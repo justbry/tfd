@@ -1,2 +1,3 @@
 date,event_type,idem,postings
+2026-01-15,mrr.changed,stripe:in_1:mrr,"mrr:recurring:family:fam_8k2 26000 MRR | mrr:movement:new -26000 MRR"
 2026-01-15,credit.granted,engine:01KF1D0X800000130YHE8YRFXX:1:granted,"credits:avail:family:fam_8k2:visit 2 VISIT | credits:issued:sparkle-2@v3 -2 VISIT"

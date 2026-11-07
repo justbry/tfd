@@ -34,9 +34,9 @@
     "yearlyCount": 0,
     "refundCount": 0
   },
-  "fixtureHash": "78f43be349c9e824bd79ba1460f8357144342690e4765ebbef00dd407c86547e",
-  "kpisHash": "fc5ba6e6be3521d52e94293da50687b51959605ed7fdf0b2e2d9fab724287f84",
-  "events": 673,
+  "fixtureHash": "1a02d70f55dd33301f28cafa1d204e5749b5d535d25c7601276b7f0eb20416b9",
+  "kpisHash": "b1dec7691c9adb10cd633ea90fc403e028cda5e294f547a6b8ebf96fc84b5f35",
+  "events": 693,
   "periods": 6,
   "summary": {
     "gross_collected": 297100,

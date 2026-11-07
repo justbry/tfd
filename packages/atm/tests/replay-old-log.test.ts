@@ -361,9 +361,10 @@ describe("a log the current writer made", () => {
 		const store = createStore({ menu, school: SCHOOL, family: FAMILY });
 		store.handle(renewal("sparkle-2", "in_1", T1, T2), T1 + 10_000);
 		expect(store.events.length).toBeGreaterThan(0);
-		// the money lines of the payment (`payment.*`) are not commands
+		// the money lines of the payment (`payment.*`) and the MRR it books are not commands
 		for (const e of store.events.filter(
-			(e) => !e.event_type.startsWith("payment."),
+			(e) =>
+				!e.event_type.startsWith("payment.") && e.event_type !== "mrr.changed",
 		))
 			expect(e.payload.complete).toBe(true);
 		const replayed = replayEvents({

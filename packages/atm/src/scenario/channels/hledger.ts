@@ -7,7 +7,7 @@
  * What hledger cannot see, and so what differs from the atm channel by construction:
  * - an event with no postings is not a transaction (`monthJournal` leaves it out), so a `count` or `distinct` over such an
  *   event type counts 0 here;
- * - the `credits` commodity sums every non-USD commodity into one number; hledger cannot add different commodities, so a
+ * - the `credits` commodity sums every commodity but USD and MRR into one number; hledger cannot add different commodities, so a
  *   cell with several is added in TypeScript (the fixtures have one credit commodity);
  * - regexes are POSIX ERE and case-insensitive in hledger (there is no way to turn that off), so the channel refuses to run
  *   when a filter would match differently with and without case (`assertCaseSafe`);
@@ -27,6 +27,15 @@ import {
 } from "../kpis.js";
 
 const USD = "USD";
+const MRR = "MRR";
+
+/** The `cur:` query of a sum's commodity: USD, MRR, or every other (the credit units). */
+const commodityQuery = (commodity: "usd" | "mrr" | "credits"): string =>
+	commodity === "usd"
+		? `cur:^${USD}$`
+		: commodity === "mrr"
+			? `cur:^${MRR}$`
+			: `not:cur:^(${USD}|${MRR})$`;
 
 type Where = BaseKpi["compute"]["where"];
 
@@ -203,7 +212,7 @@ export const hledgerChannel: KpiChannel = {
 					const places = c.commodity === "usd" ? 2 : 0;
 					const filters = [
 						...whereQueries(c.where),
-						c.commodity === "usd" ? `cur:^${USD}$` : `not:cur:^${USD}$`,
+						commodityQuery(c.commodity),
 					];
 					// the columns: the requested months; a cumulative sum starts from the first posting (--historical)
 					const columns = [
@@ -251,7 +260,7 @@ export const hledgerChannel: KpiChannel = {
 					}
 					const withoutAccount = [
 						...whereQueries({ ...c.where, account: undefined }),
-						c.commodity === "usd" ? `cur:^${USD}$` : `not:cur:^${USD}$`,
+						commodityQuery(c.commodity),
 					];
 					const groups = new Map<string, string[]>();
 					for (const account of used) {

@@ -21,6 +21,8 @@ export type OrgLabels = {
 	income: string;
 	/** The presets the org's page shows, first the default, with the switcher's label. */
 	presets: Array<{ name: string; label: string }>;
+	/** The title of `mrr`, when the org has its own word for recurring revenue. */
+	recurring?: string;
 };
 
 export const ORG_LABELS: Record<OrgKind, OrgLabels> = {
@@ -52,6 +54,7 @@ export const ORG_LABELS: Record<OrgKind, OrgLabels> = {
 		plan: { one: "giving level", other: "giving levels" },
 		credit: { one: "retreat seat", other: "retreat seats" },
 		income: "Giving",
+		recurring: "Recurring giving",
 		presets: [{ name: "church-giving", label: "A year of giving" }],
 	},
 	saas: {
@@ -84,9 +87,10 @@ const capitalized = (text: string): string =>
  * titles it.
  */
 export const orgKpiTitles = (kind: OrgKind): Record<string, string> => {
-	const { holder, credit, income } = ORG_LABELS[kind];
+	const { holder, credit, income, recurring } = ORG_LABELS[kind];
 	const credits = capitalized(credit.other);
 	return {
+		...(recurring ? { mrr: recurring } : {}),
 		paying_members: `Paying ${holder.other}`,
 		new_paying_members: `New paying ${holder.other}`,
 		arpa: `Avg per paying ${holder.one}`,

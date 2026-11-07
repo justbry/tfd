@@ -29,9 +29,9 @@
     "refundCount": 0,
     "seatChangeRate": 0.2
   },
-  "fixtureHash": "6ecb16fdd01061b20de6eeeff5a720e44145a8014f905d2bc8a7d7022c7bc335",
-  "kpisHash": "a6e338b79948fbdde0b4554e50a61008dc5e9063f11e9f4d222280ca203068d6",
-  "events": 1314,
+  "fixtureHash": "b10b6da76b4fe90c5f027a4d86e2c5cc5b348fa6c444ba523f7c7373c886f49d",
+  "kpisHash": "5f1c286245fb8611f29243eb959417e33e23c9a57fef9c6087aaea0a92bf96ad",
+  "events": 1395,
   "periods": 9,
   "summary": {
     "gross_collected": 1777163,

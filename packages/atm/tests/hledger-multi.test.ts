@@ -127,7 +127,11 @@ const isAccountRow = (label: string | undefined): label is string =>
 	typeof label === "string" && label.includes(":") && !label.endsWith(":");
 
 const commodityOfAccount = (account: string): string =>
-	account.startsWith("credits:") ? "VISIT" : "USD";
+	account.startsWith("credits:")
+		? "VISIT"
+		: account.startsWith("mrr:")
+			? "MRR"
+			: "USD";
 
 // ---- the assertions: each returns what is wrong -------------------------------------------------------------------
 

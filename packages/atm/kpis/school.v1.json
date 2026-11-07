@@ -386,6 +386,115 @@
 				},
 				"cumulative": true
 			}
+		},
+		{
+			"id": "mrr",
+			"title": "Monthly recurring revenue",
+			"unit": "cents",
+			"precision": 0,
+			"definition": "What the subscriptions running at the end of the month bill a month: each recurring price's amount less its discount, over the months of its interval (a yearly price is a twelfth), rounded half up per item, in cents. One-time lines add nothing, a free (100%-discounted) subscription adds 0, a change counts from the moment Stripe makes it and a cancelled subscription leaves at its end. USD only: a subscription in another currency is never booked (its invoices leave money.skipped markers).",
+			"compute": {
+				"op": "sum",
+				"commodity": "mrr",
+				"sign": 1,
+				"where": {
+					"eventType": ["mrr.changed"],
+					"account": "^mrr:recurring:"
+				},
+				"cumulative": true
+			}
+		},
+		{
+			"id": "new_mrr",
+			"title": "New MRR",
+			"unit": "cents",
+			"precision": 0,
+			"definition": "MRR added in the month by subscriptions that started (or started paying, after a free spell).",
+			"compute": {
+				"op": "sum",
+				"commodity": "mrr",
+				"sign": -1,
+				"where": {
+					"eventType": ["mrr.changed"],
+					"account": "^mrr:movement:new$"
+				}
+			}
+		},
+		{
+			"id": "expansion_mrr",
+			"title": "Expansion MRR",
+			"unit": "cents",
+			"precision": 0,
+			"definition": "MRR added in the month by running subscriptions that went up: more seats, a higher tier, a recurring add-on.",
+			"compute": {
+				"op": "sum",
+				"commodity": "mrr",
+				"sign": -1,
+				"where": {
+					"eventType": ["mrr.changed"],
+					"account": "^mrr:movement:expansion$"
+				}
+			}
+		},
+		{
+			"id": "contraction_mrr",
+			"title": "Contraction MRR",
+			"unit": "cents",
+			"precision": 0,
+			"definition": "MRR lost in the month by running subscriptions that went down: fewer seats, a lower tier, a discount.",
+			"compute": {
+				"op": "sum",
+				"commodity": "mrr",
+				"sign": 1,
+				"where": {
+					"eventType": ["mrr.changed"],
+					"account": "^mrr:movement:contraction$"
+				}
+			}
+		},
+		{
+			"id": "churned_mrr",
+			"title": "Churned MRR",
+			"unit": "cents",
+			"precision": 0,
+			"definition": "MRR lost in the month by subscriptions that ended: what they billed a month before they ended.",
+			"compute": {
+				"op": "sum",
+				"commodity": "mrr",
+				"sign": 1,
+				"where": {
+					"eventType": ["mrr.changed"],
+					"account": "^mrr:movement:churned$"
+				}
+			}
+		},
+		{
+			"id": "net_new_mrr",
+			"title": "Net new MRR",
+			"unit": "cents",
+			"precision": 0,
+			"definition": "New plus expansion less contraction and churned MRR, in the month: how much MRR moved.",
+			"compute": {
+				"op": "combine",
+				"terms": [
+					{
+						"kpi": "new_mrr",
+						"sign": 1
+					},
+					{
+						"kpi": "expansion_mrr",
+						"sign": 1
+					},
+					{
+						"kpi": "contraction_mrr",
+						"sign": -1
+					},
+					{
+						"kpi": "churned_mrr",
+						"sign": -1
+					}
+				]
+			}
 		}
 	]
 }

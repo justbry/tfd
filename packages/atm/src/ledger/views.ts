@@ -48,7 +48,7 @@ import {
 	type FinanceViews,
 } from "./finance.js";
 import { byText } from "./order.js";
-import { MONEY_COMMODITY } from "./postings.js";
+import { isCreditCommodity } from "./postings.js";
 import {
 	eventsAsOf,
 	type MemberSummary,
@@ -112,8 +112,8 @@ type MonthAccumulator = {
 
 const addPostings = (month: MonthAccumulator, event: AtmEvent): void => {
 	for (const posting of event.postings) {
-		// money is the finance month view's (finance.ts)
-		if (posting.commodity === MONEY_COMMODITY) continue;
+		// money is the finance month view's (finance.ts); MRR is a KPI, not a credit
+		if (!isCreditCommodity(posting.commodity)) continue;
 		const units = Number(decimalToUnits(posting.amount, CREDIT_DECIMALS));
 		const slot = month.credits[posting.commodity] ?? {
 			granted: 0,

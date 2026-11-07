@@ -10,9 +10,9 @@
 		"hledger": "0839327607edfc6d9ccc2dfc4d98d5a7d5a5a0c0bdc088f3668522ac0d9b457f"
 	},
 	"H7": {
-		"atm": "3bb1cb25f9cfde85dc0995215f38791d72b9e24403c66fd2411dd0d92ac2c480",
-		"duckdb": "3bb1cb25f9cfde85dc0995215f38791d72b9e24403c66fd2411dd0d92ac2c480",
-		"hledger": "3bb1cb25f9cfde85dc0995215f38791d72b9e24403c66fd2411dd0d92ac2c480"
+		"atm": "aeab57e8d7222e8bbf940b7d40fb8dcabdd26734edceb06246d23468fbe6adf7",
+		"duckdb": "aeab57e8d7222e8bbf940b7d40fb8dcabdd26734edceb06246d23468fbe6adf7",
+		"hledger": "aeab57e8d7222e8bbf940b7d40fb8dcabdd26734edceb06246d23468fbe6adf7"
 	},
 	"H8": "78a2e22d172374932c0500f29d9e754c1f080ca431301b2ea3cc7df392ab1096",
 	"version": 1

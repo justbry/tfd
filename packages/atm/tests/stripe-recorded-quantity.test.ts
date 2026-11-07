@@ -195,6 +195,8 @@ describe("recorded quantity payloads (2025-10-29.clover)", () => {
 				interval: "month",
 				priceId: item.price.id,
 				quantity: 4,
+				unitAmount: item.price.unit_amount,
+				intervalCount: 1,
 			},
 		]);
 		expect(subscription.currentPeriodStart).toBe(CREATED_AT * SECOND);

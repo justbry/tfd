@@ -14,7 +14,7 @@ export type KpiBy = { from: string; pattern: string };
 export type KpiCompute =
 	| {
 			op: "sum";
-			commodity: "usd" | "credits";
+			commodity: "usd" | "mrr" | "credits";
 			sign: 1 | -1;
 			where: KpiWhere;
 			cumulative?: boolean;
