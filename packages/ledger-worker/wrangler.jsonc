@@ -1,8 +1,8 @@
 // The ledger Worker (contract plans/ledger-ui/S8-contract.md section 11). Nothing here is a secret.
 //
 // `LEDGER_ISS` is the family service's API_BASE for the environment and `LEDGER_JWKS_URL` its
-// /.well-known/ledger-jwks.json. The staging bucket exists (b4uni-stg-ledger); b4uni-prod-ledger does not and
-// production stays off (D2: one bucket per environment). The UI (`packages/ledger-ui`, built to `dist`) is served as static assets: a page that is not a file falls
+// /.well-known/ledger-jwks.json. Staging is the only environment (D2: one bucket per
+// environment; D13: production stays off until the owner answers E2/E11). The UI (`packages/ledger-ui`, built to `dist`) is served as static assets: a page that is not a file falls
 // back to index.html, and /v1/* and /healthz run the Worker first. Build the UI before `wrangler deploy`
 // (`bun run check:bundle` does, or uses a placeholder page when it cannot).
 {
@@ -32,24 +32,6 @@
 			"vars": {
 				"LEDGER_ISS": "https://api-staging.b4uni.com",
 				"LEDGER_JWKS_URL": "https://api-staging.b4uni.com/.well-known/ledger-jwks.json"
-			}
-		},
-		"production": {
-			"name": "ledger",
-			"routes": [{ "pattern": "ledger.b4uni.com", "custom_domain": true }],
-			"triggers": { "crons": ["*/5 * * * *"] },
-			"assets": {
-				"directory": "../ledger-ui/dist",
-				"binding": "ASSETS",
-				"not_found_handling": "single-page-application",
-				"run_worker_first": ["/v1/*", "/healthz"]
-			},
-			"r2_buckets": [
-				{ "binding": "LEDGER_BUCKET", "bucket_name": "b4uni-prod-ledger" }
-			],
-			"vars": {
-				"LEDGER_ISS": "https://api.b4uni.com",
-				"LEDGER_JWKS_URL": "https://api.b4uni.com/.well-known/ledger-jwks.json"
 			}
 		}
 	}

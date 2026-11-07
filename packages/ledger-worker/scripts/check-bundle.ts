@@ -1,5 +1,5 @@
 /**
- * `wrangler deploy --dry-run` for both environments: the bundle builds and the bindings resolve. The config serves the UI
+ * `wrangler deploy --dry-run` for the staging environment: the bundle builds and the bindings resolve. The config serves the UI
  * from `../ledger-ui/dist`, which wrangler needs to exist, so the check builds the UI first when it can (its own
  * dependencies installed) and otherwise points `--assets` at a placeholder page; it says which.
  */
@@ -46,7 +46,7 @@ if (assets === null) {
 	);
 }
 
-for (const environment of ["staging", "production"]) {
+for (const environment of ["staging"]) {
 	const ok = await run(
 		[
 			"bunx",

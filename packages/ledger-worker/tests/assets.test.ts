@@ -43,7 +43,7 @@ test("an unknown /v1 path is the Worker's JSON 404, not the asset", async () => 
 	});
 });
 
-test("wrangler.jsonc binds the same assets, Worker first, in both environments", () => {
+test("wrangler.jsonc binds the assets, Worker first, in staging", () => {
 	const config = readFileSync(
 		join(import.meta.dir, "../wrangler.jsonc"),
 		"utf8",
@@ -51,16 +51,15 @@ test("wrangler.jsonc binds the same assets, Worker first, in both environments",
 	const parsed = JSON.parse(config.replace(/^\s*\/\/.*$/gm, "")) as {
 		env: Record<string, { assets: Record<string, unknown> }>;
 	};
-	for (const environment of ["staging", "production"])
-		expect(parsed.env[environment]?.assets).toEqual({
-			directory: "../ledger-ui/dist",
-			binding: "ASSETS",
-			not_found_handling: "single-page-application",
-			run_worker_first: ["/v1/*", "/healthz"],
-		});
+	expect(parsed.env.staging?.assets).toEqual({
+		directory: "../ledger-ui/dist",
+		binding: "ASSETS",
+		not_found_handling: "single-page-application",
+		run_worker_first: ["/v1/*", "/healthz"],
+	});
 });
 
-test("the environments' buckets, issuers and cron", () => {
+test("the staging bucket, issuer and cron", () => {
 	const config = readFileSync(
 		join(import.meta.dir, "../wrangler.jsonc"),
 		"utf8",
@@ -78,13 +77,23 @@ test("the environments' buckets, issuers and cron", () => {
 	expect(parsed.env.staging?.r2_buckets).toEqual([
 		{ binding: "LEDGER_BUCKET", bucket_name: "b4uni-stg-ledger" },
 	]);
-	expect(parsed.env.production?.r2_buckets).toEqual([
-		{ binding: "LEDGER_BUCKET", bucket_name: "b4uni-prod-ledger" },
-	]);
 	expect(parsed.env.staging?.vars.LEDGER_ISS).toBe(
 		"https://api-staging.b4uni.com",
 	);
-	expect(parsed.env.production?.vars.LEDGER_ISS).toBe("https://api.b4uni.com");
-	for (const environment of ["staging", "production"])
-		expect(parsed.env[environment]?.triggers.crons).toEqual(["*/5 * * * *"]);
+	expect(parsed.env.staging?.triggers.crons).toEqual(["*/5 * * * *"]);
+});
+
+// Contract D13: production stays off until the owner answers E2/E11. Remove this only with that decision.
+test("wrangler.jsonc has no production environment and binds no production resource", () => {
+	const config = readFileSync(
+		join(import.meta.dir, "../wrangler.jsonc"),
+		"utf8",
+	);
+	const parsed = JSON.parse(config.replace(/^\s*\/\/.*$/gm, "")) as {
+		env: Record<string, unknown>;
+	};
+	expect(Object.keys(parsed.env)).toEqual(["staging"]);
+	expect(config).not.toMatch(/b4uni-prod-/);
+	expect(config).not.toMatch(/"production"/);
+	expect(config).not.toMatch(/"pattern":\s*"ledger\.b4uni\.com"/);
 });
