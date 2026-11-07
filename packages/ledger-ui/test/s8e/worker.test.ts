@@ -342,7 +342,7 @@ describe("the fetch WorkerSource over section 11", () => {
 		expect(http.calls).toEqual([]);
 	});
 
-	test("schools: lag and stale from GET /v1/schools, facts from ledger/school; still not available for the badges", async () => {
+	test("schools: lag and stale from GET /v1/schools, facts from ledger/school; the badges are null, never 0", async () => {
 		const { reader, http } = adapters({ worker: "fetch" });
 		http.always("GET", /ledger\/school$/, {
 			status: 200,
@@ -361,10 +361,38 @@ describe("the fetch WorkerSource over section 11", () => {
 				],
 			}),
 		});
+		expect(await reader.schools()).toEqual([
+			{
+				id: schoolId,
+				name: "Vibes of Light",
+				timeZone: "America/Denver",
+				currency: "usd",
+				role: "owner",
+				creditUnit: { one: "session", other: "sessions" },
+				stale: false,
+				lagMinutes: 3,
+				attentionCount: null,
+				tabBadges: null,
+			},
+		]);
+	});
+
+	test("schools: a null lag or school fact is not available, never a made-up value", async () => {
+		const { reader, http } = adapters({ worker: "fetch" });
+		http.always("GET", /ledger\/school$/, {
+			status: 200,
+			body: { ...schoolFactsAnswer, timeZone: null },
+		});
+		http.on("GET", workerPath("/schools"), {
+			status: 200,
+			body: envelope({
+				schools: [{ id: schoolId, asOf: null, lagMinutes: null, stale: true }],
+			}),
+		});
 		const error = await rejection(reader.schools());
 		expect(error.kind).toBe("not_available");
-		expect(error.message).toContain("attentionCount");
-		expect(error.message).not.toContain("lagMinutes");
+		expect(error.message).toContain(`${schoolId}.timeZone`);
+		expect(error.message).toContain(`${schoolId}.lagMinutes`);
 	});
 
 	test("disclosure without its views and copy is not available; never an invented view", async () => {

@@ -451,6 +451,11 @@ export const formatDay = (seconds: number, timeZone: string): string =>
 		day: "numeric",
 		timeZone,
 	}).format(new Date(seconds * 1000));
+/** A membership's period end as `formatDay` shows it, or "—" for one with no period yet: never a date made up. */
+export const formatPeriodEnd = (
+	seconds: number | null,
+	timeZone: string,
+): string => (seconds === null ? "—" : formatDay(seconds, timeZone));
 /** `Nov 4 17:00` for `YYYY-MM-DDTHH:MM`. */
 export const formatWallTime = (wallTime: string): string =>
 	`${monthAndDay(wallTime.slice(0, 10))} ${wallTime.slice(11)}`;

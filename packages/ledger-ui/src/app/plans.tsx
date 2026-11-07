@@ -284,10 +284,9 @@ export function Plans({
 	const open = (kind: PlanKind, id: string | null): void =>
 		setEditing({ kind, id });
 
-	/** Publishes once the last save has settled. The family PIN is typed in the review and handed over here and goes no
-	 * further: the Writer contract has no PIN parameter (buzz-school checks it on the session). S8 hand-off: open the
-	 * session with `_pin` before the `publishMenu` call below. */
-	const publish = async (_pin: string): Promise<void> => {
+	/** Publishes once the last save has settled, with the family PIN typed in the review: the Writer opens the PIN
+	 * with it (buzz-school checks it on the session) and keeps it nowhere. */
+	const publish = async (pin: string): Promise<void> => {
 		setPublishing(true);
 		if (!(await session.lastSave)) {
 			setPublishing(false);
@@ -295,7 +294,7 @@ export function Plans({
 			return;
 		}
 		try {
-			await writer.publishMenu(school.id);
+			await writer.publishMenu(school.id, pin);
 		} catch {
 			setPublishing(false);
 			onToast(publishFailedToast);

@@ -46,15 +46,17 @@ const counted = (count: number, noun: string): string =>
 	`${count} ${noun}${count === 1 ? "" : "s"}`;
 
 /** A tab's badge from the school's counts and whether its Plans draft has changes (mockup `#plbadge`, `#bkbadge`, `#pbadge`), or null when it has none.
- * `meaning` is what a screen reader hears for the badge. */
+ * `meaning` is what a screen reader hears for the badge. A school with no counts (`tabBadges` null) shows no count
+ * badge, never 0. */
 function tabBadge(
 	tab: SchoolTab,
 	{ tabBadges }: School,
 	plansDraft: boolean,
 ): { text: string; meaning: string; tone: "b-warn" | "b-bad" } | null {
-	const { bookingsOverdue, promosExpiring } = tabBadges;
 	if (tab === "plans" && plansDraft)
 		return { text: "draft", meaning: "draft", tone: "b-warn" };
+	if (!tabBadges) return null;
+	const { bookingsOverdue, promosExpiring } = tabBadges;
 	if (tab === "bookings" && bookingsOverdue > 0)
 		return {
 			text: String(bookingsOverdue),
@@ -353,7 +355,7 @@ export function Shell({
 							/* A session exists only once the panes have loaded, which is what can tell its draft from the live menu. */
 							planSession && panes
 								? panes.plansDraftChanged(planSession)
-								: school.tabBadges.plansDraft,
+								: (school.tabBadges?.plansDraft ?? false),
 						);
 						return (
 							<button

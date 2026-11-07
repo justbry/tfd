@@ -80,8 +80,8 @@ export type Member = {
 	quantity: number;
 	interval: "month" | "year";
 	status: MembershipStatus;
-	/** Unix seconds. */
-	currentPeriodEnd: number;
+	/** Unix seconds; null for a membership with no period yet (shown as "—", never a date made up). */
+	currentPeriodEnd: number | null;
 	cancelAtPeriodEnd: boolean;
 	menuVersion: number;
 	balances: MemberBalance[];
@@ -201,7 +201,8 @@ export type Capabilities = {
 export type FinanceGrant = {
 	subject: string;
 	grant: "finance";
-	grantedBy: string;
+	/** Null when the route does not say who granted. */
+	grantedBy: string | null;
 	/** Unix seconds. */
 	grantedAt: number;
 	revokedAt: number | null;
@@ -371,7 +372,9 @@ export type RefundRequest = {
 };
 export type RefundResult = {
 	refundId: string;
-	status: "pending" | "succeeded" | "failed";
+	/** Stripe's refund status: `requires_action` waits on the customer's bank, `canceled` was stopped before it
+	 * paid out. */
+	status: "pending" | "succeeded" | "failed" | "requires_action" | "canceled";
 	refundedCents: number;
 	remainingCents: number;
 };

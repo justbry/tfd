@@ -689,10 +689,12 @@ export interface LedgerReader {
 	audienceReport(query: AudienceReportQuery): Promise<AudienceReport>;
 	donors(query: DonorsQuery): Promise<DonorsReport>;
 	promos(query: PromosQuery): Promise<PromoList>;
-	/** The school's rules in force (every audience sees them, v2 "School policy: every audience sees it."). */
+	/** The school's rules in force (every audience sees them, v2 "School policy: every audience sees it."). Either is
+	 * null where no source has it (D11): no cutoff claim, no offer that rests on the rules, and the school's own
+	 * `creditUnit` for a null unit. */
 	schoolRules(
 		school: string,
-	): Promise<{ rules: SchoolRules; unit: CreditUnit }>;
+	): Promise<{ rules: SchoolRules | null; unit: CreditUnit | null }>;
 }
 
 export interface LedgerWriter {

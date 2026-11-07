@@ -202,9 +202,10 @@ export interface PlansReader {
 export interface PlansWriter {
 	/** `POST /school-admin/schools/<id>/billing/menu`: the whole draft. */
 	saveMenu(schoolId: string, menu: Menu): Promise<void>;
-	/** `POST /school-admin/schools/<id>/billing/menu/publish`: publishes the saved draft. The family PIN the review asks
-	 * for only enables the button here; buzz-school checks the PIN on the session, so S8 opens it before this call. */
-	publishMenu(schoolId: string): Promise<void>;
+	/** `POST /school-admin/schools/<id>/billing/menu/publish`: publishes the saved draft. `pin` is the family PIN the
+	 * review asks for: buzz-school checks the PIN on the session, so the HTTP Writer opens it with this PIN
+	 * (`POST /family/pin/verify`) before it publishes. Never stored or recorded. */
+	publishMenu(schoolId: string, pin: string): Promise<void>;
 }
 
 /** Tiers and packs: buzz-school's menu limits (`src/school-billing/menu.ts`), drawn as "3 of 4" and "2 of 6". Grants

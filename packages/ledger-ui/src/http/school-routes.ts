@@ -497,15 +497,13 @@ const balanceOf = (
 	return result;
 };
 
-/** One membership. The route does not send the membership id (`school_memberships.id`), and sends
- * `currentPeriodEnd: null` for a membership with no period yet; the contract has neither, so both are mismatches. */
+/** One membership. The route does not send the membership id (`school_memberships.id`), which the contract needs, so
+ * a row without it is a mismatch; `currentPeriodEnd` is null for a membership with no period yet. */
 export function memberOf(row: WireRecord, index: number): Member {
 	const route = "GET .../billing/members-list";
 	const path = `members[${index}]`;
 	if (!("membershipId" in row))
 		throw schemaMismatch(route, `${path}.membershipId is missing`);
-	if (row.currentPeriodEnd === null)
-		throw schemaMismatch(route, `${path}.currentPeriodEnd is null`);
 	const key = stringOf(route, row.key, `${path}.key`);
 	if (!key.startsWith("family:"))
 		throw schemaMismatch(route, `${path}.key is not family:<id>`);
@@ -519,7 +517,7 @@ export function memberOf(row: WireRecord, index: number): Member {
 		quantity: numberOf(route, row.quantity, `${path}.quantity`),
 		interval: oneOf(route, row.interval, `${path}.interval`, intervals),
 		status: oneOf(route, row.status, `${path}.status`, membershipStatuses),
-		currentPeriodEnd: numberOf(
+		currentPeriodEnd: nullableNumberOf(
 			route,
 			row.currentPeriodEnd,
 			`${path}.currentPeriodEnd`,
@@ -634,20 +632,22 @@ export function capabilitiesOf(answer: unknown): Capabilities {
 // ---- GET .../finance-grants (routes/ledger.ts)
 
 /** The owner's list. The route lists live grants only (`revokedAt` is then null) as `{ pubkey, grant, grantedAt }`;
- * it does not say who granted, so a row without `grantedBy` is a mismatch. */
+ * it does not say who granted, so `grantedBy` is null unless the row sends it. */
 export function financeGrantsOf(answer: unknown): FinanceGrant[] {
 	const route = "GET .../finance-grants";
 	const body = recordOf(route, answer, "answer");
 	return arrayOf(route, body.grants, "grants").map((value, index) => {
 		const grant = recordOf(route, value, `grants[${index}]`);
-		if (!("grantedBy" in grant))
-			throw schemaMismatch(route, `grants[${index}].grantedBy is missing`);
 		return {
 			subject: stringOf(route, grant.pubkey, `grants[${index}].pubkey`),
 			grant: oneOf(route, grant.grant, `grants[${index}].grant`, [
 				"finance",
 			] as const),
-			grantedBy: stringOf(route, grant.grantedBy, `grants[${index}].grantedBy`),
+			grantedBy: nullableStringOf(
+				route,
+				grant.grantedBy ?? null,
+				`grants[${index}].grantedBy`,
+			),
 			grantedAt: numberOf(route, grant.grantedAt, `grants[${index}].grantedAt`),
 			revokedAt: null,
 		};

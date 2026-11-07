@@ -125,6 +125,7 @@ export function createFixtureWriter(options: {
 		cancelBooking,
 		remindHost: (request) => record("remindHost", [request], nothing),
 		saveMenu: (schoolId, menu) => record("saveMenu", [schoolId, menu], nothing),
+		/* The PIN is never recorded: a write's record holds no secret. */
 		publishMenu: (schoolId) => record("publishMenu", [schoolId], nothing),
 		refund: (request) =>
 			record("refund", [request], () => ({
