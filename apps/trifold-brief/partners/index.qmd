@@ -1,0 +1,196 @@
+---
+pagetitle: "Trifold brief · Partners"
+brief-audience: "Partners: networks, co-ops, affiliates, vertical software"
+brief-length: "16 slides, about 15 minutes"
+---
+
+{{< include ../_partials/_title.qmd >}}
+
+{{< include ../_partials/_how.qmd >}}
+
+{{< include ../_partials/_receipts.qmd >}}
+
+## Who brings schools to Trifold {#channels}
+
+<span class="kicker">Channels · proposed</span>
+
+| Channel | Who | What they get |
+|---------|-------------------|----------------------|
+| Receipts | Every family that pays a Trifold school | Nothing: each receipt will carry a "Verify at trifold…" link |
+| Schools referring schools | Paying schools | Account credit |
+| Community affiliates | Microschool consultants, co-ops and networks, homeschool and ed-tech creators, Stripe developers | Cash commission, for 24 months |
+| Accountants and bookkeepers | CPAs, enrolled agents, bookkeepers, tax preparers | No cash: client discounts, free seats, the firm program |
+| Vertical software | Jackrabbit-, Pike13- and Mindbody-style tools | A revenue-share contract under Platform and the Witness API |
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Programs, rates and rewards are drafts to test; none of the programs is built yet.</p>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §1 (the channel table, verbatim apart from tense) and header ("Every price and rate here is an assumption... Nothing in this doc is built"). Growth loop 1: `docs/business/business-plan.md` §7. No school issues receipts yet (business-plan §3).
+:::
+
+## Affiliate tiers: 25, 30 and 35 percent, for 24 months {#affiliate-tiers}
+
+<span class="kicker">Community affiliates · cash</span>
+
+| Tier | Active schools you referred | Commission | Extras |
+|-------|----------|---------------|------------------|
+| Affiliate | 0–4 | 25% of subscription revenue × 24 months | Link, referral code, dashboard |
+| Partner | 5–19 | 30% × 24 months | Demo account, co-marketing kit, directory listing |
+| Ambassador | 20+ | 35% × 24 months | Early access, featured on the site, a quarterly call |
+
+<p class="lede">The tier is recalculated monthly from paying schools you referred yourself that are still active. The school you refer gets 20% off its first 3 months.</p>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> The rates and thresholds are assumptions to test. The 24-month length is decided.</p>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §3.1 (tiers, rates, thresholds and extras verbatim; recalculated monthly from personally referred, still-active paying schools; churn lowers it; the referred school gets 20% off its first 3 months), §3 ("Cash is limited to 24 months", owner's decision 2026-11-07, was 12 in the first draft) and §6 item 1 (rates and thresholds open, after design-partner tests).
+:::
+
+## Why 24 months, not for life {#why-24-months}
+
+<span class="kicker">Bounded cost</span>
+
+<div class="cards">
+<div class="card"><span class="big">≈ $640</span>The most one school can earn an affiliate: 35% × 24 months ≈ 8.4 months of a school's revenue at about $76 a month</div>
+<div class="card card--green"><span class="big">≈ 23%</span>Of a school's revenue, if it stays 3 years. No lifetime liability</div>
+<div class="card card--ink"><span class="big">24</span>months, matching the FSL's two years: one number for how long Trifold's protections last</div>
+</div>
+
+<p class="fine">For comparison: GoHighLevel pays 40% for as long as the customer pays, about $30 a month per school forever at a ~$76 average. Xero and QuickBooks pay much less, and pay CPAs through discounts, not cash.</p>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Revenue per school is the plan's illustrative ~$76 average.</p>
+
+::: {.notes}
+Sources: `docs/business/go-to-market.md` §3.1 ("The cost is bounded at 35% × 24 ≈ 8.4 months of a school's revenue (about $640 at $76/mo)... If a school stays 3 years, that is about 23% of its revenue") and §3 (GoHighLevel 40% for life, 5% second tier, 90-day cookie; Xero ~10% for 6 months or $160 flat in listings; QuickBooks up to 10%, 30-day cookie; neither pays CPAs cash; "40% for life is about $30 a month per school forever"). GoHighLevel figures come from third-party guides (go-to-market "Sources"); confirm against HighLevel's own terms.
+
+Arithmetic: 0.35 × 24 = 8.4; 8.4 × $76 = $638. Over 36 months: 8.4 / 36 = 23%. The plan's exact average is $76.50 (business-plan §8); go-to-market rounds to $76.
+:::
+
+## Networks and schools, without a downline {#networks}
+
+<span class="kicker">Recruiting without a second tier</span>
+
+<div class="cards">
+<div class="card"><strong>Organization affiliates</strong>A co-op, microschool network or consulting firm joins as one affiliate. Each staff member or member school gets a sub-link; all their sales count toward the organization's tier and payout, which it splits however it likes. Trifold pays one party per sale.</div>
+<div class="card card--green"><strong>Schools refer schools</strong>Give a month, get a month, as account credit, never cash, up to 12 months. Every school has a code, and no sign-up is needed.</div>
+<div class="card card--ink"><strong>Only your own referrals count</strong>Recruiting affiliates never raises your rate or tier. An optional, capped one-time bonus ($50 when a recruit's first school has paid 3 months, at most 10 a year) is undecided.</div>
+</div>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §3.4 items 1–3 (organization affiliates instead of downlines; tiers count only your own referrals; the optional one-time $50 recruit bonus, capped at 10 a year, "Leave it out if even this looks wrong") and §6 item 2 (whether to offer it is open); §3.2 (schools referring schools: give a month, get a month, account credit, never cash, capped at 12 months; every school already has a code); §3.5 ("The organization sub-link is a dimension on `share.accrued`").
+:::
+
+## Published anti-MLM rules {#anti-mlm}
+
+<span class="kicker">Trust first</span>
+
+<ul class="ticks">
+<li>Free to join. No purchase required, no paid ranks.</li>
+<li>Commission only on subscriptions customers actually paid for, never on affiliate sign-ups or fees.</li>
+<li>No income claims. Affiliates disclose their commission, as the FTC's endorsement guides require.</li>
+<li>The 24-month cap means nobody earns forever from other people's work.</li>
+<li>Banned: bidding on "Trifold" in search ads, coupon sites, self-referral, income claims, and claims Trifold doesn't make ("we file your taxes").</li>
+</ul>
+
+<p class="fine">Why: the FTC's guidance on multi-level marketing treats pay driven by recruitment rather than sales to real customers as the warning sign, and a trust brand can't carry that look.</p>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §3.4 item 4 (the published anti-MLM rules, verbatim), §3.4 opening paragraph (FTC MLM guidance), §3.5 ("Banned" row; that row also bans breaking the claim rules) and "Sources" (FTC business guidance concerning multi-level marketing). A lawyer reviews the affiliate terms, disclosures and FTC wording before launch (§4).
+:::
+
+## How referrals are counted and paid {#mechanics}
+
+<span class="kicker">Mechanics · proposed</span>
+
+| Term | Rule |
+|-----|--------------------|
+| What counts | Subscriptions and compliance packs. Credits and metered API use are excluded |
+| Attribution | 90-day cookie, last click wins, plus a referral code at checkout |
+| Payout | Monthly, after the 30-day refund window; $50 minimum; Stripe Connect; 1099-NEC above the IRS threshold |
+| Downgrade or refund | Commission follows what was actually paid |
+| Review | Manual approval of an affiliate's first 3 customers |
+
+<p class="fine">Run on tfd: revenue share is already ledger events (<code>share.accrued</code>, <code>share.reversed</code>, <code>share.charged</code>, <code>share.settled</code>), and <code>tfd share</code> prints each referrer's monthly statement. Payouts would reconcile against Stripe Connect.</p>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §3.5 (the mechanics table, verbatim apart from the "Banned" row, which is on the previous slide; "Run on tfd": the share events and `tfd share`). `tfd share` exists (released in 0.9.0, `packages/atm/ROADMAP.md` "0.9.0 design"); the affiliate program itself is not built.
+:::
+
+## Vertical software and the Witness API {#platforms}
+
+<span class="kicker">Platforms</span>
+
+<div class="cards">
+<div class="card"><strong>Partner, don't compete</strong>Scheduling and enrollment tools (Jackrabbit-, Pike13- and Mindbody-style) run operations; Trifold keeps the books. Embed Trifold under a revenue-share contract.</div>
+<div class="card card--green"><strong>Adopt the open format</strong>Issue receipts in the Apache-2.0 format and they check in the same free verifier. Say "implements the Trifold receipt format v1" once you pass the published test vectors.</div>
+<div class="card card--ink"><strong>The Witness API <span class="tag tag--later">Later</span></strong>Trifold's countersignature alone, for self-hosters and platforms: the first 500 receipts a month free, then $0.03–0.05 each. It ships once the witness does.</div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Witness API pricing and platform terms are drafts. Platform and Enterprise: rollups across schools, network revenue share, SSO and SAML, an SLA and embedding rights, metered or custom.</p>
+
+::: {.notes}
+Sources: `docs/business/market-research.md` §1 (vertical software: "Partner and embed (Witness API). They run operations; Trifold keeps the books") and §3 point 5; `docs/business/business-plan.md` §4 (vertical software can embed Trifold through the Witness API) and §7 (growth loop 2: others adopt the standard; Witness API in phase 2); `docs/business/pricing-strategy.md` §4 (Witness API: first 500 receipts a month free, then $0.03–0.05 each; Platform / Enterprise row); `docs/business/go-to-market.md` §1 (revenue-share contract); `TRADEMARKS.md` ("implements the Trifold receipt format v1" only if the implementation passes the published test vectors, `packages/atm/tests/golden/receipt/`). The witness is not built (business-plan §3).
+:::
+
+## Implementers and integrators {#implementers}
+
+<span class="kicker">Proposal · not yet in the business docs</span>
+
+| Tier | Earned by | What it unlocks |
+|--------|--------------------|----------------------|
+| Registered | Signing the partner terms | Listing, deal registration, the partner docs |
+| Certified | Sourced and serviced clients, plus certified staff | Leads routed from Trifold, the certified badge |
+| Premier | More sourced and serviced clients and certified staff | Priority leads, featured listing |
+
+<div class="cards cards--2">
+<div class="card"><strong>Certification</strong>An exam built on tfd's scenario fixtures and the receipt test vectors: can you set up a school's books, and can you show a receipt checks?</div>
+<div class="card card--green"><strong>What they earn</strong>20% × 24 months on hosted clients they source. 10% × 24 months on Witness API use by self-hosted clients they bring.</div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Proposal</span> Not in the business docs or decided. Tier thresholds are not set; every rate is an assumption.</p>
+
+::: {.notes}
+PROPOSAL, added at the owner's request on 2026-11-07 (coordinator's brief for this deck); not yet in `docs/business/go-to-market.md` or any other doc, so there is no doc section to cite. Thresholds for Registered / Certified / Premier are deliberately left unset.
+
+Consistent with the docs: the 24-month cash limit (go-to-market §3, owner's decision); test vectors (`packages/atm/tests/golden/receipt/`, CC0-1.0, AGENTS.md); scenario fixtures (`packages/atm/fixtures/`, used by `tfd scenario`, `docs/business/financial-model.md` §2); Witness API (pricing-strategy §4), not built.
+:::
+
+## Implementers: marketplace, bounties and limits {#implementers-limits}
+
+<span class="kicker">Proposal · not yet in the business docs</span>
+
+<div class="cards">
+<div class="card"><strong>Marketplace</strong>Books templates, dashboard specs and Stripe mappings that partners publish for others to use.</div>
+<div class="card card--green"><strong>Integration bounties</strong>Paid bounties for integrations, contributed under the CLA. 90-day deal registration protects a partner's lead.</div>
+<div class="card card--clay"><strong>Limits</strong>No hosting one tfd for many clients. No white label. The school owns its data and can leave with its ledger.</div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Proposal</span> To be written up in the go-to-market doc and decided by the owner. Outside contributions wait until the CLA text is published and reviewed.</p>
+
+::: {.notes}
+PROPOSAL, as above: no doc section yet.
+
+Consistent with the docs: one tfd for many clients is probably a Competing Use under the FSL (`docs/business/pricing-strategy.md` §4c; `docs/business/go-to-market.md` §2); the CLA is decided but its text isn't published, and no outside contributions are accepted until it is (AGENTS.md "Open licensing items" 3; `CONTRIBUTING.md`); export never paywalled (pricing-strategy §2); books templates and dashboard specs are the firm program's "Books template" idea (go-to-market §2). Dashboard specs and KPI specs are FSL today, not part of the open standard (AGENTS.md open item 4).
+:::
+
+{{< include ../_partials/_built-next.qmd >}}
+
+## How to apply {#apply}
+
+<span class="kicker">Next step</span>
+
+<div class="cards">
+<div class="card"><strong>Networks and co-ops</strong>Join as one organization affiliate, with sub-links for your staff or member schools.</div>
+<div class="card card--green"><strong>Creators and consultants</strong>Apply as an affiliate. Your first 3 customers are reviewed by hand.</div>
+<div class="card card--ink"><strong>Vertical software</strong>Talk to us about embedding Trifold and adopting the receipt format.</div>
+</div>
+
+<div class="placeholder"><strong>Owner to fill in</strong>Where to apply: contact, form or calendar link. The program launches after a lawyer reviews its terms.</div>
+
+::: {.notes}
+Sources: `docs/business/go-to-market.md` §3.4 item 1 (organization affiliates), §3.5 (manual approval of the first 3 customers), §4 (a lawyer reviews the affiliate terms, disclosures and FTC wording before launch), §6 item 5 (which program ships first is open). Placeholder: no application channel exists in the docs.
+:::
+
+{{< include ../_partials/_team.qmd >}}
+
+{{< include ../_partials/_paths.qmd >}}

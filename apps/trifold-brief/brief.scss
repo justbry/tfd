@@ -1,0 +1,263 @@
+/*-- scss:defaults --*/
+// Brand kit colours (docs/brand/trifold-brand-and-messaging.md, "Colour"). Text pairs are checked for WCAG AA:
+// ink on paper 12.7:1; muted 5.6:1; green text uses a darker ledger green (6.4:1) because #2F7D5B is 4.4:1 on
+// paper; saffron is never text on paper, only marks, rules and text on ink (6.6:1).
+$ink: #1e2a44;
+$paper: #f6f1e7;
+$card: #fffdf8;
+$green: #2f7d5b;
+$green-text: #246249;
+$saffron: #e8a33d;
+$clay: #b5533c;
+$clay-text: #9a4532;
+$muted: #55607a;
+$line: #dcd3c1;
+
+$body-bg: $paper;
+$body-color: $ink;
+$presentation-heading-color: $ink;
+$link-color: $green-text;
+$presentation-font-size-root: 32px;
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+$presentation-heading-font: "Fraunces", "Iowan Old Style", Georgia, serif;
+$font-family-monospace: "JetBrains Mono", ui-monospace, Menlo, monospace;
+$code-color: $ink;
+$code-bg: #efe8d9;
+
+/*-- scss:rules --*/
+.reveal-viewport,
+.reveal,
+.reveal .slide-background,
+.reveal .slide-background-content { background: $paper !important; }
+.reveal { color: $ink; }
+.reveal h1, .reveal h2, .reveal h3 {
+  font-family: "Fraunces", "Iowan Old Style", Georgia, serif;
+  font-weight: 560;
+  color: $ink !important;
+  letter-spacing: -0.005em;
+  text-transform: none;
+}
+.reveal h2 { font-size: 1.4em; line-height: 1.15; margin-bottom: 0.4em; }
+.reveal h3 { font-size: 0.8em; margin: 0 0 0.3em; }
+.reveal p, .reveal li { line-height: 1.38; }
+.reveal .slides section { text-align: left; }
+// Room for the fixed path navigation (nav.html) above every slide's heading.
+.reveal .slides > section, .reveal .slides > section > section { padding-top: 46px; }
+.reveal a { color: $green-text; text-decoration: underline; text-underline-offset: 0.15em; }
+.reveal a:focus-visible, .brief-nav a:focus-visible, .brief-nav summary:focus-visible {
+  outline: 3px solid $saffron;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.reveal .progress { color: $saffron; }
+.reveal .progress span { background: $saffron; }
+.reveal .footer {
+  font-size: 0.4em;
+  color: $muted;
+  bottom: 14px;
+  left: 60px;
+  right: 80px;
+  text-align: center;
+}
+.reveal .slide-number {
+  right: 14px;
+  bottom: 12px;
+  background: transparent;
+  color: $ink;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 15px;
+}
+.reveal .slide-menu-button { left: 10px; bottom: 10px; }
+.reveal .slide-menu-button .fas, .reveal .slide-menu-button a { color: $ink; }
+.reveal code, .num { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.reveal code { font-size: 0.9em; background: #efe8d9 !important; padding: 0.05em 0.3em; border-radius: 4px; color: $ink !important; white-space: nowrap; }
+
+.kicker {
+  display: block;
+  color: $green-text;
+  font-size: 0.42em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 650;
+  margin-bottom: 0.5em;
+}
+.lede { font-size: 0.78em; color: $ink; max-width: 34em; }
+.reveal .fine { font-size: 0.46em; color: $muted; margin-top: 0.7em; max-width: 52em; }
+
+/* status and assumption tags */
+.tag {
+  display: inline-block;
+  font-size: 0.62em;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.12em 0.55em;
+  border-radius: 99px;
+  vertical-align: 0.15em;
+  white-space: nowrap;
+}
+.tag--built { background: $green; color: #ffffff; }
+.tag--next { background: $ink; color: $paper; }
+.tag--later { background: transparent; color: $ink; border: 1.5px solid $ink; }
+.tag--assume { background: #fbe8c6; color: $ink; border: 1.5px dashed #b07a22; }
+.assume-note { font-size: 0.44em; color: $muted; margin-top: 0.4em; }
+.assume-note .tag { font-size: 0.85em; margin-right: 0.4em; }
+
+/* cards */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6em; margin-top: 0.6em; }
+.cards--2 { grid-template-columns: repeat(2, 1fr); }
+.cards--4 { grid-template-columns: repeat(4, 1fr); }
+.card {
+  background: $card;
+  border: 1px solid $line;
+  border-top: 4px solid $saffron;
+  border-radius: 12px;
+  padding: 0.6em 0.75em 0.55em;
+  font-size: 0.56em;
+  line-height: 1.38;
+}
+.card--green { border-top-color: $green; }
+.card--ink { border-top-color: $ink; }
+.card--clay { border-top-color: $clay; }
+.card--quiet { border-top-color: $line; }
+.card strong { display: block; font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 1.32em; margin-bottom: 0.25em; color: $ink; }
+.card p { margin: 0.2em 0 0; }
+.card ul { margin: 0.2em 0 0 1.1em; padding: 0; }
+.card li { margin: 0.12em 0; }
+.card .big { display: block; font-family: "JetBrains Mono", monospace; font-variant-numeric: tabular-nums; font-size: 1.7em; font-weight: 600; color: $ink; }
+
+/* the three folds: one row of panels, the brand's three-column motif */
+.folds { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 0.35em; align-items: stretch; margin-top: 0.6em; }
+.folds .card { border-top-width: 4px; }
+.folds .arrow { align-self: center; font-size: 0.9em; color: $muted; }
+
+/* tables */
+.reveal table { font-size: 0.5em; border-collapse: collapse; margin: 0.4em 0 0; width: 100%; }
+.reveal table th { font-weight: 650; text-align: left; border-bottom: 2px solid $ink; padding: 0.35em 0.6em; background: transparent; }
+.reveal table td { border-bottom: 1px solid $line; padding: 0.35em 0.6em; vertical-align: top; }
+.reveal table tbody tr:nth-child(odd) { background: rgba(255, 253, 248, 0.7); }
+.reveal table td:first-child { font-weight: 600; }
+.reveal table td.num, .reveal table th.num { text-align: right; }
+
+/* plain bullet slides */
+.reveal ul.ticks { list-style: none; margin: 0.4em 0 0; padding: 0; font-size: 0.66em; }
+.reveal ul.ticks li { position: relative; padding: 0.2em 0 0.2em 1.4em; }
+.reveal ul.ticks li::before { content: ""; position: absolute; left: 0.1em; top: 0.62em; width: 0.62em; height: 0.36em; border-left: 3px solid $green; border-bottom: 3px solid $green; transform: rotate(-45deg); }
+.reveal .slides section ul:not(.ticks) li, .reveal .slides section ol li { font-size: 0.68em; }
+.reveal .slides section .card ul li { font-size: 1em; }
+
+/* the three checks motif */
+.checks { display: flex; gap: 0.5em; flex-wrap: wrap; font-family: "JetBrains Mono", monospace; font-size: 0.55em; margin-top: 0.5em; }
+.checks span { background: $card; border: 1px solid $line; border-radius: 99px; padding: 0.2em 0.75em; }
+.checks .ok::after { content: " ✓"; color: $green-text; font-weight: 700; }
+.checks .soon { color: $muted; }
+
+/* hero */
+.reveal .slides section.hero { text-align: left; }
+.reveal .hero h2 { font-size: 2.6em; margin: 0; line-height: 1; max-width: 60%; }
+.reveal .hero .hero-mark { position: absolute; right: 0; top: 50%; width: 330px; height: 330px; transform: translateY(-50%); }
+.reveal .hero .tagline { font-family: "Fraunces", Georgia, serif; font-size: 1.15em; margin: 0.2em 0 0.6em; max-width: 60%; }
+.reveal .hero .hero-lede { font-size: 0.66em; max-width: 58%; }
+.reveal .hero .meta { font-size: 0.5em; color: $muted; margin-top: 1.2em; max-width: 60%; }
+.reveal .hero .meta strong { color: $ink; }
+
+/* other paths, last slide of each deck */
+.paths { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5em; margin-top: 0.5em; }
+.paths a {
+  display: block;
+  text-decoration: none;
+  background: $card;
+  border: 1px solid $line;
+  border-left: 5px solid $saffron;
+  border-radius: 10px;
+  padding: 0.5em 0.7em;
+  font-size: 0.5em;
+  color: $ink;
+}
+.paths a strong { display: block; font-family: "Fraunces", Georgia, serif; font-size: 1.3em; color: $ink; }
+.paths a span { color: $muted; }
+.paths a:hover { border-left-color: $green; }
+
+/* placeholders the owner fills in */
+.placeholder {
+  border: 2px dashed $clay;
+  border-radius: 12px;
+  padding: 0.6em 0.8em;
+  background: #fbf3ee;
+  font-size: 0.6em;
+  margin-top: 0.5em;
+}
+.placeholder strong { color: $clay-text; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8em; display: block; margin-bottom: 0.2em; }
+
+/* risk rows */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5em 1em; margin-top: 0.4em; }
+.split p { margin: 0; padding: 0.4em 0.7em; background: $card; border-left: 4px solid $clay; border-radius: 0 10px 10px 0; font-size: 0.5em; line-height: 1.35; }
+.split p b { display: block; }
+.split p em { display: block; font-style: normal; color: $green-text; margin-top: 0.15em; }
+
+/* fixed path navigation (nav.html): on every slide, never in print */
+.brief-nav {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 14px/1.2 "Inter", system-ui, sans-serif;
+  color: $ink;
+  pointer-events: none;
+}
+.brief-nav > * { pointer-events: auto; }
+.brief-nav a, .brief-nav summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: $ink;
+  text-decoration: none;
+  background: rgba(255, 253, 248, 0.92);
+  border: 1px solid $line;
+  border-radius: 99px;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.brief-nav a:hover, .brief-nav summary:hover { border-color: $ink; }
+.brief-nav svg { width: 18px; height: 18px; flex: none; }
+.brief-nav .brief-nav__here { color: $muted; font-weight: 500; }
+.brief-nav details { position: relative; }
+.brief-nav summary { list-style: none; }
+.brief-nav summary::-webkit-details-marker { display: none; }
+.brief-nav summary::after { content: "▾"; font-size: 11px; }
+.brief-nav details ul {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  min-width: 270px;
+  background: $card;
+  border: 1px solid $line;
+  border-radius: 12px;
+  box-shadow: 0 14px 30px -18px rgba(30, 42, 68, 0.45);
+}
+.brief-nav details li a { display: block; border: 0; border-radius: 8px; background: transparent; padding: 7px 10px; font-weight: 500; }
+.brief-nav details li a:hover, .brief-nav details li a:focus-visible { background: #f1ebde; }
+.brief-nav details li a[aria-current="page"] { font-weight: 700; }
+.brief-nav details li a[aria-current="page"]::after { content: " · you are here"; color: $muted; font-weight: 500; }
+.brief-nav .brief-nav__print { margin-left: auto; }
+html.print-pdf .brief-nav, html.reveal-print .brief-nav { display: none; }
+@media print { .brief-nav { display: none; } }
+
+/* narrow screens */
+@media (max-width: 700px) {
+  .cards, .cards--4, .paths, .split, .folds { grid-template-columns: 1fr; }
+  .folds .arrow { display: none; }
+  .brief-nav { font-size: 12px; }
+  .brief-nav .brief-nav__here { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal .slides section, .reveal .slides section .fragment { transition: none !important; }
+}

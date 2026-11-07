@@ -1,0 +1,16 @@
+## Where next {#where-next}
+
+<span class="kicker">Other paths</span>
+
+<nav class="paths" aria-label="Other paths through the brief">
+<a href="/overview/"><strong>The 5-minute overview</strong><span>The core story in nine slides</span></a>
+<a href="/investors/"><strong>Investors</strong><span>Market, model, illustrative financials, moat, risks, the ask</span></a>
+<a href="/firms/"><strong>Accounting firms and bookkeepers</strong><span>Provable books, the firm program, what you earn, Idaho and Utah rules</span></a>
+<a href="/schools/"><strong>Schools</strong><span>What families get, prices, self-host or hosted, your data</span></a>
+<a href="/partners/"><strong>Partners</strong><span>Affiliate tiers, organization affiliates, anti-MLM rules, the Witness API</span></a>
+<a href="/"><strong>All paths</strong><span>Back to the picker</span></a>
+</nav>
+
+::: {.notes}
+Every path is linkable on its own: /overview/, /investors/, /firms/, /schools/, /partners/. Add ?print-pdf to any path for the print view (then print to PDF from the browser).
+:::

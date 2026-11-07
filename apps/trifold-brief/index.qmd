@@ -1,0 +1,71 @@
+---
+pagetitle: "Trifold brief · Choose your path"
+format:
+  html:
+    minimal: true
+    embed-resources: true
+    css: [_fonts.css, picker.css]
+    include-in-header:
+      text: |
+        <meta name="robots" content="noindex">
+---
+
+```{=html}
+<header class="top">
+  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+    <g stroke="#f6f1e7" stroke-width="3" stroke-linejoin="round">
+      <path d="M50 58.7 L50 10 L10 83 Z" fill="#e8a33d" />
+      <path d="M50 58.7 L10 83 L90 83 Z" fill="#1e2a44" />
+      <path d="M50 58.7 L90 83 L50 10 Z" fill="#2f7d5b" />
+    </g>
+  </svg>
+  <p class="wordmark">Trifold</p>
+</header>
+<main>
+  <h1>The Trifold brief</h1>
+  <p class="lede">Three sides of every dollar. Pick the path that fits you; each one is its own short deck, and you can switch paths from any slide.</p>
+
+  <h2 id="paths-heading">I'm an…</h2>
+  <ul class="picker" aria-labelledby="paths-heading">
+    <li>
+      <a href="/investors/">
+        <span class="who">Investor</span>
+        <span class="covers">The market and first wedge, business model and plans, illustrative financials (assumptions, not forecasts), the moat, go-to-market, risks and the ask.</span>
+        <span class="time">19 slides · about 20 minutes</span>
+      </a>
+    </li>
+    <li>
+      <a href="/firms/">
+        <span class="who">Accounting firm or bookkeeper</span>
+        <span class="covers">Provable books from your seat, the firm program (Listed, Practice, Practice Pro), what you earn from your own markup, and the Idaho and Utah rules on paying accountants.</span>
+        <span class="time">14 slides · about 15 minutes</span>
+      </a>
+    </li>
+    <li>
+      <a href="/schools/">
+        <span class="who">School</span>
+        <span class="covers">What families will get, the price ladder and what a school would pay, free self-hosting or hosted Trifold, and why your data stays yours.</span>
+        <span class="time">13 slides · about 12 minutes</span>
+      </a>
+    </li>
+    <li>
+      <a href="/partners/">
+        <span class="who">Partner: network, co-op, affiliate or vertical software</span>
+        <span class="covers">Affiliate tiers, organization affiliates instead of a downline, the anti-MLM rules, the Witness API, and a proposal for implementers.</span>
+        <span class="time">16 slides · about 15 minutes</span>
+      </a>
+    </li>
+  </ul>
+
+  <a class="overview" href="/overview/">
+    <span class="who">The 5-minute overview</span>
+    <span class="covers">The problem, how it works, signed receipts and the open verifier, prices, the first market, and what is built versus next.</span>
+    <span class="time">9 slides · about 5 minutes</span>
+  </a>
+
+  <p class="howto">In a deck: arrow keys or space to move, Esc for an overview of all slides, M for the slide menu. Each deck has a "Print or save as PDF" link.</p>
+</main>
+<footer>
+  <p>Confidential draft · not legal, tax or investment advice. Every price, rate and projection is an assumption to test, not a decision or a forecast. Draft of 7 November 2026.</p>
+</footer>
+```

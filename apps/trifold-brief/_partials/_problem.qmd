@@ -1,0 +1,17 @@
+## Books anyone can quietly change, and receipts that prove nothing {#problem}
+
+<span class="kicker">The problem</span>
+
+<div class="cards">
+<div class="card card--clay"><strong>Closing is manual</strong>Small membership and booking businesses run on Stripe, spreadsheets and a bookkeeper. Closing a month is slow, hand-made work.</div>
+<div class="card card--clay"><strong>Edits leave no trace</strong>The books can be changed quietly, and nobody outside the business can tell.</div>
+<div class="card card--clay"><strong>An email is not proof</strong>A family gets a Stripe email, not a receipt that proves anything to a state program, an auditor or a court.</div>
+</div>
+
+<p class="fine">And the software is getting dearer. In 2026 QuickBooks Online Essentials went from $75 to $85 a month for renewals (from 1 August), Xero US from $25 / $55 / $90 to $27 / $59 / $97 (from 1 October), and FreshBooks raised its prices on 27 January. QuickBooks caps users at every tier. List prices from third-party sources; recheck before quoting.</p>
+
+::: {.notes}
+Sources: `docs/business/business-plan.md` §2 (the three problems, nearly word for word). Price rises: `docs/business/market-research.md` §2, "General accounting" (QuickBooks Online renewals from 1 Aug 2026, Essentials $75 → $85, Plus $115 → $140, Advanced $275 → $340, user caps 1/3/5/25; Xero US from 1 Oct 2026; FreshBooks raised 27 Jan 2026) and §3 points 1–2.
+
+Caveat to say out loud: market-research.md says most prices come from third-party aggregators and are accurate "to within a few dollars"; recheck the vendor's own page before publishing a comparison.
+:::

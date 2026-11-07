@@ -1,0 +1,239 @@
+---
+pagetitle: "Trifold brief · Investors"
+brief-audience: "Investor path"
+brief-length: "19 slides, about 20 minutes"
+---
+
+{{< include ../_partials/_title.qmd >}}
+
+{{< include ../_partials/_problem.qmd >}}
+
+{{< include ../_partials/_how.qmd >}}
+
+{{< include ../_partials/_receipts.qmd >}}
+
+## The first wedge: microschools in Idaho and Utah {#market}
+
+<span class="kicker">Market · the working default</span>
+
+<div class="cards">
+<div class="card"><strong>Who</strong>Microschools and small private schools of about 10 to 150 families that bill through Stripe. They run on Stripe and spreadsheets and usually pay a bookkeeper.</div>
+<div class="card card--green"><strong>Why them first</strong>Families in state programs, such as Idaho's parental choice tax credit and Utah Fits All, need payment records that hold up. The founder's related businesses (B4 Uni and its family service) are the first design partners.</div>
+<div class="card card--ink"><strong>Then</strong>Businesses with the same shape (memberships, credits, bookings): studios, tutoring, camps and gyms. Vertical software embeds Trifold.</div>
+</div>
+
+<div class="placeholder"><strong>Not yet researched</strong>Market size: how many microschools, studios and tutoring businesses there are, and how many use Stripe. A bottom-up count by state comes before raising money.</div>
+
+::: {.notes}
+Sources: `docs/business/business-plan.md` §1 and §4 (first and next customers; Idaho and Utah is "the working default", §12 item 3, still open); `docs/business/market-research.md` §4 (why Idaho and Utah: B4 Uni and buzz-school run on released tfd versions but are related parties, design partners, not independent customers, `website-open-questions.md` 4.4; state programs; schools run on Stripe and spreadsheets and pay a bookkeeper; "check each program's current receipt rules before building on this").
+
+Placeholder: market-research §5, "Gaps in this research": market size not researched; no willingness-to-pay interviews yet; state program receipt rules need primary sources. Do not quote a market size; none is sourced.
+:::
+
+## Nobody offers books a third party can check {#competition}
+
+<span class="kicker">Competition · list prices a month</span>
+
+| Group | Examples and prices | Where Trifold fits |
+|----|--------|--------|
+| General accounting | QuickBooks Online $38–340, user caps at every tier; Xero US $27–97 | Replace it for Stripe-native businesses (Pro), or feed it (Starter) |
+| AI-native accounting | Puzzle $30 / $72 / $120 / $360; Digits $65 / $100 / about $250 | Same buyers. Trifold adds an engine free to self-host and provable books |
+| Bookkeeping services | Pilot Bookkeeping Essentials $99; human-led $349–849 and up (aggregators) | The Witnessed + Bookkeeper bundle, sold through partners |
+| Vertical software | Jackrabbit $49–245; Pike13 $139–249 | Partners, not rivals: they run operations, Trifold keeps the books |
+
+<p class="fine">None of these offers signed receipts, sealed months or an independent witness. The nearest, Airtight (Australia and the Gulf), signs entries inside its own system; Trifold hands the signed receipt to the person who paid, with a free verifier and an open format. Prices: vendor pages where read (6 November 2026), otherwise third-party pages; recheck before quoting.</p>
+
+::: {.notes}
+Sources: `docs/business/market-research.md` §1 (the four groups and "where Trifold fits") and §2 (prices: QuickBooks $38 / $85 / $140 / $340, user caps 1 / 3 / 5 / 25; Xero $27 / $59 / $97; Puzzle $30 / $72 / $120 / $360 on Puzzle's own page, 2026-11-06 (aggregators ~$25 / $60); Digits $65 / $100 / Pro ~$250; Pilot Bookkeeping Essentials $99 on Pilot's page, 2026-11-06 (aggregators $199 entry, human-led $349–849+); Jackrabbit $49–245; Pike13 $139–249), §3 point 5 ("Nobody offers provable books").
+
+Airtight: `docs/business/pricing-strategy.md` §9 (reviewed 2026-11-06 from its own pages; claims not independently verified; AUD $49 / $99 / $199 / $499+; Ed25519 receipts kept in its own system; no free tier). Airtight uses a label we never use for Trifold; don't repeat it on our slides.
+
+Reliability: market-research.md header (audited 2026-11-07 against `docs/website/competitors.md`; where they differ, the vendor page wins).
+:::
+
+{{< include ../_partials/_rule.qmd >}}
+
+{{< include ../_partials/_pricing.qmd >}}
+
+## About $76.50 a paying school a month {#unit}
+
+<span class="kicker">Unit economics · illustrative</span>
+
+<div class="cards cards--4">
+<div class="card"><span class="big">40%</span>Starter at $29</div>
+<div class="card"><span class="big">35%</span>Pro at $79</div>
+<div class="card"><span class="big">20%</span>Witnessed at $149</div>
+<div class="card"><span class="big">5%</span>Bookkeeper bundle, counting only Trifold's ~$149 share</div>
+</div>
+
+<div class="cards cards--2">
+<div class="card card--ink"><strong>$76.50 a month</strong>Subscription revenue per paying school: 0.40 × $29 + 0.35 × $79 + 0.20 × $149 + 0.05 × $149 = $11.60 + $27.65 + $29.80 + $7.45. Credit packs (about $2–3) are left out.</div>
+<div class="card card--green"><strong>Upgrades for features, not limits</strong>A family makes about 7 ledger events a month, so the Free plan's 1,000 events covers about 140 families. Schools would move up for features (QuickBooks sync, Pricing Lab, Rifo, the witness), all still to build.</div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> The tier mix and every price are assumptions to test with design partners, not data.</p>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §8 ("Assumed mix of paying schools: 40% Starter, 35% Pro, 20% Witnessed, 5% bundle (counting only Trifold's ~$149 share)"; "$76.50 a school per month in subscription ($11.60 + $27.65 + $29.80 + $7.45)", audited 2026-11-07; credit packs about $2–3, left out; "A family makes about 7 events a month, so Free's 1,000 events covers about 140 families"; why schools upgrade).
+
+The 7-events figure comes from one fixture family (`docs/business/pricing-strategy.md` §3: 81 events a year for one family; a 100-family school projects to ~700 a month); replace with real customer data.
+:::
+
+## Illustrative outlook: assumptions, not forecasts {#financials}
+
+<span class="kicker">Financials · illustrative</span>
+
+| | End of year 1 | End of year 2 | End of year 3 |
+|-------------|---:|---:|---:|
+| Free hosted and self-hosted schools (adoption, not revenue) | 300 | 2,000 | 8,000 |
+| Paying schools | 50 | 300 | 1,000 |
+| Annual recurring revenue (paying × $76.50 × 12) | ~$46K | ~$275K | ~$918K |
+| Platform and Witness API | — | small | 10–20% on top |
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Every number here is an assumption, not a forecast or a result, and is before annual-billing discounts. No customer interviews or price tests have been run yet.</p>
+
+<p class="fine">What would change it most: how many free schools convert to paid, whether Rifo can close a month reliably (that decides what Witnessed is worth), and how many platforms adopt the standard.</p>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §8, the table and "What would change the outlook most", verbatim figures. Header: "These are assumptions, not forecasts."
+
+Arithmetic (plan §8 as audited 2026-11-07): 50 × $76.50 × 12 = $45,900; 300 × $76.50 × 12 = $275,400; 1,000 × $76.50 × 12 = $918,000.
+
+Costs to model (plan §8): Stripe fees, AI tokens per credit, hosting, partner bookkeeper payouts, support, legal, people. `docs/business/financial-model.md` §1: tfd's scenario generator cannot run this yet (no growth curve, no expenses, no MRR); the outlook is hand arithmetic until phase 0's notebook exists. Willingness to pay untested: market-research §5.
+:::
+
+## Month 36, by hand: the shape of the costs {#month-36}
+
+<span class="kicker">Financials · illustrative</span>
+
+<div class="cards cards--4">
+<div class="card"><span class="big">≈ $89K</span>Gross collected in the month: subscriptions, credit packs, bookkeeper pass-through</div>
+<div class="card"><span class="big">≈ $79K</span>Net revenue in the month</div>
+<div class="card card--green"><span class="big">≈ 85%</span>Gross margin, of net revenue, after Stripe, partner share, AI and hosting</div>
+<div class="card card--ink"><span class="big">≈ $35K</span>Operating expenses in month 36</div>
+</div>
+
+<p class="lede">Under these assumptions operating income is negative through most of year 2 and positive by year 3. Founder pay is left out.</p>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Hand arithmetic on the plan's assumptions, not a model run. Opex schedule, conversion, churn and AI cost per credit are all assumed.</p>
+
+::: {.notes}
+Source: `docs/business/financial-model.md` §5, "Worked example: a 36-month Trifold run", the paragraph "What month 36 should roughly show" (1,000 paying × ~$76.50 ≈ $76,500, plus ~$2,500 credit packs, plus ~$10,000 bookkeeper pass-through (50 bundles × $200): gross ≈ $89,000, net ≈ $79,000; Stripe ≈ $3,000, partner share $10,000, AI ≈ $6,000 paying + ≈ $1,600 free, hosting under $1,000; gross margin about 85% of net revenue; opex ≈ $35,000; "operating income is positive by year 3 under these assumptions and negative through most of year 2").
+
+The knobs behind it (same section): 2% a month free-to-paid conversion, 2% paid churn, AI cost 0.4 cents a credit (40% of face), opex schedule (legal $15,000 over months 1–6, marketing $1,000 → $3,000 → $8,000 a month by year, one hire at $8,000/mo from month 19, two more from month 28), "founder pay left out". All assumptions.
+:::
+
+## Moat, strongest first {#moat}
+
+<span class="kicker">Defensibility</span>
+
+<div class="cards">
+<div class="card"><strong>1 · The witness network</strong>Trifold's countersignature and its public transparency log. It can't be forked. Not built yet. <span class="tag tag--next">Next</span></div>
+<div class="card card--green"><strong>2 · Owning the open standard</strong>The receipt and seal format, spec and verifier (Apache-2.0) and the test vectors (CC0). Every platform that adopts it extends the verifier's reach.</div>
+<div class="card card--ink"><strong>3 · The trademark</strong>"Trifold" and "Witnessed by Trifold". A fork must rename. Not registered yet; clearance search first.</div>
+</div>
+<div class="cards cards--2">
+<div class="card card--quiet"><strong>4 · Rifo and the workflows on the books</strong>The agent that closes the month and answers questions, on top of the ledger. <span class="tag tag--next">Next</span></div>
+<div class="card card--quiet"><strong>5 · The license, the weakest</strong>FSL-1.1-ALv2 blocks a hosted clone of tfd for two years per release; then each release is Apache-2.0.</div>
+</div>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §9 ("Moat, strongest first", the five items in this order) and §5 ("The license is the weakest of the moats... What can't be copied is the witness network and its transparency log, the trademark, and Rifo").
+
+Status: the witness is not built (Next, premium, phase 2), Rifo is not built (Next) (plan §3 as audited); neither has shipped (AGENTS.md "Claims"). The open standard is only the receipt and seal format, spec, verifier and vectors; the KPI spec and event envelope are FSL (AGENTS.md open item 4). Trademark: `TRADEMARKS.md` (draft policy; none registered, so ™ only; clearance search first) and plan §10 (Samsung Galaxy Z TriFold dominates search; old TRIFOLD filings).
+
+Be honest that moat 1 does not exist yet; today's defensibility is the standard plus the license.
+:::
+
+## Go-to-market in four phases {#gtm}
+
+<span class="kicker">Plan · targets, not results</span>
+
+| Phase | When | Goal | What ships | Proof it worked |
+|------|------|---------|---------------|--------------|
+| 0 · Foundations | Now to month 3 | A credible standard | Spec v1 in its own repo, test vectors, verifiers in three languages; 5–10 design-partner schools | Design partners issuing real receipts |
+| 1 · Wedge | Months 3–9 | Win microschools in Idaho and Utah | Hosted Free, Starter, Pro; CPA partner pilot; Stripe App | 100 schools hosted, 20 paying, ~10 CPA partners |
+| 2 · Premium | Months 9–18 | Make Witnessed real | Milestones 2 and 3, transparency log, Witness API | Witnessed 25%+ of paying schools; 3 outside issuers |
+| 3 · Expand | Month 18+ | Adjacent verticals and platforms | Studios, tutoring, camps, gyms; embedded deals; tax packages | Platform revenue; net retention above 110% |
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Timings and targets are plan assumptions. Growth loops: every receipt will carry a "Verify at trifold…" link; adopters of the format extend the verifier; CPAs bring clients.</p>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §7 (the phase table, verbatim apart from "tfd Tax" written as "tax packages", and the three growth loops). Channels detail: `docs/business/go-to-market.md` §1.
+
+The phases are targets in a draft plan. Phase 0 items such as "verifiers in three languages" are not built: there is one verifier today (`packages/verify`, TypeScript/WebCrypto, plus tfd's own).
+:::
+
+## Protect the engine, keep the checking free {#license}
+
+<span class="kicker">Licensing</span>
+
+<div class="cards">
+<div class="card card--green"><strong>Apache-2.0 and CC0</strong>The receipt and seal format, spec and verifier; the test vectors. Checking can never be restricted, so "anyone can check, forever" holds.</div>
+<div class="card"><strong>FSL-1.1-ALv2</strong>The tfd engine and CLI, from 0.10.0 (releases up to 0.9.0 stay Apache-2.0). Source-available: free to self-host for your own books. No competing hosted service. Each release becomes Apache-2.0 two years after it ships.</div>
+<div class="card card--ink"><strong>Proprietary</strong>The hosted service, Rifo, the witness and the website. Customers pay for these.</div>
+</div>
+
+<p class="fine">Why FSL: a fixed, short text with a two-year conversion, unlike BSL's per-author grant and up-to-four-year wait, Elastic License 2.0 and SSPL, which never convert, or AGPL, which lets a competitor host the engine. Even if Trifold disappears, the code becomes Apache-2.0.</p>
+
+::: {.notes}
+Sources: AGENTS.md "Licensing" (the table and the "Why"; tfd 0.10.0 of 2026-11-07 is the first FSL release, earlier releases stay Apache-2.0; the owner considered three years on 2026-11-07 and kept FSL's two); KPI spec and event envelope schema are FSL, not part of the open standard (AGENTS.md open item 4); `docs/business/business-plan.md` §5 (licensing, "How FSL compares"); `docs/business/pricing-strategy.md` §8 (the comparison table: Sentry and others on FSL, HashiCorp's BSL switch and the OpenTofu fork). LICENSING.md at the repo root.
+
+Wording rules (AGENTS.md "Rules for words"): never the OSI label for tfd (FSL is not OSI-approved); "source-available", "Fair Source", "free to self-host" are fine; "open format", "open verifier" are fine.
+
+Open licensing items (AGENTS.md): licensor legal entity name; a grant for firms hosting tfd for many clients; event envelope schema and KPI spec license. CLA decided 2026-11-07 (`CONTRIBUTING.md`); trademark policy is a draft, marks unregistered, so ™ only.
+:::
+
+## Risks, and how each is handled {#risks}
+
+<span class="kicker">Risks</span>
+
+<div class="split">
+<p><b>A big vendor clones the engine and hosts it</b><em>FSL bars a competing hosted service for two years per release; the witness, its log and the trademark can't be cloned.</em></p>
+<p><b>Over-claiming</b><em>"Signed receipts and sealed books" until the per-event chain and daily matching ship. No speed numbers.</em></p>
+<p><b>Tax preparation is regulated</b><em>Trifold prepares the books and never signs returns; filing goes through licensed CPAs or enrolled agents.</em></p>
+<p><b>What the witness promises</b><em>Narrowly: "Trifold saw this exact record at time T", not "the money moved". Terms reviewed by a lawyer.</em></p>
+<p><b>Student data (FERPA, state laws)</b><em>Checked per school type; personal data kept out of signed receipts, as it is today.</em></p>
+<p><b>Trademark conflict</b><em>"Trifold" collides in search with the Samsung Galaxy Z TriFold, and old filings exist. Clearance search in classes 9, 36 and 42 before filing.</em></p>
+</div>
+
+<p class="fine">Also in the plan: key compromise, erasure that could break receipts (an owner decision before release), license backlash, deep competitor discounts, and Rifo's ability to close a month.</p>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §10 (the risk table; six rows shown nearly verbatim, the rest listed in the fine print) and §8 ("whether Rifo can close a month reliably"). Erasure: `packages/atm/ROADMAP.md` milestone 1, "Owner decision before release: erasure must not rewrite events". Pricing risks: `docs/business/pricing-strategy.md` §10 (stack fatigue; Witnessed needs Rifo to close reliably).
+:::
+
+{{< include ../_partials/_built-next.qmd >}}
+
+{{< include ../_partials/_team.qmd >}}
+
+## The ask {#ask}
+
+<span class="kicker">Investment</span>
+
+<div class="placeholder"><strong>Owner to fill in</strong>Amount, instrument and terms; use of funds; the milestones it buys; timing.</div>
+
+<div class="cards cards--2">
+<div class="card card--ink"><strong>The next 90 days in the plan</strong>
+<ul>
+<li>Register the domains; order a trademark clearance search</li>
+<li>Move the receipt and seal spec to its own repo, with test vectors</li>
+<li>Recruit 5–10 design-partner schools and test prices with them</li>
+<li>Settle the open owner decisions: erasure, key ids, refunds on receipts, disputes, when to seal</li>
+</ul></div>
+<div class="card"><strong>Open decisions that shape the round</strong>
+<ul>
+<li>Is the paid line only "Trifold as witness", or also Stripe matching or Rifo?</li>
+<li>Microschools first, or broader membership businesses from the start?</li>
+<li>Final prices, after design-partner tests</li>
+<li>Forming the legal entity that holds the license and marks</li>
+</ul></div>
+</div>
+
+::: {.notes}
+Placeholder: none of the source docs states an ask, a round size, a valuation or a use of funds. The owner fills in the box.
+
+Sources for the two lists: `docs/business/business-plan.md` §11 ("Next 90 days", items 3, 4, 5 and 7) and §12 ("Open decisions", items 2, 3, 4 and 5). market-research §5: "Do a bottom-up count by state before raising money."
+:::
+
+{{< include ../_partials/_paths.qmd >}}

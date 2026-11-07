@@ -1,0 +1,30 @@
+## Free when you do it yourself. Paid when Trifold is the third party. {#the-rule}
+
+<span class="kicker">Business model</span>
+
+<div class="cards cards--2">
+<div class="card card--green"><strong>Never paywalled</strong>
+<ul>
+<li>Verifying receipts and seals, for anyone</li>
+<li>Data export: the business owns its books</li>
+<li>Erasure and privacy tools</li>
+<li>Correctness and security fixes</li>
+<li>The receipt and seal specs (Apache-2.0)</li>
+</ul></div>
+<div class="card"><strong>What paid plans will sell</strong>
+<ul>
+<li>Automation and scheduling</li>
+<li>Teams and collaboration</li>
+<li>AI: Rifo <span class="tag tag--next">Next</span></li>
+<li>Views across many schools</li>
+<li>Trifold as witness <span class="tag tag--next">Next</span></li>
+</ul></div>
+</div>
+
+<p class="fine">A self-hosted copy cannot produce Trifold's witness signature, so the premium tier will protect itself without a strict license.</p>
+
+::: {.notes}
+Sources: `docs/business/pricing-strategy.md` §1 ("The rule": anything a school can do on its own is free to self-host; anything that needs Trifold as the trusted third party is paid; the five things paid tiers sell; why the premium tier protects itself) and §2 ("Never paywall"). Same rule in `docs/business/business-plan.md` §5.
+
+Correction applied (pricing-strategy §2 item 5, audited 2026-11-07): only the receipt and seal specs are open (Apache-2.0). The KPI spec and the event envelope schema are FSL today, so they are not called part of the open standard. Hosted plans are not built, so "will sell".
+:::

@@ -1,0 +1,24 @@
+## The price ladder {#pricing}
+
+<span class="kicker">Plans · draft prices · hosted plans not built yet</span>
+
+| Plan | A month | Limits | What it will add |
+|------|-------|---------------|----------------------|
+| Community | $0, self-hosted | None | The whole engine and `tfd` CLI. Self-signed receipts and seals |
+| Free (hosted) | $0 | 1,000 events, 200 credits, 2 seats | Hosted books and signed receipts. About 140 families |
+| Starter | $29 | 5,000 events, 1,000 credits, 5 seats | Sync to QuickBooks or Xero, with signed receipts on top |
+| Pro (recommended) | $79 | 25,000 events, 5,000 credits, unlimited seats, up to 3 organizations | Replaces QuickBooks: Pricing Lab, daily reconcile, bank import, Rifo |
+| Witnessed | $149 | 25,000 events, 8,000 credits | Once the witness ships: Trifold's countersignature, the transparency log, the auditor portal |
+| Witnessed + Bookkeeper | about $349 | As Witnessed | A partner bookkeeper closes the month |
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Every price and limit is a starting point to test with design partners, not a decision. Annual: two months free ($290, $790, $1,490). Non-profits and co-ops about half ($15, $39, $79, about $249); whether that stacks with annual is undecided.</p>
+
+<p class="fine">No per-seat fees. No per-transaction fees. No surprise bills: event limits are soft on every plan and the books never stop; only Platform pays for events (about $1 per 10,000). Also planned: compliance packs ($15–30 per state program) and the Witness API (500 receipts a month free, then $0.03–0.05 each). Early access, not sign-up: nothing hosted is live.</p>
+
+::: {.notes}
+Sources: `docs/business/pricing-strategy.md` §4 (rate card with limits: Free 1,000 events / 200 credits / 2 seats; Starter 5,000 / 1,000 / 5; Pro 25,000 / 5,000 / unlimited seats / up to 3 organizations; Witnessed 25,000 / 8,000; bundle ~$349; compliance pack $15–30 per state program; Witness API first 500 receipts a month free, then $0.03–0.05; "No per-seat fees. No per-transaction fees. No surprise bills."; the event limit is soft on Free, Starter, Pro and Witnessed, Platform pays about $1 per 10,000 events; annual two months free: $290 / $790 / $1,490), §4b (non-profit and co-op: $15 / $39 / $79 / ~$249; stacking is a proposal, §11 item 4), and `docs/business/business-plan.md` §6. "About 140 families": business-plan §8 (about 7 events a family a month).
+
+Status: hosted plans not built (business-plan §3, phase 1 in §7). Pricing Lab, bank import, QuickBooks/Xero sync, Rifo and the witness are Next (AGENTS.md "Claims"; pricing-strategy §6). CTA wording: `docs/website/decisions.md` (primary CTA "Get early access", because Cloud isn't live) and `docs/website/messaging.md`; "Recommended" as the only plan badge and Witnessed in the future tense, per the 2026-11-07 docs audit (no customer counts exist to back a popularity badge).
+
+Every price is an assumption to test, not a decision (headers of business-plan, pricing-strategy, go-to-market).
+:::

@@ -1,0 +1,13 @@
+## Who is building Trifold {#team}
+
+<span class="kicker">Team</span>
+
+<div class="placeholder"><strong>Owner to fill in</strong>Founders and roles, the background that matters for books, payments and schools, advisors, and who to contact.</div>
+
+<p class="fine">Design partners, disclosed: B4 Uni's family service (buzz-school) already runs on released tfd versions. B4 Uni and Vibes of Light are the founder's own or related businesses, so they are design partners, not independent customers.</p>
+
+::: {.notes}
+Placeholder: none of the source docs names the team. The owner fills this slide in.
+
+Fact on the slide: `docs/business/business-plan.md` §1 (B4 Uni's family service uses released tfd versions as a pinned dependency, though it doesn't yet call the engine's handler, shipper or receipts; B4 Uni and Vibes of Light are the owner's own or related businesses, design partners, not independent customers); `docs/business/market-research.md` §4; `docs/business/website-open-questions.md` 4.4 (disclose the connection; FTC material-connection and fake-review rules). No customer counts or testimonials anywhere in this brief.
+:::
