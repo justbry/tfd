@@ -31,6 +31,11 @@ await bundle("src/worker.ts", "node", "worker.js");
 const LOCAL_IMPORT =
 	/^import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"([^"]+)";?\n/gm;
 const LOCAL_REEXPORT = /^export\s+\*\s+from\s+"([^"]+)";?\n/gm;
+/** `export { a, b } from "./x.js"`: the names are declared (and exported) in the inlined file. */
+const LOCAL_NAMED_REEXPORT =
+	/^export\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"(\.[^"]+)";?\n/gm;
+/** `import("./x.js").Name` in an inferred type: the name, once the file is inlined. */
+const LOCAL_TYPE_IMPORT = /import\("(\.[^"]+)"\)\.([A-Za-z_$][\w$]*)/g;
 
 /** One declaration file from an entry's `.d.ts` and the local ones it imports or re-exports, in dependency order. */
 const inlineDeclarations = async (root: string, entry: string) => {
@@ -65,6 +70,14 @@ const inlineDeclarations = async (root: string, entry: string) => {
 			.replace(LOCAL_REEXPORT, (_all, specifier) => {
 				follow(null, specifier);
 				return "";
+			})
+			.replace(LOCAL_NAMED_REEXPORT, (_all, names, specifier) => {
+				follow(names, specifier);
+				return "";
+			})
+			.replace(LOCAL_TYPE_IMPORT, (_all, specifier, name) => {
+				follow(name, specifier);
+				return name;
 			});
 		for (const target of followed) await visit(target);
 		bodies.push(text.trim());

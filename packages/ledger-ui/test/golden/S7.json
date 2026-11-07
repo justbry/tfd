@@ -73,18 +73,8 @@
 		"period-chip"
 	],
 	"matrix": {
-		"surface": [
-			"settings-books",
-			"dashboard-plan",
-			"plans-revenue"
-		],
-		"as": [
-			"public",
-			"member",
-			"governance",
-			"finance",
-			"owner"
-		]
+		"surface": ["settings-books", "dashboard-plan", "plans-revenue"],
+		"as": ["public", "member", "governance", "finance", "owner"]
 	},
 	"moves": {
 		"fields": [
@@ -153,14 +143,8 @@
 					"[data-test=lock-panel]": 0
 				},
 				"contains": {
-					"[data-test=key-row][data-key=k1]": [
-						"Website",
-						"Publishable"
-					],
-					"[data-test=key-row][data-key=k2]": [
-						"Booking server",
-						"Secret"
-					],
+					"[data-test=key-row][data-key=k1]": ["Website", "Publishable"],
+					"[data-test=key-row][data-key=k2]": ["Booking server", "Secret"],
 					"[data-test=key-row][data-key=k3]": [
 						"Bookkeeper, expires Dec 5",
 						"Ledger read"
@@ -477,9 +461,7 @@
 						"count": {
 							"[data-test=basis-save][aria-busy=true]": 1
 						},
-						"absent": [
-							"Accounting basis saved"
-						]
+						"absent": ["Accounting basis saved"]
 					}
 				},
 				{
@@ -605,10 +587,7 @@
 					"[data-test=key-row]": 4
 				},
 				"contains": {
-					"[data-test=key-row]": [
-						"Docs site",
-						"used never"
-					]
+					"[data-test=key-row]": ["Docs site", "used never"]
 				}
 			}
 		},
@@ -859,9 +838,7 @@
 							"[data-test=dialog-confirm][aria-busy=true]": 1,
 							"[data-test=key-row]": 3
 						},
-						"absent": [
-							"Revoked."
-						]
+						"absent": ["Revoked."]
 					}
 				},
 				{
@@ -1148,9 +1125,7 @@
 						"count": {
 							"[data-test=dialog-confirm][aria-busy=true]": 1
 						},
-						"absent": [
-							"Stripe key saved"
-						]
+						"absent": ["Stripe key saved"]
 					}
 				},
 				{
@@ -1390,9 +1365,7 @@
 						"count": {
 							"[data-test=dialog-confirm][aria-busy=true]": 1
 						},
-						"absent": [
-							"Zeffy connected."
-						]
+						"absent": ["Zeffy connected."]
 					}
 				},
 				{
@@ -1581,9 +1554,7 @@
 						"count": {
 							"[data-test=dialog-confirm][aria-busy=true]": 1
 						},
-						"absent": [
-							"Disclosure saved"
-						]
+						"absent": ["Disclosure saved"]
 					}
 				},
 				{
@@ -1687,9 +1658,7 @@
 						"A link was mailed to confirm: this publishes your books. Nothing changes until you open it. The link works once and expires in 15 minutes."
 					]
 				},
-				"absent": [
-					"Disclosure saved"
-				]
+				"absent": ["Disclosure saved"]
 			},
 			"shot": {
 				"full": true,
@@ -1817,9 +1786,7 @@
 				"count": {
 					"[data-test=dialog]": 0
 				},
-				"absent": [
-					"Disclosure saved"
-				]
+				"absent": ["Disclosure saved"]
 			}
 		},
 		{
@@ -1919,9 +1886,7 @@
 						"count": {
 							"[data-test=dialog-confirm][aria-busy=true]": 1
 						},
-						"absent": [
-							"Disclosure saved"
-						]
+						"absent": ["Disclosure saved"]
 					}
 				},
 				{

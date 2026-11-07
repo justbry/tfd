@@ -236,7 +236,8 @@ const sumsToZero = (e: AtmEvent) => {
 /** The credit and plan events: not the money lines, nor the MRR they move (`tests/billing-mrr.test.ts`). */
 const creditEvents = (events: readonly AtmEvent[]) =>
 	events.filter(
-		(e) => !e.event_type.startsWith("payment.") && e.event_type !== "mrr.changed",
+		(e) =>
+			!e.event_type.startsWith("payment.") && e.event_type !== "mrr.changed",
 	);
 
 describe("handleStripeEvent", () => {
