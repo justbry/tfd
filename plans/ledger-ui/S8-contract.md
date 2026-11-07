@@ -168,6 +168,20 @@ The plan is `docs/features/ledger-ui-gaps.md` in buzz-school (PR #1348): for eac
 
 Groups 8 and 10 need a migration, and so does a gift-code table if promos are built. Which groups are built, and in what order, is decided by the S8 thread with the orchestrator, not by a child.
 
+### UI-found gaps (ledger-ui S8e part 1, 2026-11-07)
+
+Route answers that missed fields the UI's types require, and the choice taken for each (default taken under the owner's S8 goal; the owner may override). Built by the buzz-school thread S8d-bz2 unless noted.
+
+| Gap | Choice |
+| --- | --- |
+| `views: Record<Audience, AudienceView>` on the Worker's `/disclosure` (grain, delay, rounding, small counts, cell rules, preset and period gates, and the server-worded copy) | New pure `audienceViews({ file, override, size, year, clock })` in `atm/worker` (S8c2). Oracle: for each school record in `packages/ledger-ui/src/fixtures/disclosure.json`, at the fixture clock `2026-11-05T12:00`, it returns exactly that record's `views`; every spec-versus-fixture disagreement is listed, not silently resolved. |
+| `GET .../bookings` lacks `attendance` | Join `attendanceFor`. |
+| members-list lacks `membershipId` and `MemberBalance.granted` | Add both; `rolledOver` only if the lots give it exactly. `currentPeriodEnd` stays nullable (the UI type is nullable). |
+| finance-grants takes a 64-hex pubkey; the UI identifies people by profile id | The route accepts the profile id and answers profile ids (and `grantedBy` if kept); the pubkey form stays one release if cheap. |
+| `ledger/school` can answer `null` for time zone, currency, credit unit | Default server-side: zone as today else UTC; currency from the menu, else the connected Stripe account's, else `null`; credit unit from the menu, else `credit`/`credits`; a `defaulted` list names what was defaulted. |
+| Saving a menu needs a price on every tier, so a not-for-sale tier returns 400 | A tier with `public: false` may have no prices; `public: true` still needs one. Publish creates no Stripe price for it. |
+| Refund `status` can be `requires_action` or `canceled` | The route answers Stripe's status verbatim (documented); the UI adds the two values. |
+
 Contract changes the plan asks for (the orchestrator changes `src/data/` and the fixtures together):
 - allow `null` for `expiringGifts`, `bookingRules`, `settings.basis`, `settings.zeffy` and `stripe.missing`;
 - `Disclosure.year`, `size` and `views` need income, so the Worker assembles them from buzz-school's file, the school's override and the viewer;
@@ -209,7 +223,7 @@ This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orc
 | --- | --- | --- | --- | --- |
 | `GET /v1/schools` | any token | `{ schools: [{ id, asOf: string \| null, lagMinutes: number \| null, stale: boolean }] }` for the token's schools | `School.stale`, `School.lagMinutes` (the adapter merges them into `schools()`) | `stale` is `lagMinutes > 15`. A school with no manifest has `null`s and `stale: true`. Name, time zone, currency and credit unit are not here (`GET .../ledger/school` on the family service). |
 | `GET /v1/schools/:school/kpi?audience=&pin=open\|locked` | audience gate | `KpiDocument` | `kpiDocument`; `audienceReport` for public, member and governance | `source` is `{kind:"events"}` and `dataSource` `"events"`. `pin=locked` is always allowed; `pin=open` is honoured as is (the token was minted with the PIN open). A school with no usable `catalog.published` has plans in alphabetical order. No `preset` parameter. |
-| `GET /v1/schools/:school/disclosure` | any token | `{ school, year, size, file, override: null, source: "defaults" }` | `disclosure` (the adapter adds `viewer`, `views` and `viewAs` with `audiencesOf` from the buzz-school facts) | `file` is the B4 Uni file shipped with the Worker. `override` is `null` until buzz-school stores one (build list group 8): the UI says "B4 Uni defaults". |
+| `GET /v1/schools/:school/disclosure` | any token | `{ school, year, size, file, override: null, source: "defaults", views }` where `views: Record<Audience, AudienceView>` is `audienceViews({ file, override, size, year, clock })` from `atm/worker` (S8c2) | `disclosure` (the adapter adds `viewer` and `viewAs` with `audiencesOf` from the buzz-school facts) | `file` is the B4 Uni file shipped with the Worker. `override` is `null` until buzz-school stores one (build list group 8): the UI says "B4 Uni defaults". |
 | `GET /v1/schools/:school/audience-report?audience=public\|member\|governance&from=&to=` | audience gate | `AudienceReport` | `audienceReport` | Derived from the same KPI document; same errors. |
 | `GET /v1/schools/:school/ledger?from=&to=&type=&drill=` | finance | `LedgerPage` with each entry's `member` as `{ key } \| null` (the adapter fills `id` and `name` from members-list) | `ledger` | `pending` is always `[]` (the Worker cannot see buzz-school's unshipped outbox; the UI keeps its own pending writes). `timeZone`, `currency` and `unit` come from the latest `catalog.published` menu, else `null`. `promo` is not a parameter: a request with `promo` is `501 not_available`. `drill=disc` returns no rows (no event records a discount). A page holds at most one `from` to `to` range of 62 days (`400 bad_request` beyond). |
 | `GET /v1/schools/:school/income-statement?from=&to=&compare=0\|1` | finance | `IncomeStatement` | `incomeStatement` | `amounts.discounts`, `amounts.giftsSold`, `giftsOutstanding` and `matchesStripe` are `null`; `basis` is `{kind:"cash"}`; `amounts.income` is income less fundraising; `net` is what `hledger is` prints (it includes disputes and the B4 Uni share). `previous` and `previous.changes` when `compare=1`. |

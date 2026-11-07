@@ -108,6 +108,66 @@
 		},
 		{
 			"table": "rollovers",
+			"id": "roll_cmd_010_1",
+			"data": {
+				"id": "roll_cmd_010_1",
+				"cus_ent_id": "ce_1",
+				"balance": 0,
+				"usage": 1,
+				"expires_at": 1776441780000,
+				"entities": {}
+			}
+		},
+		{
+			"table": "rollovers",
+			"id": "roll_cmd_023_1",
+			"data": {
+				"id": "roll_cmd_023_1",
+				"cus_ent_id": "ce_1",
+				"balance": 0,
+				"usage": 1,
+				"expires_at": 1781712180000,
+				"entities": {}
+			}
+		},
+		{
+			"table": "rollovers",
+			"id": "roll_cmd_028_1",
+			"data": {
+				"id": "roll_cmd_028_1",
+				"cus_ent_id": "ce_1",
+				"balance": 0,
+				"usage": 1,
+				"expires_at": 1784304180000,
+				"entities": {}
+			}
+		},
+		{
+			"table": "rollovers",
+			"id": "roll_cmd_032_1",
+			"data": {
+				"id": "roll_cmd_032_1",
+				"cus_ent_id": "ce_1",
+				"balance": 0,
+				"usage": 1,
+				"expires_at": 1786982580000,
+				"entities": {}
+			}
+		},
+		{
+			"table": "rollovers",
+			"id": "roll_cmd_035_1",
+			"data": {
+				"id": "roll_cmd_035_1",
+				"cus_ent_id": "ce_1",
+				"balance": 0,
+				"usage": 1,
+				"expires_at": 1789660980000,
+				"entities": {}
+			}
+		},
+		{
+			"table": "rollovers",
 			"id": "roll_cmd_051_1",
 			"data": {
 				"id": "roll_cmd_051_1",

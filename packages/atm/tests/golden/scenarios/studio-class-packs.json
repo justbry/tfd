@@ -29,9 +29,9 @@
     "refundCount": 0,
     "seatChangeRate": 0.2
   },
-  "fixtureHash": "44fb88781a4686b05ef1208c98f2c399c30f02843332ea163857230730fb7140",
-  "kpisHash": "cdbb0c6d85e3e5938e1c83c96817c00d7aad0f14b5632fbb84c83e2c62aa587e",
-  "events": 1305,
+  "fixtureHash": "6ecb16fdd01061b20de6eeeff5a720e44145a8014f905d2bc8a7d7022c7bc335",
+  "kpisHash": "a6e338b79948fbdde0b4554e50a61008dc5e9063f11e9f4d222280ca203068d6",
+  "events": 1314,
   "periods": 9,
   "summary": {
     "gross_collected": 1777163,
@@ -47,7 +47,7 @@
     "new_paying_members": 40,
     "credits_granted": 1513,
     "credits_consumed": 244,
-    "credits_expired": 926,
+    "credits_expired": 946,
     "paying_members_last_period": 22
   },
   "skippedNonUsd": 0
