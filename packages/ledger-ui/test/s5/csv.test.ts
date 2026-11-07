@@ -90,7 +90,10 @@ test("the income statement's file lists the eight lines, signed, with the curren
 		line,
 		amountCents: statement.amounts[field],
 	}));
-	expect(toCsv(statementColumns(statement), rows)).toBe(
+	const { currency } = statement;
+	if (currency === null)
+		throw new Error("the fixture statement has a currency");
+	expect(toCsv(statementColumns({ ...statement, currency }), rows)).toBe(
 		[
 			`${byteOrderMark}line,amount,currency,period_from,period_to`,
 			"Memberships,260.00,USD,2026-11-01,2026-11-30",

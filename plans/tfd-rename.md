@@ -29,7 +29,8 @@ Some names that contain "atm" never change, because they are stored, hashed or s
 
 ## Step 3: a compatibility window for callers (with buzz-school)
 
-- [ ] Publish the tarball under both names for one release (`atm-v<v>/atm-<v>.tgz` and `tfd-v<v>/tfd-<v>.tgz`), then change buzz-school's pin and its `import … from "atm"`.
+- [x] The package is named `tfd`; releases are `tfd-v<v>/tfd-<v>.tgz` (owner, 2026-11-07). No double publish: buzz-school keeps the dependency key `atm`, and Bun installs the tarball under the key, so `import … from "atm"` keeps working (checked under Bun and Node). The workspace subpath `atm/worker` is `tfd/worker`.
+- [ ] buzz-school moves its pin to the first `tfd-v*` release, and later renames its key and imports to `tfd`.
 - [ ] The Worker accepts both JWT audiences, `atm-ledger` and `tfd-ledger`, until buzz-school mints the new one.
 - [ ] Read `TFD_*` environment variables first and fall back to `ATM_*`, for one minor release.
 - [ ] Export the new type names with deprecated `Atm*` aliases (types only, so free).

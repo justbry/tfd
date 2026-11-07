@@ -1,6 +1,6 @@
 {
-	"name": "atm",
-	"version": "0.9.0",
+	"name": "tfd",
+	"version": "0.10.0",
 	"private": true,
 	"license": "SEE LICENSE IN LICENSING.md",
 	"type": "module",
@@ -19,6 +19,11 @@
 			"types": "./dist/worker.d.ts",
 			"bun": "./src/worker.ts",
 			"default": "./dist/worker.js"
+		},
+		"./scenarios": {
+			"types": "./src/scenario/api.ts",
+			"bun": "./src/scenario/api.ts",
+			"default": "./src/scenario/api.ts"
 		}
 	},
 	"files": [

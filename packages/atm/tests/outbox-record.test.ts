@@ -463,7 +463,9 @@ const bookSomeVisits = (service: ReturnType<typeof familyService>) => {
 
 /** The handler now also books the money of an invoice (`payment.succeeded`): the tests below are about the credit events. */
 const isNotGrantOrMoney = (type: string) =>
-	type !== "credit.granted" && type !== "payment.succeeded";
+	type !== "credit.granted" &&
+	type !== "payment.succeeded" &&
+	type !== "mrr.changed";
 
 /** An event that was made by an engine command: a money event (a payment, a refund, a payout) has none. */
 const hasCommand = (event: AtmEvent) => event.payload.command !== undefined;

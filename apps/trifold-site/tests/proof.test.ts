@@ -7,12 +7,14 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { BUILD } from "../scripts/agent-files";
 import { DEMO_URL, SITE_ORIGIN } from "../src/lib/config";
-import { type Preset, VERTICALS } from "../src/lib/verticals";
+import { dashboardPath, type Preset, VERTICALS } from "../src/lib/verticals";
 
 const SRC = join(import.meta.dir, "../src");
 const CONFIG = "lib/config.ts";
 const DEMO_HOST = new URL(DEMO_URL).host;
 
+/** "Recurring giving" is the church's name for MRR only: its stat ("… last month") and KPI ("… (MRR)") labels. */
+const CHURCH_MRR_ELSEWHERE = /recurring giving(?! last month| \(MRR\))/i;
 /** Claims the site must never make, in any built page, mirror or agent file. */
 const BANNED: [string, RegExp][] = [
 	["a speed or duration number", /\b\d+\s*(seconds?|minutes?|mins?)\b/i],
@@ -22,18 +24,26 @@ const BANNED: [string, RegExp][] = [
 	["DuckDB over R2", /duckdb over r2/i],
 	["a fourth path", /fourth path/i],
 	["the wrong school name", /honeycomb hollow/i],
-	["MRR, except saying there is none", /(?<!no )\bMRR\b/],
+	["ARR, except saying there is none", /(?<!no )\bARR\b/],
+	["logo churn, except saying there is none", /(?<!no )logo churn/i],
 	["pledges, except saying there are none", /(?<!no )\bpledges?\b/i],
 	["win-back", /win-back/i],
 	["refund windows", /refund window/i],
 	["giver retention", /giver retention/i],
+	[
+		"recurring giving, except as the church's MRR label (its income, Giving, includes one-time gifts)",
+		CHURCH_MRR_ELSEWHERE,
+	],
 	["a vertical still coming", /simulation coming/i],
 ];
 /** Words for what the generator doesn't model, or KPIs the engine doesn't compute: never in vertical copy. */
 const NOT_MODELLED =
-	/win-back|pledge|refund window|failed payment|retention|\bMRR\b|recurring revenue|seat changes|coming/i;
+	/win-back|pledge|refund window|failed payment|retention|\bARR\b|logo churn|recurring revenue|seat changes|coming/i;
 
-/** The verified runs on atm dev (10a447d6), as the coordinator recorded them: verticals.ts must match. */
+/**
+ * The verified runs on tfd dev (a5f769038, 2026-11-07: `simulate --profile <preset> --json`, every channel equal), with
+ * mrr read from the last month of the KPI table: verticals.ts must match.
+ */
 const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 	"studio-members": {
 		seed: 201,
@@ -44,7 +54,8 @@ const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 		disputes: 1,
 		grossCollected: "$47,527",
 		payingLastMonth: 45,
-		hash: "c315b659…ca91",
+		mrr: "$4,060.67",
+		hash: "4d2a1faf…27f9",
 	},
 	"studio-class-packs": {
 		seed: 202,
@@ -55,7 +66,8 @@ const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 		disputes: 2,
 		grossCollected: "$17,771.63",
 		payingLastMonth: 22,
-		hash: "cdbb0c6d…587e",
+		mrr: "$1,989",
+		hash: "5f1c2862…96ad",
 	},
 	"church-giving": {
 		seed: 301,
@@ -66,7 +78,8 @@ const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 		disputes: 0,
 		grossCollected: "$68,050",
 		payingLastMonth: 52,
-		hash: "b87fa3cb…7904",
+		mrr: "$5,655",
+		hash: "7e300ea9…1c08",
 	},
 	"saas-seats": {
 		seed: 401,
@@ -77,7 +90,8 @@ const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 		disputes: 1,
 		grossCollected: "$69,521",
 		payingLastMonth: 49,
-		hash: "cd0acf28…69f6",
+		mrr: "$7,401.01",
+		hash: "2a8acedb…74e6",
 	},
 	"saas-annual": {
 		seed: 402,
@@ -88,7 +102,8 @@ const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 		disputes: 0,
 		grossCollected: "$52,993",
 		payingLastMonth: 0,
-		hash: "84d6c33c…3f36",
+		mrr: "$2,046.67",
+		hash: "e816e133…e4ee",
 	},
 	"creator-launch": {
 		seed: 501,
@@ -99,14 +114,14 @@ const VERIFIED: Record<string, Omit<Preset, "name" | "what" | "payingNote">> = {
 		disputes: 6,
 		grossCollected: "$25,297",
 		payingLastMonth: 66,
-		hash: "38e8325c…62ad",
+		mrr: "$1,460.85",
+		hash: "04940170…d901",
 	},
 };
 const PRESETS = VERTICALS.flatMap((vertical) => vertical.presets);
 const presetByName = new Map(PRESETS.map((preset) => [preset.name, preset]));
-const SIMULATED = VERTICALS.filter(
-	(vertical) => vertical.status === "simulated",
-);
+/** The orgs with presets: every vertical but the school. */
+const SIMULATED = VERTICALS.filter((vertical) => vertical.presets.length > 0);
 const NEAR_VERTICAL = /customers?|used by|trusted by/i;
 /** Characters either side of a vertical's name that must stay clear of customer language. */
 const NEAR_WINDOW = 400;
@@ -141,17 +156,23 @@ describe("source", () => {
 		expect(spelled).toEqual([CONFIG]);
 	});
 
-	test("only the school links a dashboard; the simulated orgs have presets and no demo link", () => {
+	test("every org has a demo dashboard; only the school has the live demo; the simulated orgs have presets", () => {
 		expect(
 			VERTICALS.filter((vertical) => vertical.demoUrl).map(
 				(vertical) => vertical.slug,
 			),
 		).toEqual(["schools"]);
-		expect(
-			VERTICALS.filter((vertical) => vertical.status === "dashboard").map(
-				(vertical) => vertical.slug,
-			),
-		).toEqual(["schools"]);
+		for (const vertical of VERTICALS)
+			expect({
+				slug: vertical.slug,
+				status: vertical.status,
+				dashboard: vertical.dashboard,
+			}).toEqual({
+				slug: vertical.slug,
+				status: "dashboard",
+				dashboard: dashboardPath(vertical.demoOrg),
+			});
+		expect(SIMULATED.length).toBe(VERTICALS.length - 1);
 		expect(VERTICALS[0]?.demoUrl).toBe(DEMO_URL);
 		for (const vertical of SIMULATED)
 			expect({
@@ -187,7 +208,7 @@ describe("source", () => {
 		}
 	});
 
-	test("the church vertical speaks of givers and recurring giving, never members or MRR", () => {
+	test("the church vertical speaks of givers and giving; recurring giving only names its MRR; never members", () => {
 		const nonprofit = VERTICALS.find((entry) => entry.slug === "churches");
 		// The church's own words; the engine's KPI names (new_paying_members) are shown beside them, not instead.
 		const text = JSON.stringify([
@@ -198,8 +219,10 @@ describe("source", () => {
 			Object.values(nonprofit?.labels ?? {}),
 		]);
 		expect(text).toContain("giver");
-		expect(text).toMatch(/recurring giving/i);
-		expect(text).not.toMatch(/\bMRR\b|\bmembers?\b/i);
+		expect(text).toContain("giving");
+		expect(text).not.toMatch(CHURCH_MRR_ELSEWHERE);
+		expect(text).not.toMatch(/\bmembers?\b/i);
+		expect(nonprofit?.labels?.mrr).toBe("Recurring giving last month");
 	});
 });
 
@@ -207,9 +230,13 @@ describe("build output", () => {
 	if (!existsSync(join(BUILD, "llms.txt")))
 		throw new Error("No build/llms.txt: run `bun run build` before `bun test`");
 	const read = (file: string) => readFileSync(join(BUILD, file), "utf8");
+	// The demo dashboards under demo/orgs/ are copies of generated pages, checked in tests/org-demos.test.ts.
 	const built = files(
 		BUILD,
-		(file) => /\.(html|md|txt)$/.test(file) && !file.includes("/_app/"),
+		(file) =>
+			/\.(html|md|txt)$/.test(file) &&
+			!file.includes("/_app/") &&
+			!relative(BUILD, file).startsWith("demo/"),
 	);
 
 	test("llms.txt lists /proof, the live demo and every simulation", () => {
@@ -258,7 +285,7 @@ describe("build output", () => {
 		}
 	});
 
-	test("only the school's card links the dashboard; simulated cards have no demo link and nothing unmodelled", () => {
+	test("only the school's card links the live demo; every gallery card links its dashboard; nothing unmodelled", () => {
 		const seen: Record<string, number> = {};
 		for (const file of built.filter((entry) => entry.endsWith(".html"))) {
 			for (const [, slug = "", status = "", inner = ""] of read(
@@ -271,15 +298,25 @@ describe("build output", () => {
 						...where,
 						demo: false,
 					});
-				if (status === "simulated")
+				if (relative(BUILD, file) === "index.html") {
+					const dashboard = VERTICALS.find(
+						(vertical) => vertical.slug === slug,
+					)?.dashboard;
+					expect({
+						...where,
+						dashboard:
+							Boolean(dashboard) && inner.includes(`href="${dashboard}"`),
+					}).toEqual({ ...where, dashboard: true });
+				}
+				if (slug !== "schools")
 					expect({
 						...where,
 						match: NOT_MODELLED.exec(tokens(inner))?.[0] ?? null,
 					}).toEqual({ ...where, match: null });
 			}
 		}
-		// Simulated: the homepage gallery (4), and one card each on /for/studios, /churches, /nonprofits, /saas and /creators.
-		expect(seen).toEqual({ dashboard: 1, simulated: SIMULATED.length + 5 });
+		// The homepage gallery (5), and one card each on /for/studios, /churches, /nonprofits, /saas and /creators.
+		expect(seen).toEqual({ dashboard: VERTICALS.length + 5 });
 	});
 
 	test("every number shown for a preset equals verticals.ts, and /proof has a row for each", () => {
@@ -301,6 +338,7 @@ describe("build output", () => {
 								preset.disputes,
 								preset.grossCollected,
 								preset.payingLastMonth,
+								preset.mrr,
 								preset.hash,
 								preset.months,
 							]
@@ -308,6 +346,7 @@ describe("build output", () => {
 								preset.grossCollected,
 								preset.members,
 								preset.payingLastMonth,
+								preset.mrr,
 								preset.seed,
 								preset.months,
 							];
@@ -357,12 +396,13 @@ describe("build output", () => {
 		}
 	});
 
-	test("the churches page says giver and recurring giving, never MRR or members", () => {
+	test("the churches page says giver and giving, recurring giving only for its MRR, never members", () => {
 		const page = read("for/churches.md");
 		expect(page).toContain("giver");
-		expect(page).toMatch(/recurring giving/i);
 		expect(page).toContain("Giving collected");
-		expect(page).not.toMatch(/\bMRR\b|\bmembers?\b/i);
+		expect(page).toContain("Recurring giving last month");
+		expect(page).not.toMatch(CHURCH_MRR_ELSEWHERE);
+		expect(page).not.toMatch(/\bmembers?\b/i);
 	});
 
 	test("the homepage shows the diagram once and the demo with its caption", () => {

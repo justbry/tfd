@@ -7,7 +7,7 @@ import {
 	insideCutoff,
 	needsOutcome,
 } from "../data/bookings.ts";
-import type { MembersSummary } from "../data/members.ts";
+import type { SchoolRules } from "../data/ledger.ts";
 import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
@@ -40,7 +40,8 @@ import { plural } from "./wording.ts";
 type Filter = "outcome" | "approval" | "cutoff";
 type View = BookingsPeriod & { filter: Filter | null };
 type Dialog = { action: "noshow" | "release"; booking: Booking };
-type BookingRules = MembersSummary["bookingRules"];
+/** Null where no source has the rules (D11): no cutoff forfeit is claimed and no waive is offered. */
+type BookingRules = SchoolRules | null;
 
 /** Brief A caps a range at 62 days: the overdue group reads that many days before the range. */
 const overdueDays = 62;
@@ -379,21 +380,21 @@ export function Bookings({
 		if (!option.admin) return;
 		let current = true;
 		const load = async (): Promise<void> => {
-			const [inRange, before, summary] = await Promise.all([
+			const [inRange, before, schoolRules] = await Promise.all([
 				reader.bookings({ school: school.id, from, to }),
 				reader.bookings({
 					school: school.id,
 					from: addDays(from, -overdueDays),
 					to: addDays(from, -1),
 				}),
-				reader.membersSummary({ schoolId: school.id }),
+				reader.schoolRules(school.id),
 			]);
 			if (current)
 				setLoaded({
 					key,
 					inRange: inRange.bookings,
 					before: before.bookings,
-					rules: summary.bookingRules,
+					rules: schoolRules.rules,
 				});
 			if (current) setFailedKey((before) => (before === key ? null : before));
 		};
@@ -503,7 +504,7 @@ export function Bookings({
 	};
 	const startRelease = (booking: Booking): void => {
 		const forfeits =
-			insideCutoff(booking, clock) && shown?.rules.lateCancel === "spend";
+			insideCutoff(booking, clock) && shown?.rules?.lateCancel === "spend";
 		if (forfeits) setDialog({ action: "release", booking });
 		else
 			send(

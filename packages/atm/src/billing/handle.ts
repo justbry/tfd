@@ -65,6 +65,7 @@ import {
 	skippedDisputeEvents,
 	skippedRefundEvents,
 } from "./money.js";
+import { invoiceMrr, subscriptionMrr } from "./mrr.js";
 import {
 	describeNormalizeError,
 	mappingFor,
@@ -305,10 +306,20 @@ const decide = (
 				booker: bookerOf(input, holder),
 				holder,
 			});
-			const money = [...payment, ...share.events];
+			// The subscription's recurring revenue as this invoice bills it, booked after the payment (also when it paid nothing).
+			const mrr = invoiceMrr({
+				invoice: resolved.invoice,
+				state: result.state,
+				context: {
+					labels: result.labels,
+					booker: bookerOf(input, holder),
+					holder,
+				},
+			});
+			const money = [...payment, ...share.events, ...mrr.events];
 			// Remember that the books hold this payment: a refund takes back only a payment that was booked. `result.state` is
-			// this decision's own copy.
-			const record = result.state.invoices[resolved.invoice.id];
+			// this decision's own copy (and `mrr.state` shares its invoices).
+			const record = mrr.state.invoices[resolved.invoice.id];
 			// Only a payment line is a payment the books took: the `money.skipped` marker of a non-USD invoice is not one.
 			if (record && payment.some((e) => e.event_type === "payment.succeeded")) {
 				record.paid = resolved.invoice.amountPaid;
@@ -316,7 +327,12 @@ const decide = (
 				if (share.accrued > 0)
 					record.share = { accrued: share.accrued, reversed: 0 };
 			}
-			return { ok: true, result, reason: "invoice", money };
+			return {
+				ok: true,
+				result: { ...result, state: mrr.state },
+				reason: "invoice",
+				money,
+			};
 		}
 		case "BillingRefund": {
 			const refund = withInvoiceId(fact as BillingRefund, input);
@@ -451,20 +467,31 @@ const decide = (
 							.join(", ")}`,
 					),
 				};
+			const result = subscriptionToCommands({
+				...common,
+				// A subject known only by the event's metadata (the subscription came before any invoice) has no holder yet.
+				state: grants.holder ? grants : { ...grants, holder },
+				subscription,
+				plan: resolveSubscriptionPlan(subscription.items, menuItems),
+			});
+			// A change of the subscription's items, or its end, moves its recurring revenue from now.
+			const mrr = subscriptionMrr({
+				subscription,
+				state: result.state,
+				context: {
+					labels: result.labels,
+					booker: bookerOf(input, holder),
+					holder,
+				},
+			});
 			return {
 				ok: true,
-				result: subscriptionToCommands({
-					...common,
-					// A subject known only by the event's metadata (the subscription came before any invoice) has no holder yet.
-					state: grants.holder ? grants : { ...grants, holder },
-					subscription,
-					plan: resolveSubscriptionPlan(subscription.items, menuItems),
-				}),
+				result: { ...result, state: mrr.state },
 				reason:
 					subscription.status === "canceled"
 						? "subscription ended"
 						: "subscription",
-				money: [],
+				money: mrr.events,
 			};
 		}
 		default:

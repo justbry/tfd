@@ -612,7 +612,8 @@ describe("not replayable: history before the inputs were stored", () => {
 		h.raw.exec("DELETE FROM atm_input_seeds");
 		const sim = await whatIf(h, {}, { allowBaselineDrift: false });
 		expect(sim.baseline.identical).toBe(true);
-		// the holder's whole history is carried over: the two payment lines, the two grants and the renewal's plan change
+		// the holder's whole history is carried over: the two payment lines, the two grants, the first invoice's MRR and the
+		// renewal's plan change
 		expect(
 			logOf(h)
 				.map((e) => e.event_type)
@@ -620,6 +621,7 @@ describe("not replayable: history before the inputs were stored", () => {
 		).toEqual([
 			"credit.granted",
 			"credit.granted",
+			"mrr.changed",
 			"payment.succeeded",
 			"payment.succeeded",
 			"plan.changed",

@@ -30,9 +30,9 @@
     "seatChangeRate": 0.12,
     "upgradeRate": 0.04
   },
-  "fixtureHash": "2e0b73fffac671caf2d7d160e1240862321abffca1348d332ca27b4d05b88670",
-  "kpisHash": "cd0acf28b0cd8b8de312e0ec05c34c2622fff2c9199414759c8888801fc769f6",
-  "events": 4548,
+  "fixtureHash": "d8254d535d955dd7e9ea196eadd5976ee05f5e485beff8003e98588fdf88859f",
+  "kpisHash": "2a8acedb84951f6fd2867e3f6681039f89282d8393ba054498541f95a12274e6",
+  "events": 4856,
   "periods": 12,
   "summary": {
     "gross_collected": 6952100,
@@ -48,7 +48,7 @@
     "new_paying_members": 89,
     "credits_granted": 82438,
     "credits_consumed": 1151,
-    "credits_expired": 44787,
+    "credits_expired": 42242,
     "paying_members_last_period": 49
   },
   "skippedNonUsd": 0

@@ -2,7 +2,7 @@
 
 ### 1. Giving records the treasurer trusts
 
-Recurring giving at each giving level, one-time gifts and the roof campaign arrive through Stripe, then end up in a spreadsheet one person understands.
+Monthly and yearly gifts at each giving level, one-time gifts and the roof campaign arrive through Stripe, then end up in a spreadsheet one person understands.
 
 **How Trifold answers it** (chapters 01 and 02, Money in and Books): every gift lands as an event and posts as balanced books, automatically. Corrections are new events, never edits, so the record of what was given doesn't quietly change.
 

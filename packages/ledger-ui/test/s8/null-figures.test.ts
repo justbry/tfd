@@ -60,3 +60,32 @@ test("a ledger page without a published menu takes the school's own time zone an
 	expect(text("[data-test=ledger-count]")).toBe("1 event · America/Denver");
 	expect(text("[data-test=ledger-credit-head]")).not.toBe("");
 });
+
+test("a statement without a published menu takes the school's own currency and unit, never no currency", async () => {
+	const statement = await base.incomeStatement({
+		school: "vol",
+		from: "2026-11-01",
+		to: "2026-11-30",
+		compare: false,
+	});
+	const shown = (): string[] =>
+		[...document.querySelectorAll("[data-test=report-line]")].map(
+			(line) => line.textContent ?? "",
+		);
+	await open("#/vol/reports", { reader: base });
+	const withMenu = shown();
+	cleanUp();
+	const reader: Reader = {
+		...base,
+		incomeStatement: async (): Promise<IncomeStatement> => ({
+			...statement,
+			currency: null,
+			unit: null,
+		}),
+	};
+	await open("#/vol/reports", { reader });
+	expect(withMenu.length).toBeGreaterThan(0);
+	// vol's own currency is the statement's, so the lines read the same
+	expect(shown()).toEqual(withMenu);
+	expect(shown().join(" ")).toContain("$");
+});

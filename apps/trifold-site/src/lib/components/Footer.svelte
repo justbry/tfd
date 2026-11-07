@@ -55,7 +55,7 @@
 					>tfd</a
 				>, the engine behind it. Source-available on GitHub; each release becomes Apache-2.0 after two years.
 			</p>
-			<p class="num">© 2026 Trifold · Sample data on this site is invented.</p>
+			<p class="num">© 2026 Trifold. All rights reserved. · Sample data on this site is invented.</p>
 		</div>
 	</div>
 </footer>

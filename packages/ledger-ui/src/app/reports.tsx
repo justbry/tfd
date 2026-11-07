@@ -42,6 +42,11 @@ const financeOnlyTitle = "Finance admins only: the rows behind a figure";
 const grainWords = { year: "years", quarter: "quarters", month: "months" };
 /** A figure the source does not record yet (the Worker answers null): never shown as 0. */
 const notAvailableText = "—";
+const donorsNotAvailableText = "Not available yet: no source records donors.";
+/** The statement as Reports shows it: a school with no published menu has no statement currency or unit, so the
+ * school's own stand in (as the Ledger's do). */
+type ShownStatement = IncomeStatement & { currency: string; unit: CreditUnit };
+
 const statementAmount = (cents: number | null, currency: string): string =>
 	cents === null ? notAvailableText : formatMoney(cents, currency);
 const whoSees: Record<AudienceReport["audience"], string> = {
@@ -306,7 +311,7 @@ function StatementBody({
 	onDrill,
 	onPromos,
 }: {
-	statement: IncomeStatement;
+	statement: ShownStatement;
 	period: Period;
 	onDrill: (drill: LedgerDrill) => void;
 	onPromos: () => void;
@@ -430,7 +435,7 @@ function Statement({
 	period,
 	onDrill,
 }: {
-	statement: IncomeStatement;
+	statement: ShownStatement;
 	period: Period;
 	onDrill: (drill: LedgerDrill) => void;
 }): JSX.Element {
@@ -742,13 +747,17 @@ function DocumentStatement({
 
 // ---- Rules in force.
 
+/** A rule with no source (D11): the row says so and claims no cutoff. */
+const ruleNotAvailable = "Not available";
+
 function Rules({
 	rules,
 	unit,
 	canEdit,
 	onEdit,
 }: {
-	rules: SchoolRules;
+	/** Null where no source has the rules (D11). */
+	rules: SchoolRules | null;
 	unit: CreditUnit;
 	canEdit: boolean;
 	onEdit: () => void;
@@ -757,17 +766,23 @@ function Rules({
 		{
 			rule: "cutoff",
 			label: "Cancel cutoff (default)",
-			value: `${rules.cancelCutoffHours} hours before`,
+			value: rules
+				? `${rules.cancelCutoffHours} hours before`
+				: ruleNotAvailable,
 		},
 		{
 			rule: "no-show",
 			label: "No-show",
-			value: `${unit.other} are ${rules.noShow === "spend" ? "spent" : "released"}`,
+			value: rules
+				? `${unit.other} are ${rules.noShow === "spend" ? "spent" : "released"}`
+				: ruleNotAvailable,
 		},
 		{
 			rule: "late-cancel",
 			label: "Late cancel",
-			value: `${unit.other} are ${rules.lateCancel === "spend" ? "forfeited" : "released"}`,
+			value: rules
+				? `${unit.other} are ${rules.lateCancel === "spend" ? "forfeited" : "released"}`
+				: ruleNotAvailable,
 		},
 	];
 	return (
@@ -832,11 +847,15 @@ export function Reports({
 		if (pinLocked) return null;
 		const [rules, donors] = await Promise.all([
 			reader.schoolRules(school.id),
-			reader.donors({
-				school: school.id,
-				audience,
-				year: Number(clock.today.slice(0, 4)),
-			}),
+			// Donor names have no source yet (S8-contract section 11): a donors read that fails leaves the card not
+			// available and the rest of the report as it is.
+			reader
+				.donors({
+					school: school.id,
+					audience,
+					year: Number(clock.today.slice(0, 4)),
+				})
+				.catch(() => null),
 		]);
 		const common = { rules, donors };
 		return documentAudience === null
@@ -870,7 +889,8 @@ export function Reports({
 			<PinLock
 				key={audience}
 				levelName={audienceNames[audience]}
-				onUnlock={() => {
+				unlock={(pin) => writer.unlockBooks(school.id, pin)}
+				onUnlocked={() => {
 					navigate(withQuery(route, "pin", null));
 					onToast("Books unlocked for this session.");
 				}}
@@ -880,7 +900,12 @@ export function Reports({
 		return <LoadFailed what="the report" onRetry={status.retry} />;
 	if (!loaded) return null;
 
-	const { rules, donors, statement, document } = loaded;
+	const { rules, donors, document } = loaded;
+	const statement: ShownStatement | null = loaded.statement && {
+		...loaded.statement,
+		currency: loaded.statement.currency ?? school.currency,
+		unit: loaded.statement.unit ?? school.creditUnit,
+	};
 	const openLedger = (drill: LedgerDrill): void =>
 		navigate(ledgerRoute(route, drill));
 	const download = statement ? (
@@ -944,20 +969,31 @@ export function Reports({
 				</div>
 				<Rules
 					rules={rules.rules}
-					unit={rules.unit}
+					unit={rules.unit ?? school.creditUnit}
 					canEdit={admin}
 					onEdit={() => onToast("Opening school settings in buzz-school…")}
 				/>
 			</div>
 			<div class="card" data-test="donors" style="margin-top:10px">
-				<Donors
-					report={donors}
-					audience={audience}
-					currency={school.currency}
-					today={clock.today}
-					writer={writer}
-					onToast={onToast}
-				/>
+				{donors ? (
+					<Donors
+						report={donors}
+						audience={audience}
+						currency={school.currency}
+						today={clock.today}
+						writer={writer}
+						onToast={onToast}
+					/>
+				) : (
+					<>
+						<h5 data-test="donors-title">
+							<Icon name="users" /> Donors and payers
+						</h5>
+						<div class="mut" data-test="donors-not-available">
+							{donorsNotAvailableText}
+						</div>
+					</>
+				)}
 			</div>
 		</>
 	);

@@ -233,8 +233,12 @@ const sumsToZero = (e: AtmEvent) => {
 };
 
 /** The events that move credits: the money lines of a payment or a refund (`payment.*`) are tested apart, in tests/billing-money.test.ts. */
+/** The credit and plan events: not the money lines, nor the MRR they move (`tests/billing-mrr.test.ts`). */
 const creditEvents = (events: readonly AtmEvent[]) =>
-	events.filter((e) => !e.event_type.startsWith("payment."));
+	events.filter(
+		(e) =>
+			!e.event_type.startsWith("payment.") && e.event_type !== "mrr.changed",
+	);
 
 describe("handleStripeEvent", () => {
 	test("a first payment: rows for the engine and the grants under one revision, and a labelled credit.granted", () => {
@@ -402,7 +406,7 @@ describe("handleStripeEvent", () => {
 			T0 + 86_400_000,
 		);
 		expect(
-			r.events.map((e) => [e.event_type, e.postings, e.payload]),
+			creditEvents(r.events).map((e) => [e.event_type, e.postings, e.payload]),
 		).toMatchObject([
 			[
 				"credit.expiration_changed",
@@ -471,7 +475,8 @@ describe("handleStripeEvent", () => {
 				at: T0 + 86_400_000,
 			});
 		const first = s.handle(ended("evt_sub_del"), T0 + 86_400_000);
-		expect(first.events).toHaveLength(1);
+		// the expiration event, and the MRR the end takes away
+		expect(creditEvents(first.events)).toHaveLength(1);
 		expect(s.handle(ended("evt_sub_del"), T0 + 86_400_000)).toEqual({
 			rowChanges: null,
 			events: [],
@@ -783,7 +788,7 @@ describe("what the random histories found", () => {
 		const moved = ended.events.filter(
 			(e) => e.event_type === "credit.expiration_changed",
 		);
-		expect(moved).toHaveLength(ended.events.length);
+		expect(moved).toHaveLength(creditEvents(ended.events).length);
 		const byRow = Object.fromEntries(
 			moved.map((e) => [
 				(e.payload as { row_id: string }).row_id,
@@ -1507,7 +1512,7 @@ describe("subscription events", () => {
 				}),
 				T0 + DAY,
 			);
-			return r.events.map((e) => e.idem);
+			return creditEvents(r.events).map((e) => e.idem);
 		});
 		expect(idems[0]).toHaveLength(1);
 		expect(idems[0]?.[0]).not.toBe(idems[1]?.[0]);

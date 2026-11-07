@@ -2,6 +2,7 @@
 	"name": "trifold-site",
 	"version": "0.1.0",
 	"private": true,
+	"license": "SEE LICENSE IN LICENSE",
 	"type": "module",
 	"description": "The Trifold marketing website: a SvelteKit static site for Cloudflare Pages.",
 	"imports": {
@@ -14,6 +15,7 @@
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"samples": "bun ./scripts/make-samples.ts",
+		"org-demos:sync": "bun ./scripts/sync-org-demos.ts",
 		"test": "bun test tests",
 		"prepare": "svelte-kit sync || echo ''"
 	},

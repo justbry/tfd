@@ -10,7 +10,7 @@
  */
 import type { AtmEvent } from "../types.js";
 import { byText } from "./order.js";
-import { MONEY_COMMODITY } from "./postings.js";
+import { isCreditCommodity } from "./postings.js";
 import { decimalToUnits } from "./util.js";
 
 const MONEY_DECIMALS = 2;
@@ -134,8 +134,8 @@ const cents = (amount: string): number =>
 	Number(decimalToUnits(amount, MONEY_DECIMALS));
 
 const creditsOf = (event: AtmEvent): number | null => {
-	const postings = event.postings.filter(
-		(posting) => posting.commodity !== MONEY_COMMODITY,
+	const postings = event.postings.filter((posting) =>
+		isCreditCommodity(posting.commodity),
 	);
 	if (postings.length === 0) return null;
 	const sum = (prefix: string) =>

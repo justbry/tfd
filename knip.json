@@ -116,6 +116,14 @@
 				"scripts/org-demos/dashboard.client.js"
 			]
 		},
+		"packages/ledger-worker": {
+			"entry": [
+				"src/main.ts",
+				"src/testing/worker-entry.ts",
+				"tests/**/*.test.ts"
+			],
+			"project": ["src/**/*.ts"]
+		},
 		"packages/ksuid": {
 			"project": ["src/**/*.ts"]
 		},

@@ -2,7 +2,11 @@
  * The ledger-commodity rule for a menu's feature ids. Pure and free of Ajv, so the replay path (`billing/grants.ts`)
  * can use it without pulling in the schema validator that `billing/menu.ts` imports.
  */
-import { commodityOf, MONEY_COMMODITY } from "../ledger/postings.js";
+import {
+	commodityOf,
+	MONEY_COMMODITY,
+	MRR_COMMODITY,
+} from "../ledger/postings.js";
 
 /** A feature id that cannot be a ledger commodity, or two that would share one. `path` is the dotted path of the feature at fault. */
 export type CommodityProblem = { path: string; message: string };
@@ -36,6 +40,14 @@ export const commodityProblems = (
 			problems.push({
 				path,
 				message: `feature id ${JSON.stringify(feature.id)} becomes the credit commodity ${commodity}, which is the money commodity (dollars): give it an id whose letters do not spell ${MONEY_COMMODITY}`,
+			});
+			return;
+		}
+		// MRR is the books' memo commodity of recurring revenue, in cents: a credit in it would add up with that.
+		if (commodity === MRR_COMMODITY) {
+			problems.push({
+				path,
+				message: `feature id ${JSON.stringify(feature.id)} becomes the credit commodity ${commodity}, which is the books' recurring revenue commodity: give it an id whose letters do not spell ${MRR_COMMODITY}`,
 			});
 			return;
 		}

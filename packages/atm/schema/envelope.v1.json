@@ -71,7 +71,8 @@
 				"share.accrued",
 				"share.reversed",
 				"share.settled",
-				"money.skipped"
+				"money.skipped",
+				"mrr.changed"
 			]
 		},
 		"event_time": {

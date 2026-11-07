@@ -2,11 +2,23 @@
 
 The sections for past releases keep the name the engine had then, `atm`.
 
-## On `dev` since 0.9.0
+## On `dev` since 0.10.0
 
-Changes merged to `dev` after the `atm-v0.9.0` tag. Nothing here is in a release yet.
+Changes merged to `dev` after the `atm-v0.10.0` tag. Nothing here is in a release yet.
 
-- **The CLI is also `tfd` (additive: nothing to change).** The docs now call the product and the managed service Trifold and this package the Trifold engine, and the CLI `tfd`. `atm` is the same command and keeps working, so scripts and cron lines that call `atm` need no change. Nothing stored or published changed: the package is still `atm` (`import … from "atm"`, `"atm/worker"`), the release is still `atm-v<version>` with `atm-<version>.tgz`, and the `ATM_*` environment variables, the handler's tables, the events, the log layout and the log prefixes are as they were. The names that must never change are listed in `docs/frozen-identifiers.md`.
+- **The package is named `tfd`, and releases are `tfd-v<version>` with `tfd-<version>.tgz` (nothing to change until you move the pin).** The published `package.json` now says `"name": "tfd"` and `"license": "SEE LICENSE IN LICENSING.md"` (it said `Apache-2.0`, which was wrong: the bundle holds the FSL-1.1-ALv2 engine). The tarball carries `LICENSE.md` (FSL), `LICENSING.md` and `LICENSES/Apache-2.0.txt` in place of `LICENSE`. Releases stay on `justbry/atm`; old `atm-v*` releases stay where they are. When you move buzz-school to the first `tfd-v*` release (0.10.0 and earlier are `atm-v*`), either:
+  1. **keep the key**: `"atm": "https://github.com/justbry/atm/releases/download/tfd-v<version>/tfd-<version>.tgz"`. Bun installs the tarball under the key, so `import … from "atm"` keeps working (checked under Bun and Node); or
+  2. **rename it**: `"tfd": "…"`, and change every `from "atm"` to `from "tfd"` in the same commit.
+
+## Moving to 0.10.0 from 0.9.0
+
+Everything merged to `dev` after the `atm-v0.9.0` tag is in 0.10.0. A caller that reads `views/months/YYYY-MM.json` must change (the first item); the rest is additive or says what to do.
+
+- **`MonthView.money` is removed from `views/months/YYYY-MM.json` (a reader of it must change).** The month's money (collected, refunded, fees, net) is now `money` in `views/finance/months/YYYY-MM.json`, which `runViews` writes next to the other views (finance members are `views/finance/members/<hash>.json`, KPI contributions `views/kpi/contributions/YYYY-MM.json`). A reader that took `month.money` reads the finance month instead; a TypeScript caller sees the property gone from `MonthView`. Every month object, the manifest and a committed view snapshot change bytes, so regenerate the views and any hash pinned over them. Detail: `plans/ledger-ui/S8a-hash-changes.md`.
+- **The tarball now has `atm/worker` (additive).** Earlier tarballs had no `./worker` export; a pinned install of 0.10.0 can `import … from "atm/worker"` (the Worker-safe read slice: `kpiDocument`, `runViews`, `incomeStatement`, `ledgerRows`, views, `R2BindingStore`). It needs the `nodejs_compat` flag in a Worker (README).
+- **`catalogPublishedEvent` is also exported from the package root (additive).** It was in `atm/worker` only. A caller that already imports it from `atm/worker` needs no change.
+
+- **The CLI is also `tfd` (additive: nothing to change).** The docs now call the product and the managed service Trifold and this package the Trifold engine, and the CLI `tfd`. `atm` is the same command and keeps working, so scripts and cron lines that call `atm` need no change. Nothing stored changed (the package and release names changed later; see the item above): the `ATM_*` environment variables, the handler's tables, the events, the log layout and the log prefixes are as they were. The names that must never change are listed in `docs/frozen-identifiers.md`.
 
 - **Signed receipts and sealed months (additive: new exports and commands; nothing a caller does today changes).** No table, no change to the handler, the outbox or any event. New exports: `receiptOf`, `signReceipt`, `verifyReceipt`, `checkReceiptAgainstEvents`, `sealOf`, `signSeal`, `verifySeals`, and the types `AtmReceipt`, `AtmSignedReceipt`, `AtmSigner`, `AtmPublicKeys`, `ReceiptVerdict`, `LedgerVerdict`, `AtmSeal`, `AtmSignedSeal`, `SealOfInput`, `SealReport`; new schemas `schema/receipt.v1.json` and `schema/seal.v1.json`; new commands `tfd keys new`, `tfd receipt`, `tfd verify receipt`, `tfd seal`, `tfd verify seals` (README, "Receipts and seals"). To use them, in order:
   1. **Make one platform key** with `tfd keys new --out <dir>` (default id `trifold-YYYY-MM`). Keep `<id>.private.pem` in the secret store, never in the repository; publish `keys.json`. When you rotate, run `tfd keys new --out <dir> --id <new id>` into the same folder: it adds the new public key to `keys.json` beside the old ones, which old receipts and seals still need.

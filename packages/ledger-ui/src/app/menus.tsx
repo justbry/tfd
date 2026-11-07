@@ -127,7 +127,9 @@ const schoolLabel = (school: School): string =>
 	[
 		school.name,
 		school.stale ? "stale" : "",
-		school.attentionCount > 0 ? `${school.attentionCount} need attention` : "",
+		school.attentionCount !== null && school.attentionCount > 0
+			? `${school.attentionCount} need attention`
+			: "",
 	]
 		.filter(Boolean)
 		.join(", ");
@@ -270,7 +272,7 @@ export function SchoolList({
 						<Icon name="building" />
 						<span class="sp2">{school.name}</span>
 						{school.stale && <span class="badge b-warn">stale</span>}
-						{school.attentionCount > 0 && (
+						{school.attentionCount !== null && school.attentionCount > 0 && (
 							<span class="badge b-warn">{school.attentionCount}</span>
 						)}
 					</button>

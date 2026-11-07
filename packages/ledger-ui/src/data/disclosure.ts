@@ -231,7 +231,8 @@ export type ViewAsOption = {
 /** The signed-in person at the school (spec "A person's audiences"). */
 export type Viewer = {
 	id: string;
-	name: string;
+	/** Null when no source gives the signed-in person's name (the HTTP build). */
+	name: string | null;
 	role: "owner" | "admin" | "member";
 	financeGrant: boolean;
 	/** The highest audience held. */
@@ -334,6 +335,10 @@ export const derivedKpis: Record<
 	arpa: { inputs: ["gross_collected", "paying_members"], capped: true },
 	breakage_rate: {
 		inputs: ["credits_expired", "credits_granted"],
+		capped: false,
+	},
+	net_new_mrr: {
+		inputs: ["new_mrr", "expansion_mrr", "contraction_mrr", "churned_mrr"],
 		capped: false,
 	},
 };

@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
-	 * A simulated org in full, for its audience page: what's modelled, every verified preset and the KPIs it produces.
-	 * No dashboard and no demo link; the numbers come from the CLI.
+	 * A simulated org in full, for its audience page: what's modelled, every verified preset and the KPIs it produces,
+	 * as the CLI prints them. Its demo dashboard is framed or linked beside it, by SimulatedSection.
 	 */
 	import { presetView, SCENARIO_ORGS_URL, type Vertical } from "#lib/verticals";
 	import PresetStats from "./PresetStats.svelte";

@@ -31,6 +31,7 @@ import type {
 	Menu,
 	RowData,
 } from "../src/billing/types.js";
+import type { AtmEvent } from "../src/types.js";
 import { createStore, type Store } from "./billing-store.js";
 import {
 	chargeRefunded,
@@ -38,6 +39,10 @@ import {
 	invoicePaid,
 	subscriptionEvent,
 } from "./stripe-events.js";
+
+/** What a decision books besides the MRR it moves (`tests/billing-mrr.test.ts`). */
+const withoutMrr = (events: readonly AtmEvent[]) =>
+	events.filter((event) => event.event_type !== "mrr.changed");
 
 const SCHOOL = "sch_vol";
 const FAMILY = "fam_q42";
@@ -364,7 +369,7 @@ describe("a raise mid-cycle (2 -> 4, always_invoice)", () => {
 		const eventFirst = newStore();
 		create(eventFirst, { quantity: 2 });
 		const sub = eventFirst.handle(updated(4, RAISED), RAISED);
-		expect(sub.events).toEqual([]);
+		expect(withoutMrr(sub.events)).toEqual([]);
 		expect(sub.rowChanges?.upserts.map((u) => u.table)).toEqual([GRANTS_TABLE]);
 		expect(eventFirst.avail(RAISED + SECOND)).toBe(4);
 		expect(grantsOf(eventFirst).quantity).toBe(2);
@@ -1059,7 +1064,7 @@ describe("a decrease (4 -> 2)", () => {
 		create(s, { quantity: 4 });
 		s.spend(2, CREATED + DAY);
 		const sub = s.handle(updated(2, LOWERED), LOWERED);
-		expect(sub.events).toEqual([]);
+		expect(withoutMrr(sub.events)).toEqual([]);
 		expect(s.avail(LOWERED + SECOND)).toBe(6);
 		expect(grantsOf(s).quantity).toBe(4);
 		expect(grantsOf(s).membership?.quantity).toBe(2);
@@ -1119,7 +1124,7 @@ describe("the membership's quantity", () => {
 		);
 		expect(same.rowChanges).toBeNull();
 		const r = s.handle(updated(4, CREATED + 2 * HOUR), CREATED + 2 * HOUR);
-		expect(r.events).toEqual([]);
+		expect(withoutMrr(r.events)).toEqual([]);
 		expect(r.rowChanges?.upserts.map((u) => u.table)).toEqual([GRANTS_TABLE]);
 		const state = grantsOf(s);
 		expect(state.membership?.quantity).toBe(4);
@@ -1187,7 +1192,7 @@ describe("a line that pays for no units", () => {
 		const s = newStore();
 		const result = create(s, { quantity: 0 });
 		expect(result.refused).toBeUndefined();
-		expect(result.events).toEqual([]);
+		expect(withoutMrr(result.events)).toEqual([]);
 		expect(grantsOf(s).quantity).toBe(1);
 	});
 

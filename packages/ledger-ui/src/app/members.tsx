@@ -58,6 +58,7 @@ import {
 	type Change,
 	capitalized,
 	formatDay,
+	formatPeriodEnd,
 	insideCutoffOf,
 	membershipChangesOf,
 	paymentsOf,
@@ -255,7 +256,8 @@ function MemberRow({
 							<>
 								{" "}
 								<span class="badge" data-test="status-badge">
-									Cancels {formatDay(member.currentPeriodEnd, school.timeZone)}
+									Cancels{" "}
+									{formatPeriodEnd(member.currentPeriodEnd, school.timeZone)}
 								</span>
 							</>
 						)}
@@ -478,7 +480,7 @@ function Roster({
 	const memberOf = (person: Person): Member | null =>
 		loaded.members.find(({ profileId }) => profileId === person.id) ?? null;
 	const renewalOf = (member: Member | null): string =>
-		member ? formatDay(member.currentPeriodEnd, school.timeZone) : "";
+		member ? formatPeriodEnd(member.currentPeriodEnd, school.timeZone) : "";
 	const writeContextOf = (person: Person): WriteContext => ({
 		writer,
 		schoolId: school.id,

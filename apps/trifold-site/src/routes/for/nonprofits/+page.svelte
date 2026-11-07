@@ -6,7 +6,7 @@
 	const faq = [
 		{
 			q: "Is there a non-profit simulation?",
-			a: "Not one of its own. The closest is Cedar Hill Community Church, a simulated church: recurring gifts at fixed levels, one-time gifts and a few refunds. It shows how gifts move through the same books and checks.",
+			a: "Not one of its own. The closest is Cedar Hill Community Church, a simulated church: monthly and yearly gifts at fixed levels, one-time gifts and a few refunds. It shows how gifts move through the same books and checks, and it has a demo dashboard on synthetic data.",
 		},
 		{
 			q: "Can donors get acknowledgment letters?",
@@ -39,6 +39,7 @@
 		<SimulatedSection
 			slug="churches"
 			title="The closest simulation: a year of giving."
+			embed={false}
 			lede="There's no non-profit or co-op simulation of its own. The closest giving model is Cedar Hill Community Church, a simulated church. Its year runs through the engine, hledger and DuckDB, and all three give the same KPI hash."
 		/>
 	{/snippet}

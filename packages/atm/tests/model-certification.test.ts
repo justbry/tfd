@@ -459,11 +459,11 @@ describe("measures resolve", () => {
 	const measureIds = new Set(measures.map((measure) => measure.id));
 
 	test("the model parses and has the counts it is expected to", () => {
-		expect(model.entities).toHaveLength(19);
+		expect(model.entities).toHaveLength(20);
 		expect(model.relationships).toHaveLength(8);
 		expect(model.dimensions).toHaveLength(5);
-		expect(model.measures).toHaveLength(29);
-		expect(measures).toHaveLength(29);
+		expect(model.measures).toHaveLength(35);
+		expect(measures).toHaveLength(35);
 	});
 
 	test("every kpiSpec measure is a KPI of the spec, and every spec KPI has a kpiSpec measure", () => {
@@ -591,12 +591,13 @@ describe("disclosure meaning of capped", () => {
 		(measure) => measure.source === "kpiSpec" && measure.inputs.length > 0,
 	);
 
-	test("the derived kpiSpec measures are the five the disclosure file lists", () => {
+	test("the derived kpiSpec measures are the six the disclosure file lists", () => {
 		expect(derived.map((measure) => measure.id).sort()).toEqual([
 			"arpa",
 			"breakage_rate",
 			"dispute_rate",
 			"net_income",
+			"net_new_mrr",
 			"refund_rate",
 		]);
 	});

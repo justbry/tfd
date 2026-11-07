@@ -1,0 +1,29 @@
+{
+	"name": "ledger-worker",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The ledger Worker: the read endpoints of the ledger UI (ledger.b4uni.com) over a school's R2 views and event log, behind a ledger token. See plans/ledger-ui/S8-contract.md section 11.",
+	"exports": {
+		"./testing": {
+			"bun": "./src/testing/harness.ts",
+			"default": "./src/testing/harness.ts"
+		}
+	},
+	"scripts": {
+		"ts": "tsc --noEmit",
+		"test": "bun test tests",
+		"check:bundle": "bun scripts/check-bundle.ts",
+		"staging-e2e": "bun scripts/staging-e2e.ts"
+	},
+	"dependencies": {
+		"tfd": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/bun": "1.4.2",
+		"@types/node": "24.13.3",
+		"esbuild": "0.25.0",
+		"miniflare": "4.20260730.0",
+		"typescript": "~5.8.3"
+	}
+}

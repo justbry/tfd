@@ -16,21 +16,22 @@ import p12 from "../../schema/payload/dispute.closed.v1.json";
 import p13 from "../../schema/payload/fundraise.paid_out.v1.json";
 import p14 from "../../schema/payload/fundraise.received.v1.json";
 import p15 from "../../schema/payload/money.skipped.v1.json";
-import p16 from "../../schema/payload/payment.disputed.v1.json";
-import p17 from "../../schema/payload/payment.refunded.v1.json";
-import p18 from "../../schema/payload/payment.succeeded.v1.json";
-import p19 from "../../schema/payload/payout.paid.v1.json";
-import p20 from "../../schema/payload/plan.attached.v1.json";
-import p21 from "../../schema/payload/plan.canceled.v1.json";
-import p22 from "../../schema/payload/plan.changed.v1.json";
-import p23 from "../../schema/payload/policy.published.v1.json";
-import p24 from "../../schema/payload/referral.qualified.v1.json";
-import p25 from "../../schema/payload/referral.rewarded.v1.json";
-import p26 from "../../schema/payload/share.accrued.v1.json";
-import p27 from "../../schema/payload/share.charged.v1.json";
-import p28 from "../../schema/payload/share.reversed.v1.json";
-import p29 from "../../schema/payload/share.settled.v1.json";
-import p30 from "../../schema/payload/subject.erased.v1.json";
+import p16 from "../../schema/payload/mrr.changed.v1.json";
+import p17 from "../../schema/payload/payment.disputed.v1.json";
+import p18 from "../../schema/payload/payment.refunded.v1.json";
+import p19 from "../../schema/payload/payment.succeeded.v1.json";
+import p20 from "../../schema/payload/payout.paid.v1.json";
+import p21 from "../../schema/payload/plan.attached.v1.json";
+import p22 from "../../schema/payload/plan.canceled.v1.json";
+import p23 from "../../schema/payload/plan.changed.v1.json";
+import p24 from "../../schema/payload/policy.published.v1.json";
+import p25 from "../../schema/payload/referral.qualified.v1.json";
+import p26 from "../../schema/payload/referral.rewarded.v1.json";
+import p27 from "../../schema/payload/share.accrued.v1.json";
+import p28 from "../../schema/payload/share.charged.v1.json";
+import p29 from "../../schema/payload/share.reversed.v1.json";
+import p30 from "../../schema/payload/share.settled.v1.json";
+import p31 from "../../schema/payload/subject.erased.v1.json";
 import receipt from "../../schema/receipt.v1.json";
 import seal from "../../schema/seal.v1.json";
 
@@ -54,19 +55,20 @@ export const payloadSchemas: Record<string, Record<string, unknown>> = {
 	"fundraise.paid_out": p13,
 	"fundraise.received": p14,
 	"money.skipped": p15,
-	"payment.disputed": p16,
-	"payment.refunded": p17,
-	"payment.succeeded": p18,
-	"payout.paid": p19,
-	"plan.attached": p20,
-	"plan.canceled": p21,
-	"plan.changed": p22,
-	"policy.published": p23,
-	"referral.qualified": p24,
-	"referral.rewarded": p25,
-	"share.accrued": p26,
-	"share.charged": p27,
-	"share.reversed": p28,
-	"share.settled": p29,
-	"subject.erased": p30,
+	"mrr.changed": p16,
+	"payment.disputed": p17,
+	"payment.refunded": p18,
+	"payment.succeeded": p19,
+	"payout.paid": p20,
+	"plan.attached": p21,
+	"plan.canceled": p22,
+	"plan.changed": p23,
+	"policy.published": p24,
+	"referral.qualified": p25,
+	"referral.rewarded": p26,
+	"share.accrued": p27,
+	"share.charged": p28,
+	"share.reversed": p29,
+	"share.settled": p30,
+	"subject.erased": p31,
 };

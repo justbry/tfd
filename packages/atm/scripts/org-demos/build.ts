@@ -60,6 +60,8 @@ export type DemoPage = {
 		credit: { one: string; other: string };
 	};
 	titles: Record<string, string>;
+	/** The owner caption's sentence about anonymous names, in the org's words ("" leaves it out). */
+	anonymousNote: string;
 	presets: DemoPreset[];
 };
 
@@ -154,6 +156,7 @@ export const demoPage = async (kind: OrgKind): Promise<DemoPage> => {
 			credit: labels.credit,
 		},
 		titles: orgKpiTitles(kind),
+		anonymousNote: labels.anonymousNote ?? "",
 		presets,
 	};
 };
@@ -200,7 +203,7 @@ export const galleryHtml = (pages: readonly DemoPage[]): string => {
 		.join("\n");
 	return `${head("Trifold KPI demos · demo, synthetic data", readAsset("dashboard.css"))}<body class="gallery">
 <header><h1>Trifold KPI demos <span>demo, synthetic data</span></h1></header>
-<p class="note">Five invented organizations, each with months of simulated billing run through the Trifold engine. Every dashboard draws atm's KPI document as built from that org's events, with no login. Every name and number is invented.</p>
+<p class="note">Five invented organizations, each with months of simulated billing run through the Trifold engine. Every dashboard draws the Trifold KPI document as built from that org's events, with no login. Every name and number is invented.</p>
 <ul class="cards">
 ${cards}
 </ul>

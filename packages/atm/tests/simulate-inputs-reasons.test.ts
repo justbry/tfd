@@ -196,6 +196,8 @@ describe("the version labels come from the input's own row", () => {
 		).toEqual([
 			["3", "1"],
 			["3", "1"],
+			// the first invoice's mrr.changed (the renewal at the same price moves no MRR)
+			["3", "1"],
 			["4", "2"],
 			["4", "2"],
 		]);

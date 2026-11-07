@@ -139,6 +139,9 @@ button.on {
 #theme {
 	margin-left: auto;
 }
+.embed #theme {
+	display: none;
+}
 .note {
 	font-size: 11px;
 	color: var(--mu);

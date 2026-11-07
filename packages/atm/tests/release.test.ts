@@ -31,7 +31,6 @@ import {
 
 /** No network: the tarball is built, packed and installed from disk, as the family service would install it. */
 const COMMIT = "0123456789abcdef0123456789abcdef01234567";
-const root = join(import.meta.dir, "../../..");
 const { version } = JSON.parse(
 	readFileSync(join(import.meta.dir, "../package.json"), "utf8"),
 ) as { version: string };
@@ -117,12 +116,12 @@ describe("the publish package.json", () => {
 			"sideEffects",
 		]);
 		expect(manifest).toEqual({
-			name: "atm",
+			name: "tfd",
 			version: "1.2.3",
-			license: "Apache-2.0",
+			license: "SEE LICENSE IN LICENSING.md",
 			repository: {
 				type: "git",
-				url: "git+https://github.com/justbry/atm.git",
+				url: "git+https://github.com/justbry/tfd.git",
 				directory: "packages/atm",
 			},
 			type: "module",
@@ -130,8 +129,12 @@ describe("the publish package.json", () => {
 			types: "./dist/index.d.ts",
 			exports: {
 				".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
+				"./worker": {
+					types: "./dist/worker.d.ts",
+					default: "./dist/worker.js",
+				},
 			},
-			files: ["dist"],
+			files: ["dist", "LICENSING.md", "LICENSES"],
 			sideEffects: false,
 		});
 	});
@@ -157,17 +160,20 @@ describe("the publish package.json", () => {
 });
 
 describe("the tarball", () => {
-	test("holds exactly the six files, and the LICENSE is the repo's", () => {
+	test("holds exactly these files, and the license texts are the package's", () => {
 		expect(listTarball(tarball)).toEqual([...PACKAGE_FILES]);
-		const license = Bun.spawnSync(
-			["tar", "-xzOf", tarball, "package/LICENSE"],
-			{
+		for (const file of [
+			"LICENSE.md",
+			"LICENSING.md",
+			"LICENSES/Apache-2.0.txt",
+		]) {
+			const text = Bun.spawnSync(["tar", "-xzOf", tarball, `package/${file}`], {
 				stdout: "pipe",
-			},
-		);
-		expect(license.stdout.toString()).toBe(
-			readFileSync(join(root, "LICENSE"), "utf8"),
-		);
+			});
+			expect(text.stdout.toString()).toBe(
+				readFileSync(join(import.meta.dir, "..", file), "utf8"),
+			);
+		}
 	});
 
 	test("the README names the source commit and upstream", () => {
@@ -204,6 +210,58 @@ describe("the tarball", () => {
 		expect(digests(packed).sha256).not.toBe(digests(tarball).sha256);
 	});
 
+	test("installed into an empty directory it exports what the ledger emission pins, from `tfd` and `tfd/worker`, under Bun and Node", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "atm-install-exports-"));
+		await writeFile(
+			join(dir, "package.json"),
+			JSON.stringify({ name: "consumer", private: true, type: "module" }),
+		);
+		const env = { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? dir };
+		const add = Bun.spawnSync(["bun", "add", tarball], { cwd: dir, env });
+		if (add.exitCode !== 0) throw new Error(add.stderr.toString());
+		const rootNames = [
+			"appendToOutbox",
+			"catalogPublishedEvent",
+			"HANDLER_DDL",
+			"ledgerEvent",
+			"migrateHandlerSchema",
+			"planOutbox",
+			"shipOutbox",
+		];
+		const workerNames = [
+			"catalogPublishedEvent",
+			"incomeStatement",
+			"kpiDocument",
+			"ledgerRows",
+			"runViews",
+		];
+		await writeFile(
+			join(dir, "exports.mjs"),
+			[
+				'import * as root from "tfd";',
+				'import * as worker from "tfd/worker";',
+				"const kinds = (module, names) => Object.fromEntries(names.map((name) => [name, typeof module[name]]));",
+				`console.log(JSON.stringify({ root: kinds(root, ${JSON.stringify(rootNames)}), worker: kinds(worker, ${JSON.stringify(workerNames)}) }));`,
+			].join("\n"),
+		);
+		for (const runtime of ["bun", "node"]) {
+			const out = Bun.spawnSync([runtime, "exports.mjs"], { cwd: dir, env });
+			if (out.exitCode !== 0) throw new Error(out.stderr.toString());
+			const kinds = JSON.parse(out.stdout.toString());
+			expect(kinds.root).toEqual(
+				Object.fromEntries(
+					rootNames.map((name) => [
+						name,
+						name === "HANDLER_DDL" ? "string" : "function",
+					]),
+				),
+			);
+			expect(kinds.worker).toEqual(
+				Object.fromEntries(workerNames.map((name) => [name, "function"])),
+			);
+		}
+	}, 60_000);
+
 	test("installed into an empty directory it runs the engine, validateMenu and invoice -> runOnState, under Bun and Node", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "atm-install-"));
 		await writeFile(
@@ -229,7 +287,7 @@ describe("the tarball", () => {
 			join(dir, "consumer.mjs"),
 			[
 				'import { readFileSync } from "node:fs";',
-				'import * as lib from "atm";',
+				'import * as lib from "tfd";',
 				'const read = (f) => JSON.parse(readFileSync(f, "utf8"));',
 				'const subject = read("subject.json"), command = read("command.json"), menu = read("menu.json"), invoice = read("invoice.json");',
 				'const catalog = lib.menuCatalogRows({ menu, school: "sch_vol" });',

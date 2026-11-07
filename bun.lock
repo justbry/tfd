@@ -392,8 +392,8 @@
       },
     },
     "packages/atm": {
-      "name": "atm",
-      "version": "0.9.0",
+      "name": "tfd",
+      "version": "0.10.0",
       "bin": {
         "atm": "./src/atm.ts",
         "tfd": "./src/bin.ts",
@@ -406,8 +406,8 @@
       },
       "devDependencies": {
         "@types/bun": "1.4.2",
-        "esbuild": "^0.25.0",
-        "miniflare": "^4.20260730.0",
+        "esbuild": "0.25.0",
+        "miniflare": "4.20260730.0",
         "typescript": "~5.8.3",
       },
     },
@@ -862,6 +862,20 @@
     "packages/ksuid": {
       "name": "@autumn/ksuid",
       "version": "1.0.0",
+    },
+    "packages/ledger-worker": {
+      "name": "ledger-worker",
+      "version": "0.1.0",
+      "dependencies": {
+        "tfd": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.2",
+        "@types/node": "24.13.3",
+        "esbuild": "0.25.0",
+        "miniflare": "4.20260730.0",
+        "typescript": "~5.8.3",
+      },
     },
     "packages/logging": {
       "name": "@autumn/logging",
@@ -1375,7 +1389,7 @@
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
         "@vitejs/plugin-react": "catalog:",
-        "esbuild": "0.25.0",
+        "esbuild": "^0.25.0",
         "eslint": "^9.21.0",
         "eslint-plugin-react-hooks": "^5.1.0",
         "eslint-plugin-react-refresh": "^0.4.19",
@@ -4020,8 +4034,6 @@
 
     "asynckit": ["asynckit@0.4.0", "", {}, "sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q=="],
 
-    "atm": ["atm@workspace:packages/atm"],
-
     "atmn": ["atmn@workspace:packages/atmn"],
 
     "atmn-tests": ["atmn-tests@workspace:packages/atmn-tests"],
@@ -5534,6 +5546,8 @@
 
     "leac": ["leac@0.6.0", "", {}, "sha512-y+SqErxb8h7nE/fiEX07jsbuhrpO9lL8eca7/Y1nuWV2moNlXhyd59iDGcRf6moVyDMbmTNzL40SUyrFU/yDpg=="],
 
+    "ledger-worker": ["ledger-worker@workspace:packages/ledger-worker"],
+
     "leven": ["leven@4.1.0", "", {}, "sha512-KZ9W9nWDT7rF7Dazg8xyLHGLrmpgq2nVNFUckhqdW3szVP6YhCpp/RAnpmVExA9JvrMynjwSLVrEj3AepHR6ew=="],
 
     "levn": ["levn@0.4.1", "", { "dependencies": { "prelude-ls": "^1.2.1", "type-check": "~0.4.0" } }, "sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ=="],
@@ -6893,6 +6907,8 @@
     "text-upper-case": ["text-upper-case@1.2.11", "", {}, "sha512-BfTL7yB1YIRlVGNdZUvno013hOq2cRs07fDR2ApppOXRDuKrEmsLDEY82xXlDzQHELp0jexqkI+NeyPIl6MtMw=="],
 
     "text-upper-case-first": ["text-upper-case-first@1.2.11", "", {}, "sha512-vgfbwKo8TEJbRsapR9LWWvIJRnv8u9aXVa6cyYOAQQmurCx54Cnt59x5fKdiq+hFaBJ51AbzCgMpbP3p65/pHQ=="],
+
+    "tfd": ["tfd@workspace:packages/atm"],
 
     "thenify": ["thenify@3.3.1", "", { "dependencies": { "any-promise": "^1.0.0" } }, "sha512-RVZSIV5IG10Hk3enotrhvz0T9em6cyHBLkH/YAZuKqd8hRkKhSfCGIcP2KUY0EPxndzANBmNllzWPwak+bheSw=="],
 

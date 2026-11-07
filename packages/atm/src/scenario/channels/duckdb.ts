@@ -97,18 +97,22 @@ const sqlFor = (kpi: BaseKpi, periods: readonly string[]): string => {
 				)
 			: "NULL";
 		const conditions = [
-			c.commodity === "usd" ? "commodity = 'USD'" : "commodity <> 'USD'",
+			c.commodity === "usd"
+				? "commodity = 'USD'"
+				: c.commodity === "mrr"
+					? "commodity = 'MRR'"
+					: "commodity NOT IN ('USD', 'MRR')",
 			...(c.where.account
 				? [`regexp_matches(account, ${lit(c.where.account)})`]
 				: []),
 			...eventConditions(c.where),
 			...(c.by ? [`${dim} IS NOT NULL`] : []),
 		];
-		// whole cents without float drift: the DECIMAL times 100 is exact; credit units must already be whole
+		// whole cents without float drift: the DECIMAL times 100 is exact; credit units and MRR cents must already be whole
 		const units =
 			c.commodity === "usd"
 				? "CAST(amount * 100 AS BIGINT)"
-				: `CASE WHEN amount = trunc(amount) THEN CAST(amount AS BIGINT) ELSE error('credit amount is not a whole number') END`;
+				: `CASE WHEN amount = trunc(amount) THEN CAST(amount AS BIGINT) ELSE error('credit or MRR amount is not a whole number') END`;
 		const postings = `SELECT ${MONTH} AS month, ${idOf(dim)} AS id, ${c.sign} * ${units} AS v FROM ledger_postings WHERE ${conditions.join(" AND ")}`;
 		if (c.cumulative)
 			return `SELECT m.id AS id, p.period AS period, CAST(sum(m.v) AS BIGINT) AS value FROM (${postings}) m JOIN (VALUES ${periods.map((p) => `(${lit(p)})`).join(", ")}) p(period) ON m.month <= p.period GROUP BY m.id, p.period`;

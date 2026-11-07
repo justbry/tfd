@@ -1,6 +1,6 @@
 # Licensing
 
-tfd (this package, still named `atm` until rename step 4) is source-available. Each file falls under one of these licenses; `REUSE.toml` is the machine-readable version of this table.
+tfd (this package) is source-available. Each file falls under one of these licenses; `REUSE.toml` is the machine-readable version of this table.
 
 | What | License | Text |
 |---|---|---|
