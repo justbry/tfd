@@ -9,6 +9,7 @@ Detail lives in the companion docs in this folder:
 | `pricing-strategy.md` | Tiers, pricing units, credits, features by tier, the license comparison |
 | `market-research.md` | Competitor prices with sources, the first market, research gaps |
 | `financial-model.md` | How to model 1–3 years with tfd's scenario generator, what it lacks, and how to add expenses |
+| `go-to-market.md` | Channels, the firm program ("Trifold for Firms"), referral and affiliate tiers, what Idaho and Utah allow when paying accountants |
 | `website-open-questions.md` | What must be decided or researched before the website can be built and launched |
 | `../brand/trifold-brand-and-messaging.md` | Names, voice, website outline, customer profiles (PR #121) |
 
@@ -105,6 +106,8 @@ A trademark policy reserves the names "Trifold" and "Witnessed by Trifold".
 Tiers are limited by ledger events per month, plus credits for AI and witness signatures. Storage and compute are included. Full rate card, credit prices and reasoning: `pricing-strategy.md`.
 
 ## 7. Go-to-market
+
+Channels, the firm program and the referral program are in `go-to-market.md`.
 
 The plan is built for adoption. Three loops spread the product:
 1. **Receipts carry a "Verify at trifold…" link.** Every payment a family makes shows them the product.

@@ -104,6 +104,8 @@ Published rule, not case-by-case discounts (Airtight sets firm discounts by hand
 - Clients a firm brings get 20% off their first year (to test).
 - A partner directory, with a stated policy that Trifold pays no referral fees to tax preparers, matching the disclosure Airtight publishes.
 
+The full firm program (Listed, Practice, Practice Pro) and the referral program are in `go-to-market.md`. Idaho and Utah allow CPAs commissions outside attest and compilation clients, with written disclosure, so the no-referral-fee rule is a choice stricter than the law (`go-to-market.md` §4).
+
 ### Firms hosting tfd for their clients: the tradeoffs (open, decide before the partner program)
 
 The FSL already allows a firm to work on a client's **own** install ("professional services that you provide to a licensee"). The open question is one firm running **one tfd for many clients**: that is probably a Competing Use, because it substitutes for Starter, Pro and the Witnessed + Bookkeeper bundle.
@@ -115,7 +117,7 @@ The FSL already allows a firm to work on a client's **own** install ("profession
 | **C. Public grant with a cap**, e.g. up to 10 clients free, then a partner agreement | Small firms are free; large ones pay; one rule, no case-by-case deals | A cap needs counting and trust; a firm can split into entities; still new legal text to maintain |
 | **D. No public grant; a written partner agreement on request** (a commercial license, priced per client or as a revenue share) | Keeps FSL's text clean; terms fit each firm; turns the largest firms into revenue | Case-by-case, which this section otherwise avoids; slower for firms; needs a lawyer per template |
 
-**Suggestion:** A now, with D available on request. B gives the most away exactly where Trifold earns: hosted books with a bookkeeper. Revisit C once the partner program has data on firm sizes. Whatever is chosen, it lives in a separate written permission, never in an edited FSL (a changed FSL is no longer FSL).
+**Suggestion:** A now, with D available on request, published as the firm program in `go-to-market.md` §2 (tiers, wholesale prices, white label that stops at the proof). Referrals and affiliate tiers are in `go-to-market.md` §3. B gives the most away exactly where Trifold earns: hosted books with a bookkeeper. Revisit C once the partner program has data on firm sizes. Whatever is chosen, it lives in a separate written permission, never in an edited FSL (a changed FSL is no longer FSL).
 
 ## 5. Credits
 
