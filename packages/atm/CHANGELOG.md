@@ -10,6 +10,14 @@ Newest first. The version history before 0.3.0 and what a caller has to change f
 
   **How each was checked:** every PR above was merged on local gates (tests with `--timeout 60000`, `tsc`, Biome, the build, `knip`), run on the head and again on the tree with `dev` merged in; the inherited Autumn workflows never ran. The atm workflow ran on #43's head (`ea198874c`, run 42067266463, ubuntu-latest): hledger 1.52.1 installed with a matching sha256, 1061 pass, 51 skip, 0 fail, and the three `hledger agrees` tests passed (none skipped). Locally, on the merged tree of each: #41 1090 pass, #42 1094, #49 1124, #46 1138, #47 1166, #48 1223 (50 skipped, 0 failed in each). #41 to #49 had not run in CI when merged; `dev`'s own runs are the first. The skips are the staging R2 and SeaweedFS contract suites and the DuckDB DDL test (no credentials, no `weed`, no `duckdb`). Four of them (#46 to #49) were each reviewed with a high-effort pass that found and fixed real bugs before the merge.
 
+## Unreleased
+
+Merged on `dev` after the 0.10.0 release PR.
+
+| PR | Merge commit | What |
+|---|---|---|
+| S8c2 (this PR) | | `audienceViews({ file, override, size, year, clock })`, `schoolSize` and `surfaceLocks` exported from `atm/worker` (ledger UI slice S8c2, for the ledger Worker): for each of the five audiences the `AudienceView` of the UI's disclosure contract (grain, delay, rounding, small counts, cell rules, the period control's presets and periods, and the server-worded summary, `sees`, `periodNote` and `customRangeNote`) from the B4 Uni file and the school's override, and a View as row's lock panels. Pure and Ajv-free; the output types are a copy of the UI's (`ledger/audience-view-types.ts`). `tests/audience-views.test.ts` requires views equal to every school of `packages/ledger-ui/src/fixtures/disclosure.json` at the clock `2026-11-05T12:00`, and covers overrides, the size bands and other clocks as spec-only cases; `tests/ledger-read-hygiene.test.ts` walks it for Worker safety. Additive: no other export, view or hash changes |
+
 ## 0.10.0
 
 **Release 0.10.0**: the ledger UI's read models and the exports buzz-school's ledger emission needs, with everything else merged on `dev` since `atm-v0.9.0` (`85c995cb2`). Tag `atm-v0.10.0` at the merge of its release PR on `dev`; the tarball is `https://github.com/justbry/atm/releases/download/atm-v0.10.0/atm-0.10.0.tgz` (the release script still publishes to `justbry/atm`; the repository is now `justbry/tfd`), and its sha256 and sha512 are printed by `release.ts` and recorded in the GitHub release notes. A minor release: the S8a and S8b exports are new API, and `MonthView.money` is removed (`UPGRADING.md`, "Moving to 0.10.0 from 0.9.0"). (#87 first landed in this file inside the 0.9.0 table, because its branch was merged after the 0.9.0 notes were rewritten; the tag `atm-v0.9.0` (`85c995cb2`) is from before #87, so its row is here.)
