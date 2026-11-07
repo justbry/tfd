@@ -8,7 +8,7 @@ Status: draft, 2026-11-07. Every price and rate here is an assumption to test wi
 |---|---|---|---|
 | Receipts | Every family that pays a Trifold school | Nothing: each receipt carries a "Verify at trifold…" link (growth loop 1) | `business-plan.md` §7 |
 | Schools referring schools | Paying schools | Account credit | 3.2 |
-| Community affiliates | Microschool consultants, co-ops and networks, homeschool and ed-tech creators, Stripe developers | Cash commission, limited to 12 months | 3.1 |
+| Community affiliates | Microschool consultants, co-ops and networks, homeschool and ed-tech creators, Stripe developers | Cash commission, limited to 24 months | 3.1 |
 | Accountants and bookkeepers | CPAs, enrolled agents, bookkeepers, tax preparers | No cash; client discounts, free seats, the firm program | 2, 3.3 |
 | Vertical software | Jackrabbit-, Pike13- and Mindbody-style tools | A revenue-share contract under Platform / Witness API (not covered here) | `pricing-strategy.md` §4 |
 
@@ -55,7 +55,7 @@ Tiers are ranked by active paying clients, like Xero's partner tiers.
 GoHighLevel pays **40% for as long as the customer pays**, plus **5% of the sales of affiliates you recruit**, with a 90-day last-click cookie and monthly Net-30 payouts over $50. Accounting vendors pay much less: Xero doesn't publish a rate (listings show 10% for 6 months, or $160 flat), and QuickBooks pays up to 10% with a 30-day cookie. Neither pays CPAs in cash; they pay through discounts and tiers.
 
 Trifold changes three things:
-- **Cash is limited to 12 months.** 40% for life is about $30 a month per school forever, at a ~$76 average.
+- **Cash is limited to 24 months,** matching the FSL's two years: a referral earns while the release it was sold on is still Trifold's to license. 40% for life is about $30 a month per school forever, at a ~$76 average.
 - **There is no second tier** (3.4).
 - **Accountants get no cash** (section 4).
 
@@ -65,11 +65,11 @@ The tier is recalculated monthly from the **paying schools the affiliate referre
 
 | Tier | Active schools referred | Commission | Extras |
 |---|---|---|---|
-| **Affiliate** | 0–4 | 25% of subscription revenue × 12 months | Link, referral code, dashboard |
-| **Partner** | 5–19 | 30% × 12 months | Demo account, co-marketing kit, directory listing |
-| **Ambassador** | 20+ | 35% × 12 months | Early access, featured on the site, quarterly call |
+| **Affiliate** | 0–4 | 25% of subscription revenue × 24 months | Link, referral code, dashboard |
+| **Partner** | 5–19 | 30% × 24 months | Demo account, co-marketing kit, directory listing |
+| **Ambassador** | 20+ | 35% × 24 months | Early access, featured on the site, quarterly call |
 
-The cost is bounded at 35% × 12 ≈ 4.2 months of a school's revenue (about $320 at $76/mo), and there is no lifetime liability. The referred school gets 20% off its first 3 months.
+The cost is bounded at 35% × 24 ≈ 8.4 months of a school's revenue (about $640 at $76/mo), and there is no lifetime liability. If a school stays 3 years, that is about 23% of its revenue. The referred school gets 20% off its first 3 months.
 
 ### 3.2 Schools referring schools (credit)
 
@@ -90,7 +90,7 @@ GoHighLevel's 5% second tier pays for building a downline. The FTC's guidance on
    - free to join, no purchase required, no paid ranks;
    - commission only on subscriptions customers actually paid for, never on affiliate signups or fees;
    - no income claims; affiliates disclose their commission (FTC endorsement guides);
-   - the 12-month cap means nobody earns forever from other people's work.
+   - the 24-month cap means nobody earns forever from other people's work.
 
 ### 3.5 Mechanics
 
