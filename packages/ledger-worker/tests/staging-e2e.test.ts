@@ -9,6 +9,7 @@ import {
 	findFixtureNames,
 	fixtureSchoolNames,
 	type Inputs,
+	inputsFrom,
 	LEDGER_ORIGIN,
 	newReport,
 	parseArgs,
@@ -16,6 +17,7 @@ import {
 	registerSecret,
 	resolveTargets,
 	runStages,
+	Session,
 	STAGING_API,
 	STAGING_WORKER,
 	scrub,
@@ -36,6 +38,7 @@ const NO_INPUTS: Inputs = {
 	paymentId: undefined,
 	refundCents: undefined,
 	bookingId: undefined,
+	schoolIdNoFinance: undefined,
 };
 
 let harness: LedgerHarness;
@@ -63,6 +66,15 @@ beforeAll(async () => {
 		port: 0,
 		fetch(request) {
 			const path = new URL(request.url).pathname;
+			if (path === "/echo")
+				return Response.json(
+					{
+						origin: request.headers.get("origin"),
+						cookie: request.headers.get("cookie"),
+						accept: request.headers.get("accept"),
+					},
+					{ headers: { "set-cookie": "b4u_session=renewed; Path=/" } },
+				);
 			if (path === "/.well-known/ledger-jwks.json")
 				return Response.json({ keys: harness.jwks.keys() });
 			if (request.method === "OPTIONS") {
@@ -282,6 +294,46 @@ test("arguments: stages, flags, and the safe default that leaves stage 4 out", (
 	});
 	expect(() => parseArgs(["--stage", "9"])).toThrow(UsageError);
 	expect(() => parseArgs(["--host", "x"])).toThrow(UsageError);
+	// stage 5 is the UI package's script: the error says where it runs
+	expect(() => parseArgs(["--stage", "5"])).toThrow(
+		"bun run --cwd packages/ledger-ui staging-ui",
+	);
+});
+
+test("S8F_SCHOOL_ID_NO_FINANCE is a uuid, read like the other inputs", () => {
+	const id = "666B4767-7006-4AB0-85E8-D7071053F9AF";
+	expect(inputsFrom({ S8F_SCHOOL_ID_NO_FINANCE: id }).schoolIdNoFinance).toBe(
+		id.toLowerCase(),
+	);
+	expect(inputsFrom({}).schoolIdNoFinance).toBeUndefined();
+	expect(() => inputsFrom({ S8F_SCHOOL_ID_NO_FINANCE: "school-1" })).toThrow(
+		UsageError,
+	);
+});
+
+test("the browser fetch of stage 5: the session's cookie and the ledger Origin on the api, nothing on the Worker, no other host", async () => {
+	const session = new Session(contextFor(), "qa@example.test", "13579");
+	session.jar.set("b4u_session", "jar-value-for-the-test");
+	const apiOrigin = `http://127.0.0.1:${api.port}`;
+	const echoed = await session.browserFetch(`${apiOrigin}/echo`, {
+		method: "GET",
+		headers: { accept: "application/json" },
+	});
+	expect(await echoed.json()).toEqual({
+		origin: LEDGER_ORIGIN,
+		cookie: "b4u_session=jar-value-for-the-test",
+		accept: "application/json",
+	});
+	// the cookie the family service sets is kept for the next call
+	expect(session.jar.get("b4u_session")).toBe("renewed");
+	const health = await session.browserFetch(`${harness.url}/healthz`);
+	expect(health.status).toBe(200);
+	for (const elsewhere of [
+		"https://ledger.b4uni.com/v1/schools",
+		"https://api.b4uni.com/school-admin/ledger-token",
+		`${apiOrigin}.evil.example/echo`,
+	])
+		await expect(session.browserFetch(elsewhere)).rejects.toThrow(UsageError);
 });
 
 test("exit code and summary: FAIL always fails, BLOCKED only with --strict", () => {

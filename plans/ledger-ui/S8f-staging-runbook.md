@@ -18,6 +18,7 @@ bun run --cwd packages/ledger-worker staging-e2e [--stage N[,N]] [--json] [--str
 | 2 | a QA account that owns or administers a staging school and has a PIN | the sign-in chain (QA link, verify, PIN, ledger token), the Worker's envelope, tampered and expired-looking tokens refused, finance gating for an admin without the grant |
 | 3 | stage 2, plus the R2 key, `ledger_export` on and one ship and views run | `asOf` is set and not stale; the KPI document and a month of ledger rows answer with `asOf` and `lagMinutes` |
 | 4 | stage 2, plus a Stripe TEST key connected to the school, a paid member's TEST charge, a booking | step-up, a refund with an `Idempotency-Key` and its replay, the refund reaching the Worker's ledger with `asOf` after it, a booking cancel |
+| 5 | stage 2's account, plus a school where its token is `finance:false` for the gating | the ledger UI's own HTTP adapters (`packages/ledger-ui/src/http`) on staging: every Reader call, C5, C4, finance gating through the UI, and the HTTP build's entry. Runs from the UI package (below) |
 
 The default is stages `1,2,3`. **Stage 4 moves (test) money and mails the booking's people, so it runs only when you ask for it** (`--stage 4`), and it never refunds without `S8F_PAYMENT_ID` and `S8F_REFUND_CENTS` and `S8F_SCHOOL_ID` all set explicitly.
 
@@ -34,8 +35,25 @@ Inputs are environment variables, never argv:
 | `S8F_PAYMENT_ID` | stage 4: a `pi_`, `ch_` or `py_` id of a Stripe TEST-mode charge for a paid member of that school |
 | `S8F_REFUND_CENTS` | stage 4: the amount to refund, a positive integer, at most the charge |
 | `S8F_BOOKING_ID` | stage 4: a booking of the school to cancel (it mails that booking's people; use a test booking) |
+| `S8F_SCHOOL_ID_NO_FINANCE` | stage 5: a school the account administers **without** the finance grant (a uuid); default the token's first such school |
 
 Tokens, links, PINs and cookies are never printed beyond their first four characters, and the cookie jar lives in memory only. The QA link is minted over `fly ssh console -a b4uni-stg-family -C "bun src/ops/cli.ts qa-link --email <addr> --by s8f --apply"` (the `fly` CLI must be logged in), is good for 5 minutes and single use, and is redeemed with `POST /family/verify`; the step-up for the refund is a second link with `--purpose step_up`, good for 10 minutes.
+
+## Stage 5: the UI's HTTP adapters on staging (S8e)
+
+```bash
+bun run --cwd packages/ledger-ui staging-ui [--json] [--strict]
+```
+
+`packages/ledger-ui/scripts/staging-ui.ts`. It is stage 5 of this script, run from the UI package because Bun takes the JSX settings of the directory it starts in (`staging-e2e --stage 5` says so and stops). It imports the S8f script's allow-list, `Session`, inputs, redaction and command line, so the hosts, the sign-in, the lines and the exit codes are the same; it needs `bun install` in `packages/ledger-ui`. Nothing in it writes. It signs in (`qa-link-login`, `pin-verify`, `ledger-token`), opens the PIN again (`pin-open`), then builds `createHttpAdapters` on the session: a `fetch` that adds the session's cookies and the browser's `Origin` (`https://ledger-staging.b4uni.com`) on the family service, the UI's own ledger-token source, and `createFetchWorkerSource` on `https://ledger-staging.b4uni.com/v1` (`adapters`). Then, on the working school (`S8F_SCHOOL_ID`, else the token's first):
+
+- `reader-<call>`: `schools`, `disclosure`, `kpi-<audience>-open|locked` for every audience the viewer holds, `audience-report-<audience>` (public, member, governance), `ledger` (this month, members joined), `income-statement` and `income-statement-compare`, `members-income`, `members`, `bookings` (±30 days), `capabilities`, `menu-versions`, `settings`. PASS is the `src/data` type, or the contract's typed `not_available` (the line says which); any other rejection is a FAIL, a `no_data` before any view is BLOCKED. A `schema_mismatch` FAIL names the field the family service does not send yet (for example `members[0].membershipId`, `balances[0].granted`, `bookings[0].attendance`).
+- `c5-<audience>` for public, member and governance: the raw Worker JSON of those answers holds no `family:` key, `cus_` id or email (the line names the kind and the endpoint, never the match).
+- `c4-<audience>-open|locked`: the real app (happy-dom) mounts the Dashboard on every document the viewer may preview, every view and shown period, each cell checked against the document (`test/consistency-checks.ts`), and no Reader rejection but `not_available` during the mount.
+- `gating-ledger`, `gating-income-statement` (the Reader rejects `forbidden finance_required`) and `gating-ledger-mount` (the mounted Ledger shows its lock, no row, no finance read on the Worker), on `S8F_SCHOOL_ID_NO_FINANCE` or the token's first `finance:false` school; BLOCKED when the token has none.
+- `http-app-dashboard` and `http-app-ledger`: `mountHttpApp`, the HTTP build's entry, on the working school: KPI cards with figures, and this month's ledger rows (BLOCKED when the Reader's ledger has no entry this month).
+
+The local tests run the same stage on the Miniflare Worker and a fake family service: `packages/ledger-ui/test/staging/staging-ui.test.ts`.
 
 ## Owner steps (nobody else can do these)
 
@@ -74,6 +92,7 @@ Then, from this repo, with the inputs in the environment (`set -a; . <your env f
 bun run --cwd packages/ledger-worker staging-e2e --stage 1,2,3          # about a minute
 bun run --cwd packages/ledger-worker staging-e2e --stage 4              # the refund: up to ~15 minutes of polling
 bun run --cwd packages/ledger-worker staging-e2e --stage 1,2,3,4 --strict   # the gate: nothing BLOCKED, nothing FAILed
+bun run --cwd packages/ledger-ui staging-ui                             # stage 5, the UI's adapters: a few minutes
 ```
 
 The Worker's cron runs every 5 minutes and the shipper every 10 (`R2_LEDGER_EVERY_MIN`), so after a first event allow up to about 15 minutes before stage 3 has `asOf`. Stage 4 polls the Worker every 30 s for up to 15 minutes and prints each poll.
