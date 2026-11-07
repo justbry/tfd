@@ -1,6 +1,7 @@
 import { mkdtemp, readdir, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readEnvironmentVariable } from "../src/environment.js";
 
 export const tmp = (name: string) => mkdtemp(join(tmpdir(), `atm-${name}-`));
 
@@ -33,11 +34,12 @@ const runsWithVersion = (command: string): boolean => {
 export const hasHledger = runsWithVersion("hledger");
 export const hasDuckdb = runsWithVersion("duckdb");
 
-/** The `weed` binary for the SeaweedFS contract run: env ATM_WEED when it runs, else `weed` on PATH, else null. */
+/** The `weed` binary for the SeaweedFS contract run: env TFD_WEED (or the old ATM_WEED) when it runs, else `weed` on PATH, else null. */
 export const weedBinary = (() => {
-	const candidates = [process.env.ATM_WEED, "weed"].filter(
-		(candidate): candidate is string => Boolean(candidate),
-	);
+	const candidates = [
+		readEnvironmentVariable(process.env, "TFD_WEED"),
+		"weed",
+	].filter((candidate): candidate is string => Boolean(candidate));
 	for (const candidate of candidates) {
 		try {
 			const result = Bun.spawnSync([candidate, "version"], {

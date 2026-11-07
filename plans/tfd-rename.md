@@ -1,6 +1,6 @@
 # Renaming atm to tfd
 
-Status: step 1 in PR #144, 2026-11-07. Owner decisions of 2026-11-06 and 2026-11-07.
+Status: steps 1 and 2 merged; step 3, the tfd side, in its PR, 2026-11-07. Owner decisions of 2026-11-06 and 2026-11-07.
 
 ## Names
 
@@ -29,11 +29,11 @@ Some names that contain "atm" never change, because they are stored, hashed or s
 
 ## Step 3: a compatibility window for callers (with buzz-school)
 
-- [ ] Publish the tarball under both names for one release (`atm-v<v>/atm-<v>.tgz` and `tfd-v<v>/tfd-<v>.tgz`), then change buzz-school's pin and its `import … from "atm"`.
-- [ ] The Worker accepts both JWT audiences, `atm-ledger` and `tfd-ledger`, until buzz-school mints the new one.
-- [ ] Read `TFD_*` environment variables first and fall back to `ATM_*`, for one minor release.
-- [ ] Export the new type names with deprecated `Atm*` aliases (types only, so free).
-- [ ] Caller-facing log and stderr prefixes (`atm: …`, `atm <command> failed:`, `atm reconcile:`): announce them in `UPGRADING.md` one release ahead, then print `tfd`. A caller's alert that greps them has to change in the same window.
+- [x] Publish the tarball under both names for one release (`atm-v<v>/atm-<v>.tgz` and `tfd-v<v>/tfd-<v>.tgz`). Done in code: `release.ts` publishes on `justbry/tfd`, stages and packs the build once per name (the `tfd` tarball is a package named `tfd`, the `atm` one `atm`; only `package.json` and the README differ), and creates both releases at one commit, `tfd` first; `--ci` creates or checks each name, and `release-atm.yml` runs for `tfd-v*` and `atm-v*` tags in one concurrency group. Tests in `tests/release.test.ts` (both tarballs installed and imported under Bun and Node, `publishStep`). Left: cut the release (bump the version, `just release`); then buzz-school changes its pin to the `tfd` URL and `import … from "atm"` to `"tfd"` (the exact change is in the step 3 PR's description). The `atm` name is dropped from `RELEASE_NAMES` in the release after.
+- [x] The Worker accepts both JWT audiences, `atm-ledger` and `tfd-ledger`, until buzz-school mints the new one. Done as `isLedgerTokenAudience` (and `LEDGER_TOKEN_AUDIENCE`, `LEGACY_LEDGER_TOKEN_AUDIENCE`, `LEDGER_TOKEN_AUDIENCES`) in `atm/worker`, `src/ledger/ledger-token.ts`: no code in this repository verified `aud` yet (the ledger Worker of S8 is not built), so this is the check that Worker calls. Left: the Worker calls it; buzz-school mints `tfd-ledger`; then `atm-ledger` goes. `plans/atm-ontology/dashboards.md` plans an `atm-embed` audience with `tfd-embed` beside it; nothing built.
+- [x] Read `TFD_*` environment variables first and fall back to `ATM_*`, for one minor release. Done: `readEnvironmentVariable` in `src/environment.ts` (an empty value counts as unset), used for the six `R2_*` variables of `tfd inputs ship` and for every variable the tests and scripts read (`DIST`, `WEED`, `GOLDEN_E2E*`, `KILL_*`, `R2_ACCOUNT_ID`, `R2_API_TOKEN`). Left: remove the fallback in the minor release after next; `.github/workflows/atm-tests.yml` still sets `ATM_GOLDEN_E2E_SHARD`, which works through the fallback.
+- [x] Export the new type names with deprecated `Atm*` aliases (types only, so free). Done: the 42 types of `src/types.ts` are defined as `Tfd*`, and each `Atm*` is a `/** @deprecated */` alias (`tests/dist.test.ts` checks the pairs in the built `types.d.ts`). Left: the code and the declared signatures still use `Atm*` (step 4's codemod moves them); the aliases go after the window.
+- [ ] Caller-facing log and stderr prefixes (`atm: …`, `atm <command> failed:`, `atm reconcile:`): announce them in `UPGRADING.md` one release ahead, then print `tfd`. A caller's alert that greps them has to change in the same window. Announced in `UPGRADING.md` ("On `dev` since 0.9.0", item 5 of the rename window). Left: print `tfd` in the release after the one that carries the announcement, with `tests/ship-inputs-cli.test.ts` and the other tests that pin them.
 
 ## Step 4: identifiers and the directory (last)
 

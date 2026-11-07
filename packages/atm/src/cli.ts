@@ -24,6 +24,7 @@ import { assertInputTables } from "./handler/schema.js";
 import { journalMonth, readEvents } from "./ledger/files.js";
 import {
 	InputsDestinationError,
+	LEGACY_R2_ENV_NOTE,
 	R2_ENV,
 	resolveInputsDestination,
 } from "./ledger/inputs-destination.js";
@@ -524,7 +525,7 @@ exitTwoOnUsageError(inputsCommand);
 const inputsShipCommand = inputsCommand
 	.command("ship")
 	.description(
-		`ship a school's unshipped stored inputs (atm_event_inputs) from the handler's SQLite file to <root>/schools/<id>/inputs/<env>/date=YYYY-MM-DD/batch-*.jsonl (UTC commit day), with the contexts/ and seeds/ they refer to, create-only, safe to rerun, run it from cron before \`${commandName} ship\`. First settles the erasure queue: a shipped batch that held an erased holder's facts is rewritten under a new key with the tombstone and the old object deleted. Exits 0 when done (also when there was nothing to ship), 1 when a key already holds different bytes (conflict lines on stderr) or an erasure is still pending, 2 on any other error (one line on stderr). R2 credentials are read from the environment only (${R2_ENV.accessKeyId}, ${R2_ENV.secretAccessKey}, optional ${R2_ENV.sessionToken}); the R2 path has not been run against R2`,
+		`ship a school's unshipped stored inputs (atm_event_inputs) from the handler's SQLite file to <root>/schools/<id>/inputs/<env>/date=YYYY-MM-DD/batch-*.jsonl (UTC commit day), with the contexts/ and seeds/ they refer to, create-only, safe to rerun, run it from cron before \`${commandName} ship\`. First settles the erasure queue: a shipped batch that held an erased holder's facts is rewritten under a new key with the tombstone and the old object deleted. Exits 0 when done (also when there was nothing to ship), 1 when a key already holds different bytes (conflict lines on stderr) or an erasure is still pending, 2 on any other error (one line on stderr). R2 credentials are read from the environment only (${R2_ENV.accessKeyId}, ${R2_ENV.secretAccessKey}, optional ${R2_ENV.sessionToken}; ${LEGACY_R2_ENV_NOTE}); the R2 path has not been run against R2`,
 	)
 	.requiredOption("--db <file>", "the SQLite file the webhook handler writes")
 	.requiredOption("--school <id>", "school id, as in schools/<id>/")

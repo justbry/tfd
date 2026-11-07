@@ -2,7 +2,7 @@
  * Runs the SHIPPED `dist/worker.js` (what `atm/worker` resolves to for a consumer: built by `build.ts` with Bun's `node`
  * target, the engine inlined) inside workerd under `nodejs_compat`, over an R2 bucket binding. The other workerd test
  * bundles the source with esbuild, which is not what a consumer loads; this one loads the built file as is. With
- * `ATM_DIST` set (the release script does) it tests that directory instead of building one.
+ * `TFD_DIST` (or the old `ATM_DIST`) set (the release script does) it tests that directory instead of building one.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { cpSync } from "node:fs";
@@ -10,6 +10,7 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Miniflare } from "miniflare";
+import { readEnvironmentVariable } from "../src/environment.js";
 import { readEvents } from "../src/ledger/files.js";
 import { membersOf } from "../src/ledger/summary.js";
 import { buildViews } from "../src/ledger/views.js";
@@ -79,8 +80,9 @@ let distWorker: string;
 let miniflare: Miniflare;
 beforeAll(async () => {
 	const dist = join(await mkdtemp(join(tmpdir(), "atm-dist-worker-")), "dist");
-	if (process.env.ATM_DIST) {
-		cpSync(process.env.ATM_DIST, dist, { recursive: true });
+	const builtDist = readEnvironmentVariable(process.env, "TFD_DIST");
+	if (builtDist) {
+		cpSync(builtDist, dist, { recursive: true });
 	} else {
 		const build = Bun.spawnSync([
 			"bun",
