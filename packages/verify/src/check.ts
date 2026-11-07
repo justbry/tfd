@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * One verification as a visitor sees it: the signature (always), then the school's books and seal when the verifier
- * holds them (today only the sample school's). Each step reuses the tfd port in core.ts.
+ * The whole check of one receipt, as a verifier page runs it: the signature (always), then the school's books and seal
+ * when the caller holds them. Each step is one of core.ts's ports of tfd's checks.
  */
 import {
 	type BooksEvent,
@@ -35,15 +35,11 @@ export type Outcome =
 			seal: { month: string; verdict: SealVerdict; covers: boolean } | null;
 	  };
 
-/** Parse pasted or dropped text. Accepts the signed receipt JSON as is. */
-export const parseReceipt = (text: string): unknown => {
-	try {
-		return JSON.parse(text);
-	} catch {
-		return undefined;
-	}
-};
-
+/**
+ * A receipt's signature against `keys`, then, when `loadBooks` has the school's books, the receipt against its event and
+ * the month's seal against the seal chain. The month's latest seal decides, as in tfd's verifySeals. Never throws for
+ * untrusted input.
+ */
 export const checkReceipt = async (
 	value: unknown,
 	keys: PublicKeys,
