@@ -428,7 +428,26 @@ describe("the fetch WorkerSource over section 11", () => {
 		expect(reader.schoolsLeftOut()).toEqual([]);
 	});
 
-	test("schools: a null time zone, credit unit or lag leaves only that school out, and says why", async () => {
+	test("schools: a school with no ledger views yet is listed with a null lag, never left out", async () => {
+		const { reader, http } = twoSchools({
+			name: "Buzz Studio",
+			currency: null,
+		});
+		http.on("GET", workerPath("/schools"), {
+			status: 200,
+			body: envelope({
+				schools: [schoolRow(schoolId), schoolRow(otherSchoolId, null)],
+			}),
+		});
+		const schools = await reader.schools();
+		expect(schools.map(({ id, lagMinutes }) => [id, lagMinutes])).toEqual([
+			[schoolId, 3],
+			[otherSchoolId, null],
+		]);
+		expect(reader.schoolsLeftOut()).toEqual([]);
+	});
+
+	test("schools: a null time zone or credit unit leaves only that school out, and says why", async () => {
 		const { reader, http } = twoSchools({ timeZone: null, creditUnit: null });
 		http.on("GET", workerPath("/schools"), {
 			status: 200,
@@ -440,11 +459,10 @@ describe("the fetch WorkerSource over section 11", () => {
 		expect(reader.schoolsLeftOut()).toEqual([
 			`${otherSchoolId}.timeZone`,
 			`${otherSchoolId}.creditUnit`,
-			`${otherSchoolId}.lagMinutes`,
 		]);
 	});
 
-	test("schools: when every school has a null lag or school fact, not available, never an empty list or a made-up value", async () => {
+	test("schools: when every school has a null school fact, not available, never an empty list or a made-up value", async () => {
 		const { reader, http } = adapters({ worker: "fetch" });
 		http.always("GET", /ledger\/school$/, {
 			status: 200,
@@ -459,11 +477,7 @@ describe("the fetch WorkerSource over section 11", () => {
 		const error = await rejection(reader.schools());
 		expect(error.kind).toBe("not_available");
 		expect(error.message).toContain(`${schoolId}.timeZone`);
-		expect(error.message).toContain(`${schoolId}.lagMinutes`);
-		expect(reader.schoolsLeftOut()).toEqual([
-			`${schoolId}.timeZone`,
-			`${schoolId}.lagMinutes`,
-		]);
+		expect(reader.schoolsLeftOut()).toEqual([`${schoolId}.timeZone`]);
 	});
 
 	test("disclosure without its views and copy is not available; never an invented view", async () => {
