@@ -392,7 +392,7 @@
       },
     },
     "packages/atm": {
-      "name": "atm",
+      "name": "tfd",
       "version": "0.10.0",
       "bin": {
         "atm": "./src/atm.ts",
@@ -867,7 +867,7 @@
       "name": "ledger-worker",
       "version": "0.1.0",
       "dependencies": {
-        "atm": "workspace:*",
+        "tfd": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "1.4.2",
@@ -1389,7 +1389,7 @@
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
         "@vitejs/plugin-react": "catalog:",
-        "esbuild": "0.25.0",
+        "esbuild": "^0.25.0",
         "eslint": "^9.21.0",
         "eslint-plugin-react-hooks": "^5.1.0",
         "eslint-plugin-react-refresh": "^0.4.19",
@@ -4033,8 +4033,6 @@
     "async-sema": ["async-sema@3.1.1", "", {}, "sha512-tLRNUXati5MFePdAk8dw7Qt7DpxPB60ofAgn8WRhW6a2rcimZnYBP9oxHiv0OHy+Wz7kPMG+t4LGdt31+4EmGg=="],
 
     "asynckit": ["asynckit@0.4.0", "", {}, "sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q=="],
-
-    "atm": ["atm@workspace:packages/atm"],
 
     "atmn": ["atmn@workspace:packages/atmn"],
 
@@ -6909,6 +6907,8 @@
     "text-upper-case": ["text-upper-case@1.2.11", "", {}, "sha512-BfTL7yB1YIRlVGNdZUvno013hOq2cRs07fDR2ApppOXRDuKrEmsLDEY82xXlDzQHELp0jexqkI+NeyPIl6MtMw=="],
 
     "text-upper-case-first": ["text-upper-case-first@1.2.11", "", {}, "sha512-vgfbwKo8TEJbRsapR9LWWvIJRnv8u9aXVa6cyYOAQQmurCx54Cnt59x5fKdiq+hFaBJ51AbzCgMpbP3p65/pHQ=="],
+
+    "tfd": ["tfd@workspace:packages/atm"],
 
     "thenify": ["thenify@3.3.1", "", { "dependencies": { "any-promise": "^1.0.0" } }, "sha512-RVZSIV5IG10Hk3enotrhvz0T9em6cyHBLkH/YAZuKqd8hRkKhSfCGIcP2KUY0EPxndzANBmNllzWPwak+bheSw=="],
 

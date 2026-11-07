@@ -6,7 +6,7 @@ const PACKAGE = resolve(import.meta.dir, "../..");
 
 let bundled: Promise<string> | null = null;
 
-/** The script text; built once per process. `atm/worker` resolves to its source through atm's `bun` export condition. */
+/** The script text; built once per process. `tfd/worker` resolves to its source through atm's `bun` export condition. */
 export const bundleTestWorker = (): Promise<string> => {
 	bundled ??= (async () => {
 		const result = await build({

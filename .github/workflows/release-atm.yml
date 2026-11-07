@@ -1,12 +1,12 @@
-name: Release atm
+name: Release tfd
 
-# Pushing a tag atm-v<version> builds packages/atm at that tag and puts atm-<version>.tgz on the GitHub release for it.
+# Pushing a tag tfd-v<version> (atm-v<version> through 0.10.0) builds packages/atm at that tag and puts tfd-<version>.tgz on the GitHub release for it.
 # If the release already exists (`bun run --cwd packages/atm release` made it from a laptop), this checks that its asset
 # is exactly what this commit builds, and fails if not. B4 Uni's family service pins the asset URL and its sha512.
 
 on:
   push:
-    tags: ["atm-v*"]
+    tags: ["tfd-v*"]
 
 permissions:
   contents: write

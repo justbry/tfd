@@ -1,5 +1,5 @@
 /** `GET /v1/schools/:school/fundraising`: what each Zeffy campaign received in a range, and what Zeffy paid out. */
-import type { AtmEvent } from "atm";
+import type { AtmEvent } from "tfd";
 import type { SchoolSnapshot } from "../data/snapshot.js";
 import { ApiError } from "../http.js";
 import { daysInRange } from "../time.js";

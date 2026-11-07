@@ -2,7 +2,7 @@
  * The wire shapes of contract section 11 that are the Worker's own. They follow `packages/ledger-ui/src/data/` (the
  * orchestrator's, which this package may not import or edit) with the `null`s section 11 asks that contract to allow.
  */
-import type { Cell } from "atm/worker";
+import type { Cell } from "tfd/worker";
 
 export type CreditUnit = { one: string; other: string };
 

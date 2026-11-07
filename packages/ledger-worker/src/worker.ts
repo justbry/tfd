@@ -6,7 +6,7 @@
  * token's `schools[]` (404 `not_found`, the same for an unknown school), the gate of the endpoint (403), the query (400),
  * then the data (404 `no_data`, 409, 503).
  */
-import { R2BindingStore } from "atm/worker";
+import { R2BindingStore } from "tfd/worker";
 import {
 	type Audience,
 	audienceAllowed,

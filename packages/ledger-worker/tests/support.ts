@@ -1,5 +1,5 @@
-/** What the endpoint tests share: calling the Worker, and the inputs that `atm/worker`'s functions are called with directly. */
-import type { AtmEvent } from "atm";
+/** What the endpoint tests share: calling the Worker, and the inputs that `tfd/worker`'s functions are called with directly. */
+import type { AtmEvent } from "tfd";
 import {
 	type Audience,
 	buildViews,
@@ -8,7 +8,7 @@ import {
 	type KpiDocumentRow,
 	kpiDocument,
 	type Views,
-} from "atm/worker";
+} from "tfd/worker";
 import { DISCLOSURE_FILE, sizeOf } from "../src/data/disclosure.js";
 import { kpiRowsOf } from "../src/data/snapshot.js";
 import type { LedgerHarness } from "../src/testing/harness.js";

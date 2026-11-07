@@ -1,6 +1,6 @@
 /** The views job: every school's prefix gets its views, one school's failure stops no other, and a failure is logged by school id only. */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { R2BindingStore, readViewsFromStore } from "atm/worker";
+import { R2BindingStore, readViewsFromStore } from "tfd/worker";
 import {
 	type LedgerHarness,
 	startLedgerWorker,

@@ -1,5 +1,5 @@
 /** What the latest `catalog.published` event says about the school; null where the log has none, never a guess. */
-import type { AtmEvent, Menu } from "atm";
+import type { AtmEvent, Menu } from "tfd";
 
 export type SchoolMenu = {
 	timeZone: string;
