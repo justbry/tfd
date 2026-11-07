@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import type { DownloadFile } from "../../src/data/ledger.ts";
 import { createHttpAdapters } from "../../src/http/adapters.ts";
-import type { DisclosurePresentationSource } from "../../src/http/disclosure.ts";
 import type { LedgerSchoolClaim } from "../../src/http/ledger-token.ts";
 import type { Fetch } from "../../src/http/transport.ts";
 import {
@@ -216,7 +215,6 @@ export function httpAdaptersOn(
 	grants: LedgerSchoolClaim[],
 	options: {
 		tokenLifetimeSeconds?: number;
-		presentation?: DisclosurePresentationSource;
 	} = {},
 ) {
 	const buzzSchool = fakeBuzzSchool(worker, grants, options);
@@ -239,7 +237,6 @@ export function httpAdaptersOn(
 			return source;
 		},
 		files: { save: async (file) => void saved.push(file) },
-		...(options.presentation ? { presentation: options.presentation } : {}),
 	});
 	if (!source) throw new Error("the adapters built no Worker source");
 	return { ...adapters, worker: source as WorkerSource, buzzSchool, scheduler };

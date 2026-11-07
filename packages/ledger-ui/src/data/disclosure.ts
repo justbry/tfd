@@ -231,7 +231,8 @@ export type ViewAsOption = {
 /** The signed-in person at the school (spec "A person's audiences"). */
 export type Viewer = {
 	id: string;
-	name: string;
+	/** Null when no source gives the signed-in person's name (the HTTP build). */
+	name: string | null;
 	role: "owner" | "admin" | "member";
 	financeGrant: boolean;
 	/** The highest audience held. */

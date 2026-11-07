@@ -14,7 +14,6 @@ import type { DisclosureFile, SchoolSize } from "../../src/data/disclosure.ts";
 import type { KpiDocument } from "../../src/data/kpi-document.ts";
 import disclosureFixture from "../../src/fixtures/disclosure.json";
 import { createFixtureWriter } from "../../src/fixtures/writer.ts";
-import type { DisclosurePresentationSource } from "../../src/http/disclosure.ts";
 import type { LedgerSchoolClaim } from "../../src/http/ledger-token.ts";
 import { localWallTime } from "../../src/http/school-routes.ts";
 import { dashboardProblems, documentProblems } from "../consistency-checks.ts";
@@ -86,19 +85,6 @@ const grants: LedgerSchoolClaim[] = presets.map((id) => ({
 	finance: true,
 }));
 const disclosureFile = disclosureFixture.file as unknown as DisclosureFile;
-const disclosureCopy = disclosureFixture.schools.b4u;
-/** The View as copy and the viewer's name have no source yet (src/http/disclosure.ts): the fixture's stand in. */
-const presentation: DisclosurePresentationSource = {
-	presentation: async () => ({
-		viewerName: "Jo A.",
-		rows: Object.fromEntries(
-			disclosureCopy.viewAs.map(({ value, name, summary, locks }) => [
-				value,
-				{ name, summary, locks },
-			]),
-		) as never,
-	}),
-};
 const millisecondsPerSecond = 1000;
 const centsPerUnit = 100;
 const billingIncome = "income:billing:";
@@ -412,7 +398,7 @@ describe.skipIf(skip)(
 				let renders = 0;
 				for (const preset of presets) {
 					const school = inputsOf(preset);
-					const { reader } = httpAdaptersOn(worker, grants, { presentation });
+					const { reader } = httpAdaptersOn(worker, grants);
 					for (const variant of documentVariants()) {
 						const expected = await reader.kpiDocument({
 							school: preset,

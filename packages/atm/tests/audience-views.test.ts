@@ -25,6 +25,8 @@ import {
 	type DisclosureOverride,
 	schoolSize,
 	surfaceLocks,
+	viewAsRows,
+	viewAsValues,
 } from "../src/worker.js";
 
 const REPOSITORY = resolve(import.meta.dir, "../../..");
@@ -39,6 +41,8 @@ type FixtureSchool = {
 	views: Record<(typeof audiences)[number], AudienceView>;
 	viewAs: Array<{
 		value: string;
+		name: string;
+		summary: string;
 		audience: (typeof audiences)[number];
 		admin: boolean;
 		locks: unknown;
@@ -151,6 +155,73 @@ describe("audienceViews equals the fixture (fixture-proven)", () => {
 				).toBe(canonicalize(row.locks));
 		});
 	}
+
+	test("viewAsRows: every school's View as rows are the record's name, summary and locks (the oracle)", () => {
+		const mismatches: string[] = [];
+		for (const [id, record] of Object.entries(fixture.schools)) {
+			const views = audienceViews({
+				file: fixture.file,
+				override: record.override,
+				size: record.size,
+				year: record.year,
+				clock: FIXTURE_CLOCK,
+			});
+			const rows = viewAsRows({
+				file: fixture.file,
+				override: record.override,
+				views,
+			});
+			expect(Object.keys(rows), id).toEqual([...viewAsValues]);
+			expect(
+				record.viewAs.map(({ value }) => value),
+				id,
+			).toEqual([...viewAsValues]);
+			for (const expected of record.viewAs) {
+				const row = rows[expected.value as (typeof viewAsValues)[number]];
+				for (const field of ["name", "summary", "locks"] as const)
+					if (canonicalize(row?.[field]) !== canonicalize(expected[field]))
+						mismatches.push(`${id}.${expected.value}.${field}`);
+			}
+		}
+		expect(mismatches).toEqual([]);
+	});
+
+	test("viewAsRows: the Admin row is the mockup's fixed copy, and its locks follow the audience it shows", () => {
+		const views = viewsAt("2026-11-05");
+		const previewed = viewAsRows({ file: FILE, override: {}, views });
+		expect(previewed.admin.name).toBe("Admin");
+		expect(previewed.admin.summary).toBe(
+			"Sees roster, plans, bookings and balances. Cannot see money per person, the ledger or names.",
+		);
+		// an admin row never carries the settings lock; a governance audience sees the plan breakdown
+		const governance = viewAsRows({
+			file: FILE,
+			override: {},
+			views,
+			adminAudience: "governance",
+		});
+		expect(governance.admin.locks).toEqual({});
+		expect(
+			viewAsRows({ file: FILE, override: {}, views, adminAudience: "public" })
+				.admin.locks,
+		).toEqual(previewed.admin.locks);
+	});
+
+	test("(control) a wrong summary is a mismatch the oracle sees", () => {
+		const record = fixture.schools.vol;
+		if (!record) throw new Error("no vol");
+		const views = viewsAt("2026-11-05");
+		const wrong = viewAsRows({
+			file: FILE,
+			override: {},
+			views: {
+				...views,
+				member: { ...views.member, summary: "Sees nothing." },
+			},
+		});
+		const member = record.viewAs.find(({ value }) => value === "member");
+		expect(wrong.member.summary).not.toBe(member?.summary);
+	});
 
 	test("the five records differ in one leaf only: Public's rounding, small against large", () => {
 		const small = fixture.schools.vol?.views;

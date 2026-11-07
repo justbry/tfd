@@ -412,6 +412,28 @@ describe("the fetch WorkerSource over section 11", () => {
 			"not_available",
 		);
 	});
+
+	test("disclosure from a Worker that sends views but no View as rows is not available", async () => {
+		const { reader, http } = adapters({ worker: "fetch" });
+		const views = Object.fromEntries(
+			audiences.map((audience) => [audience, { name: audience }]),
+		);
+		http.on("GET", workerPath(`/schools/${schoolId}/disclosure`), {
+			status: 200,
+			body: envelope({
+				school: schoolId,
+				year: 2026,
+				size: "small",
+				file: {},
+				override: null,
+				source: "defaults",
+				views,
+			}),
+		});
+		const error = await rejection(reader.disclosure(schoolId));
+		expect(error.kind).toBe("not_available");
+		expect(error.message).toContain("View as rows");
+	});
 });
 
 describe("the disclosure's viewer and View as rows", () => {
@@ -474,7 +496,7 @@ describe("the disclosure's viewer and View as rows", () => {
 		expect(owner.viewAs).toBe("owner");
 	});
 
-	test("assembly keeps the Worker's file, size and year; no stored override is the defaults", () => {
+	test("assembly keeps the Worker's file, size, year and View as copy; no stored override is the defaults; no name", () => {
 		const viewer = viewerOf(profileId, {
 			id: schoolId,
 			role: "owner",
@@ -492,9 +514,10 @@ describe("the disclosure's viewer and View as rows", () => {
 				file,
 				override: null,
 				source: "defaults",
+				views,
+				viewAs: copy,
 			},
 			viewer,
-			{ viewerName: "Jo A.", views, rows: copy },
 		);
 		expect(result).toMatchObject({
 			school: schoolId,
@@ -504,7 +527,11 @@ describe("the disclosure's viewer and View as rows", () => {
 			override: {},
 			views,
 		});
-		expect(result.viewer.name).toBe("Jo A.");
+		// no route gives the signed-in person's name
+		expect(result.viewer.name).toBeNull();
 		expect(result.viewAs.map(({ value }) => value)).toEqual([...viewAsValues]);
+		expect(
+			result.viewAs.map(({ value, name, summary }) => [value, name, summary]),
+		).toEqual(viewAsValues.map((value) => [value, value, `${value} summary`]));
 	});
 });

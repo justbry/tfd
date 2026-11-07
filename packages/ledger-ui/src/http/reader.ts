@@ -3,12 +3,7 @@ import type { LedgerEntry, LedgerPage } from "../data/ledger.ts";
 import type { MenuVersionBody } from "../data/plans.ts";
 import type { Reader } from "../data/reader.ts";
 import type { School } from "../data/types.ts";
-import {
-	assembleDisclosure,
-	type DisclosurePresentationSource,
-	noDisclosurePresentation,
-	viewerOf,
-} from "./disclosure.ts";
+import { assembleDisclosure, viewerOf } from "./disclosure.ts";
 import { AdapterError, notAvailable, schemaMismatch } from "./errors.ts";
 import type { LedgerTokenSource } from "./ledger-token.ts";
 import type { PendingStore, PendingWrite } from "./pending.ts";
@@ -56,10 +51,8 @@ export function createHttpReader(options: {
 	worker: WorkerSource;
 	tokens: LedgerTokenSource;
 	pending: PendingStore;
-	presentation?: DisclosurePresentationSource;
 }): HttpReader {
 	const { api, worker, tokens, pending } = options;
-	const presentation = options.presentation ?? noDisclosurePresentation;
 
 	/** A Worker answer has shipped every write its `asOf` passes. */
 	const seen = <Data>(school: string, answer: WorkerAnswer<Data>): Data => {
@@ -175,13 +168,10 @@ export function createHttpReader(options: {
 		disclosure: async (school) => {
 			const { token, claim } = await claimOf(school);
 			const answer = await worker.disclosure(school);
-			const viewer = viewerOf(token.subject, claim);
-			const shown = await presentation.presentation({
-				school,
-				disclosure: seen(school, answer),
-				viewer,
-			});
-			return assembleDisclosure(answer.data, viewer, shown);
+			return assembleDisclosure(
+				seen(school, answer),
+				viewerOf(token.subject, claim),
+			);
 		},
 
 		bookings: async ({ school, from, to }) => {
@@ -310,18 +300,9 @@ export function createHttpReader(options: {
 			};
 			return result;
 		},
-		incomeStatement: async (query) => {
-			const { currency, unit, ...statement } = seen(
-				query.school,
-				await worker.incomeStatement(query),
-			);
-			if (currency === null || unit === null)
-				throw notAvailable(
-					"incomeStatement",
-					"its currency and unit come from the school's published menu, and the school has none",
-				);
-			return { ...statement, currency, unit };
-		},
+		/* A school with no published menu has a null currency and unit: Reports uses the school's own. */
+		incomeStatement: async (query) =>
+			seen(query.school, await worker.incomeStatement(query)),
 		audienceReport: async (query) =>
 			seen(query.school, await worker.audienceReport(query)),
 		donors: unavailable(

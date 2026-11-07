@@ -9,10 +9,7 @@ import {
 import type { IncomeStatement, LedgerPage } from "../../src/data/ledger.ts";
 import disclosureFixture from "../../src/fixtures/disclosure.json";
 import { createFixtureWriter } from "../../src/fixtures/writer.ts";
-import {
-	type DisclosurePresentationSource,
-	viewerOf,
-} from "../../src/http/disclosure.ts";
+import { viewerOf } from "../../src/http/disclosure.ts";
 import { AdapterError } from "../../src/http/errors.ts";
 import type { LedgerSchoolClaim } from "../../src/http/ledger-token.ts";
 import { localWallTime } from "../../src/http/school-routes.ts";
@@ -140,24 +137,8 @@ describe.skipIf(skip)("the HTTP Reader on the real ledger Worker", () => {
 		}
 	});
 
-	test("disclosure: the Worker's file and views, the viewer from the token; without the View as copy it is not available", async () => {
-		const bare = httpAdaptersOn(worker, ownerGrants);
-		expect((await rejection(bare.reader.disclosure(owned))).kind).toBe(
-			"not_available",
-		);
-		// The View as copy and the viewer's name have no source yet: the fixture's stand in, as a presentation source.
-		const presentation: DisclosurePresentationSource = {
-			presentation: async () => ({
-				viewerName: "Jo A.",
-				rows: Object.fromEntries(
-					disclosureCopy.viewAs.map(({ value, name, summary, locks }) => [
-						value,
-						{ name, summary, locks },
-					]),
-				) as never,
-			}),
-		};
-		const { reader } = httpAdaptersOn(worker, ownerGrants, { presentation });
+	test("disclosure: the Worker's file, views and View as copy, the viewer from the token, no name", async () => {
+		const { reader } = httpAdaptersOn(worker, ownerGrants);
 		const raw = (await dataOf(`/schools/${owned}/disclosure`)) as Record<
 			string,
 			unknown
@@ -175,7 +156,8 @@ describe.skipIf(skip)("the HTTP Reader on the real ledger Worker", () => {
 		expect(disclosure.override).toEqual({});
 		expect(disclosure.viewer).toMatchObject({
 			id: "profile_e2e",
-			name: "Jo A.",
+			// no route gives the signed-in person's name
+			name: null,
 			role: "owner",
 			viewAs: "owner",
 			audiences: [...audiences],
@@ -183,6 +165,24 @@ describe.skipIf(skip)("the HTTP Reader on the real ledger Worker", () => {
 		expect(disclosure.viewAs.map(({ value }) => value)).toEqual([
 			...viewAsValues,
 		] as ViewAs[]);
+		// Each row's copy and locks are the Worker's; on the B4 Uni defaults they are the fixture's.
+		const rows = raw.viewAs as Record<ViewAs, unknown>;
+		const copyOf = ({
+			name,
+			summary,
+			locks,
+		}: Pick<(typeof disclosure.viewAs)[number], "name" | "summary"> & {
+			locks: unknown;
+		}) => ({
+			name,
+			summary,
+			locks,
+		});
+		for (const option of disclosure.viewAs)
+			expect(copyOf(option), option.value).toEqual(rows[option.value] as never);
+		expect(disclosure.viewAs.map(copyOf)).toEqual(
+			disclosureCopy.viewAs.map(copyOf) as never,
+		);
 		const admin = await reader.disclosure(noFinance);
 		expect(admin.viewer).toMatchObject({
 			audience: "public",
@@ -358,19 +358,7 @@ describe.skipIf(skip)("the HTTP Reader on the real ledger Worker", () => {
 
 describe.skipIf(skip)("the UI on the Worker's answers", () => {
 	test("the Reports statement shows the Worker's null figures as not available, never as $0.00; donors are not available", async () => {
-		const { reader } = httpAdaptersOn(worker, ownerGrants, {
-			presentation: {
-				presentation: async () => ({
-					viewerName: "Jo A.",
-					rows: Object.fromEntries(
-						disclosureCopy.viewAs.map(({ value, name, summary, locks }) => [
-							value,
-							{ name, summary, locks },
-						]),
-					) as never,
-				}),
-			},
-		});
+		const { reader } = httpAdaptersOn(worker, ownerGrants);
 		const now = localWallTime(
 			Date.parse(worker.clock.now()) / 1000,
 			"America/Denver",

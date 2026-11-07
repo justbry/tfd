@@ -4,6 +4,8 @@ import type {
 	DisclosureFile,
 	DisclosureOverride,
 	SchoolSize,
+	ViewAs,
+	ViewAsOption,
 } from "../data/disclosure.ts";
 import type { KpiDocument } from "../data/kpi-document.ts";
 import type {
@@ -58,7 +60,8 @@ export type WorkerSchoolStatus = {
 	stale: boolean;
 };
 
-/** `GET /v1/schools/:school/disclosure`: the Reader adds `viewer` and `viewAs`. */
+/** `GET /v1/schools/:school/disclosure`: the Reader adds `viewer`, and each View as row's `held`, `audience` and
+ * `admin`. */
 export type WorkerDisclosure = {
 	school: string;
 	year: number;
@@ -70,7 +73,13 @@ export type WorkerDisclosure = {
 	/** Each audience's view, worked out by the Worker at its clock (`audienceViews` of `atm/worker`, S8c2); absent
 	 * from a Worker older than S8c2. */
 	views?: Record<Audience, AudienceView>;
+	/** Each View as row's name, summary and locks (`viewAsRows` of `atm/worker`, S8e part 3); absent from a Worker
+	 * older than that. */
+	viewAs?: Record<ViewAs, WorkerViewAsRow>;
 };
+
+/** What the Worker words for a View as row; the adapter adds `value`, `held`, `audience` and `admin`. */
+export type WorkerViewAsRow = Pick<ViewAsOption, "name" | "summary" | "locks">;
 
 /** A ledger entry as the Worker sends it: `member` is the key only; the Reader joins the name from members-list. The
  * log holds a promo's id, not its code, so `promo.code` is null. */
@@ -95,16 +104,6 @@ export type WorkerLedgerQuery = {
 	drill: LedgerDrill | null;
 };
 
-/** `GET /v1/schools/:school/income-statement`: `currency` and `unit` come from the latest `catalog.published` menu,
- * so they are null for a school with none. */
-export type WorkerIncomeStatement = Omit<
-	IncomeStatement,
-	"currency" | "unit"
-> & {
-	currency: string | null;
-	unit: IncomeStatement["unit"] | null;
-};
-
 /** `GET /v1/schools/:school/members/:key/money`: the money half of `memberDetail`. */
 export type WorkerMemberMoney = {
 	payments: PaymentRow[];
@@ -125,7 +124,7 @@ export interface WorkerSource {
 	ledger(query: WorkerLedgerQuery): Promise<WorkerAnswer<WorkerLedgerPage>>;
 	incomeStatement(
 		query: IncomeStatementQuery,
-	): Promise<WorkerAnswer<WorkerIncomeStatement>>;
+	): Promise<WorkerAnswer<IncomeStatement>>;
 	membersIncome(query: {
 		school: string;
 		from: string;

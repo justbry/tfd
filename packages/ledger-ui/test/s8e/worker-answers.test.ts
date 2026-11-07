@@ -1,5 +1,4 @@
 import { expect, test } from "bun:test";
-import { AdapterError } from "../../src/http/errors.ts";
 import type { WorkerLedgerPage } from "../../src/http/worker-source.ts";
 import { schoolId } from "./helpers.ts";
 import { memberRow, membersAnswer } from "./recorded.ts";
@@ -72,23 +71,18 @@ test("a ledger promo without a code is no promo label, never a made-up code", as
 	]);
 });
 
-test("a statement with no currency or unit (no published menu) is not available, not a statement in no currency", async () => {
+test("a statement with no currency or unit (no published menu) comes through as null: Reports uses the school's own", async () => {
 	const { reader, http } = adapters({ worker: "fetch" });
 	http.on("GET", /\/income-statement$/, {
 		status: 200,
 		body: envelope({ school: schoolId, currency: null, unit: null }),
 	});
-	const error = await reader
-		.incomeStatement({
-			school: schoolId,
-			from: "2026-11-01",
-			to: "2026-11-30",
-			compare: false,
-		})
-		.then(
-			() => null,
-			(caught: unknown) => caught,
-		);
-	expect(error).toBeInstanceOf(AdapterError);
-	expect((error as AdapterError).kind).toBe("not_available");
+	const statement = await reader.incomeStatement({
+		school: schoolId,
+		from: "2026-11-01",
+		to: "2026-11-30",
+		compare: false,
+	});
+	expect(statement.currency).toBeNull();
+	expect(statement.unit).toBeNull();
 });

@@ -1,4 +1,3 @@
-import type { DisclosurePresentationSource } from "./disclosure.ts";
 import {
 	createLedgerTokenSource,
 	type LedgerTokenSource,
@@ -25,7 +24,6 @@ export function createHttpAdapters(options: {
 	worker: (tokens: LedgerTokenSource) => WorkerSource;
 	files: FileSaver;
 	pinSource?: PinSource;
-	presentation?: DisclosurePresentationSource;
 }): {
 	reader: HttpReader;
 	writer: ReturnType<typeof createHttpWriter>;
@@ -44,13 +42,7 @@ export function createHttpAdapters(options: {
 	});
 	const worker = options.worker(tokens);
 	return {
-		reader: createHttpReader({
-			api,
-			worker,
-			tokens,
-			pending,
-			...(options.presentation ? { presentation: options.presentation } : {}),
-		}),
+		reader: createHttpReader({ api, worker, tokens, pending }),
 		writer: createHttpWriter({
 			api,
 			tokens,
