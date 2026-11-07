@@ -21,8 +21,8 @@ test("Harbor Arts has its ARTS20 code: below Governance its Used column says who
 test("the fixture Reader answers every school-scoped read for Harbor Arts", async () => {
 	const reader = createFixtureReader({ clock });
 	const { rules, unit } = await reader.schoolRules("har");
-	expect(rules.cancelCutoffHours).toBe(24);
-	expect(unit.other).toBe("credits");
+	expect(rules?.cancelCutoffHours).toBe(24);
+	expect(unit?.other).toBe("credits");
 	const page = await reader.ledger({
 		school: "har",
 		from: "2026-01-01",

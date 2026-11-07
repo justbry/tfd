@@ -2,6 +2,7 @@ import type { Booking } from "../data/bookings.ts";
 import type { LedgerEntry, LedgerPage } from "../data/ledger.ts";
 import type { MenuVersionBody } from "../data/plans.ts";
 import type { Reader } from "../data/reader.ts";
+import type { School } from "../data/types.ts";
 import {
 	assembleDisclosure,
 	type DisclosurePresentationSource,
@@ -126,7 +127,10 @@ export function createHttpReader(options: {
 				),
 				worker.schools(),
 			]);
+			// Name, time zone, currency and credit unit come from ledger/school, stale and lag from the Worker.
+			// `attentionCount` and `tabBadges` have no source on either side: null, so no badge shows.
 			const missing: string[] = [];
+			const schools: School[] = [];
 			token.schools.forEach((claim, index) => {
 				const fact = facts[index];
 				const row = status.data.schools.find(({ id }) => id === claim.id);
@@ -136,19 +140,34 @@ export function createHttpReader(options: {
 						missing.push(`${claim.id}.${field}`);
 				if (!row || row.lagMinutes === null)
 					missing.push(`${claim.id}.lagMinutes`);
+				if (
+					!fact?.timeZone ||
+					!fact.currency ||
+					!fact.creditUnit ||
+					!row ||
+					row.lagMinutes === null
+				)
+					return;
+				schools.push({
+					id: claim.id,
+					name: fact.name,
+					timeZone: fact.timeZone,
+					currency: fact.currency,
+					role: claim.role,
+					creditUnit: fact.creditUnit,
+					stale: row.stale,
+					lagMinutes: row.lagMinutes,
+					attentionCount: null,
+					tabBadges: null,
+				});
 			});
-			// Name, time zone, currency and credit unit come from ledger/school, stale and lag from the Worker; but
-			// `attentionCount` and `tabBadges` have no source on either side, and `School` has no null for them.
-			throw notAvailable(
-				"schools",
-				`School.attentionCount and School.tabBadges have no source (contract change proposed in the S8e report)${missing.length ? `; also null: ${missing.join(", ")}` : ""}`,
-			);
+			if (missing.length)
+				throw notAvailable("schools", `null: ${missing.join(", ")}`);
+			return schools;
 		},
 
-		dashboardOptions: unavailable(
-			"dashboardOptions",
-			"real data has no presets and DashboardOptions.presets must hold at least one (S8c: no presets)",
-		),
+		/* Real data has no presets (S8c): the Dashboard shows no scenario control. */
+		dashboardOptions: async () => ({ presets: [] }),
 
 		kpiDocument: async ({ school, audience, pinLocked }) =>
 			seen(school, await worker.kpiDocument({ school, audience, pinLocked })),
@@ -291,10 +310,8 @@ export function createHttpReader(options: {
 			"donor names and spreads have no source (S8-contract section 11, D5)",
 		),
 		promos: unavailable("promos", "no promo route (D8)"),
-		schoolRules: unavailable(
-			"schoolRules",
-			"no school-level booking rule exists (D11)",
-		),
+		/* No school-level booking rule exists (D11): no rules, and the UI uses the school's own credit unit. */
+		schoolRules: async () => ({ rules: null, unit: null }),
 
 		memberPortal: unavailable(
 			"memberPortal",

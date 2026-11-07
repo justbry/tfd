@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { AdapterError } from "../../src/http/errors.ts";
 import {
+	adminPubkey,
 	apiBase,
 	bookingId,
 	familyId,
@@ -270,7 +271,7 @@ describe("members: GET .../billing/members-list", () => {
 		expect("rolledOver" in (page.members[0]?.balances[0] ?? {})).toBe(false);
 	});
 
-	test("a membership with no period end is a mismatch, not 0", async () => {
+	test("a membership with no period end reads null, not 0; a missing one is a mismatch", async () => {
 		const { reader, http } = adapters();
 		const balance = { ...memberRow().balances[0], granted: 8 };
 		http.on("GET", /members-list$/, {
@@ -283,9 +284,21 @@ describe("members: GET .../billing/members-list", () => {
 				}),
 			]),
 		});
-		expect((await rejection(reader.members({ schoolId }))).message).toContain(
-			"currentPeriodEnd",
-		);
+		expect(
+			(await reader.members({ schoolId })).members[0]?.currentPeriodEnd,
+		).toBeNull();
+		const { currentPeriodEnd: _dropped, ...withoutPeriodEnd } = memberRow({
+			membershipId,
+			balances: [balance],
+		});
+		const missing = adapters();
+		missing.http.on("GET", /members-list$/, {
+			status: 200,
+			body: membersAnswer([withoutPeriodEnd]),
+		});
+		expect(
+			(await rejection(missing.reader.members({ schoolId }))).message,
+		).toContain("currentPeriodEnd");
 	});
 });
 
@@ -346,15 +359,21 @@ describe("capabilities and finance grants", () => {
 		);
 	});
 
-	test("finance grants: the route does not say who granted, so the read is a mismatch", async () => {
+	test("finance grants: the route does not say who granted, so grantedBy is null", async () => {
 		const { reader, http } = adapters();
 		http.on("GET", /finance-grants$/, {
 			status: 200,
 			body: financeGrantsAnswer,
 		});
-		expect(
-			(await rejection(reader.financeGrants({ schoolId }))).message,
-		).toContain("grantedBy");
+		expect(await reader.financeGrants({ schoolId })).toEqual([
+			{
+				subject: adminPubkey,
+				grant: "finance",
+				grantedBy: null,
+				grantedAt: 1_792_500_000,
+				revokedAt: null,
+			},
+		]);
 	});
 });
 
@@ -392,7 +411,6 @@ describe("calls with no source answer not available, ask nothing, and hold no 0"
 			(reader: ReturnType<typeof adapters>["reader"]) => Promise<unknown>,
 		]
 	> = [
-		["dashboardOptions", (reader) => reader.dashboardOptions()],
 		["people", (reader) => reader.people({ schoolId })],
 		["membersSummary", (reader) => reader.membersSummary({ schoolId })],
 		[
@@ -412,7 +430,6 @@ describe("calls with no source answer not available, ask nothing, and hold no 0"
 			"promos",
 			(reader) => reader.promos({ school: schoolId, audience: "owner" }),
 		],
-		["schoolRules", (reader) => reader.schoolRules(schoolId)],
 		[
 			"memberPortal",
 			(reader) => reader.memberPortal({ school: schoolId, profileId }),
@@ -427,6 +444,16 @@ describe("calls with no source answer not available, ask nothing, and hold no 0"
 			expect(error.kind).toBe("not_available");
 			expect(http.calls).toEqual([]);
 		});
+
+	test("no presets and no school rules: empty and null, never invented, and nothing is asked", async () => {
+		const { reader, http } = adapters();
+		expect(await reader.dashboardOptions()).toEqual({ presets: [] });
+		expect(await reader.schoolRules(schoolId)).toEqual({
+			rules: null,
+			unit: null,
+		});
+		expect(http.calls).toEqual([]);
+	});
 
 	test("the Worker's reads reject not_connected in part 1", async () => {
 		const { reader } = adapters();

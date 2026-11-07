@@ -96,7 +96,15 @@ export async function sendInvoice(
 	};
 }
 
-/** Brief C1 `refunds`: the refund shows as an open payment row and takes from what is left on the payment. */
+/** Stripe stopped the refund before it paid out: nothing moved, so no row shows. */
+export const refundCanceledToast =
+	"Stripe canceled the refund. Nothing was refunded.";
+/** Stripe holds the refund until the customer acts (their bank details): it shows as pending until then. */
+export const refundRequiresActionToast =
+	"Refund sent. Stripe is waiting on the customer before it pays out; it shows as pending until then.";
+
+/** Brief C1 `refunds`: the refund shows as an open payment row and takes from what is left on the payment. A refund
+ * Stripe canceled shows nothing; one waiting on the customer shows pending and says so. */
 export async function refundPayment(
 	context: WriteContext,
 	payment: RefundablePayment,
@@ -110,6 +118,8 @@ export async function refundPayment(
 		note: fields.note,
 	});
 	if (result.status === "failed") throw new Error("Stripe refused the refund");
+	if (result.status === "canceled")
+		return { changes: [], toast: refundCanceledToast };
 	return {
 		changes: [
 			ledger(
@@ -124,7 +134,10 @@ export async function refundPayment(
 				payment.paymentIntentId,
 			),
 		],
-		toast: sentToast,
+		toast:
+			result.status === "requires_action"
+				? refundRequiresActionToast
+				: sentToast,
 	};
 }
 

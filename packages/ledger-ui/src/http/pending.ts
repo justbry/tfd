@@ -120,7 +120,7 @@ export function createPendingStore(options: {
 	};
 }
 
-/** A `Storage` that lives as long as the page: what the browser build uses until gate H allows the browser's persistent storage. */
+/** A `Storage` that lives as long as the page: the tests', and the browser build's where the page may not persist. */
 export function memoryStorage(): StorageLike & {
 	snapshot(): Map<string, string>;
 } {

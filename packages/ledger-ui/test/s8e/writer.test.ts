@@ -209,8 +209,8 @@ describe("each write: request and mapped answer", () => {
 		expect(apiCalls(http)).toHaveLength(2);
 	});
 
-	test("saveMenu sends buzz-school's Menu (no tier audience); publishMenu opens the PIN first", async () => {
-		const { writer, http, pinAsks, pending } = adapters();
+	test("saveMenu sends buzz-school's Menu (no tier audience); publishMenu opens the PIN it is given first", async () => {
+		const { writer, http, pinAsks, pending, storage } = adapters();
 		http.always("POST", /billing\/menu(\/publish)?$/, {
 			status: 200,
 			body: billingStateAnswer,
@@ -227,13 +227,15 @@ describe("each write: request and mapped answer", () => {
 			})),
 		} as never;
 		await writer.saveMenu(schoolId, draft);
-		await writer.publishMenu(schoolId);
+		await writer.publishMenu(schoolId, "2468");
 		expect(sent(http).map(({ path, body }) => [path, body])).toEqual([
 			[`${school}/billing/menu`, menu],
-			["/family/pin/verify", { pin: "4821" }],
+			["/family/pin/verify", { pin: "2468" }],
 			[`${school}/billing/menu/publish`, {}],
 		]);
-		expect(pinAsks).toEqual([{ school: schoolId, purpose: "publishMenu" }]);
+		// The review typed the PIN: the pin source is not asked, and the PIN is not kept.
+		expect(pinAsks).toEqual([]);
+		expect(storage.getItem(pendingStorageKey) ?? "").not.toContain("2468");
 		// The menu save is not a ledger event; the publish is (catalog.published).
 		expect(pending.forSchool(schoolId).map(({ method }) => method)).toEqual([
 			"publishMenu",
@@ -242,7 +244,7 @@ describe("each write: request and mapped answer", () => {
 
 	test("publishMenu with no PIN given rejects pin_required and sends nothing", async () => {
 		const { writer, http } = adapters({ pin: null });
-		expect((await rejection(writer.publishMenu(schoolId))).kind).toBe(
+		expect((await rejection(writer.publishMenu(schoolId, ""))).kind).toBe(
 			"pin_required",
 		);
 		expect(apiCalls(http)).toEqual([]);
@@ -436,7 +438,7 @@ describe("retries keep the Idempotency-Key of the user action", () => {
 		const { writer, http, pending } = adapters();
 		http.on("POST", /refunds$/, {
 			status: 200,
-			body: { ...refundAnswer, status: "requires_action" },
+			body: { ...refundAnswer, status: "reversed" },
 		});
 		expect(
 			(
@@ -455,6 +457,37 @@ describe("retries keep the Idempotency-Key of the user action", () => {
 			"accepted",
 		]);
 	});
+});
+
+describe("refund: every Stripe refund status maps", () => {
+	for (const status of [
+		"pending",
+		"succeeded",
+		"failed",
+		"requires_action",
+		"canceled",
+	] as const)
+		test(status, async () => {
+			const { writer, http } = adapters();
+			http.on("POST", /refunds$/, {
+				status: 200,
+				body: { ...refundAnswer, status },
+			});
+			expect(
+				await writer.refund({
+					schoolId,
+					paymentIntentId: "pi_1A2b3C4d5E",
+					amountCents: 2500,
+					reason: "requested_by_customer",
+					note: "x y z",
+				}),
+			).toEqual({
+				refundId: refundAnswer.refundId,
+				status,
+				refundedCents: refundAnswer.refundedCents,
+				remainingCents: refundAnswer.remainingCents,
+			});
+		});
 });
 
 describe("writes with no route answer not available and send nothing", () => {

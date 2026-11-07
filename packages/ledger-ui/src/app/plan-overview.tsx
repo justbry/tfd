@@ -176,7 +176,8 @@ export function PlanStrip({
 	view: PlansView;
 	summary: PlanSummary;
 	currency: string;
-	attentionCount: number;
+	/** Null when no source counts it: the stat shows "—", never 0. */
+	attentionCount: number | null;
 	/** The month the viewed period reads from (`YYYY-MM-01`): it names the stat when its figure is withheld. */
 	viewedMonth: string;
 	onMembers: () => void;
@@ -219,7 +220,7 @@ export function PlanStrip({
 				label="Need attention"
 				onClick={onMembers}
 			>
-				{attentionCount}
+				{attentionCount ?? "—"}
 			</PlanStat>
 		</div>
 	);

@@ -31,6 +31,7 @@ import {
 	eventLabel,
 	formatDay,
 	formatPaymentDay,
+	formatPeriodEnd,
 	formatWallTime,
 	historyOf,
 	paymentsOf,
@@ -330,8 +331,8 @@ export function MemberDrawer({
 					<AttentionBadges reasons={reasons} unitPlural={unit.other} />{" "}
 					<span class="badge" data-test="renews-badge">
 						{ended
-							? `ends ${standing?.endsToday ? "today" : formatDay(member.currentPeriodEnd, school.timeZone)}`
-							: `renews ${formatDay(member.currentPeriodEnd, school.timeZone)}`}
+							? `ends ${standing?.endsToday ? "today" : formatPeriodEnd(member.currentPeriodEnd, school.timeZone)}`
+							: `renews ${formatPeriodEnd(member.currentPeriodEnd, school.timeZone)}`}
 					</span>
 				</>
 			)}

@@ -32,6 +32,9 @@ import { useViewing } from "./viewing.ts";
  * other presets of the mart have no control: they stay reachable by the route's `preset=<id>`, and the segmented control
  * then shows none pressed. */
 const featuredScenarios = 4;
+/** Real data has no presets: the query then names none, and the Reader answers the school's one document (the HTTP
+ * Reader sends no preset to the Worker). */
+const noPreset = "";
 
 type DashboardView = "money" | "members" | "risk";
 type ViewOption = { id: DashboardView; label: string; icon: IconName };
@@ -1386,7 +1389,7 @@ export function Dashboard({
 			): Promise<KpiDocument | undefined> => {
 				const read = await reader.kpiDocument({
 					school: school.id,
-					preset: preset.id,
+					preset: preset?.id ?? noPreset,
 					audience: forAudience,
 					pinLocked: locked,
 				});
@@ -1546,7 +1549,7 @@ export function Dashboard({
 						PIN locked
 					</button>
 				)}
-				{document.source.kind === "mart" && (
+				{document.source.kind === "mart" && featured.length > 0 && (
 					<>
 						<span class="sp" />
 						{/* biome-ignore lint/a11y/useSemanticElements: the mockup's segmented control is a div; a fieldset brings its own border and padding */}

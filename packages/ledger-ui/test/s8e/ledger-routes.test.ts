@@ -98,7 +98,7 @@ test(`every api.b4uni.com path the adapters call is in LEDGER_ROUTES (buzz-schoo
 				reason: "admin_release",
 			}),
 		() => writer.saveMenu(schoolId, menu as never),
-		() => writer.publishMenu(schoolId),
+		() => writer.publishMenu(schoolId, "4821"),
 		() =>
 			writer.refund({
 				schoolId,

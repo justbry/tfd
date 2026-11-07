@@ -40,7 +40,8 @@ const agree = (count: number, singular: string, plural: string): string =>
 	count === 1 ? singular : plural;
 
 /** Built only from the school's rules, the booking's `billing` and the attendee's name; with no `billing` there is no
- * line, and no balance is computed. A no-show on a booking holding no credits says so. */
+ * line, and no balance is computed. A no-show on a booking holding no credits says so. With no rules (D11: no source)
+ * the line claims no rule: a no-show says the rule is not available, and a release has no line. */
 export function consequenceLine({
 	action,
 	waive,
@@ -52,7 +53,7 @@ export function consequenceLine({
 	action: "noshow" | "release";
 	/** The "Waive the late-cancel forfeit" box. */
 	waive: boolean;
-	rules: BookingRules;
+	rules: BookingRules | null;
 	booking: Pick<Booking, "billing" | "cutoffMinutes">;
 	creditUnit: CreditUnit;
 	memberName: string;
@@ -64,6 +65,12 @@ export function consequenceLine({
 		if (credits === 0)
 			return {
 				before: "No credits are involved. The no-show is recorded.",
+				strong: "",
+				after: "",
+			};
+		if (!rules)
+			return {
+				before: `The no-show is recorded. The school's no-show rule for the ${creditUnit.other} held is not available here.`,
 				strong: "",
 				after: "",
 			};
@@ -80,7 +87,7 @@ export function consequenceLine({
 					after: ` ${agree(credits, "returns", "return")} to available.`,
 				};
 	}
-	if (billing.kind !== "held") return null;
+	if (billing.kind !== "held" || !rules) return null;
 	const count = creditCount(credits, creditUnit);
 	if (rules.lateCancel === "spend" && !waive)
 		return {

@@ -742,13 +742,17 @@ function DocumentStatement({
 
 // ---- Rules in force.
 
+/** A rule with no source (D11): the row says so and claims no cutoff. */
+const ruleNotAvailable = "Not available";
+
 function Rules({
 	rules,
 	unit,
 	canEdit,
 	onEdit,
 }: {
-	rules: SchoolRules;
+	/** Null where no source has the rules (D11). */
+	rules: SchoolRules | null;
 	unit: CreditUnit;
 	canEdit: boolean;
 	onEdit: () => void;
@@ -757,17 +761,23 @@ function Rules({
 		{
 			rule: "cutoff",
 			label: "Cancel cutoff (default)",
-			value: `${rules.cancelCutoffHours} hours before`,
+			value: rules
+				? `${rules.cancelCutoffHours} hours before`
+				: ruleNotAvailable,
 		},
 		{
 			rule: "no-show",
 			label: "No-show",
-			value: `${unit.other} are ${rules.noShow === "spend" ? "spent" : "released"}`,
+			value: rules
+				? `${unit.other} are ${rules.noShow === "spend" ? "spent" : "released"}`
+				: ruleNotAvailable,
 		},
 		{
 			rule: "late-cancel",
 			label: "Late cancel",
-			value: `${unit.other} are ${rules.lateCancel === "spend" ? "forfeited" : "released"}`,
+			value: rules
+				? `${unit.other} are ${rules.lateCancel === "spend" ? "forfeited" : "released"}`
+				: ruleNotAvailable,
 		},
 	];
 	return (
@@ -944,7 +954,7 @@ export function Reports({
 				</div>
 				<Rules
 					rules={rules.rules}
-					unit={rules.unit}
+					unit={rules.unit ?? school.creditUnit}
 					canEdit={admin}
 					onEdit={() => onToast("Opening school settings in buzz-school…")}
 				/>

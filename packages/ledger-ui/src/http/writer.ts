@@ -30,9 +30,9 @@ import { isRecord, numberOf, oneOf, recordOf, stringOf } from "./wire.ts";
  * - **Pending until shipped.** A write that puts an event in the ledger stays in the pending store, `accepted`, until
  *   a Worker read's `asOf` passes it (`pending.ts`).
  * - **The PIN.** `publishMenu` opens the PIN first (`POST /family/pin/verify`; buzz-school's publish needs the PIN
- *   open and no mailed link), with the PIN the `pinSource` gives; any other write that answers `pin_required` opens it
- *   the same way and is sent once more. The Stripe key writes carry their PIN in the request. A missing PIN rejects
- *   `pin_required`.
+ *   open and no mailed link), with the PIN the review collected, as do the Stripe key writes with theirs; any other
+ *   write that answers `pin_required` opens it with the PIN the `pinSource` gives and is sent once more. A missing PIN
+ *   rejects `pin_required`.
  * - **The mailed-link step-up** (money writes and finance grants, 403 `step_up_required`) rejects `step_up`: only the
  *   person can open the mailed link.
  */
@@ -222,8 +222,8 @@ export function createHttpWriter(options: {
 				menuBodyOf(menu),
 			);
 		},
-		publishMenu: async (schoolId) => {
-			await openPin(schoolId, "publishMenu");
+		publishMenu: async (schoolId, pin) => {
+			await openPin(schoolId, "publishMenu", pin);
 			await post(
 				"publishMenu",
 				schoolId,
@@ -254,6 +254,8 @@ export function createHttpWriter(options: {
 					"pending",
 					"succeeded",
 					"failed",
+					"requires_action",
+					"canceled",
 				] as const),
 				refundedCents: numberOf(route, body.refundedCents, "refundedCents"),
 				remainingCents: numberOf(route, body.remainingCents, "remainingCents"),

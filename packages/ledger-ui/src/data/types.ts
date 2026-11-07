@@ -19,14 +19,15 @@ export type School = {
 	/** The ledger shipper is behind; `lagMinutes` says by how much. */
 	stale: boolean;
 	lagMinutes: number;
-	/** Members that need attention. */
-	attentionCount: number;
+	/** Members that need attention; null when no source counts them (the HTTP build): no badge, never 0. */
+	attentionCount: number | null;
+	/** Null when no source has them (the HTTP build): the tabs show no badge. */
 	tabBadges: {
 		/** The plans have unpublished changes. */
 		plansDraft: boolean;
 		bookingsOverdue: number;
 		promosExpiring: number;
-	};
+	} | null;
 };
 
 /** A fixture scenario the Dashboard's switcher offers (mockup `KFIX`): an atm preset, its label and, where the mockup
@@ -34,7 +35,8 @@ export type School = {
 export type Preset = { id: string; label: string; note?: string };
 
 /** What the Dashboard may ask the Reader for: the presets of the fixture schools, in switcher order. The audiences
- * come from the disclosure (`disclosure.ts`), and each cell carries its own text. */
+ * come from the disclosure (`disclosure.ts`), and each cell carries its own text. Real data has none: an empty list,
+ * and the Dashboard shows no scenario control. */
 export type DashboardOptions = {
-	presets: [Preset, ...Preset[]];
+	presets: Preset[];
 };
