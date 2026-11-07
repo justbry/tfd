@@ -35,6 +35,7 @@ import {
 import {
 	audienceReportRoute,
 	clockOf,
+	disclosureBeforeViews,
 	disclosureRoute,
 	kpiRoute,
 } from "./routes/kpi.js";
@@ -91,6 +92,11 @@ const audienceGate = (
 	return asked;
 };
 
+/** The books audience the View as Admin row shows this caller. D7: an admin without the finance grant reads the books
+ * at their own (public) audience; an owner or a finance admin previewing the row sees `member`. */
+const adminAudienceOf = (grant: SchoolGrant): Audience =>
+	grant.role === "owner" || grant.finance ? "member" : maxAudienceOf(grant);
+
 const routes: Record<string, Route> = {
 	kpi: {
 		gate: "any",
@@ -112,14 +118,7 @@ const routes: Record<string, Route> = {
 	disclosure: {
 		gate: "any",
 		handle: ({ snapshot, now, grant }) =>
-			disclosureRoute(
-				snapshot,
-				now,
-				// D7: an admin without the finance grant reads the books at their own (public) audience
-				grant.role === "owner" || grant.finance
-					? "member"
-					: maxAudienceOf(grant),
-			),
+			disclosureRoute(snapshot, now, adminAudienceOf(grant)),
 	},
 	"audience-report": {
 		gate: "any",
@@ -279,7 +278,21 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 				"This needs the finance grant on the school.",
 			);
 		route.check?.(url.searchParams, grant);
-		const snapshot = await openSnapshot(store, school);
+		const snapshot = await openSnapshot(store, school).catch((error) => {
+			// The disclosure is policy, not data: a school with no views yet still answers it (the defaults).
+			if (
+				route === routes.disclosure &&
+				error instanceof ApiError &&
+				error.code === "no_data"
+			)
+				return null;
+			throw error;
+		});
+		if (snapshot === null)
+			return okResponse(
+				disclosureBeforeViews(school, now, adminAudienceOf(grant)),
+				{ asOf: null, lagMinutes: null },
+			);
 		const data = await route.handle({
 			snapshot,
 			query: url.searchParams,

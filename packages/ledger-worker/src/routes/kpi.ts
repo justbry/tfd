@@ -144,11 +144,39 @@ export const disclosureRoute = async (
 ) => {
 	const rows = await snapshot.kpiRows();
 	const clock = await clockOf(snapshot, now);
+	return disclosureAnswer(snapshot.school, rows, clock, adminAudience);
+};
+
+/**
+ * The disclosure of a school with no views yet (nothing has shipped): it is policy, not data, so it answers before a first
+ * views run. The B4 Uni defaults; the size of a school with no closed year (no rows); the clock in UTC, the zone a school
+ * with no menu and no events has (`zoneOf`).
+ */
+export const disclosureBeforeViews = (
+	school: string,
+	now: number,
+	adminAudience: Audience,
+) => {
+	const wallTime = localWallTime(now, "UTC");
+	return disclosureAnswer(
+		school,
+		[],
+		{ today: wallTime.slice(0, 10), now: wallTime },
+		adminAudience,
+	);
+};
+
+const disclosureAnswer = (
+	school: string,
+	rows: readonly KpiDocumentRow[],
+	clock: { today: string; now: string },
+	adminAudience: Audience,
+) => {
 	const year = Number(clock.today.slice(0, 4));
 	const { size, file, override } = disclosureOf(rows, year);
 	const views = audienceViews({ file, override, size, year, clock });
 	return {
-		school: snapshot.school,
+		school,
 		year,
 		size,
 		file,
