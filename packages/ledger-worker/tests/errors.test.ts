@@ -366,6 +366,34 @@ describe("403 and 404: who and what", () => {
 		expect(reply.body.asOf).toBeNull();
 		expect(reply.body.lagMinutes).toBeNull();
 	});
+
+	test("disclosure before a first views run: the B4 Uni defaults, never no_data, with null asOf and lagMinutes", async () => {
+		for (const grant of [
+			{ id: "fresh-school", role: "owner", finance: true },
+			{ id: "fresh-school", role: "admin", finance: false },
+		] as const) {
+			const reply = await call(
+				harness,
+				await mint([grant]),
+				"/v1/schools/fresh-school/disclosure",
+			);
+			expect(reply.status).toBe(200);
+			expect(reply.body.asOf).toBeNull();
+			expect(reply.body.lagMinutes).toBeNull();
+			const data = reply.body.data as Record<string, unknown>;
+			expect(data.school).toBe("fresh-school");
+			expect(data.source).toBe("defaults");
+			expect(data.override).toBeNull();
+			expect(Object.keys(data.views as object).sort()).toEqual([
+				"finance",
+				"governance",
+				"member",
+				"owner",
+				"public",
+			]);
+			expect(Object.keys(data.viewAs as object).length).toBeGreaterThan(0);
+		}
+	});
 });
 
 describe("400: the query", () => {
