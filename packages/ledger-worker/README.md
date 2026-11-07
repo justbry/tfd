@@ -104,3 +104,7 @@ these claims, `extraSigner(fill)`, `signer`, `issuer`, `bucket` (the Worker's R2
 `bun test` (or `bun run test`); `bun run ts` for the types. `endpoints.test.ts` compares every endpoint with the same
 `atm/worker` function called directly, on four presets; `errors.test.ts` covers the error table; `gating.test.ts` the
 finance-false guarantees; `cron.test.ts` the views job; `consumer.test.ts` uses the harness as another package would.
+
+## Staging end-to-end (S8f)
+
+`bun run staging-e2e [--stage N[,N]] [--json] [--strict]` (`scripts/staging-e2e.ts`) checks the deployed staging Worker and family service; it refuses any host but the two staging ones. `tests/staging-e2e.test.ts` runs its stage 1 against the harness. Inputs, owner steps and expected output: `plans/ledger-ui/S8f-staging-runbook.md`.
