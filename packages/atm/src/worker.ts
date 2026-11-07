@@ -4,6 +4,9 @@
  * document for an audience from its KPI rows, and `suppressKpis` is the cell-rule suppression of the KPI export; both are
  * pure and Ajv-free. Needs the `nodejs_compat` flag (see README).
  */
+
+export * from "./ledger/audience-view-types.js";
+export * from "./ledger/audience-views.js";
 export * from "./ledger/catalog.js";
 export * from "./ledger/contributions.js";
 export * from "./ledger/finance.js";
