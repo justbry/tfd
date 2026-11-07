@@ -27,6 +27,12 @@ import {
 	okResponse,
 	plainResponse,
 } from "./http.js";
+import {
+	type ConfigAction,
+	putConfigRoute,
+	readConfigRoute,
+	verifyConfigRoute,
+} from "./routes/config.js";
 import { fundraisingRoute } from "./routes/fundraising.js";
 import {
 	incomeStatementRoute,
@@ -47,6 +53,9 @@ import { runViewsJob, type ViewsJobResult } from "./views-job.js";
 
 const SCHOOL_PATH = /^\/v1\/schools\/([^/]+)\/(.+)$/;
 const MEMBER_MONEY = /^members\/([^/]+)\/money$/;
+/** `config/<name>` and `config/<name>/verify`: the school's config objects (S9 plan section 4). */
+const CONFIG_PATH = /^config\/([^/]+?)(\/verify)?$/;
+const CONFIG_SCHOOL_PATH = /^\/v1\/schools\/[^/]+\/config\/[^/]+?(\/verify)?$/;
 const BEARER = /^Bearer\s+(\S+)$/i;
 const MS_PER_SECOND = 1000;
 const JWKS_FETCH_TIMEOUT_MS = 5000;
@@ -156,6 +165,31 @@ const memberMoney: Route = {
 	handle: ({ snapshot, key }) => memberMoneyRoute(snapshot, key ?? ""),
 };
 
+/** The config action a method and path ask for, or null when the path is not a config path. */
+const configActionOf = (
+	method: string,
+	rest: string,
+): { name: string; action: ConfigAction } | null => {
+	const match = CONFIG_PATH.exec(rest);
+	if (match === null) return null;
+	const name = decode(match[1] as string);
+	const verify = match[2] !== undefined;
+	const action: ConfigAction | null =
+		verify && method === "POST"
+			? "verify"
+			: !verify && method === "GET"
+				? "read"
+				: !verify && method === "PUT"
+					? "put"
+					: null;
+	if (action === null)
+		throw new ApiError(
+			"method_not_allowed",
+			"That method is not served on this path.",
+		);
+	return { name, action };
+};
+
 const decode = (segment: string): string => {
 	try {
 		return decodeURIComponent(segment);
@@ -236,7 +270,8 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		now: number,
 	): Promise<Response> => {
 		const caller = await authenticate(request, env, now);
-		if (request.method !== "GET")
+		const configPath = CONFIG_SCHOOL_PATH.exec(url.pathname);
+		if (request.method !== "GET" && configPath === null)
 			throw new ApiError("method_not_allowed", "Only GET is served.");
 		const store = new R2BindingStore(env.LEDGER_BUCKET);
 		if (url.pathname === "/v1/schools") {
@@ -260,6 +295,27 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		if (match === null) throw new ApiError("not_found", "No such endpoint.");
 		const school = decode(match[1] as string);
 		const rest = match[2] as string;
+		const config = configActionOf(request.method, rest);
+		if (config !== null) {
+			const grant = caller.schools.get(school);
+			if (grant === undefined)
+				throw new ApiError("not_found", "No such school.");
+			const context = {
+				store,
+				school,
+				name: config.name,
+				grant,
+				subject: caller.subject,
+				stepUpAt: caller.stepUpAt,
+				now,
+				request,
+			};
+			return config.action === "read"
+				? readConfigRoute(context)
+				: config.action === "verify"
+					? verifyConfigRoute(context)
+					: putConfigRoute(context);
+		}
 		const moneyKey = MEMBER_MONEY.exec(rest)?.[1];
 		// own keys only: `constructor` or `__proto__` is not an endpoint
 		const route =
@@ -329,6 +385,10 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 						"The ledger cannot be read right now.",
 					),
 				);
+			} finally {
+				// a refusal that never read the body (owner_only, step_up_required) would leave it on the connection
+				if (request.body !== null && !request.bodyUsed)
+					await request.body.cancel();
 			}
 		},
 

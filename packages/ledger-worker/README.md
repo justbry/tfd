@@ -23,7 +23,7 @@ Token (401) → route → the school is in the token's `schools[]` (404 `not_fou
 endpoint's gate (403 `finance_required`, 403 `audience_not_allowed`) → the query (400) → the data (404 `no_data`, 409
 `view_mismatch`, 501, 503). Every `/v1` answer is `Cache-Control: private, no-store`.
 
-The token's `sub` is dropped when the token is checked: it is not stored, logged or returned. A failure in the views job is
+The token's `sub` is not stored, logged or returned. It is held for the one request only, and a config write turns it into an opaque writer id (`u_` and the first 16 hex characters of the sha256 of `<school>:<sub>`) for the audit line and the manifest. A failure in the views job is
 logged as `views job failed for school <id>` and nothing else (a job message can carry an event id or a `family:<id>` key).
 
 ## Configuration
@@ -52,6 +52,47 @@ installed, and otherwise checks against a placeholder page (`--assets`) and says
 **Assets.** A page that is not a file in the UI build gets `index.html`. `/v1/*` and `/healthz` run the Worker first, so an
 unknown `/v1/x` is the Worker's JSON 404, never a page. The harness serves a placeholder `index.html` the same way (or the
 `assetsDirectory` it is given).
+
+## Config objects (S9.6)
+
+`schools/<id>/config/` holds the school's config, written only by the Worker (and the seeder in test and staging):
+`settings.json`, `disclosure.json`, `booking-rules.json`, `plans-draft.json`, `promos.json`, `manifest.json` (the sha256,
+size, time and writer of each) and `audit/YYYY-MM.jsonl` (one line for each accepted write). Every object is canonical JSON
+(sorted keys, two-space indent, trailing newline), so equal content is equal bytes and an equal sha256, which is the ETag.
+The shapes mirror the UI's types (`src/config/types.ts`); the validators (`src/config/definitions.ts`) are hand-written (no
+schema library, no `new Function`) and answer every problem as `{ path, message, hint }`.
+
+- `GET .../config/:name`: any listed school; `promos` also needs `finance:true`. `ETag: "<sha256>"`.
+- `POST .../config/:name/verify` (owner): `{ value }` gives `{ ok, problems, diff, verifiedHash, baseEtag }`; writes nothing.
+- `PUT .../config/:name` (owner and an `su` claim, unix seconds, no older than 10 minutes, D22): `{ value, verifiedHash }`
+  with `If-Match: "<baseEtag>"` (`If-None-Match: *` for a new object). `403 owner_only`, `403 step_up_required`, `412
+  stale_etag`, `422 invalid_config`. Until buzz-school sends `su` (S9-bz1) every put is `step_up_required`.
+
+A put writes the object (a conditional put on the ETag it read), then the audit line (conditional too, so two writers each
+keep theirs), then the manifest, which is rebuilt from the objects' own bytes so a write that stopped half way is repaired
+by the next. If the audit or manifest step fails after the object landed, the answer is a 503 and the object is changed:
+read it again before saving.
+
+**Seeding.** `src/testing/seed-config.ts` `seedSchoolFixtures(store, { schools, now })` lands the UI's fixtures
+(`packages/ledger-ui/src/fixtures`, imported read-only) as these objects: an object is written only when absent or its
+sha256 differs, with `If-None-Match: *` or the ETag, so a second run reports `written:0` and changes no byte, and runs at
+once are safe. The same fixtures overwrite an owner's edit of an object they describe. `bun run --cwd packages/ledger-worker
+seed:r2 [--env staging] [--school <id>] [--dry-run]` runs it on the staging bucket with the four `R2_LEDGER_*` variables
+(`set -a; . ~/.config/b4uni/r2-stg-ledger-s3.env; set +a`); it refuses every bucket but `b4uni-stg-ledger`, every environment
+but `staging` and every host outside `r2.cloudflarestorage.com`, and prints no credential. It seeds config only: events and
+views come from the shipper and the views job (the harness seeds its own).
+
+| UI reader (`ledger-ui/src/http/reader.ts`) | Config keys | Fixture it comes from |
+| --- | --- | --- |
+| `settings` | `settings`, `booking-rules` | `fixtures/settings.json` (basis, Stripe, Zeffy, keys); rules below |
+| `schoolRules` | `booking-rules` | `fixtures/ledger-data.ts` `rulesBySchool` |
+| `promos` | `promos` | `fixtures/ledger-data.ts` `promosBySchool` |
+| `planSummary` | `plans-draft` (features, tier copy and order, link flag) | `fixtures/plans.ts` `plansBySchool` |
+| `disclosure` | `disclosure` (the school's override) | `fixtures/disclosure.json` `schools.<id>.override` |
+
+`tests/seed-config.test.ts` fails when a reader that `reader.ts` leaves unavailable has neither a row in `readerConfig`
+(`seed-config.ts`) nor a place on the list of readers that stay unavailable. The Worker's `disclosure` route does not read
+`config/disclosure.json` yet (its `override` is `null`).
 
 ## The views job and `asOf`
 

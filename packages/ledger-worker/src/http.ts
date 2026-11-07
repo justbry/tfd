@@ -17,7 +17,11 @@ export type ErrorCode =
 	| "not_available"
 	| "views_unavailable"
 	| "jwks_unavailable"
-	| "method_not_allowed";
+	| "method_not_allowed"
+	| "owner_only"
+	| "step_up_required"
+	| "stale_etag"
+	| "invalid_config";
 
 const STATUS: Record<ErrorCode, number> = {
 	token_missing: 401,
@@ -34,23 +38,36 @@ const STATUS: Record<ErrorCode, number> = {
 	views_unavailable: 503,
 	jwks_unavailable: 503,
 	method_not_allowed: 405,
+	owner_only: 403,
+	step_up_required: 403,
+	stale_etag: 412,
+	invalid_config: 422,
 };
+
+/** A problem with a config value (S9 plan section 4): where, what, and what to do about it. */
+export type ConfigProblem = { path: string; message: string; hint: string };
 
 /** Thrown anywhere under a handler; `worker.ts` turns it into the error body. */
 export class ApiError extends Error {
 	readonly code: ErrorCode;
 	readonly field: string | undefined;
 	readonly retryAfterSeconds: number | undefined;
+	readonly problems: readonly ConfigProblem[] | undefined;
 
 	constructor(
 		code: ErrorCode,
 		message: string,
-		extra: { field?: string; retryAfterSeconds?: number } = {},
+		extra: {
+			field?: string;
+			retryAfterSeconds?: number;
+			problems?: readonly ConfigProblem[];
+		} = {},
 	) {
 		super(message);
 		this.code = code;
 		this.field = extra.field;
 		this.retryAfterSeconds = extra.retryAfterSeconds;
+		this.problems = extra.problems;
 	}
 
 	get status(): number {
@@ -82,6 +99,7 @@ export const errorResponse = (error: ApiError): Response => {
 				...(error.retryAfterSeconds === undefined
 					? {}
 					: { retryAfterSeconds: error.retryAfterSeconds }),
+				...(error.problems === undefined ? {} : { problems: error.problems }),
 			},
 		}),
 		{ status: error.status, headers },
@@ -95,11 +113,16 @@ export const lagMinutesOf = (asOf: string, now: number): number =>
 export const okResponse = (
 	data: unknown,
 	freshness: { asOf: string | null; lagMinutes: number | null },
-): Response =>
-	new Response(JSON.stringify({ ...freshness, data }), {
+	headers: Record<string, string> = {},
+): Response => {
+	const responseHeaders = baseHeaders();
+	for (const [name, value] of Object.entries(headers))
+		responseHeaders.set(name, value);
+	return new Response(JSON.stringify({ ...freshness, data }), {
 		status: 200,
-		headers: baseHeaders(),
+		headers: responseHeaders,
 	});
+};
 
 export const plainResponse = (body: unknown): Response =>
 	new Response(JSON.stringify(body), { status: 200, headers: baseHeaders() });
