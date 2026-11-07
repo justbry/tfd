@@ -1,5 +1,6 @@
 import type {
 	Audience,
+	AudienceView,
 	DisclosureFile,
 	DisclosureOverride,
 	SchoolSize,
@@ -33,9 +34,9 @@ import {
 
 /**
  * The ledger Worker's reads (`plans/ledger-ui/S8-contract.md` section 11): every read of atm data. Part 1 of S8e
- * ships this seam, a source that rejects every call with `not_connected`, and the fetch source written against
- * section 11; part 2 runs the fetch source against `packages/ledger-worker/src/testing/harness.ts` (S8c) and the
- * C1 to C5 gates.
+ * shipped this seam, a source that rejects every call with `not_connected`, and the fetch source written against
+ * section 11; part 2 connects the fetch source in the browser build and runs it against the real Worker on
+ * `packages/ledger-worker/src/testing/harness.ts` (S8c): `test/worker-e2e/`.
  *
  * Every answer keeps the manifest's `asOf` and `lagMinutes`: the Reader clears the pending writes a read has shipped
  * and shows the lag. A `null` in `data` is a figure with no source (D11); `501 not_available` is a whole answer with
@@ -57,7 +58,7 @@ export type WorkerSchoolStatus = {
 	stale: boolean;
 };
 
-/** `GET /v1/schools/:school/disclosure`: the Reader adds `viewer`, `views` and `viewAs`. */
+/** `GET /v1/schools/:school/disclosure`: the Reader adds `viewer` and `viewAs`. */
 export type WorkerDisclosure = {
 	school: string;
 	year: number;
@@ -66,11 +67,16 @@ export type WorkerDisclosure = {
 	/** null until buzz-school stores one (build list group 8): the B4 Uni defaults apply. */
 	override: DisclosureOverride | null;
 	source: string;
+	/** Each audience's view, worked out by the Worker at its clock (`audienceViews` of `atm/worker`, S8c2); absent
+	 * from a Worker older than S8c2. */
+	views?: Record<Audience, AudienceView>;
 };
 
-/** A ledger entry as the Worker sends it: `member` is the key only; the Reader joins the name from members-list. */
-export type WorkerLedgerEntry = Omit<LedgerEntry, "member"> & {
+/** A ledger entry as the Worker sends it: `member` is the key only; the Reader joins the name from members-list. The
+ * log holds a promo's id, not its code, so `promo.code` is null. */
+export type WorkerLedgerEntry = Omit<LedgerEntry, "member" | "promo"> & {
 	member: { key: string } | null;
+	promo: { id: string; code: string | null } | null;
 };
 export type WorkerLedgerDay = Omit<LedgerDay, "entries"> & {
 	entries: WorkerLedgerEntry[];
@@ -87,6 +93,16 @@ export type WorkerLedgerQuery = {
 	to: string;
 	type: LedgerTypeFilter | null;
 	drill: LedgerDrill | null;
+};
+
+/** `GET /v1/schools/:school/income-statement`: `currency` and `unit` come from the latest `catalog.published` menu,
+ * so they are null for a school with none. */
+export type WorkerIncomeStatement = Omit<
+	IncomeStatement,
+	"currency" | "unit"
+> & {
+	currency: string | null;
+	unit: IncomeStatement["unit"] | null;
 };
 
 /** `GET /v1/schools/:school/members/:key/money`: the money half of `memberDetail`. */
@@ -109,7 +125,7 @@ export interface WorkerSource {
 	ledger(query: WorkerLedgerQuery): Promise<WorkerAnswer<WorkerLedgerPage>>;
 	incomeStatement(
 		query: IncomeStatementQuery,
-	): Promise<WorkerAnswer<IncomeStatement>>;
+	): Promise<WorkerAnswer<WorkerIncomeStatement>>;
 	membersIncome(query: {
 		school: string;
 		from: string;

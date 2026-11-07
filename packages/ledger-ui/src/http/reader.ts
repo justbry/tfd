@@ -281,14 +281,23 @@ export function createHttpReader(options: {
 			]);
 			const names = memberNamesOf(rows);
 			const joined = (entry: WorkerLedgerEntry): LedgerEntry => {
-				if (entry.member === null) return { ...entry, member: null };
+				// The log holds a promo's id, not its code: with no code there is no "· promo <code>" to show.
+				const promo =
+					entry.promo === null || entry.promo.code === null
+						? null
+						: { id: entry.promo.id, code: entry.promo.code };
+				if (entry.member === null) return { ...entry, member: null, promo };
 				const found = names.get(entry.member.key);
 				if (!found)
 					throw schemaMismatch(
 						"ledger member join",
 						`key ${entry.member.key} has no members-list row`,
 					);
-				return { ...entry, member: { key: entry.member.key, ...found } };
+				return {
+					...entry,
+					member: { key: entry.member.key, ...found },
+					promo,
+				};
 			};
 			const page = seen(school, answer);
 			const result: LedgerPage = {
@@ -301,8 +310,18 @@ export function createHttpReader(options: {
 			};
 			return result;
 		},
-		incomeStatement: async (query) =>
-			seen(query.school, await worker.incomeStatement(query)),
+		incomeStatement: async (query) => {
+			const { currency, unit, ...statement } = seen(
+				query.school,
+				await worker.incomeStatement(query),
+			);
+			if (currency === null || unit === null)
+				throw notAvailable(
+					"incomeStatement",
+					"its currency and unit come from the school's published menu, and the school has none",
+				);
+			return { ...statement, currency, unit };
+		},
 		audienceReport: async (query) =>
 			seen(query.school, await worker.audienceReport(query)),
 		donors: unavailable(

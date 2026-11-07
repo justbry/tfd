@@ -248,7 +248,8 @@ export function Ledger({
 			<PinLock
 				key={audience}
 				levelName={audienceNames[audience]}
-				onUnlock={() => {
+				unlock={(pin) => writer.unlockBooks(school.id, pin)}
+				onUnlocked={() => {
 					navigate(withQuery(route, "pin", null));
 					onToast("Books unlocked for this session.");
 				}}

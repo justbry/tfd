@@ -19,16 +19,19 @@ import type { WorkerDisclosure } from "./worker-source.ts";
  * (D7, and the Worker serves them no finer): the adapter caps them there too, so View as never offers a view the
  * Worker refuses.
  *
- * `views` (each audience's periods, presets and copy) and each View as row's name, summary and locks are worked out
- * by the server in the contract, and the viewer's display name comes from the roster: no route or Worker endpoint
- * gives any of them yet, so they come from a `DisclosurePresentationSource`, whose part-1 default is not available.
+ * `views` (each audience's periods, presets and copy) come from the Worker's answer (`audienceViews` of `atm/worker`,
+ * S8c2). Each View as row's name, summary and locks are worked out by the server in the contract, and the viewer's
+ * display name comes from the roster: no route or Worker endpoint gives them yet, so they come from a
+ * `DisclosurePresentationSource`, whose default is not available. Its `views` stand in only for a Worker that sends
+ * none.
  */
 
 export type ViewAsCopy = Pick<ViewAsOption, "name" | "summary" | "locks">;
 
 export type DisclosurePresentation = {
 	viewerName: string;
-	views: Record<Audience, AudienceView>;
+	/** Used only when the Worker's answer has no `views`. */
+	views?: Record<Audience, AudienceView>;
 	rows: Record<ViewAs, ViewAsCopy>;
 };
 
@@ -44,7 +47,7 @@ export const noDisclosurePresentation: DisclosurePresentationSource = {
 	presentation: async () => {
 		throw notAvailable(
 			"disclosure",
-			"no source gives the audience views, the View as copy or the viewer's name (S8-contract section 11 sends the file only; buzz-school build list groups 4 and 8)",
+			"no source gives the View as copy or the viewer's name (the Worker sends the file and the views; buzz-school build list groups 4 and 8)",
 		);
 	},
 };
@@ -122,6 +125,12 @@ export function assembleDisclosure(
 	viewer: Omit<Viewer, "name">,
 	presentation: DisclosurePresentation,
 ): Disclosure {
+	const views = answer.views ?? presentation.views;
+	if (!views)
+		throw notAvailable(
+			"disclosure",
+			"the Worker's answer has no views (a Worker older than S8c2)",
+		);
 	return {
 		school: answer.school,
 		year: answer.year,
@@ -130,7 +139,7 @@ export function assembleDisclosure(
 		// No stored override is the B4 Uni defaults: an override with no differences.
 		override: answer.override ?? {},
 		viewer: { ...viewer, name: presentation.viewerName },
-		views: presentation.views,
+		views,
 		viewAs: viewAsOf(viewer, presentation.rows),
 	};
 }

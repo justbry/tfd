@@ -1356,6 +1356,7 @@ type Loaded = {
  * cell is never a 0. */
 export function Dashboard({
 	reader,
+	writer,
 	school,
 	clock,
 	route,
@@ -1575,7 +1576,8 @@ export function Dashboard({
 				<PinLock
 					key={audience}
 					levelName={audienceNames[audience]}
-					onUnlock={() => {
+					unlock={(pin) => writer.unlockBooks(school.id, pin)}
+					onUnlocked={() => {
 						go("pin", null);
 						onToast("Books unlocked for this session.");
 					}}

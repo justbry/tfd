@@ -32,7 +32,8 @@ import { isRecord, numberOf, oneOf, recordOf, stringOf } from "./wire.ts";
  * - **The PIN.** `publishMenu` opens the PIN first (`POST /family/pin/verify`; buzz-school's publish needs the PIN
  *   open and no mailed link), with the PIN the review collected, as do the Stripe key writes with theirs; any other
  *   write that answers `pin_required` opens it with the PIN the `pinSource` gives and is sent once more. A missing PIN
- *   rejects `pin_required`.
+ *   rejects `pin_required`. `unlockBooks` opens it with the PIN typed on a books pane and answers `pin_wrong` and
+ *   `pin_locked` (the 429 of the shared PIN limit) as refusals, so the pane can say which.
  * - **The mailed-link step-up** (money writes and finance grants, 403 `step_up_required`) rejects `step_up`: only the
  *   person can open the mailed link.
  */
@@ -339,6 +340,20 @@ export function createHttpWriter(options: {
 			"capability resendReceipt is not_built (D8, build list group 4)",
 		),
 
+		/* The PIN opens the family session, not one school: buzz-school's verify names no school. */
+		unlockBooks: async (_schoolId, pin) => {
+			try {
+				await api.post(routes.pinVerify, { pin });
+				return { unlocked: true };
+			} catch (error) {
+				if (
+					error instanceof AdapterError &&
+					(error.kind === "pin_wrong" || error.kind === "pin_locked")
+				)
+					return { unlocked: false, reason: error.kind };
+				throw error;
+			}
+		},
 		download: (file) => files.save(file),
 		createPromo: unavailable("createPromo", "no promo route (D8)"),
 		disablePromo: unavailable("disablePromo", "no promo route (D8)"),

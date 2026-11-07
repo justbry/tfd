@@ -149,6 +149,8 @@ export function createFixtureWriter(options: {
 		resumeMembership: (request) =>
 			record("resumeMembership", [request], accepted),
 		resendReceipt: (request) => record("resendReceipt", [request], accepted),
+		/* The fixtures check no PIN: every PIN opens the books, at once and unrecorded, in either mode. */
+		unlockBooks: async () => ({ unlocked: true }),
 		download: (file) => record("download", [file], nothing),
 		createPromo: (request) =>
 			record("createPromo", [request], () => ({
