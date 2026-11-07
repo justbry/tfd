@@ -1,5 +1,5 @@
 <script lang="ts">
-	/** One verified preset run on a card: the run, three headline numbers with their KPI names, and its describe command. */
+	/** One verified preset run on a card: the run, four headline numbers with their KPI names, and its describe command. */
 	import type { PresetView } from "#lib/verticals";
 
 	let { preset, what, note }: { preset: PresetView; what?: string; note?: string } = $props();

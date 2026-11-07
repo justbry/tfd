@@ -26,14 +26,14 @@
 		TRY_IT_LINES,
 		TRY_IT_NOTE,
 	} from "#lib/content/proof";
-	import { SCENARIO_ORGS_URL, SIMPLIFICATIONS, VERTICALS } from "#lib/verticals";
+	import { DASHBOARDS_GALLERY, MRR_LIMITS, SCENARIO_ORGS_URL, SIMPLIFICATIONS, VERTICALS } from "#lib/verticals";
 
 	/** Every number on this page comes from src/lib/content/proof.ts, which holds the verified runs verbatim. */
 	const section = "border-t border-border py-[clamp(48px,6vw,88px)]";
 	const heading = "display-3 mt-4 max-w-[26ch]";
 	const text = "mt-4 max-w-[64ch] text-muted-foreground [&_strong]:text-foreground";
 	const external = { rel: "noopener", target: "_blank" } as const;
-	const SIMULATED = VERTICALS.filter((vertical) => vertical.status === "simulated");
+	const SIMULATED = VERTICALS.filter((vertical) => vertical.presets.length > 0);
 
 	const SOURCES = [
 		{ href: GOLDEN_DOC_URL, label: "The golden end-to-end check, explained", note: "packages/atm/docs/golden-e2e-check.md" },
@@ -42,6 +42,7 @@
 		{ href: SCENARIO_ORGS_URL, label: "The simulated orgs", note: "packages/atm/docs/scenario-orgs.md" },
 		{ href: CLI_URL, label: "The engine's source", note: "packages/atm" },
 		{ href: DEMO_URL, label: "The live demo", note: "Honeycomb Hill Academy, synthetic data" },
+		{ href: DASHBOARDS_GALLERY, label: "The demo dashboards", note: "all five orgs, static pages, synthetic data" },
 	];
 </script>
 
@@ -67,7 +68,8 @@
 		<h2 id="three-ways-title" class={heading}>One school year. Three tools. One hash.</h2>
 		<p class={text}>
 			The simulator generates a seeded, synthetic school year, puts it through the engine's fold, hledger and DuckDB, and
-			compares one KPI hash per channel. <strong>Same seed, same events, same hash.</strong>
+			compares one KPI hash per channel. MRR and its movements are in the hash too: each tool computes them from the books
+			on its own. <strong>Same seed, same events, same hash.</strong>
 		</p>
 		<div class="mt-10"><ThreeWays /></div>
 		<div class="mt-12 grid items-start gap-8 lg:grid-cols-2 [&>*]:min-w-0">
@@ -202,13 +204,18 @@
 		<h2 id="simulations-title" class={heading}>A studio, a church, a SaaS product, a course creator.</h2>
 		<p class={text}>
 			Four invented orgs beside the school, each on the same billing rules, the same books and the same three-way check.
-			None of it is a real organization's data.
+			None of it is a real organization's data. Each has a demo dashboard of these runs, and so does the school.
+		</p>
+		<p class="mt-4 text-[15px]">
+			<a class="font-semibold text-foreground underline" href={DASHBOARDS_GALLERY} {...external}
+				>See all five demo dashboards ↗<span class="sr-only"> (opens in a new tab)</span></a
+			>
 		</p>
 		<div class="mt-8 overflow-x-auto rounded-lg border border-border">
 			<table class="w-full min-w-max border-collapse whitespace-nowrap text-left text-[14px]">
 				<thead>
 					<tr class="border-b border-border font-mono text-[11px] tracking-[0.08em] text-muted-foreground uppercase">
-						{#each ["Org", "Preset", "Members", "Invoices", "Refunds", "Disputes", "Gross collected", "Paying last month", "KPI hash"] as column (column)}
+						{#each ["Org", "Preset", "Members", "Invoices", "Refunds", "Disputes", "Gross collected", "Paying last month", "MRR last month", "KPI hash"] as column (column)}
 							<th class="px-2.5 py-2.5 font-medium" scope="col">{column}</th>
 						{/each}
 					</tr>
@@ -217,7 +224,13 @@
 					{#each SIMULATED as vertical (vertical.slug)}
 						{#each vertical.presets as preset (preset.name)}
 							<tr class="border-b border-border last:border-0" data-preset={preset.name}>
-								<th class="max-w-[11rem] px-2.5 py-2.5 font-semibold whitespace-normal" scope="row">{vertical.org}</th>
+								<th class="max-w-[11rem] px-2.5 py-2.5 font-semibold whitespace-normal" scope="row"
+									>{vertical.org}<a
+										class="block text-[12px] font-normal text-muted-foreground underline"
+										href={vertical.dashboard}
+										{...external}>Dashboard ↗<span class="sr-only"> for {vertical.org} (opens in a new tab)</span></a
+									></th
+								>
 								<td class="num px-2.5 py-2.5"
 									>{preset.name}<span class="block text-[12px] text-muted-foreground"
 										>seed {preset.seed} · {preset.months}</span
@@ -231,6 +244,7 @@
 								<td class="num px-2.5 py-2.5"
 									>{preset.payingLastMonth}{#if preset.payingNote}<span class="text-muted-foreground">&nbsp;(all yearly)</span>{/if}</td
 								>
+								<td class="num px-2.5 py-2.5">{preset.mrr}</td>
 								<td class="num px-2.5 py-2.5">{preset.hash}</td>
 							</tr>
 						{/each}
@@ -242,9 +256,9 @@
 			</p>
 		</div>
 		<p class="mt-3 text-sm text-muted-foreground">
-			Members is new_paying_members; invoices is payments_count; paying last month is paying_members_last_month. On
-			saas-annual every plan is yearly, so nobody pays in the last month. Hashes show the first eight and last four
-			characters.
+			Members is new_paying_members; invoices is payments_count; paying last month is paying_members_last_month; MRR
+			last month is mrr. On saas-annual every plan is yearly, so nobody pays in the last month, but each yearly plan
+			still counts toward MRR. Hashes show the first eight and last four characters. {MRR_LIMITS}
 		</p>
 		<div class="mt-10 grid items-start gap-10 lg:grid-cols-2 [&>*]:min-w-0">
 			<div>

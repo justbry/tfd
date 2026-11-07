@@ -19,8 +19,8 @@ const ROLES = [
 	"accountant",
 	"developer",
 ];
-/** MRR, except when saying there is none. */
-const MRR = /(?<!no )\bMRR\b/;
+/** ARR or logo churn, except when saying there is none. */
+const NOT_COMPUTED = /(?<!no )\bARR\b|(?<!no )logo churn/i;
 const HEADER = /<header\b[\s\S]*?<\/header>/;
 /** The menu panel's own tag, then everything to the end of the header. */
 const MENU = /<div\b[^>]*id="audience-menu"[^>]*>[\s\S]*$/;
@@ -124,9 +124,12 @@ describe("build output", () => {
 			}).toMatchObject({ later: true });
 	});
 
-	test("the SaaS page claims no MRR", () => {
-		expect(read("for/saas.md")).not.toMatch(MRR);
-		expect(read("for/saas.md")).toContain("no MRR KPI yet");
+	test("the SaaS page shows MRR with its limits, and claims no ARR or logo churn", () => {
+		const page = read("for/saas.md");
+		expect(page).toContain("MRR");
+		expect(page).not.toMatch(NOT_COMPUTED);
+		expect(page).toContain("no ARR yet");
+		expect(page).toContain("no logo churn yet");
 	});
 
 	test("early access offers every audience's role", () => {

@@ -35,6 +35,7 @@ import {
 } from "../src/lib/content/proof.ts";
 import { addonsMarkdown, plansMarkdown } from "../src/lib/pricing/markdown.ts";
 import {
+	DASHBOARDS_GALLERY,
 	describeCommand,
 	type Preset,
 	SCENARIO_ORGS_URL,
@@ -49,6 +50,12 @@ const SAMPLE_FILES = [
 	"receipt-tampered.json",
 	"public-key.json",
 ] as const;
+/**
+ * The demo orgs' dashboards (static/demo/orgs/, copied from plans/ledger-ui/design/mart/orgs/): static files, not
+ * pages. No mirror, not in llms.txt's pages or the sitemap; llms.txt links them as plain URLs under Proof and
+ * Simulations, and the audience pages link them where they embed them.
+ */
+const STATIC_DEMOS = "demo/";
 const HEADERS_MARKER = "# Markdown mirrors (written by scripts/agent-files.ts)";
 
 const MAIN = /<main\b[^>]*>([\s\S]*)<\/main>/;
@@ -176,7 +183,12 @@ async function htmlFiles(dir: string): Promise<string[]> {
 	return entries
 		.filter((entry) => entry.isFile() && entry.name.endsWith(".html"))
 		.map((entry) => relative(dir, join(entry.parentPath, entry.name)))
-		.filter((file) => file !== "404.html" && !file.startsWith("_app"))
+		.filter(
+			(file) =>
+				file !== "404.html" &&
+				!file.startsWith("_app") &&
+				!file.startsWith(STATIC_DEMOS),
+		)
 		.sort();
 }
 
@@ -244,9 +256,9 @@ export function llmsTxt(pages: AgentPage[]): string {
 		", then ",
 	);
 	const presetLine = (preset: Preset) =>
-		`  - \`${preset.name}\` (seed ${preset.seed}, ${preset.months}): ${preset.members} new paying members, ${preset.invoices} payments, ${preset.refunds} refunds, ${preset.disputes} disputes, ${preset.grossCollected} gross collected, ${preset.payingLastMonth} paying members last month${preset.payingNote ? ` (${preset.payingNote})` : ""}; KPI hash ${preset.hash}. Run \`${describeCommand(preset)}\`.`;
+		`  - \`${preset.name}\` (seed ${preset.seed}, ${preset.months}): ${preset.members} new paying members, ${preset.invoices} payments, ${preset.refunds} refunds, ${preset.disputes} disputes, ${preset.grossCollected} gross collected, ${preset.payingLastMonth} paying members last month${preset.payingNote ? ` (${preset.payingNote})` : ""}, ${preset.mrr} MRR in the last month; KPI hash ${preset.hash}. Run \`${describeCommand(preset)}\`.`;
 	const simulations = VERTICALS.map((vertical) => {
-		const head = `- ${vertical.name}: ${vertical.org}, ${vertical.orgKind}. ${vertical.status === "dashboard" ? `Live dashboard at ${vertical.demoUrl}.` : "Simulated: numbers from the CLI, no dashboard."} In their words: ${vertical.vocabulary.join(", ")}.`;
+		const head = `- ${vertical.name}: ${vertical.org}, ${vertical.orgKind}. ${vertical.demoUrl ? `Live demo, the real app on synthetic data: ${vertical.demoUrl}. ` : ""}Demo dashboard, a static page on synthetic data: ${SITE_ORIGIN}${vertical.dashboard}. In their words: ${vertical.vocabulary.join(", ")}.`;
 		return [head, ...vertical.presets.map(presetLine)].join("\n");
 	}).join("\n");
 	return `# Trifold
@@ -277,6 +289,7 @@ ${compare.map(link).join("\n")}
 
 - [${proof?.title ?? "Proof"}](${proof?.mdUrl ?? `${SITE_ORIGIN}/proof.md`}): a seeded synthetic school year through the engine, hledger and DuckDB gives one identical KPI hash per channel; the golden end-to-end check, its open findings, and what it doesn't prove.
 - [Live demo](${DEMO_URL}): Honeycomb Hill Academy, a sample school's KPI dashboard on synthetic data, no login. Every number comes from the engine and is checked against its committed goldens.
+- [Demo dashboards](${SITE_ORIGIN}${DASHBOARDS_GALLERY}): the KPI dashboards of all five demo orgs (the school, a studio, a church, a SaaS product and a course creator), static pages on synthetic data, no login. Each org's page is listed under Simulations.
 - Try it: ${tryIt}. ${TRY_IT_NOTE}
 - [The golden end-to-end check](${GOLDEN_DOC_URL}): how the engine's real CLI is compared byte for byte with committed goldens.
 

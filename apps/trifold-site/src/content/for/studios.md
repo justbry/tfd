@@ -4,4 +4,4 @@ Memberships, class packs and drop-ins arrive through Stripe and post as balanced
 
 Keep your booking app. Trifold builds the books from your Stripe payments and exports to CSV and hledger for your accountant. Direct sync to booking and accounting apps isn't built yet.
 
-Ironbark Studio, above, is a simulated studio: its memberships, class packs and add-ons run through the same engine and checks as the sample school.
+Ironbark Studio, above, is a simulated studio: its memberships, class packs and add-ons run through the same engine and checks as the sample school, and its demo dashboard shows the KPIs on synthetic data.

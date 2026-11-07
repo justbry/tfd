@@ -1,7 +1,7 @@
 <script lang="ts">
 	/**
-	 * A compact gallery card (src/lib/gallery.ts). The school's links its live dashboard; a simulated org's shows its
-	 * headline preset's numbers and the command that describes it: no dashboard, no demo link.
+	 * A compact gallery card (src/lib/gallery.ts). Every card links its org's demo dashboard (a static page, synthetic
+	 * data). The school's also links its live demo, the real app; a simulated org's shows its headline preset's numbers.
 	 */
 	import type { GalleryCard } from "#lib/verticals";
 	import PresetStats from "./PresetStats.svelte";
@@ -16,20 +16,21 @@
 		"/for/saas": "For SaaS",
 		"/for/creators": "For creators",
 	};
-	const dashboard = $derived(card.status === "dashboard");
+	const live = $derived(Boolean(card.demoUrl));
 	const label = "label-mono mb-2 text-[11px]";
 </script>
 
 <article
-	class="flex flex-col gap-4 rounded-lg border border-border px-6 py-[22px] text-[15px] {dashboard
+	class="flex flex-col gap-4 rounded-lg border border-border px-6 py-[22px] text-[15px] {live
 		? 'bg-card shadow-card'
 		: ''} {className}"
 	data-vertical={card.slug}
 	data-status={card.status}
+	data-live={live}
 >
 	<header class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
 		<h3 class="text-[22px] font-[420]">{card.name}</h3>
-		{#if dashboard}<Tag tone="today">Live dashboard</Tag>{:else}<Tag>Simulated</Tag>{/if}
+		{#if live}<Tag tone="today">Live dashboard</Tag>{:else}<Tag>Simulated</Tag>{/if}
 	</header>
 	<p class="-mt-2 text-muted-foreground">{card.org}, {card.orgKind}.</p>
 	{#if card.vocabulary}
@@ -58,7 +59,10 @@
 				>Open the live demo ↗<span class="sr-only"> (opens in a new tab)</span></a
 			>
 		{/if}
+		<a class="font-semibold text-foreground underline" href={card.dashboard} rel="noopener" target="_blank"
+			>{live ? "Demo dashboard" : "Open the dashboard"} ↗<span class="sr-only"> (opens in a new tab)</span></a
+		>
 		{#if card.forPage}<a class="link-arrow text-foreground" href={card.forPage}>{FOR_LABEL[card.forPage] ?? "Read more"}</a>{/if}
-		{#if !dashboard}<a class="link-arrow text-foreground" href="/proof#simulations">Every preset</a>{/if}
+		{#if !live}<a class="link-arrow text-foreground" href="/proof#simulations">Every preset</a>{/if}
 	</p>
 </article>

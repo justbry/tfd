@@ -12,6 +12,16 @@
   Cross-Origin-Opener-Policy: same-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
 
+# The demo orgs' KPI dashboards (copied by scripts/sync-org-demos.ts), framed by the audience pages on this origin.
+# Each page is one self-contained file: an inline script and style, its data as inline JSON, no requests. So the site's
+# CSP and DENY are detached and replaced with a stricter policy that lets only this origin frame them.
+/demo/orgs/*
+  ! Content-Security-Policy
+  ! X-Frame-Options
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'
+  X-Frame-Options: SAMEORIGIN
+  X-Robots-Tag: noindex
+
 /_app/immutable/*
   Cache-Control: public, max-age=31536000, immutable
 

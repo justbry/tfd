@@ -16,8 +16,8 @@ export const SEED_7_COMMAND =
 	"bun ./src/bin.ts simulate --profile growth-12mo --seed 7";
 export const SEED_7_LINES = [
 	`$ ${SEED_7_COMMAND}`,
-	"scenario growth-12mo (seed 7): 1964 events, 2026-01..2026-12",
-	"fixture hash c5e322c7d39c63fd44c4a61d4bcb88eb92bf5ca26f7f3e6a9cff3a7cc59186af",
+	"scenario growth-12mo (seed 7): 2142 events, 2026-01..2026-12",
+	"fixture hash a55529793b6b0b73ff406c4759b7120094423597fb6b94bd4c190a4adad25276",
 	"kpis hash by channel:",
 	`  atm      ${SEED_7_HASH}`,
 	`  hledger  ${SEED_7_HASH}`,
@@ -29,12 +29,12 @@ export const SEED_42_COMMAND =
 	"bun ./src/bin.ts simulate --profile monthly-members --set members=120 --set churnRate=0.05 --set refundRate=0.08 --set yearlyShare=0.3 --seed 42";
 export const SEED_42_LINES = [
 	`$ ${SEED_42_COMMAND}`,
-	"scenario monthly-members (seed 42): 5794 events, 2026-01..2026-12",
-	"fixture hash 88662ef16ad63f969d8984bcb2743071513ef4d5fbee0ca063612351388b1e5e",
+	"scenario monthly-members (seed 42): 6186 events, 2026-01..2026-12",
+	"fixture hash 28e5497abeb025bb690f5a153178b9a09a81c4a13b2f2c2782224a52f03805b8",
 	"kpis hash by channel:",
-	"  atm      2de5997d9be71c3d3c099217459fe251b24bdfe1f5f852a6e8b778f58c1b4b27",
-	"  hledger  2de5997d9be71c3d3c099217459fe251b24bdfe1f5f852a6e8b778f58c1b4b27",
-	"  duckdb   2de5997d9be71c3d3c099217459fe251b24bdfe1f5f852a6e8b778f58c1b4b27",
+	"  atm      0c3e6401efac297c624eaec4f108addfcd0a2b8eae031a3fee626284c605c41f",
+	"  hledger  0c3e6401efac297c624eaec4f108addfcd0a2b8eae031a3fee626284c605c41f",
+	"  duckdb   0c3e6401efac297c624eaec4f108addfcd0a2b8eae031a3fee626284c605c41f",
 	"parity: every channel that ran has the same hash",
 ];
 
