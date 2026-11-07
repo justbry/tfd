@@ -13,7 +13,8 @@
 	"scripts": {
 		"ts": "tsc --noEmit",
 		"test": "bun test tests",
-		"check:bundle": "bun scripts/check-bundle.ts"
+		"check:bundle": "bun scripts/check-bundle.ts",
+		"staging-e2e": "bun scripts/staging-e2e.ts"
 	},
 	"dependencies": {
 		"atm": "workspace:*"
