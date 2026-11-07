@@ -26,4 +26,4 @@ The promise is that anyone can check the books, and that the records outlive the
 
 ## Contributing
 
-Outside contributions wait until the contributor terms (DCO or CLA) are decided; see `AGENTS.md` at the repo root.
+Outside contributions need a signed CLA (decided 2026-11-07) and wait until its text is published; see `CONTRIBUTING.md` at the repo root.
