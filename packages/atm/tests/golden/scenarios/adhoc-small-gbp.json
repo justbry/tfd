@@ -26,9 +26,9 @@
     "yearlyCount": 0,
     "refundCount": 0
   },
-  "fixtureHash": "a9cd35d7faf7978ea4b860a843e3663da460cea5b028d134c3c6f54b900df352",
-  "kpisHash": "eafe12545f6b729d072e91329217baa5268f46939b802e27d85cd3027e28cae0",
-  "events": 64,
+  "fixtureHash": "e8257c819a91a2c9a176270bebd5c16daf2c47ea7f9995f13fb0660d99659a72",
+  "kpisHash": "14684e7703222515356e27dc62372a6fc53ba2dd7d4e06ec0f398a5f0ca7616a",
+  "events": 68,
   "periods": 3,
   "summary": {
     "gross_collected": 0,
@@ -44,7 +44,7 @@
     "new_paying_members": 0,
     "credits_granted": 66,
     "credits_consumed": 9,
-    "credits_expired": 0,
+    "credits_expired": 11,
     "paying_members_last_period": 0
   },
   "skippedNonUsd": 15

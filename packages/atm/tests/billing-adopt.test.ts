@@ -536,9 +536,14 @@ describe("a member mid-cycle, moved onto atm", () => {
 		// Expiry: the credits of this invoice lapse where the caller's lot does (cycle end plus the rollover month).
 		expect(grantedNow.rolloverExpiresAt).toBe(expected.expires_at);
 		// Rollover: what February's cycle left carries over, expiring where the caller's February lot expires;
-		// January's leftover lapsed at the same instant the cycle turned, so it is gone in both.
+		// January's leftover lapsed at the same instant the cycle turned: the reset leaves it for the cron to book, and it
+		// counts in neither.
 		const caller = [februaryLot, expected];
-		const rollover = only(store.rowsOf("rollovers"));
+		const rollover = only(
+			store
+				.rowsOf("rollovers")
+				.filter((row) => (row.data.expires_at as number) > IN_3.atMs),
+		);
 		expect(rollover.data).toMatchObject({
 			balance: februaryLot.balance,
 			expires_at: februaryLot.expires_at,

@@ -939,10 +939,15 @@ describe("cycles anchored on a month-end", () => {
 		const w = history();
 		const refund = load<BillingRefund>("refund-full");
 		const before = w.avail(D("2026-04-30T17:00:00Z"));
-		w.refund({ ...refund, invoiceId: "i2", at: D("2026-04-10T00:00:00Z") });
+		const refundedAt = D("2026-04-10T00:00:00Z");
+		w.refund({ ...refund, invoiceId: "i2", at: refundedAt });
 		expect(w.avail(D("2026-04-30T17:00:00Z"))).toBeLessThan(before);
+		// A rollover that lapsed before the refund is the cron's to book, not the refund's to take back.
 		expect(
-			w.engine.rollovers.filter((r) => r.balance > 0 && r.expires_at !== null),
+			w.engine.rollovers.filter(
+				(r) =>
+					r.balance > 0 && r.expires_at !== null && r.expires_at > refundedAt,
+			),
 		).toEqual([]);
 	});
 });
