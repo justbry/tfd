@@ -200,7 +200,7 @@
 					"[data-test=disclosure-cell][data-class=income][data-audience=member]": "categories · quarter · 6 weeks",
 					"[data-test=disclosure-cell][data-class=income][data-audience=governance]": "breakdown · month · at close",
 					"[data-test=disclosure-cell][data-class=income][data-audience=finance]": "names · live",
-					"[data-test=disclosure-kpis][data-class=income]": "gross_collected, revenue_by_kind, revenue_by_tier, net_income",
+					"[data-test=disclosure-kpis][data-class=income]": "gross_collected, revenue_by_kind, revenue_by_tier, net_income, mrr, new_mrr, expansion_mrr, contraction_mrr, churned_mrr, net_new_mrr",
 					"[data-test=disclosure-cell][data-class=losses][data-audience=public]": "—",
 					"[data-test=disclosure-cell][data-class=losses][data-audience=member]": "total · quarter · 6 weeks",
 					"[data-test=disclosure-cell][data-class=losses][data-audience=governance]": "breakdown · month · at close",
