@@ -35,7 +35,9 @@ const SECONDS_PER_DAY = 86_400;
 const TOKEN_REFRESH_MARGIN_SECONDS = 60;
 const POLL_INTERVAL_MS = 30_000;
 const POLL_TIMEOUT_MS = 15 * 60_000;
-const BOOKING_WINDOW_DAYS = 31;
+/** Days each side of today for the bookings listing: the route takes at most 62 days from `from` to `to` inclusive
+ * (buzz-school `MAX_BOOKING_DAYS`, 400 `bad_range` beyond), so ±30 is 61. */
+const BOOKING_WINDOW_DAYS = 30;
 const SECRET_PREFIX_LENGTH = 4;
 const EMAIL_PREFIX_LENGTH = 3;
 const STATUS_WIDTH = 7;
