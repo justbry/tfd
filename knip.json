@@ -117,7 +117,11 @@
 			]
 		},
 		"packages/ledger-worker": {
-			"entry": ["src/testing/worker-entry.ts", "tests/**/*.test.ts"],
+			"entry": [
+				"src/main.ts",
+				"src/testing/worker-entry.ts",
+				"tests/**/*.test.ts"
+			],
 			"project": ["src/**/*.ts"]
 		},
 		"packages/ksuid": {

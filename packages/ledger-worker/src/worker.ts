@@ -98,23 +98,17 @@ const routes: Record<string, Route> = {
 	kpi: {
 		gate: "any",
 		check: (query, grant) => {
-			const audience = audienceGate(query, grant, ALL_AUDIENCES);
-			const pin = oneOf(query, "pin", ["open", "locked"], true);
-			if (
-				pin === "locked" &&
-				ALL_AUDIENCES.indexOf(audience) < ALL_AUDIENCES.indexOf("governance")
-			)
-				throw new ApiError(
-					"bad_request",
-					"pin=locked applies to governance and up.",
-					{ field: "pin" },
-				);
+			audienceGate(query, grant, ALL_AUDIENCES);
+			oneOf(query, "pin", ["open", "locked"], true);
 		},
 		handle: ({ snapshot, query, now }) =>
 			kpiRoute(
 				snapshot,
 				query.get("audience") as Audience,
-				query.get("pin") === "locked",
+				// the PIN opens the books from governance up: below it `locked` is always allowed and means nothing
+				query.get("pin") === "locked" &&
+					ALL_AUDIENCES.indexOf(query.get("audience") as Audience) >=
+						ALL_AUDIENCES.indexOf("governance"),
 				now,
 			),
 	},
