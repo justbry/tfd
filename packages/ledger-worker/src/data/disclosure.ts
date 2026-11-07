@@ -8,7 +8,7 @@ import {
 	type KpiDisclosure,
 	type KpiDocumentRow,
 	schoolSize,
-} from "atm/worker";
+} from "tfd/worker";
 import disclosureFile from "./disclosure.v1.json";
 
 export const DISCLOSURE_FILE = disclosureFile as unknown as DisclosureFile;
@@ -16,7 +16,7 @@ export const DISCLOSURE_FILE = disclosureFile as unknown as DisclosureFile;
 /** A KPI the size is taken from: the cash collected (mockup `bkSize`: the last closed year's income against `largeFrom`). */
 const SIZE_KPI = "gross_collected";
 
-/** The school's size (`schoolSize` of atm/worker) from the last closed year's gross collected; no row for that year is no closed year. */
+/** The school's size (`schoolSize` of tfd/worker) from the last closed year's gross collected; no row for that year is no closed year. */
 export const sizeOf = (
 	rows: readonly KpiDocumentRow[],
 	year: number,

@@ -1,6 +1,6 @@
 /** Fundraising totals by campaign, and how they sit in the statement: income less fundraising, net with it. */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ledgerEvent } from "atm";
+import { ledgerEvent } from "tfd";
 import {
 	type LedgerHarness,
 	startLedgerWorker,

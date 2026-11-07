@@ -10,8 +10,8 @@
 	"main": "src/main.ts",
 	"compatibility_date": "2026-07-01",
 	"compatibility_flags": ["nodejs_compat"],
-	// `atm/worker` resolves to its source, so the bundle does not need atm's `dist`
-	"alias": { "atm/worker": "../atm/src/worker.ts" },
+	// `tfd/worker` resolves to its source, so the bundle does not need tfd's `dist`
+	"alias": { "tfd/worker": "../atm/src/worker.ts" },
 	"observability": { "enabled": true },
 	"env": {
 		"staging": {

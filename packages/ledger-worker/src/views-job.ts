@@ -3,7 +3,7 @@
  * A school whose run fails does not stop the others. A failure is logged by school id only: the job's own messages can
  * carry an event id or a holder key (`family:<id>`), which no log line may hold.
  */
-import { runViews } from "atm/worker";
+import { runViews } from "tfd/worker";
 import { jobStatusKey, readJobProblem } from "./data/job-status.js";
 import { putText, type Store } from "./data/store-io.js";
 import { asOfFor } from "./data/watermark.js";

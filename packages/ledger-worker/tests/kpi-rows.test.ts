@@ -6,7 +6,7 @@ import {
 	isExportableKpiId,
 	periodsFrom,
 	SCHOOL_KPI_SPEC,
-} from "atm/worker";
+} from "tfd/worker";
 import { kpiRowsOf } from "../src/data/snapshot.js";
 import { presetEvents } from "../src/testing/seed.js";
 import { byId } from "./support.js";

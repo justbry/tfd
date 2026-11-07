@@ -1,5 +1,5 @@
 /** The finance month objects a day range needs, read through the manifest-verified reader. */
-import { type FinanceMonthObject, financeMonthsFor } from "atm/worker";
+import { type FinanceMonthObject, financeMonthsFor } from "tfd/worker";
 import { mapLimited } from "../data/concurrency.js";
 import type { SchoolSnapshot } from "../data/snapshot.js";
 import { viewValue } from "../data/snapshot.js";

@@ -1,6 +1,6 @@
-import type { Store } from "atm";
+import type { Store } from "tfd";
 
-export type { Store } from "atm";
+export type { Store } from "tfd";
 
 const decoder = new TextDecoder();
 const encoder = new TextEncoder();

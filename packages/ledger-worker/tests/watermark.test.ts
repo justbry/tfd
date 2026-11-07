@@ -1,6 +1,6 @@
 /** The ship watermark: a generation's `asOf` is the scheduled time, held back to what the shipper says it has shipped. */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { R2BindingStore, readViewsFromStore } from "atm/worker";
+import { R2BindingStore, readViewsFromStore } from "tfd/worker";
 import { watermarkKey } from "../src/data/watermark.js";
 import {
 	type LedgerHarness,

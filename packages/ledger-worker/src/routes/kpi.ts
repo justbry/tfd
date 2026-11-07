@@ -1,5 +1,5 @@
 /**
- * `GET /v1/schools/:school/kpi`, `.../audience-report` and `.../disclosure`: the KPI document of `atm/worker` for the
+ * `GET /v1/schools/:school/kpi`, `.../audience-report` and `.../disclosure`: the KPI document of `tfd/worker` for the
  * school's events, at an audience no finer than the caller's. The Worker reads the finance objects (the day-by-day gross)
  * to build the document; what it returns is the audience's document, never what it read.
  */
@@ -13,7 +13,7 @@ import {
 	type KpiDocumentRow,
 	kpiDocument,
 	viewAsRows,
-} from "atm/worker";
+} from "tfd/worker";
 import { mapLimited } from "../data/concurrency.js";
 import { disclosureOf } from "../data/disclosure.js";
 import type { SchoolMenu } from "../data/menu.js";
@@ -155,7 +155,7 @@ export const disclosureRoute = async (
 		// no stored override yet (build list group 8): the B4 Uni defaults, which the UI says
 		override: null,
 		source: "defaults" as const,
-		// worded by atm/worker at the school's clock; the adapter adds `viewer` and each row's `held`, `audience`, `admin`
+		// worded by tfd/worker at the school's clock; the adapter adds `viewer` and each row's `held`, `audience`, `admin`
 		views,
 		viewAs: viewAsRows({ file, override, views, adminAudience }),
 	};

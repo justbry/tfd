@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 /**
  * One-command release of the library: a tarball on a GitHub release, which B4 Uni's family service pins by URL
- * (`"atm": "https://github.com/justbry/atm/releases/download/atm-v<version>/atm-<version>.tgz"`, with the tarball's
+ * (`"tfd": "https://github.com/justbry/atm/releases/download/tfd-v<version>/tfd-<version>.tgz"`, with the tarball's
  * sha512 in its bun.lock).
  *
  *   bun run --cwd packages/atm release [--dry-run]
  *
  * Reads the version from package.json. A real run refuses unless the working tree is clean, HEAD is on origin, and
- * neither tag `atm-v<version>` nor a GitHub release for it exists. Then it builds into a temp dir, runs the dist
+ * neither tag `tfd-v<version>` nor a GitHub release for it exists. Then it builds into a temp dir, runs the dist
  * checks and tests/dist.test.ts against that output, stages the publish package, packs it, prints the tarball's
  * sha256 and the sha512 integrity bun.lock will record, and creates the release at HEAD. The same commit always gives
  * the same tarball bytes (fixed file times, no random content).
@@ -34,14 +34,16 @@ const here = import.meta.dir;
 const repoRoot = resolve(here, "../..");
 
 export const REPO = "justbry/atm";
-export const TAG_PREFIX = "atm-v";
+export const TAG_PREFIX = "tfd-v";
 const SEMVER = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 /** npm's fixed file time, so a pack does not depend on when the files were written. */
 const FIXED_TIME = new Date("1985-10-26T08:15:00Z");
 
 /** What the tarball holds, and nothing else. */
 export const PACKAGE_FILES = [
-	"package/LICENSE",
+	"package/LICENSE.md",
+	"package/LICENSES/Apache-2.0.txt",
+	"package/LICENSING.md",
 	"package/README.md",
 	"package/dist/index.d.ts",
 	"package/dist/index.js",
@@ -53,12 +55,12 @@ export const PACKAGE_FILES = [
 
 /** The package.json inside the tarball: no dependencies (the engine is inlined), no bin, no scripts. */
 export const publishManifest = (version: string) => ({
-	name: "atm",
+	name: "tfd",
 	version,
-	license: "Apache-2.0",
+	license: "SEE LICENSE IN LICENSING.md",
 	repository: {
 		type: "git",
-		url: "git+https://github.com/justbry/atm.git",
+		url: "git+https://github.com/justbry/tfd.git",
 		directory: "packages/atm",
 	},
 	type: "module",
@@ -68,7 +70,7 @@ export const publishManifest = (version: string) => ({
 		".": { types: "./dist/index.d.ts", default: "./dist/index.js" },
 		"./worker": { types: "./dist/worker.d.ts", default: "./dist/worker.js" },
 	},
-	files: ["dist"],
+	files: ["dist", "LICENSING.md", "LICENSES"],
 	sideEffects: false,
 });
 
@@ -80,11 +82,13 @@ export const publishReadme = ({
 	commit: string;
 }) =>
 	[
-		"# atm",
+		"# tfd",
 		"",
-		"Autumn's balance engine as a typed library: engine commands, the school ledger and the billing rules (menu, Stripe facts, credit grants, storage rows), bundled into one ESM file with no dependencies. `dist/index.d.ts` and `dist/types.d.ts` stand alone.",
+		"The Trifold engine, built on Autumn's balance engine, as a typed library: engine commands, the school ledger and the billing rules (menu, Stripe facts, credit grants, storage rows), bundled into one ESM file with no dependencies. `dist/index.d.ts` and `dist/types.d.ts` stand alone.",
 		"",
-		`Version ${version}, built from commit ${commit} of https://github.com/justbry/atm (packages/atm), a fork of https://github.com/sidgaikwad/autumn. Apache-2.0.`,
+		`Version ${version}, built from commit ${commit} of https://github.com/justbry/tfd (packages/atm), a fork of https://github.com/sidgaikwad/autumn.`,
+		"",
+		"Licenses: FSL-1.1-ALv2 (`LICENSE.md`), and each release becomes Apache-2.0 two years after it ships. Autumn's code and the receipt and seal verifier bundled in it are Apache-2.0 (`LICENSES/Apache-2.0.txt`). `LICENSING.md` says which is which.",
 		"",
 	].join("\n");
 
@@ -109,7 +113,9 @@ export const stage = ({
 		"worker.d.ts",
 	])
 		cpSync(join(distDir, file), join(stageDir, "dist", file));
-	cpSync(join(repoRoot, "LICENSE"), join(stageDir, "LICENSE"));
+	mkdirSync(join(stageDir, "LICENSES"), { recursive: true });
+	for (const file of ["LICENSE.md", "LICENSING.md", "LICENSES/Apache-2.0.txt"])
+		cpSync(join(here, file), join(stageDir, file));
 	writeFileSync(
 		join(stageDir, "package.json"),
 		`${JSON.stringify(publishManifest(version), null, 2)}\n`,
@@ -137,7 +143,7 @@ export const pack = ({
 	version: string;
 }): string => {
 	mkdirSync(outDir, { recursive: true });
-	const filename = `atm-${version}.tgz`;
+	const filename = `tfd-${version}.tgz`;
 	const run = Bun.spawnSync(
 		[
 			"bun",
@@ -209,7 +215,7 @@ export const releaseNotes = ({
 	[
 		`Library build of packages/atm at ${commit}: Autumn's balance engine, the school ledger and the billing rules, bundled into one ESM file. Used by B4 Uni's family service as a pinned dependency.`,
 		"",
-		`Asset: \`atm-${version}.tgz\`, sha256 \`${sha256}\`, integrity \`${integrity}\` (what bun.lock records).`,
+		`Asset: \`tfd-${version}.tgz\`, sha256 \`${sha256}\`, integrity \`${integrity}\` (what bun.lock records).`,
 		"",
 		`Exports (${api.values.length} values, ${api.typeCount} types in \`dist/types.d.ts\`): ${api.values.map((n) => `\`${n}\``).join(", ")}.`,
 		"",
@@ -217,7 +223,7 @@ export const releaseNotes = ({
 		"",
 		"Install: set the dependency to the asset URL, then `bun install`:",
 		"",
-		`\`"atm": "https://github.com/${REPO}/releases/download/${TAG_PREFIX}${version}/atm-${version}.tgz"\``,
+		`\`"tfd": "https://github.com/${REPO}/releases/download/${TAG_PREFIX}${version}/tfd-${version}.tgz"\``,
 	].join("\n");
 
 // ---- the command ------------------------------------------------------------------------------------------------
@@ -382,13 +388,13 @@ const main = async () => {
 				"--repo",
 				REPO,
 				"--pattern",
-				`atm-${version}.tgz`,
+				`tfd-${version}.tgz`,
 				"--dir",
 				dir,
 			]);
 			if (!got.ok)
 				throw new Error(`could not download the published asset: ${got.err}`);
-			const published = digests(join(dir, `atm-${version}.tgz`));
+			const published = digests(join(dir, `tfd-${version}.tgz`));
 			if (published.sha256 !== one.sha256)
 				throw new Error(
 					`the published ${tag} asset (${published.sha256}) is not what this commit builds (${one.sha256})`,
@@ -408,7 +414,7 @@ const main = async () => {
 			REPO,
 			"--verify-tag",
 			"--title",
-			`atm ${version}`,
+			`tfd ${version}`,
 			"--notes",
 			notes,
 		]);
@@ -427,7 +433,7 @@ const main = async () => {
 		"--target",
 		commit,
 		"--title",
-		`atm ${version}`,
+		`tfd ${version}`,
 		"--notes",
 		notes,
 	]);
@@ -435,7 +441,7 @@ const main = async () => {
 	console.log(`\n${created.out}\n`);
 	console.log("In buzz-school, set packages/family-service/package.json to:");
 	console.log(
-		`  "atm": "https://github.com/${REPO}/releases/download/${tag}/atm-${version}.tgz"`,
+		`  "tfd": "https://github.com/${REPO}/releases/download/${tag}/tfd-${version}.tgz"`,
 	);
 	console.log("then run `bun install` (bun.lock records the sha512 above).");
 };

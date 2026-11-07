@@ -1,5 +1,5 @@
 /** `GET /v1/schools`: how fresh each of the token's schools' views are. */
-import { readViewsFromStore } from "atm/worker";
+import { readViewsFromStore } from "tfd/worker";
 import type { Store } from "../data/store-io.js";
 import { lagMinutesOf } from "../http.js";
 

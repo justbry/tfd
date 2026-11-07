@@ -4,7 +4,7 @@
  * kept in the isolate while the manifest stays the same.
  */
 
-import type { AtmEvent } from "atm";
+import type { AtmEvent } from "tfd";
 import {
 	atmChannel,
 	evaluateKpis,
@@ -16,7 +16,7 @@ import {
 	readViewsFromStore,
 	SCHOOL_KPI_SPEC,
 	type ViewRead,
-} from "atm/worker";
+} from "tfd/worker";
 import { ApiError } from "../http.js";
 import { localWallTime } from "../time.js";
 import { readJobProblem } from "./job-status.js";

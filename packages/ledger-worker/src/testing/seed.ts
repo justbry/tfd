@@ -1,12 +1,12 @@
 /** Seeds a bucket with a school's event log from a scenario preset, the way the shipper leaves it, and runs the views over it. */
-import type { AtmEvent } from "atm";
-import { generateScenario, resolveScenario } from "atm/scenarios";
+import type { AtmEvent } from "tfd";
+import { generateScenario, resolveScenario } from "tfd/scenarios";
 import {
 	catalogPublishedEvent,
 	R2BindingStore,
 	type R2BucketBinding,
 	runViews,
-} from "atm/worker";
+} from "tfd/worker";
 
 export type SeededSchool = {
 	id: string;

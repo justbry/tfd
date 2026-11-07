@@ -1,6 +1,6 @@
 /** Every row of the error table (contract section 11): the status, the `code`, the headers and the body. */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { buildViews, type R2BucketBinding } from "atm/worker";
+import { buildViews, type R2BucketBinding } from "tfd/worker";
 import { base64urlEncode } from "../src/auth/jwt.js";
 import {
 	type LedgerHarness,

@@ -4,7 +4,7 @@
  * document; what it returns is the audience's.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { audiences } from "atm/worker";
+import { audiences } from "tfd/worker";
 import {
 	type LedgerHarness,
 	startLedgerWorker,

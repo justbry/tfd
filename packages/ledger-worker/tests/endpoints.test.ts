@@ -1,6 +1,6 @@
 /**
  * Every endpoint of contract section 11 on a money-heavy, a refund-heavy, a free-only and a non-USD preset, against the
- * same function of `atm/worker` called directly on the same events.
+ * same function of `tfd/worker` called directly on the same events.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
@@ -12,7 +12,7 @@ import {
 	membersIncome,
 	viewAsRows,
 	viewAsValues,
-} from "atm/worker";
+} from "tfd/worker";
 import { DISCLOSURE_FILE, sizeOf } from "../src/data/disclosure.js";
 import {
 	type LedgerHarness,
@@ -237,7 +237,7 @@ describe("disclosure", () => {
 			source: "defaults",
 		});
 		expect(data.file).toMatchObject({ version: 1, catalog: "school.v1" });
-		// the five audiences' views, from audienceViews of atm/worker; the viewer is the adapter's
+		// the five audiences' views, from audienceViews of tfd/worker; the viewer is the adapter's
 		expect(Object.keys(data.views as object)).toEqual([
 			"public",
 			"member",
@@ -262,7 +262,7 @@ describe("disclosure", () => {
 		expect(data).not.toHaveProperty("viewer");
 	});
 
-	test("viewAs: each View as row's name, summary and locks, from viewAsRows of atm/worker", async () => {
+	test("viewAs: each View as row's name, summary and locks, from viewAsRows of tfd/worker", async () => {
 		const reply = await get("/schools/monthly-members/disclosure");
 		const data = reply.body.data as {
 			views: Parameters<typeof viewAsRows>[0]["views"];

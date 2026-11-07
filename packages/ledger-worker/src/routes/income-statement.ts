@@ -5,7 +5,7 @@ import {
 	incomeStatement,
 	membersIncome,
 	type StatementFigures,
-} from "atm/worker";
+} from "tfd/worker";
 import type { SchoolSnapshot } from "../data/snapshot.js";
 import { ApiError } from "../http.js";
 import { addDays, dayNumber, daysInRange } from "../time.js";

@@ -3,8 +3,8 @@
  * object (payments and refunds) and the member's events (history). No name, email or Stripe customer id is in either.
  */
 
-import type { AtmEvent } from "atm";
-import { type FinanceMemberObject, ledgerRows } from "atm/worker";
+import type { AtmEvent } from "tfd";
+import { type FinanceMemberObject, ledgerRows } from "tfd/worker";
 import type { SchoolSnapshot } from "../data/snapshot.js";
 import { viewValue } from "../data/snapshot.js";
 import { ApiError } from "../http.js";

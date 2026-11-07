@@ -1,4 +1,4 @@
-import type { R2BucketBinding } from "atm/worker";
+import type { R2BucketBinding } from "tfd/worker";
 
 /** The Worker's static assets (the ledger UI build), bound as `ASSETS` when the wrangler config has an `assets` block. */
 export type AssetsBinding = { fetch(request: Request): Promise<Response> };

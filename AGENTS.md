@@ -7,7 +7,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 | Name | What it is |
 |---|---|
 | **Trifold** | The company and the managed (hosted) service. |
-| **tfd** | The code base, package and CLI (today `packages/atm`; the `tfd` command ships beside `atm`). It replaces the name "atm". In prose the engine may also be called "the Trifold engine". |
+| **tfd** | The code base, package and CLI. The package is named `tfd`; its directory is still `packages/atm`, and the `atm` command still works beside `tfd`. It replaces the name "atm". In prose the engine may also be called "the Trifold engine". |
 | **Rifo** | Trifold's AI agent. It drafts, explains and proposes; the engine computes every number; a person approves. Not shipped yet. |
 
 "Trivalance" is dropped; don't use it.
@@ -16,7 +16,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 
 `plans/tfd-rename.md` has the steps; `packages/atm/docs/frozen-identifiers.md` lists the names that never change, with the reasons. Until a step lands:
 - In prose, say **tfd**; command examples say `tfd`.
-- Keep literal paths (`packages/atm/...`), the package name `atm`, the repo name `justbry/atm` in `UPSTREAM.md` and release URLs, and existing `ATM_*` environment variables as they are.
+- Keep literal paths (`packages/atm/...`), the repo name `justbry/atm` in `UPSTREAM.md` and release URLs (old `atm-v*` releases stay there), and existing `ATM_*` environment variables as they are.
 - Never change bytes inside signed or golden data (receipts, seals, key ids such as `atm-test-1`, schema `$id`s) to rename anything. Signatures and test vectors depend on them.
 - Stored identifiers that contain "atm" stay frozen: mapping labels `atm/booking` and `atm/session-gift-code@v1`, Stripe idempotency keys prefixed `atm:`, the `.atm-tmp-` temp prefix, and `atm_version` in shipped input lines. Renaming them breaks replay, idempotency or existing data.
 
@@ -28,7 +28,8 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 | tfd engine and CLI (`packages/atm`, except the next two rows) | **FSL-1.1-ALv2**: source-available; no Competing Use; each release becomes Apache-2.0 two years after it ships | `packages/atm/LICENSE.md` |
 | Receipt and seal format, spec and verifier (`schema/receipt.v1.json`, `schema/seal.v1.json`, `docs/receipts.md`, `src/ledger/{receipt,seal,sign,util}.ts`) | **Apache-2.0** | SPDX headers; `packages/atm/REUSE.toml` |
 | Receipt test vectors (`packages/atm/tests/golden/receipt/`) | **CC0-1.0** | `packages/atm/REUSE.toml` |
-| The website's in-browser verifier (`apps/trifold-site/src/lib/verify/`) | **Apache-2.0** | SPDX headers |
+| The website (`apps/trifold-site`): code, copy, design, images | **Proprietary**, all rights reserved | `apps/trifold-site/LICENSE` |
+| The website's in-browser verifier (`apps/trifold-site/src/lib/verify/`) | **Apache-2.0** | SPDX headers; `apps/trifold-site/LICENSE` |
 | Hosted service, Rifo, the witness | Proprietary, not in this repo | — |
 
 `packages/atm/LICENSING.md` explains the package's licenses in prose. `REUSE.toml` is the machine-readable map: keep both in step when files move.
