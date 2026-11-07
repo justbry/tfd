@@ -171,7 +171,7 @@ These are assumptions, not forecasts. `financial-model.md` describes how to run 
 ## 11. Next 90 days
 
 1. Merge the brand kit (#121) and this plan.
-2. Add the per-package `LICENSE` files (FSL for the engine, Apache-2.0 for the format and verifier, CC0 for the vectors) and `TRADEMARKS.md`. Choose contributor terms (DCO or CLA) before accepting outside contributions.
+2. Add the per-package `LICENSE` files (FSL for the engine, Apache-2.0 for the format and verifier, CC0 for the vectors) and `TRADEMARKS.md` (draft added 2026-11-07). Contributor terms: a CLA, decided 2026-11-07 (`CONTRIBUTING.md`).
 3. Register the domains; order a trademark clearance search.
 4. Move the receipt and seal spec to its own repo with test vectors.
 5. Recruit 5–10 design-partner schools; test prices with them.
@@ -186,5 +186,5 @@ These are assumptions, not forecasts. `financial-model.md` describes how to run 
 4. Final prices, after design-partner tests.
 5. Licensor legal entity name. The `LICENSE` says "Trifold" until a company is formed.
 6. Whether accounting firms hosting tfd for many clients need an extra grant beyond FSL's "professional services" clause. Decide before the accountant partner program.
-7. Contributor terms (DCO or CLA) before accepting outside contributions.
+7. ~~Contributor terms~~ **Decided 2026-11-07:** a CLA (`CONTRIBUTING.md`); the text is adapted from the Apache ICLA and CCLA and reviewed by a lawyer before outside contributions are accepted.
 8. Whether the event envelope schema should also be Apache-2.0, so other ledgers can adopt the full standard.

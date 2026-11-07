@@ -104,6 +104,19 @@ Published rule, not case-by-case discounts (Airtight sets firm discounts by hand
 - Clients a firm brings get 20% off their first year (to test).
 - A partner directory, with a stated policy that Trifold pays no referral fees to tax preparers, matching the disclosure Airtight publishes.
 
+### Firms hosting tfd for their clients: the tradeoffs (open, decide before the partner program)
+
+The FSL already allows a firm to work on a client's **own** install ("professional services that you provide to a licensee"). The open question is one firm running **one tfd for many clients**: that is probably a Competing Use, because it substitutes for Starter, Pro and the Witnessed + Bookkeeper bundle.
+
+| Option | For | Against |
+|---|---|---|
+| **A. No grant** (FSL as written) | Strongest protection; no new legal text; firms are steered to hosted Trifold, where their seats are already free | Firms that want their own servers (data control, one tool across all clients) may pick a competitor; the CPA channel is the third growth loop |
+| **B. Public grant: "a firm may host tfd for its own clients"** | Easiest for firms; more schools issue receipts with the verify link (growth loop 1); goodwill | A 200-client firm becomes a small Trifold at $0, cannibalising Pro and the $349 bundle. "Own clients" and "bookkeeping service" are hard to draw (hosted books *is* the service). A published grant can't be taken back for the releases it covers. Two years later each release is Apache-2.0 anyway, so the grant only matters for the newest releases, which are the ones that compete |
+| **C. Public grant with a cap**, e.g. up to 10 clients free, then a partner agreement | Small firms are free; large ones pay; one rule, no case-by-case deals | A cap needs counting and trust; a firm can split into entities; still new legal text to maintain |
+| **D. No public grant; a written partner agreement on request** (a commercial license, priced per client or as a revenue share) | Keeps FSL's text clean; terms fit each firm; turns the largest firms into revenue | Case-by-case, which this section otherwise avoids; slower for firms; needs a lawyer per template |
+
+**Suggestion:** A now, with D available on request. B gives the most away exactly where Trifold earns: hosted books with a bookkeeper. Revisit C once the partner program has data on firm sizes. Whatever is chosen, it lives in a separate written permission, never in an edited FSL (a changed FSL is no longer FSL).
+
 ## 5. Credits
 
 1 credit = $0.01. Unused credits roll over for one month, then expire. tfd's own rollover and expiry rules can run this.
@@ -174,7 +187,7 @@ Decided by the owner on 2026-11-06. `justbry/atm` is a public fork of Autumn und
 | Hosted Trifold service, Rifo, the witness | Proprietary (a service; the code is never distributed) |
 | Names | Trademark policy: "Trifold" and "Witnessed by Trifold" are reserved; a fork may say it is based on tfd but may not use the Trifold names |
 
-**Open items:** contributor terms (DCO or CLA) before accepting outside contributions; whether the event envelope schema should also be Apache-2.0; whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause.
+**Open items:** whether the event envelope schema should also be Apache-2.0; whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (tradeoffs in section 4c). Contributor terms: a CLA, decided 2026-11-07 (`CONTRIBUTING.md`).
 
 **Claim rule.** An FSL engine can't be called "open source." Say "source-available," "Fair Source" or "free to self-host." "Open format," "open spec," "open standard" and "open verifier" are fine, because those parts are Apache-2.0.
 
@@ -222,7 +235,7 @@ Sources: https://airtight.one/pricing/ and https://airtight.one/
 
 ## 11. Open decisions
 
-1. ~~Engine license~~ Decided 2026-11-06: FSL-1.1-ALv2 for the engine, Apache-2.0 for the format and verifier, CC0-1.0 for vectors (section 8). Still open: the licensor legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need an extra grant (decide before the accountant partner program); contributor terms (DCO or CLA); whether the event envelope schema should also be Apache-2.0.
+1. ~~Engine license~~ Decided 2026-11-06: FSL-1.1-ALv2 for the engine, Apache-2.0 for the format and verifier, CC0-1.0 for vectors (section 8). Still open: the licensor legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need an extra grant (decide before the accountant partner program; tradeoffs in section 4c); whether the event envelope schema should also be Apache-2.0.
 2. Is "Trifold as witness" the paid line, or are Stripe matching or Rifo also paid-only?
 3. Final prices, after testing with the design-partner schools.
 4. Whether the annual and non-profit discounts stack.
