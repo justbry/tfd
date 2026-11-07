@@ -55,7 +55,7 @@ Tiers are ranked by active paying clients, like Xero's partner tiers.
 GoHighLevel pays **40% for as long as the customer pays**, plus **5% of the sales of affiliates you recruit**, with a 90-day last-click cookie and monthly Net-30 payouts over $50. Accounting vendors pay much less: Xero doesn't publish a rate (listings show 10% for 6 months, or $160 flat), and QuickBooks pays up to 10% with a 30-day cookie. Neither pays CPAs in cash; they pay through discounts and tiers.
 
 Trifold changes three things:
-- **Cash is limited to 24 months,** matching the FSL's two years: a referral earns while the release it was sold on is still Trifold's to license. 40% for life is about $30 a month per school forever, at a ~$76 average.
+- **Cash is limited to 24 months,** matching the FSL's two years, so the company has one number for how long its protections last. 40% for life is about $30 a month per school forever, at a ~$76 average.
 - **There is no second tier** (3.4).
 - **Accountants get no cash** (section 4).
 
