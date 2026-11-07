@@ -30,6 +30,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 | Receipt test vectors (`packages/atm/tests/golden/receipt/`) | **CC0-1.0** | `packages/atm/REUSE.toml` |
 | The website (`apps/trifold-site`): code, copy, design, images | **Proprietary**, all rights reserved | `apps/trifold-site/LICENSE` |
 | The website's in-browser verifier (`apps/trifold-site/src/lib/verify/`) | **Apache-2.0** | SPDX headers; `apps/trifold-site/LICENSE` |
+| Logo concepts (`docs/brand/logo/`): SVGs, animations, favicons, previews | **Proprietary**, all rights reserved | `docs/brand/logo/LICENSE` |
 | Hosted service, Rifo, the witness | Proprietary, not in this repo | — |
 
 `packages/atm/LICENSING.md` explains the package's licenses in prose. `REUSE.toml` is the machine-readable map: keep both in step when files move.
