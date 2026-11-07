@@ -9,6 +9,7 @@ import { putText, type Store } from "./data/store-io.js";
 import { asOfFor } from "./data/watermark.js";
 
 const SCHOOLS_PREFIX = "schools/";
+const TRAILING_SLASH = /\/$/;
 
 export type ViewsJobResult =
 	| { school: string; ok: true }
@@ -25,7 +26,7 @@ export const schoolIdsIn = async (store: Store): Promise<string[]> => {
 			cursor,
 		});
 		for (const prefix of page.prefixes)
-			ids.push(prefix.slice(SCHOOLS_PREFIX.length).replace(/\/$/, ""));
+			ids.push(prefix.slice(SCHOOLS_PREFIX.length).replace(TRAILING_SLASH, ""));
 		if (page.next === null) break;
 		cursor = page.next;
 	}

@@ -27,6 +27,7 @@ const MONTHS = 12;
 const REPORT_AUDIENCES = ["public", "member", "governance"] as const;
 const NOT_COMPUTED: Cell = { hidden: "not_computed", text: "Not computed" };
 const TIER_PREFIX = "revenue_by_tier:";
+const NO_CONTRIBUTIONS: KpiContributions = {};
 
 const monthsOfYear = (year: number): string[] =>
 	Array.from(
@@ -85,28 +86,8 @@ const grossByDayOf = async (
 		return viewValue(read).grossByDay;
 	});
 
-/** The year's contributions objects merged: cell to month to `{ holders, largestShare }`. */
-const contributionsOf = async (
-	snapshot: SchoolSnapshot,
-	year: number,
-): Promise<KpiContributions> => {
-	const merged: KpiContributions = {};
-	const reads = await mapLimited(
-		monthsOfYear(year),
-		READ_CONCURRENCY,
-		(month) => snapshot.reader.contributions(month),
-	);
-	for (const read of reads) {
-		if (!read.ok && read.error === "not-in-manifest") continue;
-		for (const [cell, byMonth] of Object.entries(viewValue(read).contributions))
-			merged[cell] = { ...merged[cell], ...byMonth };
-	}
-	return merged;
-};
-
 export type KpiInputs = {
 	rows: KpiDocumentRow[];
-	contributions: KpiContributions;
 	context: KpiDocumentContext;
 	year: number;
 };
@@ -119,14 +100,10 @@ export const kpiInputsOf = async (
 	const menu = await snapshot.menu();
 	const clock = await clockOf(snapshot, now);
 	const year = Number(clock.today.slice(0, 4));
-	const [days, contributions] = await Promise.all([
-		grossByDayOf(snapshot, year),
-		contributionsOf(snapshot, year),
-	]);
+	const days = await grossByDayOf(snapshot, year);
 	const plans = planOrderOf(menu, rows);
 	return {
 		rows,
-		contributions,
 		year,
 		context: {
 			school: snapshot.school,
@@ -145,13 +122,11 @@ export const kpiRoute = async (
 	pinLocked: boolean,
 	now: number,
 ): Promise<KpiDocument> => {
-	const { rows, contributions, context, year } = await kpiInputsOf(
-		snapshot,
-		now,
-	);
+	const { rows, context, year } = await kpiInputsOf(snapshot, now);
 	return kpiDocument(
 		rows,
-		contributions,
+		// the document does not read contributions (`_contributions`): the objects are not fetched for it
+		NO_CONTRIBUTIONS,
 		disclosureOf(rows, year),
 		audience,
 		pinLocked,

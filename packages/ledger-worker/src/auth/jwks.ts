@@ -45,30 +45,33 @@ export class JwksCache {
 		return now - this.fetchedAt >= MIN_REFETCH_SECONDS * MS_PER_SECOND;
 	}
 
+	private async loadKeys(now: number): Promise<Jwks> {
+		try {
+			const response = await this.fetchJwks(this.url);
+			if (!response.ok) throw new JwksUnavailable("the JWKS did not answer");
+			const body: unknown = await response.json();
+			const list =
+				typeof body === "object" && body !== null
+					? (body as { keys?: unknown }).keys
+					: undefined;
+			if (!Array.isArray(list))
+				throw new JwksUnavailable("the JWKS has no keys");
+			this.keys = { keys: list.filter(isJwk) };
+			this.expiresAt = now + maxAgeOf(response) * MS_PER_SECOND;
+			return this.keys;
+		} catch (error) {
+			if (error instanceof JwksUnavailable) throw error;
+			throw new JwksUnavailable("the JWKS could not be fetched");
+		}
+	}
+
 	private fetchFresh(now: number): Promise<Jwks> {
 		if (this.inFlight !== null) return this.inFlight;
 		this.fetchedAt = now;
-		const pending = (async (): Promise<Jwks> => {
-			try {
-				const response = await this.fetchJwks(this.url);
-				if (!response.ok) throw new JwksUnavailable("the JWKS did not answer");
-				const body: unknown = await response.json();
-				const list =
-					typeof body === "object" && body !== null
-						? (body as { keys?: unknown }).keys
-						: undefined;
-				if (!Array.isArray(list))
-					throw new JwksUnavailable("the JWKS has no keys");
-				this.keys = { keys: list.filter(isJwk) };
-				this.expiresAt = now + maxAgeOf(response) * MS_PER_SECOND;
-				return this.keys;
-			} catch (error) {
-				if (error instanceof JwksUnavailable) throw error;
-				throw new JwksUnavailable("the JWKS could not be fetched");
-			} finally {
-				this.inFlight = null;
-			}
-		})();
+		// `finally` runs after `inFlight` is set, even when `fetchJwks` throws before its first await
+		const pending = this.loadKeys(now).finally(() => {
+			this.inFlight = null;
+		});
 		this.inFlight = pending;
 		return pending;
 	}

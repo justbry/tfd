@@ -10,6 +10,7 @@ import { R2BindingStore } from "atm/worker";
 import {
 	type Audience,
 	audienceAllowed,
+	audiences,
 	type Caller,
 	callerOf,
 	type SchoolGrant,
@@ -49,13 +50,7 @@ const MS_PER_SECOND = 1000;
 const JWKS_FETCH_TIMEOUT_MS = 5000;
 const IAT_LEEWAY_SECONDS = 5;
 const REPORT_AUDIENCES = ["public", "member", "governance"] as const;
-const ALL_AUDIENCES = [
-	"public",
-	"member",
-	"governance",
-	"finance",
-	"owner",
-] as const;
+const ALL_AUDIENCES = audiences;
 
 export type LedgerWorkerOptions = {
 	/** The clock, in epoch milliseconds. */
@@ -257,7 +252,13 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		const school = decode(match[1] as string);
 		const rest = match[2] as string;
 		const moneyKey = MEMBER_MONEY.exec(rest)?.[1];
-		const route = moneyKey === undefined ? routes[rest] : memberMoney;
+		// own keys only: `constructor` or `__proto__` is not an endpoint
+		const route =
+			moneyKey === undefined
+				? Object.hasOwn(routes, rest)
+					? routes[rest]
+					: undefined
+				: memberMoney;
 		if (route === undefined)
 			throw new ApiError("not_found", "No such endpoint.");
 		const grant = caller.schools.get(school);
