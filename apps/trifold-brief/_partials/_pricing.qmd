@@ -1,24 +1,21 @@
-## The price ladder {#pricing}
+## Free to run yourself; hosted from $29 a month, no seat fees {#pricing}
 
-<span class="kicker">Plans · draft prices · hosted plans not built yet</span>
+<span class="kicker">Draft prices · hosting is next</span>
 
-| Plan | A month | Limits | What it will add |
-|------|-------|---------------|----------------------|
-| Community | $0, self-hosted | None | The whole engine and `tfd` CLI. Self-signed receipts and seals |
-| Free (hosted) | $0 | 1,000 events, 200 credits, 2 seats | Hosted books and signed receipts. About 140 families |
-| Starter | $29 | 5,000 events, 1,000 credits, 5 seats | Sync to QuickBooks or Xero, with signed receipts on top |
-| Pro (recommended) | $79 | 25,000 events, 5,000 credits, unlimited seats, up to 3 organizations | Replaces QuickBooks: Pricing Lab, daily reconcile, bank import, Rifo |
-| Witnessed | $149 | 25,000 events, 8,000 credits | Once the witness ships: Trifold's countersignature, the transparency log, the auditor portal |
-| Witnessed + Bookkeeper | about $349 | As Witnessed | A partner bookkeeper closes the month |
+<div class="ladder">
+<div class="rung"><h3>Free, run it yourself</h3><span class="price">$0</span><p class="limit">No limits</p><p>Whole engine, your server</p></div>
+<div class="rung"><h3>Free, hosted</h3><span class="price">$0</span><p class="limit">~300 events: ~40 families</p><p>Signed receipts</p></div>
+<div class="rung"><h3>Starter</h3><span class="tag tag--rec">Recommended for small schools</span><span class="price">$29<small>/mo</small></span><p class="limit">5,000 events</p><p>Itemised receipts for state programs <span class="tag tag--next">next</span></p></div>
+<div class="rung"><h3>Pro</h3><span class="price">$79<small>/mo</small></span><p class="limit">25,000 events; any seats</p><p>Rifo, Pricing Lab, daily reconcile, sync <span class="tag tag--next">next</span></p></div>
+<div class="rung"><h3>Audited</h3><span class="price">$149<small>/mo</small></span><p class="limit">25,000 events</p><p>Countersignature, auditor portal, daily Stripe matching <span class="tag tag--next">next</span></p></div>
+</div>
 
-<p class="assume-note"><span class="tag tag--assume">Assumption</span> Every price and limit is a starting point to test with design partners, not a decision. Annual: two months free ($290, $790, $1,490). Non-profits and co-ops about half ($15, $39, $79, about $249); whether that stacks with annual is undecided.</p>
-
-<p class="fine">No per-seat fees. No per-transaction fees. No surprise bills: event limits are soft on every plan and the books never stop; only Platform pays for events (about $1 per 10,000). Also planned: compliance packs ($15–30 per state program) and the Witness API (500 receipts a month free, then $0.03–0.05 each). Early access, not sign-up: nothing hosted is live.</p>
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> An event is a payment, refund or booking. Audited: Trifold countersigns your records. Credits pay for Rifo, the AI assistant. With a bookkeeper: ~$349.</p>
 
 ::: {.notes}
-Sources: `docs/business/pricing-strategy.md` §4 (rate card with limits: Free 1,000 events / 200 credits / 2 seats; Starter 5,000 / 1,000 / 5; Pro 25,000 / 5,000 / unlimited seats / up to 3 organizations; Witnessed 25,000 / 8,000; bundle ~$349; compliance pack $15–30 per state program; Witness API first 500 receipts a month free, then $0.03–0.05; "No per-seat fees. No per-transaction fees. No surprise bills."; the event limit is soft on Free, Starter, Pro and Witnessed, Platform pays about $1 per 10,000 events; annual two months free: $290 / $790 / $1,490), §4b (non-profit and co-op: $15 / $39 / $79 / ~$249; stacking is a proposal, §11 item 4), and `docs/business/business-plan.md` §6. "About 140 families": business-plan §8 (about 7 events a family a month).
+Owner decisions of 2026-11-07 (coordinator's message) override the docs here: Free hosted at about 300 events a month (about 40 families) with signed receipts; Starter $29 is the recommended wedge plan for small schools and includes the compliance pack (itemised receipts for state programs, not built); Pro $79 (Rifo, Pricing Lab, daily reconcile, QuickBooks/Xero sync: all next); Witnessed renamed Audited at $149 (Trifold's countersignature, the auditor portal, the compliance pack and daily Stripe matching: all next); the bundle is Audited + Bookkeeper, about $349. "Witnessed by Trifold" remains only the name of the badge on a countersigned record (TRADEMARKS.md). The docs may be updated on the stacked docs branch.
 
-Status: hosted plans not built (business-plan §3, phase 1 in §7). Pricing Lab, bank import, QuickBooks/Xero sync, Rifo and the witness are Next (AGENTS.md "Claims"; pricing-strategy §6). CTA wording: `docs/website/decisions.md` (primary CTA "Get early access", because Cloud isn't live) and `docs/website/messaging.md`; "Recommended" as the only plan badge and Witnessed in the future tense, per the 2026-11-07 docs audit (no customer counts exist to back a popularity badge).
+From the docs, unchanged: `docs/business/pricing-strategy.md` §4 (Community $0 self-hosted with no limits; Starter 5,000 events / 1,000 credits / 5 seats; Pro 25,000 events, 5,000 credits, unlimited seats, up to 3 organizations; 25,000 events / 8,000 credits on the top tier; "No per-seat fees. No per-transaction fees. No surprise bills."; event limits soft on every plan, only Platform pays about $1 per 10,000; annual billing two months free, $290 / $790 / $1,490; Witness API 500 receipts a month free, then $0.03–0.05); §4b (non-profits and co-ops about half: $15 / $39 / $79 / ~$249; stacking with annual undecided); `docs/business/business-plan.md` §6 and §8 (about 7 events a family a month: 300 events ≈ 43 families).
 
-Every price is an assumption to test, not a decision (headers of business-plan, pricing-strategy, go-to-market).
+Status: no hosted plan is built (business-plan §3, phase 1 in §7). Every price is an assumption to test, not a decision. Wording: "Get early access" (`docs/website/decisions.md`).
 :::

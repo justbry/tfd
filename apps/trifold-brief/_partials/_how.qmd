@@ -1,23 +1,17 @@
-## The books are built from the payments themselves {#how-it-works}
+## Every number traces back to a payment {#how-it-works}
 
 <span class="kicker">How it works</span>
 
-<div class="folds">
-<div class="card"><strong>1 · A payment lands</strong>Stripe sends a signed webhook. tfd checks Stripe's signature before it accepts anything, and a payment sent twice is recorded once.</div>
-<div class="arrow" aria-hidden="true">→</div>
-<div class="card card--ink"><strong>2 · It posts to the books</strong>Double-entry postings that must balance to zero in each currency, or the event is refused. Append-only and replayable; the journal reads in hledger.</div>
-<div class="arrow" aria-hidden="true">→</div>
-<div class="card card--green"><strong>3 · Receipt and seal</strong>tfd makes a receipt from that event and signs it with Ed25519, for the customer to keep. Each closed month gets a signed seal, chained to the month before.</div>
+<div class="strip">
+<div class="fold-a"><span class="step">1</span><h3>A payment arrives</h3><p>Stripe reports it; Trifold checks it really came from Stripe, and records a repeat only once.</p></div>
+<div class="fold-b"><span class="step">2</span><h3>The books balance</h3><p>Every payment, refund or booking posts balanced entries. Nothing is ever edited; the books rebuild from the payments.</p></div>
+<div class="fold-c"><span class="step">3</span><h3>Receipt and seal</h3><p>The payer gets a receipt signed with the school's key. Each closed month gets a signed fingerprint.</p></div>
 </div>
 
-<p class="checks" aria-label="The three checks on every payment: books, built today; receipt, built today; Stripe, reconciled on request today, daily matching next"><span class="ok">Books</span><span class="ok">Receipt</span><span class="soon">Stripe: reconciled on request today; daily matching next</span></p>
-
-<p class="fine">Trifold is the company and the hosted service. tfd is the engine and command-line tool that Trifold will host, and that anyone can run for their own books.</p>
+<p class="pills" aria-label="Three checks: books, built; receipt, built; Stripe's record, checked on request today, daily matching next"><span>Books ✓</span><span>Receipt ✓</span><span class="soon">Stripe ◌ daily matching next</span></p>
 
 ::: {.notes}
-Sources: `docs/business/business-plan.md` §1 and §3 ("Books from events", "Signed receipts", "Sealed months": built). What exists today: `docs/brand/trifold-brand-and-messaging.md`, "What exists and what is to build" (postings balance to zero per currency, `src/ledger/validate.ts`; duplicates recorded once via `idem`; replay, `src/ledger/replay.ts`; Stripe signatures checked on ingest, `src/handler/stripe-signature.ts`; journals readable by hledger). The step-by-step wording follows the site's approved copy, `apps/trifold-site/src/content/how-it-works.md`, "One payment, step by step".
+Sources: `docs/business/business-plan.md` §3 (books from events, signed receipts, sealed months: released in tfd 0.10.0). What exists: `docs/brand/trifold-brand-and-messaging.md`, "What exists and what is to build" (postings balance to zero per currency, `src/ledger/validate.ts`; a duplicate is recorded once via `idem`; balances replay from events, `src/ledger/replay.ts`; Stripe signatures checked on ingest, `src/handler/stripe-signature.ts`). The receipt is Ed25519-signed and the seal is a signed, chained hash of the month's events (`packages/atm/README.md`, "Receipts and seals"). Step wording follows `apps/trifold-site/src/content/how-it-works.md`.
 
-The three checks (brand doc, "Interface motifs": Books ✓ Receipt ✓ Stripe ✓). The third is not yet a daily match: Stripe reconciliation runs on request today; daily matching against balance transactions and payouts is milestone 3 (business-plan §3; `packages/atm/ROADMAP.md`, milestone 1 "Known limits"). So do not say the three records "agree" or are "matched" yet (brand doc, "Claim rules": that wording waits for steps 4 and 5).
-
-Names: AGENTS.md, "Names".
+The three checks are the brand doc's motif ("Interface motifs": Books ✓ Receipt ✓ Stripe ✓). The third is not built: Stripe reconciliation runs on request today (`tfd reconcile`); daily matching is milestone 3 (business-plan §3). Don't say the three records "agree" yet (brand doc, "Claim rules").
 :::

@@ -1,39 +1,19 @@
-## Signed receipts, and a verifier anyone can run {#receipts}
+## Every payer gets a receipt they can check themselves {#receipts}
 
-<span class="kicker">The proof · released in tfd 0.10.0</span>
+<span class="kicker">The proof · released 7 November 2026</span>
 
 <div class="cards">
-<div class="card"><strong>What tfd signs</strong>
-<ul>
-<li>A receipt for every payment and refund, signed with the business's Ed25519 key, for the payer to keep.</li>
-<li>Made from the event alone, so the books can make it again, byte for byte. An edit to the books shows.</li>
-<li>A refund is a new receipt naming the payment it reverses. Nothing is edited.</li>
-<li>No name or email inside.</li>
-</ul></div>
-<div class="card card--green"><strong>Who can check it</strong>
-<ul>
-<li>Anyone who holds a receipt: a family, a CPA, an auditor.</li>
-<li>In a browser, with the open verifier <code>tfd-verify</code>. Nothing leaves the page.</li>
-<li>Or at a terminal: <code>tfd verify receipt</code> and <code>tfd verify seals</code>.</li>
-<li>The format, spec and verifier are Apache-2.0; the test vectors are public domain (CC0).</li>
-</ul></div>
-<div class="card card--ink"><strong>What it catches</strong>
-<ul>
-<li>An edit in a sealed month: the seal stops matching.</li>
-<li>A deleted payment: the seal names every event.</li>
-<li>A forged or inflated receipt: the signature fails.</li>
-<li><span class="tag tag--next">Next</span> An edit before the month is sealed: a hash chain over every event.</li>
-</ul></div>
+<div class="card"><h3>Made from the books</h3><p>The books remake it byte for byte, so a later edit shows. No names inside.</p></div>
+<div class="card card--green"><h3>Anyone can check</h3><p>A family, CPA or auditor, in a browser. Nothing leaves the page.</p></div>
+<div class="card card--ink"><h3>What it catches</h3><p>A changed or deleted payment in a sealed month; a forged receipt. Edits before sealing: <span class="tag tag--next">next</span></p></div>
 </div>
 
-<p class="fine">Released 7 November 2026. No school issues these receipts yet, and no state program has accepted them; the first school pilot is next. The tfd engine is source-available (FSL-1.1-ALv2) and free to self-host; every release becomes Apache-2.0 two years after it ships.</p>
+<p class="fine">No school issues them yet; the first pilot is next. The format and checker are free for anyone, forever.</p>
 
 ::: {.notes}
-Sources: `docs/business/business-plan.md` §1 and §3 (signed receipts and sealed months "Released in tfd 0.10.0 (milestone 1, justbry/atm #123 and #137). Not yet issued by any school"; audited 2026-11-07); `packages/atm/README.md`, "Receipts and seals (new in 0.10.0)" (Ed25519 receipt per `payment.succeeded` and `payment.refunded`, a pure function of its event; no name or email; the CLI commands); `packages/atm/ROADMAP.md`, "Signed receipts and sealed months (milestone 1)" ("Not live anywhere yet: buzz-school doesn't issue receipts or seal months"). `docs/business/website-open-questions.md` 4.2: claim schools issue receipts only once a design-partner school does. No source says any state program accepts them; `docs/business/market-research.md` §4 and §5 say each program's receipt rules still need checking.
+Sources: `docs/business/business-plan.md` §1 and §3 (signed receipts and sealed months released in tfd 0.10.0, 2026-11-07, milestone 1, justbry/atm #123 and #137; "Not yet issued by any school"); `packages/atm/README.md`, "Receipts and seals (new in 0.10.0)" (an Ed25519 receipt per payment and refund, a pure function of its event; no name or email; `tfd verify receipt`, `tfd verify seals`); `packages/atm/ROADMAP.md`, milestone 1 ("Not live anywhere yet"; known limits: the open month isn't sealed until close; a receipt doesn't prove Stripe moved the money). `docs/business/website-open-questions.md` 4.2 (claim schools issue receipts only once one does). No source says any state program accepts them.
 
-Verifier: `packages/verify/README.md` (`tfd-verify`: tfd's receipt and seal checks for browsers and other WebCrypto runtimes, "nothing leaves the page"; Apache-2.0; not published to npm). Licenses: AGENTS.md, "Licensing" (format, spec, verifier Apache-2.0; vectors CC0-1.0; engine FSL-1.1-ALv2 from 0.10.0, the first FSL release; releases up to 0.9.0 stay Apache-2.0; two-year conversion kept by the owner on 2026-11-07). Wording rule: say source-available or free to self-host for tfd, never the OSI label.
+Checker: `packages/verify/README.md` (`tfd-verify`, browsers and other WebCrypto runtimes, "nothing leaves the page"; not published to npm). Licenses (AGENTS.md "Licensing"): the receipt and seal format, spec and verifier are Apache-2.0, the test vectors CC0-1.0; the engine is FSL-1.1-ALv2 from 0.10.0 and each release becomes Apache-2.0 two years after it ships. A self-hosted copy issues self-signed receipts, never "Witnessed by Trifold" (TRADEMARKS.md).
 
-What catches what: `apps/trifold-site/src/content/how-it-works.md`, "What catches what" (first rows Today; edit before sealing is Next). Known limits: ROADMAP milestone 1, "Known limits" (open month not sealed until close; a receipt does not prove Stripe moved the money).
-
-A self-hosted tfd issues self-signed receipts: "verifiable with the open verifier", never "Witnessed by Trifold" (TRADEMARKS.md).
+What catches what: `apps/trifold-site/src/content/how-it-works.md`, "What catches what" (a hash chain over every event, milestone 2, catches edits before sealing).
 :::

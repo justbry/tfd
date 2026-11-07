@@ -71,7 +71,7 @@ stage_into() {
 
 # Marker text that only the real page holds, never the 401 form.
 marker() {
-  if [[ "$1" == "/" ]]; then echo "Choose your path"; else echo 'id="where-next"'; fi
+  if [[ "$1" == "/" ]]; then echo "Pick your path"; else echo 'id="where-next"'; fi
 }
 
 verify() {

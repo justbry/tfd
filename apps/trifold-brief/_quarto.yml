@@ -19,7 +19,7 @@ format:
     theme: [default, brief.scss]
     css: _fonts.css
     embed-resources: true
-    center: true
+    center: false
     hash: true
     slide-number: c/t
     transition: fade

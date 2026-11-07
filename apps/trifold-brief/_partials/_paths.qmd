@@ -1,16 +1,16 @@
-## Where next {#where-next}
+## Pick another path, or go back to the picker {#where-next}
 
 <span class="kicker">Other paths</span>
 
 <nav class="paths" aria-label="Other paths through the brief">
-<a href="/overview/"><strong>The 5-minute overview</strong><span>The core story in nine slides</span></a>
-<a href="/investors/"><strong>Investors</strong><span>Market, model, illustrative financials, moat, risks, the ask</span></a>
-<a href="/firms/"><strong>Accounting firms and bookkeepers</strong><span>Provable books, the firm program, what you earn, Idaho and Utah rules</span></a>
-<a href="/schools/"><strong>Schools</strong><span>What families get, prices, self-host or hosted, your data</span></a>
-<a href="/partners/"><strong>Partners</strong><span>Affiliate tiers, organization affiliates, anti-MLM rules, the Witness API</span></a>
-<a href="/"><strong>All paths</strong><span>Back to the picker</span></a>
+<a href="/overview/" style="--card-path: #1e2a44"><strong>The 5-minute overview</strong><span>The core story</span></a>
+<a href="/investors/" style="--card-path: #1e2a44"><strong>Investors</strong><span>Market, model, numbers, moat</span></a>
+<a href="/firms/" style="--card-path: #2f7d5b"><strong>Accounting firms</strong><span>What you check, what you earn</span></a>
+<a href="/schools/" style="--card-path: #e8a33d"><strong>Schools, co-ops and churches</strong><span>Receipts payers can check</span></a>
+<a href="/partners/" style="--card-path: #55607a"><strong>Partners</strong><span>Referrals and integrations</span></a>
+<a href="/" style="--card-path: #dcd3c1"><strong>All paths</strong><span>Back to the picker</span></a>
 </nav>
 
 ::: {.notes}
-Every path is linkable on its own: /overview/, /investors/, /firms/, /schools/, /partners/. Add ?print-pdf to any path for the print view (then print to PDF from the browser).
+Every path has its own link: /overview/, /investors/, /firms/, /schools/, /partners/. Add ?print-pdf for the print view, then print to PDF from the browser.
 :::

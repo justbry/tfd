@@ -1,0 +1,25 @@
+## The first 10 organizations and 5 firms get free hosted setup for real receipts {#first-10}
+
+<span class="kicker">Design partners · the plan</span>
+
+<div class="cards cards--2">
+<div class="card"><h3>The offer</h3>
+<ul>
+<li>10 schools, co-ops and churches, and about 5 accounting firms</li>
+<li>Free hosted setup, done with you</li>
+<li>Real receipts to payers within 30 days</li>
+<li>Two short interviews; a price talk at day 60</li>
+</ul></div>
+<div class="card card--green"><h3>What counts as working</h3>
+<ul>
+<li>At least 5 of 10 issuing receipts</li>
+<li>At least 3 would pay</li>
+<li>At least 1 CPA has checked a receipt</li>
+</ul></div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Plan</span> Idaho and Utah first. The founder's own businesses don't count toward the test.</p>
+
+::: {.notes}
+Plan agreed in the 2026-11-07 deck review, widened by the owner the same day to 10 organizations across schools, co-ops and churches plus about 5 accounting firms as co-design partners (Listed tier plus a written agreement). It makes concrete `docs/business/business-plan.md` §7 phase 0 ("5–10 design-partner schools"; proof: "Design partners issuing real receipts") and §11 item 5 (recruit design partners; test prices with them). No school issues receipts yet (business-plan §3). The hosted service isn't built, so "hosted setup" means Trifold running it for the design partners by hand. Related businesses (B4 Uni, Vibes of Light) are design partners, not independent customers (business-plan §1). The docs may be updated to match on the stacked docs branch.
+:::

@@ -1,7 +1,10 @@
 ---
 pagetitle: "Trifold brief · The 5-minute overview"
 brief-audience: "The 5-minute overview"
-brief-length: "9 slides, about 5 minutes"
+brief-oneliner: "What Trifold does, what it costs, who it's for, and what's built versus next."
+brief-length: "8 slides, about 5 minutes"
+include-in-header:
+  text: "<style>:root { --path: #1e2a44; --path-text: #1e2a44; }</style>"
 ---
 
 {{< include ../_partials/_title.qmd >}}
@@ -14,31 +17,22 @@ brief-length: "9 slides, about 5 minutes"
 
 {{< include ../_partials/_pricing.qmd >}}
 
-## First market: microschools in Idaho and Utah {#first-market}
+## First beachhead: Idaho and Utah microschools; market: the US and English-speaking countries {#market}
 
-<span class="kicker">Go-to-market · the working default</span>
+<span class="kicker">Go-to-market</span>
 
 <div class="cards">
-<div class="card"><strong>Who first</strong>Microschools and small private schools, about 10 to 150 families, that bill through Stripe. Families in state education programs need payment records that hold up.</div>
-<div class="card card--green"><strong>How it spreads</strong>
-<ul>
-<li>Every receipt will carry a "Verify at trifold…" link</li>
-<li>Platforms that adopt the receipt format extend the verifier's reach</li>
-<li>CPAs bring clients; their seats will be free</li>
-</ul></div>
-<div class="card card--ink"><strong>Then</strong>Businesses with the same shape (memberships, credits, bookings): studios, tutoring, camps, gyms. Vertical software embeds Trifold.</div>
+<div class="card"><h3>Beachhead</h3><p>Microschools of 10 to 150 families on Stripe. Families in Idaho's tax credit and Utah's program need records that hold up.</p></div>
+<div class="card card--green"><h3>Market</h3><p>Any organization billing through Stripe in the US and English-speaking countries. Focus: schools, co-ops and churches.</p></div>
+<div class="card card--ink"><h3>Delivered with firms</h3><p>Accounting firms bring and serve clients. Each receipt will carry a "Verify at trifold…" link.</p></div>
 </div>
 
-<p class="assume-note"><span class="tag tag--assume">Assumption</span> Idaho and Utah first is the working default, still an open decision. Phase 1 target (months 3–9): 100 schools on the hosted service, 20 paying, about 10 CPA partners.</p>
-
 ::: {.notes}
-Sources: `docs/business/business-plan.md` §1 (first market), §4 (customers: 10–150 families, Stripe, Idaho and Utah; next: studios, tutoring, camps, gyms; channels) and §7 (the three growth loops; the phase table, phase 1 "proof it worked": 100 schools on cloud, 20 paying, ~10 CPA partners). Why Idaho and Utah: `docs/business/market-research.md` §4 (related-party design partners, B4 Uni and buzz-school, not independent customers; state programs such as Idaho's parental choice tax credit and Utah Fits All; "check each program's current receipt rules before building on this").
+Owner decision, 2026-11-07 (coordinator's message): the market is the entire US and each English-speaking country; Idaho and Utah microschools are the first beachhead. The docs still say "the working default" (`docs/business/business-plan.md` §1 and §12 item 3) and may be updated on the stacked docs branch. Market size is being researched.
 
-Phase 1 numbers are targets in a draft plan, not results. First market is "the working default" (business-plan §1 and §12 item 3, audited 2026-11-07). The "Verify at trifold…" link appears once schools issue receipts; none does yet (business-plan §3).
+Sources: business-plan §4 (10–150 families, Stripe; channels: CPAs and bookkeepers) and §7 (growth loops: the verify link, platforms adopting the format, CPAs). Focus on schools, co-ops and churches, delivered with accounting firms: owner decision, 2026-11-07; `docs/business/market-research.md` §4 (why Idaho and Utah; check each program's receipt rules). `docs/business/go-to-market.md` §3.2 (schools refer schools for account credit). Utah's program is not named while its appeal is pending. No school issues receipts yet, so the link is future tense.
 :::
 
 {{< include ../_partials/_built-next.qmd >}}
-
-{{< include ../_partials/_team.qmd >}}
 
 {{< include ../_partials/_paths.qmd >}}

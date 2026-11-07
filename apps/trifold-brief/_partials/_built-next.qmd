@@ -1,36 +1,33 @@
-## What is built, and what is next {#built-and-next}
+## Receipts and sealed months are released; hosting, Rifo and the witness are next {#built-and-next}
 
 <span class="kicker">Status, 7 November 2026</span>
 
-<div class="cards">
-<div class="card card--green"><strong><span class="tag tag--built">Built</span> Released in tfd 0.10.0</strong>
+<div class="timeline">
+<div class="stage stage--built"><span class="when">Released</span><h3>Built</h3>
 <ul>
-<li>Books from Stripe events: journal, reports, reconciliation on request</li>
-<li>Signed receipts for every payment and refund</li>
-<li>Sealed months, each chained to the one before</li>
-<li>Pricing what-ifs: <code>tfd simulate</code> replays the books under new prices</li>
-<li>The open verifier, <code>tfd-verify</code> (built; not yet published)</li>
+<li>Books built from Stripe payments</li>
+<li>Signed receipts for payments and refunds</li>
+<li>Sealed months, each chained to the last</li>
+<li>Price what-ifs on past payments</li>
+<li>A free in-browser receipt checker</li>
 </ul></div>
-<div class="card card--ink"><strong><span class="tag tag--next">Next</span> Not built yet</strong>
+<div class="stage stage--next"><span class="when">Not built yet</span><h3>Next</h3>
 <ul>
-<li>The first school pilot issuing real receipts</li>
-<li>Hosted plans: Free, Starter and Pro, with QuickBooks and Xero sync, Pricing Lab and bank import</li>
-<li>Rifo, the AI agent: drafts and explains; a person approves</li>
-<li>A hash chain over every event (milestone 2) and daily matching against Stripe (milestone 3)</li>
-<li>The witness, the auditor portal and the firm program</li>
+<li>First pilot issuing real receipts</li>
+<li>Hosted plans; scheduled monthly close</li>
+<li>Itemised receipts for state programs</li>
+<li>Rifo, the AI assistant</li>
+<li>Countersignature, auditor portal, daily Stripe matching</li>
 </ul></div>
-<div class="card card--quiet"><strong><span class="tag tag--later">Later</span> Planned</strong>
+<div class="stage stage--later"><span class="when">Planned</span><h3>Later</h3>
 <ul>
-<li>The public transparency log and the Witness API for platforms</li>
-<li>Itemised receipts for state programs (compliance packs)</li>
-<li>Tax packages for a CPA</li>
+<li>Public log and Witness API</li>
+<li>Tax packages for your CPA</li>
 </ul></div>
 </div>
 
-<p class="fine">Until the per-event chain and daily matching ship, we describe Trifold as <em>signed receipts and sealed books</em>.</p>
-
 ::: {.notes}
-Sources: `docs/business/business-plan.md` §3, the status column as audited on 2026-11-07: books from events, signed receipts, sealed months released in tfd 0.10.0 (2026-11-07), not yet issued or run by any school; `tfd-verify` built, not published to npm; `tfd simulate` released since 0.6.0, the paid Pricing Lab not built; hosted service (cloud Free, Starter, Pro) not built; Rifo not built (Next); per-event chain milestone 2 and daily Stripe matching milestone 3, not built; Trifold witness not built (Next, premium); tax packages not built (Later). Bank-statement import: `docs/business/pricing-strategy.md` §6 (not built in tfd yet). QuickBooks and Xero sync: pricing-strategy §4 (Starter), not built. Phases: business-plan §7 (phase 1 hosted plans and the CPA partner pilot; phase 2 milestones 2 and 3, the transparency log, the Witness API). Auditor portal: part of Witnessed (pricing-strategy §4). Firm program: `docs/business/go-to-market.md` header ("Nothing in this doc is built"). Compliance packs: pricing-strategy §4; itemised receipts not built (`packages/atm/README.md`).
+Sources: `docs/business/business-plan.md` §3, status as audited 2026-11-07: books from events, signed receipts and sealed months released in tfd 0.10.0, not yet issued by any school; `tfd simulate` released since 0.6.0 (the paid Pricing Lab is not built); `tfd-verify` built, not published; hosted service, Rifo, the witness, the per-event chain (milestone 2) and daily Stripe matching (milestone 3) not built; tax packages Later. Scheduled monthly close is a hosted Pro feature (`docs/business/pricing-strategy.md` §6). Itemised receipts (the compliance pack) are not built (`packages/atm/README.md`); the owner put them in Starter on 2026-11-07, so they are Next here. The auditor portal and countersignature are the Audited plan (owner's rename of Witnessed, 2026-11-07). Phases: business-plan §7.
 
-AGENTS.md "Claims": Rifo, the witness, daily payout matching and tax packages are Next or Later, never shipped; "signed receipts and sealed books" for milestone 1; never the bookkeeping label AGENTS.md bans.
+AGENTS.md "Claims": Rifo, the witness, daily payout matching and tax packages are Next or Later, never shipped; say "signed receipts and sealed books" for what milestone 1 built.
 :::

@@ -1,120 +1,95 @@
 ---
-pagetitle: "Trifold brief · Schools"
-brief-audience: "Schools"
-brief-length: "13 slides, about 12 minutes"
+pagetitle: "Trifold brief · Schools, co-ops and churches"
+brief-audience: "Schools, co-ops and churches"
+brief-oneliner: "Every tuition payment, gift or dues payment, a receipt your families, givers or members can check."
+brief-length: "11 slides, about 9 minutes"
+include-in-header:
+  text: "<style>:root { --path: #e8a33d; --path-text: #8a5a12; }</style>"
 ---
 
 {{< include ../_partials/_title.qmd >}}
 
-## What families will get: a receipt that proves the payment {#families}
+## Every payment gives the payer a receipt they can check {#payers}
 
-<span class="kicker">For school owners and directors</span>
+<span class="kicker">What payers will get</span>
 
 <div class="cards">
-<div class="card"><strong>A receipt they keep</strong>For every payment and refund, a receipt signed with your school's key: the amount, the date, your school, and a fingerprint of the entry in your books. No name or email inside.</div>
-<div class="card card--green"><strong>Anyone can check it</strong>A family, their CPA or an auditor checks it with a free, open verifier. If your books are later edited, the receipt no longer matches.</div>
-<div class="card card--ink"><strong>What it doesn't do yet</strong>It doesn't prove Stripe moved the money (daily matching is next), and it isn't an itemised, per-child receipt for a state program (planned).</div>
+<div class="card"><h3>A school</h3><p>A parent pays tuition and keeps a receipt signed with the school's key.</p></div>
+<div class="card card--green"><h3>A church</h3><p>Recurring giving, with a receipt for each gift that the giver can check.</p></div>
+<div class="card card--ink"><h3>A co-op</h3><p>Member dues, each with a receipt the member can check.</p></div>
 </div>
 
-<p class="fine">Released in tfd 0.10.0 on 7 November 2026. No school issues these receipts yet, and no state program has accepted them; the first school pilot is next. Check your program's own receipt rules with your CPA.</p>
+<p class="fine">Anyone holding one checks it free in a browser; if the books change, it stops matching. Not yet: proof Stripe moved the money, or itemised state-program receipts. First pilot next.</p>
 
 ::: {.notes}
-Sources: `packages/atm/README.md`, "Receipts and seals (new in 0.10.0)" (the receipt holds school, the family's timeline key, the event id, type, time and date, amount, currency, Stripe id, and `event_hash`; "No name or email"; and "Not built: an itemised receipt... a proof of payment with no items, tax or student"); `docs/business/business-plan.md` §3 (released 2026-11-07, not yet issued by any school; daily Stripe matching milestone 3); `packages/atm/ROADMAP.md` milestone 1 ("a receipt does not prove Stripe moved the money"). Itemised receipts for state programs: compliance packs in `docs/business/pricing-strategy.md` §4, not built. State rules: `docs/business/market-research.md` §4 and §5 (check each program's rules from primary sources). AGENTS.md "Claims": say tfd signs receipts, not that families use them, until a school issues real receipts.
+Sources: `packages/atm/README.md`, "Receipts and seals (new in 0.10.0)" (a receipt holds the organization, the payer's timeline key, the event's id, type, time and date, amount, currency, Stripe id and a hash of the event; no name or email; and "Not built: an itemised receipt... a proof of payment with no items, tax or student"); `docs/business/business-plan.md` §3 (released 2026-11-07, not yet issued by any school; daily Stripe matching is milestone 3); `packages/atm/ROADMAP.md` milestone 1 ("a receipt does not prove Stripe moved the money"). Itemised receipts for state programs: the compliance pack, in Starter by the owner's decision of 2026-11-07, not built. Church and co-op examples: owner's focus of 2026-11-07; non-profit and co-op pricing in `docs/business/pricing-strategy.md` §4b (donation acknowledgments, member capital accounts). AGENTS.md "Claims": tfd signs receipts; don't say organizations or families use them until one issues real receipts.
 :::
 
-{{< include ../_partials/_problem.qmd >}}
+{{< include ../_partials/_programs.qmd >}}
 
 {{< include ../_partials/_how.qmd >}}
 
-{{< include ../_partials/_receipts.qmd >}}
-
 {{< include ../_partials/_pricing.qmd >}}
 
-## What a school would pay {#school-cost}
+## Up to about 40 families is free; non-profits and co-ops pay about half {#cost}
 
-<span class="kicker">Sizing · illustrative</span>
+<span class="kicker">What it would cost · illustrative</span>
 
 <div class="cards">
-<div class="card"><span class="big">≈ 7</span>ledger events a family makes in a month</div>
-<div class="card card--green"><span class="big">≈ 140</span>families covered by the Free plan's 1,000 events. A 50-family school makes about 350.</div>
-<div class="card card--ink"><span class="big">Half</span>the price for verified non-profits and co-ops: Starter $15, Pro $39, Witnessed $79</div>
+<div class="card"><span class="big">≈ 7</span><p>events a family makes in a month</p></div>
+<div class="card card--green"><span class="big">≈ 40</span><p>families fit the free hosted plan</p></div>
+<div class="card card--ink"><span class="big">Half</span><p>for non-profits, churches and co-ops: Starter $15, Pro $39, Audited $79</p></div>
 </div>
 
-<div class="cards cards--2">
-<div class="card card--quiet"><strong>Running over never stops the books</strong>Limits are soft. Payments still book and receipts are still signed; after two months over, you're asked to move up a plan. Nothing is billed automatically.</div>
-<div class="card card--quiet"><strong>Billing you can read</strong>A full refund within 30 days of the first paid charge, cancel in two clicks, change plans any time, onboarding included.</div>
-</div>
+<p class="fine">Running over never stops the books: limits are soft, and nothing is billed automatically. Full refund within 30 days; cancel in two clicks.</p>
 
-<p class="assume-note"><span class="tag tag--assume">Assumption</span> The events-per-family figure comes from one test family; prices and policies are drafts to test with design-partner schools.</p>
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> From one test family; draft prices.</p>
 
 ::: {.notes}
-Sources: `docs/business/business-plan.md` §8 ("A family makes about 7 events a month, so Free's 1,000 events covers about 140 families"); `docs/business/pricing-strategy.md` §5 rule 3 ("A school with about 50 families makes about 350 events a month, and Free covers it"), §3 (the estimate is from one fixture family, `packages/atm/fixtures/vibes-year`; replace with real data), §4 (soft limits; after two months over, asked to move up; Platform alone pays for events), §4a (billing policies: 30-day refund, two-click cancel, plan changes any time, onboarding included, export before and after cancelling), §4b (non-profit and co-op prices; verified 501(c) or cooperative). Credits running out: §5 rule 1 (payments still book, receipts still self-signed; only Rifo and new witness signatures pause).
+Sources: `docs/business/business-plan.md` §8 ("A family makes about 7 events a month"); owner decision of 2026-11-07 (Free hosted at about 300 events, about 40 families: 300 ÷ 7 ≈ 43); `docs/business/pricing-strategy.md` §3 (the estimate is one fixture family, `packages/atm/fixtures/vibes-year`; replace with real data), §4 (soft limits: after two months over, the owner is asked to move up; nothing billed automatically), §4a (30-day refund, two-click cancel, plan changes any time, onboarding included), §4b (verified 501(c) organizations and cooperatives pay about half: $15 / $39 / $79 / ~$249; Witnessed renamed Audited by the owner). Churches are 501(c) organizations, so the non-profit price applies once verified. Credits running out: §5 rule 1 (payments still book and receipts are still signed).
 :::
 
-## Free to self-host, or let Trifold host it {#self-host-or-hosted}
+## Run it yourself free, or let Trifold host it {#self-host-or-hosted}
 
 <span class="kicker">Your choice</span>
 
 <div class="cards cards--2">
-<div class="card card--green"><strong>Community: run tfd yourself, $0</strong>
+<div class="card card--green"><h3>Run it yourself, $0</h3>
 <ul>
-<li>The whole engine and <code>tfd</code> CLI, for your own books</li>
-<li>Self-signed receipts and seals, checkable with the open verifier</li>
-<li>Source-available (FSL-1.1-ALv2); each release becomes Apache-2.0 two years after it ships</li>
-<li>For technical schools and developers</li>
+<li>The whole engine, for your own books</li>
+<li>Your own signed receipts and sealed months</li>
+<li>For organizations with a technical person</li>
 </ul></div>
-<div class="card"><strong>Hosted Trifold <span class="tag tag--next">Next</span></strong>
+<div class="card"><h3>Hosted by Trifold <span class="tag tag--next">next</span></h3>
 <ul>
-<li>Free plan: hosted books and signed receipts, no server to run</li>
-<li>Paid plans for automation, teams, Rifo and, once it ships, Trifold as witness</li>
-<li>Early access for design-partner schools; nothing hosted is live yet</li>
+<li>Free plan: no server to run</li>
+<li>Paid plans add automation, Rifo and, later, Trifold's countersignature</li>
+<li>Early access for the first design partners</li>
 </ul></div>
 </div>
 
-<p class="fine">A school's self-signed receipts are "verifiable with the open verifier". Only records Trifold itself countersigns will say "Witnessed by Trifold".</p>
-
 ::: {.notes}
-Sources: `docs/business/pricing-strategy.md` §1 (the rule) and §4 (Community: the whole engine and CLI, self-signed receipts and seals; Free hosted), §8 (FSL: free to use, modify and self-host for your own books; Apache-2.0 two years after each release); `docs/business/business-plan.md` §3 (hosted service not built); `TRADEMARKS.md`, "Witnessed by Trifold" (self-hosted receipts may say "verifiable with the open verifier", not "witnessed"). CTA wording "early access": `docs/website/decisions.md`.
+Sources: `docs/business/pricing-strategy.md` §1 (anything a school can do on its own is free to self-host; anything that needs Trifold as the trusted third party is paid), §4 (Community: the whole engine and CLI, self-signed receipts and seals), §8 (FSL-1.1-ALv2: free to use, modify and self-host for your own books; each release becomes Apache-2.0 two years after it ships); `docs/business/business-plan.md` §3 (hosted service not built). A self-hosted copy's receipts are "verifiable with the open verifier", never "Witnessed by Trifold" (TRADEMARKS.md). CTA "early access": `docs/website/decisions.md`.
 :::
 
-## Your books are yours {#your-data}
+## Your books are yours: export is never behind a paywall {#your-data}
 
 <span class="kicker">Data ownership</span>
 
 <ul class="ticks">
-<li>Export everything, in open formats, before and after you cancel. Export is never behind a paywall.</li>
-<li>Erasure and privacy tools are never behind a paywall either.</li>
-<li>Personal data stays out of signed receipts: no names or emails in them.</li>
-<li>Verification is free for anyone, forever: the receipt format and verifier are Apache-2.0.</li>
-<li>If you work with a bookkeeping firm and later leave it, your ledger comes with you.</li>
+<li>Export everything in standard formats your CPA's tools read, before and after you cancel</li>
+<li>Erasure and privacy tools are free too</li>
+<li>No names or emails inside receipts</li>
+<li>Checking a receipt is free for anyone, forever</li>
+<li>Leave a bookkeeping firm and your ledger comes with you</li>
 </ul>
 
-<p class="fine">Student data: obligations (FERPA, state privacy laws) are checked per school type. How erasure works without breaking receipts is an owner decision still to make before schools issue receipts.</p>
-
 ::: {.notes}
-Sources: `docs/business/pricing-strategy.md` §2 ("Never paywall": verification, data export, erasure and privacy tools, correctness and security fixes, the receipt and seal specs) and §4a ("Data on leaving: export everything, in open formats, before and after cancelling"); `docs/brand/trifold-brand-and-messaging.md` website outline ("data ownership: export to Parquet or hledger at any time"); `packages/atm/README.md` (no name or email in a receipt); `docs/business/business-plan.md` §10 (student data checked per school type; erasure-breaks-receipts owner decision); `packages/atm/ROADMAP.md` milestone 1 (erasure must not rewrite events: owner decision before release); `docs/business/go-to-market.md` §5 (a client can move with its ledger intact). AGENTS.md: verifier and format Apache-2.0.
+Sources: `docs/business/pricing-strategy.md` §2 ("Never paywall": verification, data export, erasure and privacy tools, correctness and security fixes, the receipt and seal specs) and §4a ("Data on leaving: export everything, in open formats, before and after cancelling"); brand doc website outline (export to Parquet or hledger); `packages/atm/README.md` (no name or email in a receipt); `docs/business/business-plan.md` §10 (student data checked per school type; erasure without breaking receipts is an owner decision before release, `packages/atm/ROADMAP.md` milestone 1); `docs/business/go-to-market.md` §5 (a client can move with its ledger intact). The receipt format and checker are Apache-2.0 (AGENTS.md).
 :::
 
 {{< include ../_partials/_built-next.qmd >}}
 
-## How to start {#start}
-
-<span class="kicker">Next step</span>
-
-<div class="cards">
-<div class="card"><strong>Become a design-partner school</strong>The plan recruits 5 to 10 schools to issue the first real receipts and to test prices before anything is final. Idaho and Utah first.</div>
-<div class="card card--green"><strong>Bring your CPA</strong>Their seats will be free on every hosted plan, and they can check any receipt with the open verifier.</div>
-<div class="card card--ink"><strong>Refer a school</strong>Give a month, get a month, as account credit, up to 12 months. Every school has a code; no sign-up needed.</div>
-</div>
-
-<div class="placeholder"><strong>Owner to fill in</strong>How a school asks for early access: contact, form or calendar link.</div>
-
-<p class="assume-note"><span class="tag tag--assume">Assumption</span> The referral credit is a draft rule, not yet built.</p>
-
-::: {.notes}
-Sources: `docs/business/business-plan.md` §7 (phase 0: 5–10 design-partner schools issuing real receipts) and §11 item 5 (recruit 5–10 design-partner schools; test prices with them); first market "the working default" (§12 item 3); `docs/business/pricing-strategy.md` §4c (firm seats free and unlimited) and the verifier rule (§2); `docs/business/go-to-market.md` §3.2 ("Give a month, get a month", account credit, never cash, capped at 12 months; every school already has a code). go-to-market header: nothing in it is built. Placeholder: no sign-up channel is in the docs; the website preview isn't linked from the deck.
-:::
-
-{{< include ../_partials/_team.qmd >}}
+{{< include ../_partials/_first10.qmd >}}
 
 {{< include ../_partials/_paths.qmd >}}

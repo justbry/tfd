@@ -1,160 +1,155 @@
 ---
 pagetitle: "Trifold brief · Accounting firms and bookkeepers"
 brief-audience: "Accounting firms and bookkeepers"
-brief-length: "14 slides, about 15 minutes"
+brief-oneliner: "Clients whose books arrive sealed and traced to the payment, so you review and sign instead of rebuilding."
+brief-length: "12 slides, about 10 minutes"
+include-in-header:
+  text: "<style>:root { --path: #2f7d5b; --path-text: #246249; }</style>"
 ---
 
 {{< include ../_partials/_title.qmd >}}
 
-## The problem from your seat {#your-seat}
+## Client books arrive open, and you can't show they didn't change {#your-seat}
 
-<span class="kicker">For CPAs, enrolled agents and bookkeepers</span>
+<span class="kicker">From your seat</span>
 
 <div class="cards">
-<div class="card card--clay"><strong>Books arrive open</strong>Clients run on Stripe, spreadsheets and you. Every month starts with matching payouts to charges and chasing the client by email.</div>
-<div class="card card--clay"><strong>No proof of what didn't change</strong>When a number is questioned, you can show today's books, not that last month's books are the same books you reviewed.</div>
-<div class="card card--clay"><strong>Software that taxes your seat</strong>QuickBooks caps users at every tier, so adding the accountant can force the client up a plan. QuickBooks, Xero and FreshBooks all raised prices in 2026.</div>
-</div>
-
-<p class="fine">What you care about, in our reading: clean reconciliation to Stripe; exports to QuickBooks, Xero, hledger and CSV; an audit trail; fewer client emails; recurring revenue.</p>
-
-::: {.notes}
-Sources: `docs/brand/trifold-brand-and-messaging.md`, "Ideal customer profiles", 4 (bookkeeper or CPA partner: serves 10–100 small businesses; cares about clean reconciliation to Stripe, exports to QuickBooks, Xero, hledger and CSV, an audit trail, fewer client emails, recurring revenue); `docs/business/business-plan.md` §2 (manual close; books changed quietly); `docs/business/market-research.md` §2 and §3 points 1–2 (price rises in 2026; QuickBooks user caps 1 / 3 / 5 / 25, "a school that adds its CPA or a second admin has to upgrade").
-:::
-
-{{< include ../_partials/_how.qmd >}}
-
-## Provable books: what you can check {#provable-books}
-
-<span class="kicker">Review</span>
-
-<div class="cards cards--2">
-<div class="card card--green"><strong><span class="tag tag--built">Built</span> In tfd today</strong>
-<ul>
-<li>Every number traces to an event; balances replay from the events and must come out the same</li>
-<li>Postings balance to zero in each currency, or the event is refused</li>
-<li>Reconciliation against Stripe on request (<code>tfd reconcile</code>)</li>
-<li>Journals hledger reads; exports to hledger and CSV</li>
-<li>Signed receipts and chained month seals, checked with <code>tfd verify</code></li>
-</ul></div>
-<div class="card card--ink"><strong><span class="tag tag--next">Next</span> With the hosted service</strong>
-<ul>
-<li>Free firm seats on every client's books, read-only or with roles</li>
-<li>Managed QuickBooks and Xero sync</li>
-<li>Scheduled monthly close and a CPA package</li>
-<li>Daily Stripe matching, and a hash chain over every event</li>
-<li>The auditor portal, with the Witnessed plan</li>
-</ul></div>
+<div class="card card--clay"><h3>Rebuilding every month</h3><p>Matching Stripe payouts to charges by hand, and chasing clients by email.</p></div>
+<div class="card card--clay"><h3>No proof of what didn't change</h3><p>You can show today's books, not that they match what you reviewed.</p></div>
+<div class="card card--clay"><h3>Seats cost your clients</h3><p>QuickBooks caps users, so adding you can force a client up a plan.</p></div>
 </div>
 
 ::: {.notes}
-Sources: `docs/brand/trifold-brand-and-messaging.md`, "What exists and what is to build" (replay, `src/ledger/replay.ts`; balance check, `src/ledger/validate.ts`; hledger-readable journals; a 2026-11-07 status note on each step) and ICP 4 ("Proof": a year-end package, every number traced to an event, a read-only partner seat, `tfd verify`); `docs/business/business-plan.md` §3 (reconciliation on demand, `tfd reconcile`, released; daily matching milestone 3 and the per-event chain milestone 2 not built); `docs/business/pricing-strategy.md` §6 (features by tier: CSV and hledger export in Community; managed QuickBooks/Xero sync in Starter and Pro; scheduled close and CPA package in Pro; auditor role in Witnessed) and §4c (firm seats free and unlimited). Hosted service not built.
+Sources: `docs/brand/trifold-brand-and-messaging.md`, "Ideal customer profiles" 4 (bookkeeper or CPA partner serving 10–100 small businesses; cares about clean reconciliation to Stripe, exports, an audit trail, fewer client emails, recurring revenue); `docs/business/business-plan.md` §2 (manual close; books changed quietly); `docs/business/market-research.md` §2 and §3 point 2 (QuickBooks user caps 1 / 3 / 5 / 25: "a school that adds its CPA or a second admin has to upgrade").
 :::
 
-{{< include ../_partials/_receipts.qmd >}}
+## Trifold grows through accounting firms: three tiers, no referral fees {#firm-tiers}
 
-## The firm program: Trifold for Firms {#firm-program}
+<span class="kicker">The firm program · the main channel · proposed</span>
 
-<span class="kicker">Tiers by active paying clients · proposed</span>
+<div class="tiers">
+<div class="tier"><span class="riser">1 client</span><div class="tread"><h3>Listed</h3><span class="rate">$0</span><p>Free seats; clients get 20% off year one. First 5 firms: co-design partners</p></div></div>
+<div class="tier"><span class="riser">5 clients</span><div class="tread"><h3>Practice</h3><span class="rate">$99/mo</span><p>30% off client plans; one bill; Rifo batch close (next)</p></div></div>
+<div class="tier"><span class="riser">15 clients · later</span><div class="tread"><h3>Practice Pro</h3><span class="rate">$399/mo</span><p>Your prices, wholesale: Pro $49; Audited $99 once it ships</p></div></div>
+</div>
 
-| Tier | Unlocked at | Firm pays | What it gets |
-|-------|--------|--------------|---------------------|
-| Listed | 1 active client | $0 | Free firm seats on every client's books; clients get 20% off their first year; a directory listing. Clients pay Trifold directly |
-| Practice | 5 active clients | $99 a month, plus 30% off each client's plan | One firm bill, a dashboard across clients, books templates, Rifo closing months in a batch |
-| Practice Pro | 15 active clients, or pay to unlock | $399 a month, plus wholesale per client (for example Pro $49, Witnessed $99) | Your own prices and checkout, a branded portal, credit re-billing with your markup, a white-label verify page (badge kept) |
+<p class="fine">The channel: 46,000–52,000 US CPA firms; about 30,700 UK accounting enterprises (sourced).</p>
 
-<p class="assume-note"><span class="tag tag--assume">Assumption</span> Every tier, threshold and price is an assumption to test with design partners. Nothing in the program is built yet: firm accounts come first, then wholesale billing, templates, Connect checkout and the white-label portal.</p>
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Drafts; nothing built yet. Practice Pro opens after about 100 paying clients.</p>
 
 ::: {.notes}
-Source: `docs/business/go-to-market.md` §2, "Firm tiers" (verbatim prices and thresholds), "What carries over from GoHighLevel" (the program is modelled on GoHighLevel's agency model; firms resell hosted Trifold) and "Build order". Header: "Every price and rate here is an assumption... Nothing in this doc is built." The 20% first-year client discount is a placeholder (`docs/business/pricing-strategy.md` §11 item 5).
+Source: `docs/business/go-to-market.md` §2, "Firm tiers" (Listed at 1 active client, $0, free firm seats, clients 20% off their first year, directory listing; Practice at 5, $99/mo + 30% off each client's plan, one firm bill, a dashboard across clients, books templates, Rifo closing months in a batch; Practice Pro at 15 or pay to unlock, $399/mo + wholesale per client, e.g. Pro $49, Witnessed $99 (renamed Audited by the owner, 2026-11-07), the firm's own prices and checkout, branded portal, white-label verify page with the badge kept), "Build order", and the header ("Nothing in this doc is built"). No referral fees: `docs/business/pricing-strategy.md` §4c and go-to-market §3.3. The 20% first-year discount is a placeholder (pricing-strategy §11 item 5). Firm counts: `docs/business/market-research.md` §6.6 (US 46,000–52,000 CPA firms, CPA Trendlines 2024; UK 30,705 accounting and auditing enterprises, SIC 69201, ONS via a secondary compilation; sourced). Owner decision of 2026-11-07: accounting firms are a key enabler; about 5 firms join in Stage A as co-design partners (Listed plus a written agreement), Practice comes in Stage B, Practice Pro in Stage C after about 100 paying clients.
 :::
 
-## What you earn: your own markup {#what-you-earn}
+## You earn your own markup: an example firm keeps about $7,000 a month {#what-you-earn}
 
 <span class="kicker">Economics · illustrative</span>
 
 <div class="cards">
-<div class="card"><strong>No referral fees</strong>Trifold pays accountants no cash and no referral fees. You earn from your own markup on service plus software, the way your practice already works.</div>
-<div class="card card--green"><strong>An example firm</strong>30 schools on Practice Pro, each paying the firm $300 a month for bookkeeping plus software. The firm keeps about <span class="num">$7,000</span> a month for its labor; Trifold earns about <span class="num">$2,050</span> (30 × ~$55 wholesale + $399).</div>
-<div class="card card--ink"><strong>White label stops at the proof</strong>You brand the portal and dashboards. Every receipt keeps its "Verify at trifold…" link, and every witnessed record keeps "Witnessed by Trifold".</div>
+<div class="card"><h3>The example</h3><p>30 schools on Practice Pro, each paying the firm $300 a month for bookkeeping and software.</p></div>
+<div class="card card--green"><span class="big">≈ $7,000</span><p>a month the firm keeps</p></div>
+<div class="card card--ink"><span class="big">≈ $2,050</span><p>a month to Trifold, at about $55 wholesale a client</p></div>
 </div>
 
-<p class="assume-note"><span class="tag tag--assume">Assumption</span> The example uses draft wholesale prices (mostly Pro at $49, a few Witnessed at $99) and an assumed $300 firm fee. It illustrates the shape, not a quote.</p>
+<p class="fine">White label stops at the proof: every receipt keeps its "Verify at trifold…" link. Clients own their books and can leave with them.</p>
 
-<p class="fine">Your clients own their books, and export is never paywalled, so a client can move between firms, or to Trifold directly, with its ledger intact.</p>
-
-::: {.notes}
-Sources: `docs/business/go-to-market.md` §2 ("Example": 30 schools on Practice Pro at $300/mo; average wholesale about $55; Trifold ≈ $2,050/mo; the firm keeps ≈ $7,000/mo; "White label stops at the proof"), §3.3 (accountants get no cash; "the firm earns from its own markup, not from a fee Trifold pays") and §5 (a departing firm: the school owns its books, export never paywalled). No-referral-fee policy: `docs/business/pricing-strategy.md` §4c. "Witnessed by Trifold" only on records with a valid Trifold witness signature (`TRADEMARKS.md`); the witness is not built.
-
-Arithmetic: 30 × $55 = $1,650 + $399 = $2,049. The firm's ≈ $7,000 is the plan's figure (30 × $300 = $9,000 billed, less ~$2,050 to Trifold ≈ $6,950).
-:::
-
-## You stay the professional {#professional}
-
-<span class="kicker">AI, data and support</span>
-
-<div class="cards">
-<div class="card card--green"><strong>"Will AI replace me?" No.</strong>Rifo will draft and you approve; the engine does the math. Approval modes: Off, Ask first (the default), or Auto within limits. <span class="tag tag--next">Next</span></div>
-<div class="card"><strong>Vetted firms only</strong>Firms are vetted on CPA, enrolled-agent or bookkeeper credentials, under binding terms with no income claims.</div>
-<div class="card card--ink"><strong>Student data</strong>A data agreement per firm; a firm sees only the roles the school grants. You handle first-line support, and Trifold supports you.</div>
-</div>
-
-<p class="fine">Trifold prepares the books and never signs or files returns. Filing stays with licensed CPAs and enrolled agents.</p>
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Draft wholesale prices and an assumed $300 fee.</p>
 
 ::: {.notes}
-Sources: `docs/brand/trifold-brand-and-messaging.md`, ICP 4 ("Objection and answer: Will AI replace me? No. The agent prepares and you sign"); `docs/business/pricing-strategy.md` §6 (Rifo approval modes: Off, Ask first (default), Auto within limits; "Rifo drafts, you approve, the engine does the math"); `docs/business/go-to-market.md` §5 (vetting on credentials; a data agreement per firm; first-line support by the firm); `docs/business/business-plan.md` §10 (tax preparation is regulated: Trifold prepares the books, never signs returns). Rifo is not built (AGENTS.md "Claims").
+Source: `docs/business/go-to-market.md` §2 ("Example": 30 schools on Practice Pro at $300/mo; average wholesale about $55, mostly Pro at $49, a few Witnessed (now Audited) at $99; Trifold ≈ 30 × $55 + $399 ≈ $2,050/mo; the firm keeps ≈ $7,000/mo; "White label stops at the proof": the verify link and "Witnessed by Trifold" can't be removed), §3.3 (the firm earns its own markup, not a fee from Trifold), §5 (a departing firm: the school owns its books, export never paywalled). "Witnessed by Trifold" appears only on records with a valid Trifold witness signature (`TRADEMARKS.md`); the witness is not built.
 :::
 
-## Idaho and Utah: the rules on paying accountants {#idaho-utah}
+{{< include ../_partials/_how.qmd >}}
 
-<span class="kicker">Compliance</span>
+## What you can check today, and what hosting adds {#check-today}
 
-| | Idaho (Code §54-218; IDAPA 24.30.01.200) | Utah (Code §58-26a-502) |
-|-----------|--------------------|-------------------|
-| Commission banned when the firm also does | An attest service, or a compilation a third party will use that doesn't disclose a lack of independence | An audit or review; such a compilation; an examination of prospective financial information |
-| For how long | The engagement, plus the period the statements cover | Same |
-| Otherwise | Allowed, with written, clear and conspicuous disclosure of the amount or its basis, before the referral | Allowed: a commission disclosed to the person referred; a referral fee to the client |
-| Also | No contingent fee for preparing a tax return | Same |
-
-<p class="fine">Trifold pays accountants no cash, a choice stricter than either state's law, so none of these disclosures is triggered and your independence stays clean. Not checked yet: enrolled agents (IRS Circular 230), other states, and the AICPA code. Not legal advice.</p>
-
-::: {.notes}
-Source: `docs/business/go-to-market.md` §4, "Paying accountants: what Idaho and Utah allow" (the table nearly verbatim; "a choice stricter than the law"; "Not checked": enrolled agents under Circular 230, states beyond Idaho and Utah (Florida's statute is stricter), AICPA Rule 1.520; a lawyer reviews the affiliate terms, disclosures and FTC wording before launch). Primary sources listed in go-to-market "Sources": Idaho Code §54-218; IDAPA 24.30.01 section 200 (dated 3-28-23); Utah Code §58-26a-502 (last amended 2008).
-:::
-
-## Hosting tfd for many clients {#firms-and-fsl}
-
-<span class="kicker">License · open decision</span>
+<span class="kicker">Review</span>
 
 <div class="cards cards--2">
-<div class="card card--green"><strong>Allowed today</strong>Working on a client's own tfd install. The FSL permits professional services to a licensee, and self-hosting your own books.</div>
-<div class="card card--clay"><strong>Probably not, without permission</strong>One tfd that your firm runs for many clients. That substitutes for Trifold's hosted plans, so it is likely a Competing Use under the FSL.</div>
+<div class="card card--green"><h3><span class="tag tag--built">Built</span> In tfd today</h3>
+<ul>
+<li>Every number traces to a payment, refund or booking</li>
+<li>Balances rebuild from the payments and must match</li>
+<li>Reconcile against Stripe on request</li>
+<li>Journals hledger reads; CSV export</li>
+<li>Receipts and seals: <code>tfd verify</code></li>
+</ul></div>
+<div class="card card--ink"><h3><span class="tag tag--next">Next</span> With hosting</h3>
+<ul>
+<li>Free firm seats on every client's books</li>
+<li>QuickBooks and Xero sync</li>
+<li>Scheduled monthly close</li>
+<li>Daily Stripe matching</li>
+<li>The auditor portal</li>
+</ul></div>
 </div>
 
-<p class="lede">The suggested path: the hosted firm program above, or a written partner agreement on request. Whether to add a grant for firms is undecided, and will be settled before the program launches.</p>
+<p class="fine">Tax packages for your review come later.</p>
 
 ::: {.notes}
-Sources: `docs/business/pricing-strategy.md` §4c, "Firms hosting tfd for their clients: the tradeoffs" (options A–D; suggestion A now with D on request, published as the firm program; any permission lives in a separate written grant, never an edited FSL); `docs/business/go-to-market.md` §2 (self-hosting tfd for many clients remains a Competing Use; the program is option D made public); AGENTS.md "Open licensing items", 2 (decide before the accountant partner program launches).
+Sources: `docs/brand/trifold-brand-and-messaging.md`, "What exists and what is to build" (replay, `src/ledger/replay.ts`; balance check, `src/ledger/validate.ts`; hledger-readable journals) and ICP 4 ("Proof": every number traced to an event, a read-only partner seat, `tfd verify`); `docs/business/business-plan.md` §3 (`tfd reconcile` on demand, released; daily matching milestone 3, not built; tax packages Later); `docs/business/pricing-strategy.md` §6 (Community: CSV and hledger export; Starter and Pro: managed QuickBooks/Xero sync; Pro: scheduled monthly close and CPA package; Witnessed: auditor role) and §4c (firm seats free and unlimited). The hosted service is not built.
+:::
+
+## Rifo will draft and you approve; Trifold never signs returns {#professional}
+
+<span class="kicker">You stay the professional</span>
+
+<div class="cards">
+<div class="card card--green"><h3>AI that asks first</h3><p>Rifo drafts; you approve; the engine does the math. Off, Ask first or Auto within limits. <span class="tag tag--next">next</span></p></div>
+<div class="card"><h3>Vetted firms</h3><p>CPA, enrolled-agent or bookkeeper credentials. No income claims.</p></div>
+<div class="card card--ink"><h3>Student data</h3><p>A data agreement per firm; you see only what the school grants.</p></div>
+</div>
+
+::: {.notes}
+Sources: brand doc ICP 4 ("Will AI replace me? No. The agent prepares and you sign"); `docs/business/pricing-strategy.md` §6 (Rifo approval modes Off, Ask first (default), Auto within limits; "Rifo drafts, you approve, the engine does the math"); `docs/business/go-to-market.md` §5 (vetting on credentials; binding terms; no income claims; a data agreement per firm; firms handle first-line support); `docs/business/business-plan.md` §10 (Trifold prepares the books and never signs returns; filing through licensed CPAs or enrolled agents). Rifo is not built.
+:::
+
+## Idaho and Utah allow referral fees with disclosure; Trifold pays none {#idaho-utah}
+
+<span class="kicker">Compliance · not legal advice</span>
+
+<div class="cards cards--2">
+<div class="card card--clay"><h3>Banned when…</h3><p>The firm also does an audit, review or attest work for that client, or a compilation a third party relies on, during the engagement. No contingent fee for preparing a return.</p></div>
+<div class="card card--green"><h3>Otherwise…</h3><p>Allowed with written disclosure of the amount or its basis, before the referral.</p></div>
+</div>
+
+<p class="fine">Trifold pays accountants no cash, a choice stricter than either state's law, so your independence stays clean.</p>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §4, "Paying accountants: what Idaho and Utah allow". Idaho: Code §54-218 and IDAPA 24.30.01.200 (banned with an attest service, or a compilation a third party will use that doesn't disclose a lack of independence; disclosure in writing, clear and conspicuous, stating the amount or basis, before the referral). Utah: Code §58-26a-502 (banned with an audit or review, such a compilation, or an examination of prospective financial information; a commission disclosed to the person referred, a referral fee to the client). Both: the ban lasts for the engagement plus the period the statements cover; no contingent fee for preparing a tax return. Not checked: enrolled agents (Circular 230), other states (Florida is stricter), AICPA Rule 1.520. A lawyer reviews the terms before launch.
+:::
+
+## Work on a client's own install today; one install for many clients needs an agreement {#firms-and-fsl}
+
+<span class="kicker">License</span>
+
+<div class="cards cards--2">
+<div class="card card--green"><h3>Allowed today</h3><p>Self-hosting tfd for your own books, and working on a client's own install.</p></div>
+<div class="card card--clay"><h3>Needs an agreement</h3><p>One tfd your firm runs for many clients. Use the hosted firm program, or ask for a partner agreement.</p></div>
+</div>
+
+<p class="fine">Whether to add a public grant for firms is undecided; it is settled before the program launches.</p>
+
+::: {.notes}
+Sources: `docs/business/pricing-strategy.md` §4c, "Firms hosting tfd for their clients" (FSL allows professional services on a client's own install; one tfd for many clients is probably a Competing Use; options A–D; suggestion A now with D on request; any permission is a separate written grant, never an edited FSL); `docs/business/go-to-market.md` §2 (the program is option D made public); AGENTS.md "Open licensing items" 2. The engine is FSL-1.1-ALv2 (AGENTS.md "Licensing").
 :::
 
 {{< include ../_partials/_built-next.qmd >}}
 
-## How to start {#start}
+## Be one of the first five firms {#start}
 
 <span class="kicker">Next step</span>
 
 <div class="cards">
-<div class="card"><strong>Be a design-partner firm</strong>The plan's first phase pilots the firm program with about 10 CPA partners in Idaho and Utah.</div>
-<div class="card card--green"><strong>Bring one client</strong>Listed starts at one active client: free seats on their books, 20% off their first year, a directory listing.</div>
-<div class="card card--ink"><strong>Check a receipt</strong>Run <code>tfd verify receipt</code> on a sample, or the browser verifier, and see what a reviewer gets.</div>
+<div class="card"><h3>Co-design it</h3><p>About 5 firms shape the program with the first 10 organizations: Listed, plus a written agreement.</p></div>
+<div class="card card--green"><h3>Bring one client</h3><p>Listed starts at one: free seats, 20% off their first year.</p></div>
+<div class="card card--ink"><h3>Check a receipt</h3><p>Run <code>tfd verify receipt</code> on a sample.</p></div>
 </div>
 
-<div class="placeholder"><strong>Owner to fill in</strong>How a firm signs up for early access: contact, form or calendar link.</div>
+<div class="placeholder"><strong>Owner to fill in</strong>How a firm asks for early access.</div>
 
 ::: {.notes}
-Sources: `docs/business/business-plan.md` §7 (phase 1: CPA partner pilot, ~10 CPA partners); `docs/business/go-to-market.md` §2 (Listed at 1 active client, assumption). The browser verifier exists in the site preview only; don't link the preview from the deck (coordinator's 2026-11-07 note). Placeholder: no contact or sign-up channel is in the docs.
+Owner decision of 2026-11-07: about 5 firms as co-design partners in Stage A. Sources: `docs/business/business-plan.md` §7 (phase 1: CPA partner pilot, about 10 CPA partners); `docs/business/go-to-market.md` §2 (Listed at 1 active client); the deck's go-to-market stages put the first firms in Stage A and the Practice tier in Stage B. Placeholder: no sign-up channel is in the docs; the website preview isn't linked from the deck.
 :::
-
-{{< include ../_partials/_team.qmd >}}
 
 {{< include ../_partials/_paths.qmd >}}
