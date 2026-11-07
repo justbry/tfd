@@ -63,6 +63,10 @@ const esc = (text) =>
 		.replaceAll("<", "&lt;")
 		.replaceAll(">", "&gt;")
 		.replaceAll('"', "&quot;");
+/** The document's owner caption names anonymous donors, which only some orgs take: say it in the org's words, or not at all. */
+const DONORS_NOTE = "Anonymous donors' names show to the owner only.";
+const captionOf = (caption) =>
+	caption.replace(DONORS_NOTE, DATA.anonymousNote).replaceAll("  ", " ");
 const titleOf = (doc, id) =>
 	DATA.titles[id] ?? doc.meta[id]?.title ?? id.replaceAll("_", " ");
 
@@ -305,7 +309,7 @@ const render = () => {
 		return `<div class="tile"><span>${esc(titleOf(doc, id))}</span><b class="${plain ? "" : "h"}">${esc(cellText(cell, meta, symbol))}</b><span>${esc(sub)}</span></div>`;
 	});
 
-	const source = "atm KPI document";
+	const source = "Trifold KPI document";
 	const range = `${labels[0] ?? ""} to ${labels.at(-1) ?? ""} ${year}`;
 	const boxes = [];
 	const rates = singles.filter((id) => doc.meta[id].kind === "rate");
@@ -392,8 +396,8 @@ const render = () => {
 		.map((item) => `${esc(item.reason)}.`)
 		.join(" ");
 	document.getElementById("foot").innerHTML = [
-		`<p><b>Demo, synthetic data.</b> ${esc(DATA.name)} is invented (${esc(DATA.label)}); every name and number is generated. Figures are atm's KPI document for this viewer, built from the simulated events; hatched means hidden for this viewer.</p>`,
-		`<p>${esc(doc.captions[String(year)] ?? "")}</p>`,
+		`<p><b>Demo, synthetic data.</b> ${esc(DATA.name)} is invented (${esc(DATA.label)}); every name and number is generated. Figures are the Trifold KPI document for this viewer, built from the simulated events; hatched means hidden for this viewer.</p>`,
+		`<p>${esc(captionOf(doc.captions[String(year)] ?? ""))}</p>`,
 		notComputed ? `<p>Not computed yet: ${notComputed}</p>` : "",
 		`<p>Preset <code>${esc(current.name)}</code>, seed ${current.seed} · kpis hash <code>${current.kpisHash.slice(0, 12)}</code> · fixture hash <code>${current.fixtureHash.slice(0, 12)}</code> · document sha256 <code>${entry.hash.slice(0, 12)}</code></p>`,
 	].join("");
@@ -433,12 +437,19 @@ const render = () => {
 			tab = button.dataset.t;
 			render();
 		};
+	postHeight();
+};
+
+// ---- Embedded: tell the host page the content's height after each render and whenever the content resizes. The
+// body's height, not the document's, so the page can shrink as well as grow in its frame.
+const postHeight = () => {
 	if (parent !== window)
 		parent.postMessage(
-			{ type: "tfd-demo:height", height: root.scrollHeight },
+			{ type: "tfd-demo:height", height: document.body.scrollHeight },
 			"*",
 		);
 };
+if (parent !== window) new ResizeObserver(postHeight).observe(document.body);
 
 // ---- Theme: ?theme=, else the reader's preference; the button flips it
 const dark = () =>

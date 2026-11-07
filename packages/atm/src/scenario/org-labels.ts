@@ -23,6 +23,13 @@ export type OrgLabels = {
 	presets: Array<{ name: string; label: string }>;
 	/** The title of `mrr`, when the org has its own word for recurring revenue. */
 	recurring?: string;
+	/** A plan's title on the page, where the menu's tier name says more than the plan's income is (by tier id). */
+	planTitles?: Record<string, string>;
+	/**
+	 * What the owner caption says about anonymous names: the KPI document's sentence names donors, which only the school
+	 * and the church take. Absent: the sentence is left out.
+	 */
+	anonymousNote?: string;
 };
 
 export const ORG_LABELS: Record<OrgKind, OrgLabels> = {
@@ -32,6 +39,7 @@ export const ORG_LABELS: Record<OrgKind, OrgLabels> = {
 		plan: { one: "membership", other: "memberships" },
 		credit: { one: "class credit", other: "class credits" },
 		income: "Memberships",
+		anonymousNote: "Anonymous donors' names show to the owner only.",
 		presets: [
 			{ name: "monthly-members", label: "Monthly members" },
 			{ name: "growth-12mo", label: "Growth over 12 months" },
@@ -55,6 +63,13 @@ export const ORG_LABELS: Record<OrgKind, OrgLabels> = {
 		credit: { one: "retreat seat", other: "retreat seats" },
 		income: "Giving",
 		recurring: "Recurring giving",
+		planTitles: {
+			"give-25": "Giving level, $25",
+			"give-50": "Giving level, $50",
+			"give-100": "Giving level, $100",
+			"give-250": "Giving level, $250",
+		},
+		anonymousNote: "Anonymous givers' names show to the owner only.",
 		presets: [{ name: "church-giving", label: "A year of giving" }],
 	},
 	saas: {
@@ -87,7 +102,7 @@ const capitalized = (text: string): string =>
  * titles it.
  */
 export const orgKpiTitles = (kind: OrgKind): Record<string, string> => {
-	const { holder, credit, income, recurring } = ORG_LABELS[kind];
+	const { holder, credit, income, recurring, planTitles } = ORG_LABELS[kind];
 	const credits = capitalized(credit.other);
 	return {
 		...(recurring ? { mrr: recurring } : {}),
@@ -101,7 +116,7 @@ export const orgKpiTitles = (kind: OrgKind): Record<string, string> => {
 		...Object.fromEntries(
 			ORGS[kind].menu.tiers.map((tier) => [
 				`revenue_by_tier:${tier.id}`,
-				tier.name,
+				planTitles?.[tier.id] ?? tier.name,
 			]),
 		),
 	};
