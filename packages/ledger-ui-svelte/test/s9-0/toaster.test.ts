@@ -18,7 +18,7 @@ function renderToaster() {
 	const store = new ToastStore(toasts);
 	const component = mount(Toaster, {
 		target: document.getElementById("target") as HTMLElement,
-		props: { store },
+		props: { store, anchor: null },
 	});
 	cleanup = () => {
 		unmount(component);
@@ -28,28 +28,84 @@ function renderToaster() {
 }
 
 describe("the toaster", () => {
-	test("is a labelled region above dialogs", () => {
+	test("is a labelled region above dialogs, on its usual edge", () => {
 		renderToaster();
 		const region = document.querySelector("[data-test=toasts]");
 		expect(region?.getAttribute("aria-label")).toBe("Notifications");
 		expect(region?.className).toContain("z-(--layer-toast)");
+		expect(region?.getAttribute("data-edge")).toBe("usual");
 	});
-	test("an error is an alert; the rest are status", async () => {
+	test("it moves off the focused control only while a toast covers it", async () => {
 		const { runtime, toasts } = renderToaster();
-		await runtime.runPromise(
+		const control = document.createElement("button");
+		control.getBoundingClientRect = () =>
+			({
+				left: 900,
+				right: 1000,
+				top: 0,
+				bottom: 100,
+				width: 100,
+				height: 100,
+			}) as DOMRect;
+		document.body.append(control);
+		control.focus();
+		flushSync();
+		const region = document.querySelector("[data-test=toasts]");
+		expect(region?.getAttribute("data-edge")).toBe("usual");
+		const id = await runtime.runPromise(
 			toasts.show({ tone: "error", title: "Server failed" }),
+		);
+		flushSync();
+		expect(region?.getAttribute("data-edge")).toBe("other");
+		await runtime.runPromise(toasts.dismiss(id));
+		flushSync();
+		expect(region?.getAttribute("data-edge")).toBe("usual");
+		await runtime.runPromise(toasts.show({ tone: "error", title: "Again" }));
+		control.blur();
+		flushSync();
+		expect(region?.getAttribute("data-edge")).toBe("usual");
+	});
+	test("two live regions exist at mount: an alert for errors, a status for the rest", async () => {
+		const { runtime, toasts } = renderToaster();
+		const assertive = document.querySelector("[data-test=toasts-assertive]");
+		const polite = document.querySelector("[data-test=toasts-polite]");
+		expect(assertive?.getAttribute("role")).toBe("alert");
+		expect(polite?.getAttribute("role")).toBe("status");
+		await runtime.runPromise(
+			toasts.show({
+				tone: "error",
+				title: "Server failed",
+				detail: "Something went wrong on our side.",
+			}),
 		);
 		await runtime.runPromise(toasts.show({ tone: "success", title: "Saved" }));
 		flushSync();
-		const roles = queryAll("[data-test=toast]").map((toast) => [
-			toast.dataset.tone,
+		expect(document.querySelector("[data-test=toasts-assertive]")).toBe(
+			assertive,
+		);
+		expect(textOf("[data-test=toasts-assertive]")).toBe(
+			"Server failed. Something went wrong on our side.",
+		);
+		expect(textOf("[data-test=toasts-polite]")).toBe("Saved");
+		const visibleRoles = queryAll("[data-test=toast]").map((toast) =>
 			toast.getAttribute("role"),
-			toast.getAttribute("aria-live"),
-		]);
-		expect(roles).toEqual([
-			["error", "alert", "assertive"],
-			["success", "status", "polite"],
-		]);
+		);
+		expect(visibleRoles).toEqual([null, null]);
+	});
+	test("a merge is announced again with its count", async () => {
+		const { runtime, toasts } = renderToaster();
+		await runtime.runPromise(
+			toasts.show({ tone: "error", title: "No connection" }),
+		);
+		flushSync();
+		const first = document.querySelector("[data-test=toasts-assertive] p");
+		await runtime.runPromise(
+			toasts.show({ tone: "error", title: "No connection" }),
+		);
+		flushSync();
+		const second = document.querySelector("[data-test=toasts-assertive] p");
+		expect(second).not.toBe(first);
+		expect(second?.textContent).toBe("No connection. 2 times");
 	});
 	test("merged messages show their count", async () => {
 		const { runtime, toasts } = renderToaster();

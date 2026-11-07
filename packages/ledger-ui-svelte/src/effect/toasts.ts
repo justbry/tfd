@@ -20,7 +20,6 @@ export const toastsLayer = Layer.effect(
 	Effect.gen(function* () {
 		const clock = yield* Clock;
 		const state = yield* Ref.make<ToastState>(emptyToastState);
-		let latest: ToastState = emptyToastState;
 		const listeners = new Set<(next: ToastState) => void>();
 		const timers = new Map<string, Fiber.Fiber<void>>();
 
@@ -28,7 +27,6 @@ export const toastsLayer = Layer.effect(
 			Effect.andThen(
 				Ref.set(state, next),
 				Effect.sync(() => {
-					latest = next;
 					for (const listener of listeners) listener(next);
 				}),
 			);
@@ -85,11 +83,10 @@ export const toastsLayer = Layer.effect(
 					if (toast) yield* startTimer(toast);
 				}),
 			dismiss: (id) => Effect.andThen(stopTimer(id), removeNow(id)),
-			state: Ref.get(state),
-			current: () => latest,
+			current: () => Ref.getUnsafe(state),
 			subscribe: (listener) => {
 				listeners.add(listener);
-				listener(latest);
+				listener(Ref.getUnsafe(state));
 				return () => {
 					listeners.delete(listener);
 				};

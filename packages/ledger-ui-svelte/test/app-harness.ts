@@ -43,7 +43,7 @@ export async function openApp(
 	document.documentElement.className = "";
 	window.history.replaceState(null, "", `/${hash}`);
 	const root = document.getElementById("app") as HTMLElement;
-	const clock = manualClock(calendar);
+	const clock = manualClock();
 	const base = fixtureLayer({ calendar, clockLayer: clock.layer });
 	const layer = options.reader
 		? Layer.mergeAll(

@@ -2,7 +2,7 @@ import type { Layer } from "effect";
 import { ManagedRuntime } from "effect";
 import { mount, unmount } from "svelte";
 import type { Clock as CalendarClock } from "$contract/data/types.ts";
-import type { AppServices } from "../effect/layers.ts";
+import type { AppServices } from "../effect/app-layer.ts";
 import { Toasts } from "../effect/services.ts";
 import App from "./App.svelte";
 import { ToastStore } from "./toast-store.svelte.ts";
@@ -26,7 +26,10 @@ export function mountApp(
 	root.classList.add("app");
 	const app = mount(App, {
 		target: root,
-		props: { root, context: { runtime, toasts, calendar: options.calendar } },
+		props: {
+			root,
+			context: { root, runtime, toasts, calendar: options.calendar },
+		},
 	});
 	return {
 		runtime,

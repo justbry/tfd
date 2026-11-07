@@ -1,4 +1,3 @@
-import type { AdapterErrorKind } from "$contract/http/errors.ts";
 import type { UiError, UiErrorDetail, UiErrorKind } from "./ui-error.ts";
 
 /** The server codes the message table answers on their own, ahead of the kind they arrive as (S9-plan section 5). */
@@ -12,34 +11,6 @@ export const serverCodes = [
 	"stripe_permission_missing",
 ] as const;
 export type ServerCode = (typeof serverCodes)[number];
-
-/** Every `AdapterErrorKind`, listed so that a test can prove the table has each one: `satisfies` fails the build
- * when the contract gains a kind this list lacks. */
-export const adapterErrorKinds = [
-	"step_up",
-	"pin_required",
-	"pin_wrong",
-	"pin_locked",
-	"unauthenticated",
-	"forbidden",
-	"not_found",
-	"no_data",
-	"conflict",
-	"rate_limited",
-	"bad_request",
-	"unavailable",
-	"server",
-	"network",
-	"schema_mismatch",
-	"not_available",
-	"not_connected",
-] as const satisfies readonly AdapterErrorKind[];
-type MissingKind = Exclude<
-	AdapterErrorKind,
-	(typeof adapterErrorKinds)[number]
->;
-/** A compile-time proof that `adapterErrorKinds` lists every kind: `never` when it does. */
-const everyKindListed: MissingKind extends never ? true : MissingKind = true;
 
 /** What a toast's button does. The toaster owns the label; the caller supplies the effect for `retry` and `reload`. */
 export type MessageAction =
@@ -99,7 +70,8 @@ const problemCount = ({ problems }: UiErrorDetail): string => {
 	return `${count} field${count === 1 ? " needs" : "s need"} a change.`;
 };
 
-/** One entry per adapter kind and `unexpected`. */
+/** One entry per adapter kind and `unexpected`: the type fails the build when the contract gains a kind this table
+ * lacks. */
 export const kindMessages: Record<UiErrorKind, MessageEntry> = {
 	step_up: {
 		title: "Confirm it is you",
@@ -165,7 +137,7 @@ export const kindMessages: Record<UiErrorKind, MessageEntry> = {
 	},
 	unavailable: {
 		title: "The ledger is catching up",
-		what: "The ledger is catching up. Try again in a minute.",
+		what: "Try again in a minute.",
 		doThis: "Retry sends the same request again; nothing is done twice.",
 		action: "retry",
 	},
@@ -260,5 +232,3 @@ export function messageFor(error: UiError): Message {
 		...(entry.action ? { action: entry.action } : {}),
 	};
 }
-
-export { everyKindListed };

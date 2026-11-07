@@ -4,13 +4,18 @@
 	import Icon from "../Icon.svelte";
 	import type { IconName } from "../icons.ts";
 	import type { ToastStore } from "../toast-store.svelte.ts";
+	import { type Box, edgeFor, positionStyle, usualBox } from "./placement.ts";
 
-	/** The toast region (S9-plan section 5): top right on wide screens, along the bottom on narrow ones, above
-	 * dialogs (`--layer-toast`). When the focused control sits under the region, the region moves to the other edge
-	 * so that it never covers it. Errors are `role=alert`, the rest `role=status`; each toast's action and Dismiss
-	 * are ordinary buttons in the tab order. */
-	let { store }: { store: ToastStore } = $props();
+	/** The toast stack (S9-plan section 5). Two live regions exist from mount: `role=alert` (assertive) announces
+	 * errors, `role=status` (polite) the rest, each line re-announced when a merge bumps its count; the visible toasts
+	 * are plain content with ordinary buttons for their action and Dismiss. Top right below the top bar on wide
+	 * screens, along the bottom on narrow ones, above dialogs (`--layer-toast`); while a toast covers the focused
+	 * control the stack takes the other edge (placement.ts). */
+	let { store, anchor }: { store: ToastStore; anchor: HTMLElement | null } =
+		$props();
 
+	const gap = 8;
+	const fallbackTop = 12;
 	const toneIcons: Record<Toast["tone"], IconName> = {
 		error: "alert",
 		warning: "alert",
@@ -25,51 +30,92 @@
 	};
 
 	let region: HTMLElement | undefined = $state();
-	/** The region has moved off its usual edge to keep clear of the focused control. */
-	let moved = $state(false);
+	let regionHeight = $state(0);
+	let viewport = $state({ width: 0, height: 0 });
+	let top = $state(fallbackTop);
+	let focused = $state<Box | null>(null);
 
-	const overlaps = (first: DOMRect, second: DOMRect): boolean =>
-		first.left < second.right &&
-		second.left < first.right &&
-		first.top < second.bottom &&
-		second.top < first.bottom;
+	const visible = $derived(store.state.visible);
+	const edge = $derived(
+		edgeFor({
+			toastCount: visible.length,
+			focused,
+			usual: usualBox(viewport, regionHeight, top),
+		}),
+	);
+	const announce = (toast: Toast): string =>
+		[toast.title, toast.detail, toast.doThis, toast.count > 1 ? `${toast.count} times` : ""]
+			.filter(Boolean)
+			.join(". ");
+
+	const boxOf = (element: Element): Box => {
+		const { left, top: boxTop, right, bottom } = element.getBoundingClientRect();
+		return { left, top: boxTop, right, bottom };
+	};
+	const measure = (): void => {
+		viewport = { width: window.innerWidth, height: window.innerHeight };
+		top = anchor ? Math.max(gap, anchor.getBoundingClientRect().bottom + gap) : fallbackTop;
+		const active = document.activeElement;
+		focused =
+			active instanceof Element && active !== document.body && !region?.contains(active)
+				? boxOf(active)
+				: null;
+	};
+
+	$effect(() => {
+		// The anchor appears once the shell renders, and the stack's height changes with its toasts.
+		void anchor;
+		void visible.length;
+		measure();
+	});
 
 	onMount(() => {
-		const onFocus = (event: FocusEvent): void => {
-			const focused = event.target;
-			if (!region || !(focused instanceof Element) || region.contains(focused))
-				return;
-			if (
-				overlaps(focused.getBoundingClientRect(), region.getBoundingClientRect())
-			)
-				moved = !moved;
+		const onFocusIn = (event: FocusEvent): void => {
+			const target = event.target;
+			if (!(target instanceof Element) || region?.contains(target)) return;
+			focused = boxOf(target);
 		};
-		document.addEventListener("focusin", onFocus);
-		return () => document.removeEventListener("focusin", onFocus);
+		const onFocusOut = (event: FocusEvent): void => {
+			if (event.relatedTarget === null) focused = null;
+		};
+		document.addEventListener("focusin", onFocusIn);
+		document.addEventListener("focusout", onFocusOut);
+		window.addEventListener("resize", measure);
+		window.addEventListener("scroll", measure, true);
+		return () => {
+			document.removeEventListener("focusin", onFocusIn);
+			document.removeEventListener("focusout", onFocusOut);
+			window.removeEventListener("resize", measure);
+			window.removeEventListener("scroll", measure, true);
+		};
 	});
 </script>
 
 <section
 	bind:this={region}
+	bind:clientHeight={regionHeight}
 	aria-label="Notifications"
 	data-test="toasts"
-	data-moved={moved ? "true" : undefined}
-	class={[
-		"pointer-events-none fixed z-(--layer-toast) flex w-[360px] max-w-[calc(100vw-16px)] flex-col gap-2",
-		moved
-			? "bottom-3 right-3 max-[600px]:inset-x-2 max-[600px]:top-2 max-[600px]:bottom-auto max-[600px]:w-auto"
-			: "top-3 right-3 max-[600px]:inset-x-2 max-[600px]:top-auto max-[600px]:bottom-2 max-[600px]:w-auto",
-	]}
+	data-edge={edge}
+	class="pointer-events-none fixed z-(--layer-toast) flex max-w-[calc(100vw-16px)] flex-col gap-2"
+	style={positionStyle(edge, viewport.width, top)}
 >
-	{#each store.state.visible as toast (toast.id)}
+	<div class="sr-only" role="alert" data-test="toasts-assertive">
+		{#each visible.filter((toast) => toast.tone === "error") as toast (`${toast.id}-${toast.count}`)}
+			<p>{announce(toast)}</p>
+		{/each}
+	</div>
+	<div class="sr-only" role="status" data-test="toasts-polite">
+		{#each visible.filter((toast) => toast.tone !== "error") as toast (`${toast.id}-${toast.count}`)}
+			<p>{announce(toast)}</p>
+		{/each}
+	</div>
+	{#each visible as toast (toast.id)}
 		<div
-			role={toast.tone === "error" ? "alert" : "status"}
-			aria-live={toast.tone === "error" ? "assertive" : "polite"}
-			aria-atomic="true"
 			data-test="toast"
 			data-tone={toast.tone}
 			class={[
-				"pointer-events-auto flex items-start gap-2 rounded-lg border-l-[3px] bg-foreground px-3 py-2 text-background shadow-toast",
+				"pointer-events-auto flex items-start gap-2 rounded-lg border-l-[3px] bg-foreground px-3 py-2 text-background shadow-[0_8px_24px_rgba(0,0,0,0.3)]",
 				toneStripes[toast.tone],
 			]}
 		>
@@ -118,7 +164,6 @@
 		<div
 			class="pointer-events-auto self-end rounded-4xl bg-foreground px-2 py-0.5 text-[10px] text-background"
 			data-test="toasts-waiting"
-			role="status"
 		>
 			{store.state.waiting.length} more waiting
 		</div>

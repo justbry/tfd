@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AdapterError } from "$contract/http/errors.ts";
 import {
-	adapterErrorKinds,
 	codeMessages,
 	kindMessages,
 	messageFor,
@@ -30,9 +29,6 @@ describe("the message table", () => {
 	test("every AdapterErrorKind of the contract has an entry", () => {
 		const missing = contractKinds().filter((kind) => !(kind in kindMessages));
 		expect(missing).toEqual([]);
-		expect([...adapterErrorKinds].sort() as string[]).toEqual(
-			contractKinds().sort(),
-		);
 	});
 	test("unexpected has an entry", () => {
 		expect(kindMessages.unexpected.title).toBeTruthy();
@@ -64,9 +60,8 @@ describe("the message table", () => {
 		const message = messageFor(
 			toUiError(new AdapterError("unavailable", "503", { status: 503 })),
 		);
-		expect(message.what).toBe(
-			"The ledger is catching up. Try again in a minute.",
-		);
+		expect(message.title).toBe("The ledger is catching up");
+		expect(message.what).toBe("Try again in a minute.");
 		expect(message.action).toBe("retry");
 	});
 	test("a server code wins over its kind", () => {

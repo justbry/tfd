@@ -11,7 +11,7 @@ import {
 	toUiError,
 	UiError,
 } from "../../src/effect/ui-error.ts";
-import { calendar, fixtureRuntime } from "../helpers.ts";
+import { fixtureRuntime } from "../helpers.ts";
 
 const logRuntime = () => ManagedRuntime.make(memoryLogLayer);
 
@@ -116,7 +116,6 @@ describe("the layers", () => {
 			storage: memoryStorage(),
 			newKey: () => "key-1",
 			files: { save: () => Promise.resolve() },
-			calendar,
 		});
 		const failed = await ManagedRuntime.make(layer).runPromise(
 			Effect.flip(read((reader) => reader.schools())),

@@ -56,8 +56,6 @@ const sameMessage = (toast: Toast, input: ToastInput): boolean =>
 export type Added = {
 	state: ToastState;
 	id: string;
-	/** The toast it joined, when it merged into one already there. */
-	merged: boolean;
 	/** It is on screen now (not waiting). */
 	shown: boolean;
 };
@@ -78,7 +76,6 @@ export function addToast(state: ToastState, input: ToastInput): Added {
 		return {
 			state: { ...state, visible: state.visible.map(bump) },
 			id: shownMatch.id,
-			merged: true,
 			shown: true,
 		};
 	const waitingMatch = state.waiting.find((toast) => sameMessage(toast, input));
@@ -86,7 +83,6 @@ export function addToast(state: ToastState, input: ToastInput): Added {
 		return {
 			state: { ...state, waiting: state.waiting.map(bump) },
 			id: waitingMatch.id,
-			merged: true,
 			shown: false,
 		};
 	const toast: Toast = { ...input, id: `toast-${state.nextNumber}`, count: 1 };
@@ -95,13 +91,11 @@ export function addToast(state: ToastState, input: ToastInput): Added {
 		return {
 			state: { ...state, visible: [...state.visible, toast], nextNumber },
 			id: toast.id,
-			merged: false,
 			shown: true,
 		};
 	return {
 		state: { ...state, waiting: [...state.waiting, toast], nextNumber },
 		id: toast.id,
-		merged: false,
 		shown: false,
 	};
 }

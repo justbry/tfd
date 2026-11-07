@@ -55,7 +55,6 @@ export function mountHttpApp(
 			storage: pendingStorage(),
 			newKey: () => crypto.randomUUID(),
 			files: browserFileSaver(root.ownerDocument),
-			calendar,
 		}),
 	});
 }

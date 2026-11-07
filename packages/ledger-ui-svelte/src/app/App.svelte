@@ -25,9 +25,13 @@
 	let hash = $state(window.location.hash);
 	let schools = $state<School[] | null>(null);
 	let failure = $state<UiError | null>(null);
+	/** A schools read is on its way: a failed one stays on screen, its Retry busy, until the retry resolves. */
+	let loading = $state(false);
+	let topBar = $state<HTMLElement | null>(null);
 
 	const loadSchools = async (): Promise<void> => {
-		failure = null;
+		if (loading) return;
+		loading = true;
 		const outcome = await perform(
 			context,
 			withRetry(
@@ -36,8 +40,11 @@
 			),
 			{ retry: loadSchools, reload: () => window.location.reload() },
 		);
-		if (outcome.ok) schools = outcome.value;
-		else failure = outcome.error;
+		loading = false;
+		if (outcome.ok) {
+			schools = outcome.value;
+			failure = null;
+		} else failure = outcome.error;
 	};
 
 	onMount(() => {
@@ -77,8 +84,8 @@
 </script>
 
 {#if failure}
-	<LoadFailed error={failure} onRetry={loadSchools} />
+	<LoadFailed error={failure} onRetry={loadSchools} busy={loading} />
 {:else if schools}
-	<Shell {route} {schools} {navigate} />
+	<Shell {route} {schools} {navigate} bind:topBar />
 {/if}
-<Toaster store={context.toasts} />
+<Toaster store={context.toasts} anchor={topBar} />

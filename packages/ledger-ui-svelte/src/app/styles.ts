@@ -9,10 +9,8 @@ export const popoverRule = "my-1 border-0 border-t border-border";
 
 /** The mockup's badges (`.badge`, `.b-warn`, `.b-bad`). */
 export const badgeTones = {
-	plain: "border-border text-muted-foreground",
 	warning: "border-warning text-warning",
 	bad: "border-destructive text-destructive",
-	good: "border-success text-success",
 } as const;
 export const mockBadge =
 	"h-auto gap-0 rounded-4xl border bg-transparent px-1.5 py-px text-[10px] font-normal leading-normal";

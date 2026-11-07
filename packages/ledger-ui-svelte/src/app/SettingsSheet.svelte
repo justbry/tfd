@@ -9,6 +9,7 @@
 	 * the gear button. */
 	let {
 		open = $bindable(),
+		root,
 		top,
 		subtitle,
 		allSchools,
@@ -16,6 +17,9 @@
 		onThemeChange,
 	}: {
 		open: boolean;
+		/** The app's frame: the sheet is drawn inside it, so its rounded corner and border bound the sheet as they
+		 * bound the mockup's absolute drawer. */
+		root: HTMLElement;
 		/** Where the top bar ends: the sheet hangs below it, as the mockup's drawer does. */
 		top: number;
 		subtitle: string;
@@ -34,9 +38,10 @@
 <Sheet.Root bind:open>
 	<Sheet.Content
 		side="right"
-		class="z-(--layer-sheet) gap-0 data-[side=right]:w-[68%] max-[600px]:data-[side=right]:w-[94%] border-t border-l border-border bg-card p-3.5 text-[12px] text-foreground shadow-[-12px_0_30px_rgba(0,0,0,0.25)] data-[side=right]:h-auto data-[side=right]:sm:max-w-none"
+		portalProps={{ to: root }}
+		class="absolute z-(--layer-sheet) gap-0 data-[side=right]:w-[68%] max-[600px]:data-[side=right]:w-[94%] border-t border-l border-border bg-card p-3.5 text-[12px] text-foreground shadow-[-12px_0_30px_rgba(0,0,0,0.25)] data-[side=right]:h-auto data-[side=right]:sm:max-w-none"
 		style={`top: ${top}px`}
-		overlayClass="z-(--layer-sheet) bg-transparent supports-backdrop-filter:backdrop-blur-none"
+		overlayClass="absolute z-(--layer-sheet) bg-transparent supports-backdrop-filter:backdrop-blur-none"
 		data-test="settings"
 	>
 		<Sheet.Header class="gap-0.5 p-0">

@@ -136,7 +136,7 @@
 				placeholder="Find a school"
 				aria-label="Find a school"
 				aria-controls={listboxId}
-				class="h-auto w-full rounded-md border-border bg-card px-2 py-1 text-[12px] shadow-none md:text-[12px]"
+				class="h-auto w-[150px] rounded-md border-border bg-card px-2 py-1 text-[12px] shadow-none md:text-[12px] focus-visible:border-border focus-visible:ring-0 focus-visible:[outline:-webkit-focus-ring-color_auto_1px]"
 				bind:value={search}
 				onkeydown={onSearchKeyDown}
 			/>

@@ -19,7 +19,7 @@ export const mayRetry = (error: UiError, attempted: Attempted): boolean =>
 	(attempted.kind === "read" || Boolean(attempted.idempotencyKey));
 
 /** Exponential backoff with jitter: each wait about twice the last, each moved by up to a fifth either way. */
-export const retrySchedule = (baseMilliseconds: number) =>
+const retrySchedule = (baseMilliseconds: number) =>
 	Schedule.jittered(Schedule.exponential(baseMilliseconds));
 
 export const retryingText = (attempt: number): string =>

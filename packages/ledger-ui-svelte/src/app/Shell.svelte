@@ -7,14 +7,17 @@
 		themeOf,
 		withQuery,
 	} from "$contract/app/route.ts";
+	import { type Disclosure, resolveViewAs } from "$contract/data/disclosure.ts";
 	import type { School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import * as Tabs from "$lib/components/ui/tabs/index.ts";
+	import { withRetry } from "../effect/retry.ts";
+	import { read } from "../effect/run.ts";
 	import { Toasts } from "../effect/services.ts";
 	import type { ToastInput } from "../effect/toast-model.ts";
 	import { toUiError } from "../effect/ui-error.ts";
 	import AllSchools from "./AllSchools.svelte";
-	import { useApp } from "./context.ts";
+	import { perform, useApp } from "./context.ts";
 	import EmptyPane from "./EmptyPane.svelte";
 	import Icon from "./Icon.svelte";
 	import LoadFailed from "./LoadFailed.svelte";
@@ -28,8 +31,14 @@
 		route,
 		schools,
 		navigate,
-	}: { route: Route; schools: School[]; navigate: (route: Route) => void } =
-		$props();
+		topBar = $bindable(null),
+	}: {
+		route: Route;
+		schools: School[];
+		navigate: (route: Route) => void;
+		/** The top bar's element, for the toast stack that sits below it. */
+		topBar?: HTMLElement | null;
+	} = $props();
 
 	const app = useApp();
 	const { today } = app.calendar;
@@ -51,6 +60,32 @@
 		shownPeriod(route.query.get("month"), today, route.tab, school),
 	);
 	const theme = $derived(themeOf(route.query));
+
+	/** The school's disclosure, for the period note of the viewer's own audience (mockup `renderPP`'s sub-line).
+	 * View as and the audience's period limits arrive with S9.1. */
+	let disclosure = $state<Disclosure | null>(null);
+	$effect(() => {
+		const schoolId = school?.id;
+		if (!schoolId) return;
+		let current = true;
+		perform(
+			app,
+			withRetry(
+				read((reader) => reader.disclosure(schoolId)),
+				{ kind: "read" },
+			),
+		).then((outcome) => {
+			if (current && outcome.ok) disclosure = outcome.value;
+		});
+		return () => {
+			current = false;
+		};
+	});
+	const periodNote = $derived.by(() => {
+		if (!school || disclosure?.school !== school.id) return null;
+		const { option } = resolveViewAs(null, disclosure);
+		return disclosure.views[option.audience]?.periodNote ?? null;
+	});
 
 	/** Each school's last tab, in memory only (mockup `s.last`). */
 	const lastTabs: Record<string, SchoolTab> = {};
@@ -82,13 +117,14 @@
 		"h-auto flex-none gap-0.5 rounded-none border-0 border-b-2 border-transparent px-2.5 py-2 text-[12px] font-normal text-muted-foreground shadow-none after:hidden hover:text-foreground data-active:border-primary data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:border-primary dark:data-active:bg-transparent [&_svg:not([class*='size-'])]:size-3.5 [&>svg]:mr-1";
 </script>
 
-<div bind:clientHeight={topBarHeight}>
+<div bind:this={topBar} bind:clientHeight={topBarHeight}>
 <TopBar
 	{route}
 	{schools}
 	{school}
 	{today}
 	{period}
+	{periodNote}
 	{settingsOpen}
 	onNavigate={navigate}
 	onChooseSchool={chooseSchool}
@@ -150,6 +186,7 @@
 	{#await settingsSheet then { default: SettingsSheet }}
 		<SettingsSheet
 			bind:open={settingsOpen}
+			root={app.root}
 			top={topBarHeight}
 			subtitle={school ? `You and ${school.name}` : "All schools"}
 			allSchools={!school}

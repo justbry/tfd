@@ -22,6 +22,7 @@
 	let {
 		period,
 		today,
+		note,
 		changed,
 		compare,
 		timeZoneNote,
@@ -30,6 +31,8 @@
 	}: {
 		period: Period;
 		today: string;
+		/** The viewed audience's note on what it may pick, under the period's name. */
+		note: string | null;
 		/** The route names a period other than the default: the button shows the dot. */
 		changed: boolean;
 		compare: boolean;
@@ -132,6 +135,9 @@
 				<Icon name="chevronRight" />
 			</Button>
 		</div>
+		{#if note}
+			<div class="px-2 pb-1 text-center text-[10.5px] text-muted-foreground" data-test="period-note">{note}</div>
+		{/if}
 		<hr class={popoverRule} />
 		{#each presets as preset (preset.label)}
 			<button
@@ -161,7 +167,6 @@
 				<Input
 					type="date"
 					aria-label="To"
-					max={today}
 					bind:value={to}
 					aria-invalid={problem !== "" ? "true" : undefined}
 					aria-describedby={`${panelId}-problem`}

@@ -1,6 +1,5 @@
 import { Context, type Effect } from "effect";
 import type { Reader as ReaderContract } from "$contract/data/reader.ts";
-import type { Clock as CalendarClock } from "$contract/data/types.ts";
 import type { Writer as WriterContract } from "$contract/data/writer.ts";
 import type { ToastInput, ToastPatch, ToastState } from "./toast-model.ts";
 
@@ -15,14 +14,11 @@ export class Writer extends Context.Service<Writer, WriterContract>()(
 	"ledger-ui-svelte/Writer",
 ) {}
 
-/** The UI's clock (protocol §3: the UI never reads the system time): the calendar the entry supplies, and the
- * waits the toasts and retries use, so that a test can move time by hand. */
+/** The toasts' clock: the wait before a success or info toast leaves, so that a test can move it by hand. The
+ * calendar (today, now) is the app context's, from the entry; retries back off on Effect's own clock. */
 export class Clock extends Context.Service<
 	Clock,
-	{
-		readonly calendar: CalendarClock;
-		readonly sleep: (milliseconds: number) => Effect.Effect<void>;
-	}
+	{ readonly sleep: (milliseconds: number) => Effect.Effect<void> }
 >()("ledger-ui-svelte/Clock") {}
 
 /** The toast queue (section 5). `subscribe` and `current` are the synchronous edge the Svelte rune store reads. */
@@ -32,7 +28,6 @@ export class Toasts extends Context.Service<
 		readonly show: (toast: ToastInput) => Effect.Effect<string>;
 		readonly update: (id: string, patch: ToastPatch) => Effect.Effect<void>;
 		readonly dismiss: (id: string) => Effect.Effect<void>;
-		readonly state: Effect.Effect<ToastState>;
 		readonly current: () => ToastState;
 		readonly subscribe: (listener: (state: ToastState) => void) => () => void;
 	}

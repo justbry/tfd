@@ -111,6 +111,18 @@ describe("the shell", () => {
 		);
 		expect(textOf("[data-test=period-word]")).toBe("Month");
 	});
+	test("the period panel carries the viewer's audience note and lets the end pass today", async () => {
+		await open("#/vol/plans");
+		click("[data-test=period-button]");
+		await until(
+			() => query("[data-test=period-note]") !== null,
+			"the period note",
+		);
+		expect(textOf("[data-test=period-note]")).toBe(
+			"Owner: months and days, live. One period for Dashboard, Reports, Ledger and Members.",
+		);
+		expect(query("input[aria-label=To]")?.hasAttribute("max")).toBe(false);
+	});
 	test("the theme comes from the route and sits on <html>", async () => {
 		await open("#/vol/plans?theme=dark");
 		expect(document.documentElement.className).toBe("dark");
@@ -173,6 +185,10 @@ describe("the shell", () => {
 describe("a failed schools read", () => {
 	test("shows the message in place and in an alert toast, and Retry reads again", async () => {
 		let calls = 0;
+		let release = (): void => undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
 		const { root } = await open("#/vol/plans", {
 			waitForRoute: false,
 			reader: (fixture) => ({
@@ -183,18 +199,25 @@ describe("a failed schools read", () => {
 						? Promise.reject(
 								new AdapterError("not_found", "404", { status: 404 }),
 							)
-						: fixture.schools();
+						: held.then(() => fixture.schools());
 				},
 			}),
 		});
 		await until(() => query("[data-test=load-failed]") !== null, "the failure");
 		expect(textOf("[data-test=load-failed]")).toContain("Not found");
-		const alert = query("[data-test=toast]");
-		expect(alert?.getAttribute("role")).toBe("alert");
+		expect(textOf("[data-test=toasts-assertive]")).toContain("Not found");
 		expect(textOf("[data-test=toast-title]")).toBe("Not found");
 		expect(textOf("[data-test=toast-action]")).toBe("Reload");
 		click("[data-test=load-retry]");
+		// While the retry is on its way the failure stays on screen, its Retry busy.
+		expect(query("[data-test=load-failed]")).not.toBeNull();
+		expect(textOf("[data-test=load-retry]")).toBe("Retrying…");
+		expect(query<HTMLButtonElement>("[data-test=load-retry]")?.disabled).toBe(
+			true,
+		);
+		release();
 		await until(() => root.dataset.route === "#/vol/plans", "the retried read");
+		expect(query("[data-test=load-failed]")).toBeNull();
 		expect(calls).toBe(2);
 	});
 });

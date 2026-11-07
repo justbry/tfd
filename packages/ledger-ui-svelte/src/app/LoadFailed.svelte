@@ -5,8 +5,13 @@
 	import Icon from "./Icon.svelte";
 
 	/** A read that failed, in place of what it would have shown (never an empty table): the message table's text,
-	 * the same as the toast's, and Retry when the screen offers it. */
-	let { error, onRetry }: { error: UiError; onRetry?: () => void } = $props();
+	 * the same as the toast's, and Retry when the screen offers it. While a retry is on its way (`busy`) the message
+	 * stays and Retry says so. */
+	let {
+		error,
+		onRetry,
+		busy = false,
+	}: { error: UiError; onRetry?: () => void; busy?: boolean } = $props();
 	const message = $derived(messageFor(error));
 </script>
 
@@ -21,8 +26,16 @@
 		<span>{message.what}</span>
 		<span class="text-muted-foreground">{message.doThis}</span>
 		{#if onRetry}
-			<Button variant="tool" size="tool-small" class="mt-1 self-start" data-test="load-retry" onclick={onRetry}>
-				Retry
+			<Button
+				variant="tool"
+				size="tool-small"
+				class="mt-1 self-start"
+				data-test="load-retry"
+				disabled={busy}
+				aria-busy={busy}
+				onclick={onRetry}
+			>
+				{busy ? "Retrying…" : "Retry"}
 			</Button>
 		{/if}
 	</div>

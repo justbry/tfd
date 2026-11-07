@@ -11,7 +11,7 @@ const warningKinds: ReadonlySet<UiErrorKind> = new Set([
 	"not_connected",
 ]);
 
-export const toneOf = (error: UiError): ToastTone =>
+const toneOf = (error: UiError): ToastTone =>
 	warningKinds.has(error.kind) ? "warning" : "error";
 
 /** What the screen can do for each action; a toast shows the message's action only when the screen gave it. */

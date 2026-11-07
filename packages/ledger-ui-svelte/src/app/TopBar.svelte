@@ -19,6 +19,7 @@
 		school,
 		today,
 		period,
+		periodNote,
 		settingsOpen,
 		onNavigate,
 		onChooseSchool,
@@ -30,6 +31,8 @@
 		school: School | undefined;
 		today: string;
 		period: Period;
+		/** The viewer's audience's note under the period's name; null on All schools and until it loads. */
+		periodNote: string | null;
 		settingsOpen: boolean;
 		onNavigate: (route: Route) => void;
 		onChooseSchool: (schoolId: string) => void;
@@ -50,6 +53,7 @@
 		<PeriodControl
 			{period}
 			{today}
+			note={periodNote}
 			changed={route.query.has("month")}
 			compare={route.query.get("compare") === "1"}
 			timeZoneNote={school ? `Times in ${school.timeZone}` : "Each school's own time zone"}
