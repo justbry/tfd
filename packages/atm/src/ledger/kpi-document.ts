@@ -441,6 +441,13 @@ export function kpiDocument(
 			: null;
 	};
 	const figureOf = (id: string, period: Period): number | null => {
+		// A balance at the month's end (rollup `last`): a quarter or a year is its last month with a figure.
+		if (id === "mrr") {
+			const found = period.months
+				.map((month) => monthValue(id, period.year, month))
+				.filter((value): value is number => value !== null);
+			return found.at(-1) ?? null;
+		}
 		if (id === "paying_members") {
 			const found = period.months
 				.map((month) => monthValue(id, period.year, month))
@@ -1033,11 +1040,6 @@ export function kpiDocument(
 		tables,
 		meta,
 		notComputed: [
-			{
-				id: "mrr",
-				reason:
-					"MRR is not computed: cash basis, a yearly payer counts in the month paid",
-			},
 			{ id: "churned_members", reason: "Churn is not computed: cash basis" },
 		],
 		notes,

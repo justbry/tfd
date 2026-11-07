@@ -393,7 +393,7 @@
     },
     "packages/atm": {
       "name": "atm",
-      "version": "0.9.0",
+      "version": "0.10.0",
       "bin": {
         "atm": "./src/atm.ts",
         "tfd": "./src/bin.ts",

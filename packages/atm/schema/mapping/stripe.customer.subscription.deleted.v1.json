@@ -79,6 +79,16 @@
 				"default": 1,
 				"min": 0,
 				"max": 99999999
+			},
+			"unitAmount": {
+				"path": "$.price.unit_amount",
+				"type": "int",
+				"optional": true
+			},
+			"intervalCount": {
+				"path": "$.price.recurring.interval_count",
+				"type": "int",
+				"optional": true
 			}
 		}
 	},

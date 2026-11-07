@@ -336,6 +336,10 @@ export const derivedKpis: Record<
 		inputs: ["credits_expired", "credits_granted"],
 		capped: false,
 	},
+	net_new_mrr: {
+		inputs: ["new_mrr", "expansion_mrr", "contraction_mrr", "churned_mrr"],
+		capped: false,
+	},
 };
 
 const detailRank = (detail: DetailStep): number => detailSteps.indexOf(detail);

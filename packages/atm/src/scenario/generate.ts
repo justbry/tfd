@@ -25,6 +25,7 @@ import {
 	payoutPaid,
 	type RawEvent,
 	subscriptionDeleted,
+	subscriptionEvent,
 } from "./stripe-events.js";
 
 const HOUR = 3_600_000;
@@ -427,9 +428,13 @@ export const generateScenario = (scenario: ResolvedScenario): Generated => {
 			const paidAt =
 				cycle === 0 ? periodStart : periodStart + rng.int(0, 3) * HOUR;
 			const periodEnd = addUtcMonths(periodStart, interval === "year" ? 12 : 1);
-			const lines = [tierLine()];
+			const billed = [tierLine()];
 			if (addonChoice && (cycle === 0 || addonChoice.price.every !== "once"))
-				lines.push(addonLine(addonChoice));
+				billed.push(addonLine(addonChoice));
+			// a free family's coupon takes all of every line off, as a 100% coupon does in Stripe
+			const lines = free
+				? billed.map((l) => ({ ...l, discount: l.amount }))
+				: billed;
 			const gross = lines.reduce((n, l) => n + l.amount, 0);
 			const paid = free ? 0 : gross;
 			const fee =
@@ -578,6 +583,44 @@ export const generateScenario = (scenario: ResolvedScenario): Generated => {
 						Math.round(unit * (count ?? 1) * share);
 					const credit = prorated(price, quantity);
 					const charge = prorated(nextPrice, next.quantity);
+					const applies = !next.billedNow || charge > credit;
+					// Stripe says the change itself first, in the subscription's own event: its items, priced, from now
+					if (applies) {
+						const nextTierId = next.tierId;
+						const nextQuantity = next.quantity;
+						at(changeAt, () => {
+							const event = subscriptionEvent({
+								type: "customer.subscription.updated",
+								eventId: `evt_su_${family}_${cycle}`,
+								subscriptionId: sub,
+								status: "active",
+								items: [
+									{
+										lookupKey: tierLineOf(nextTierId, nextPrice, nextQuantity)
+											.lookupKey,
+										interval,
+										quantity: nextQuantity ?? 1,
+										unitAmount: nextPrice,
+									},
+									...(addonChoice && addonChoice.price.every !== "once"
+										? [
+												{
+													lookupKey: addonLine(addonChoice).lookupKey,
+													interval,
+													unitAmount: addonChoice.price.amount,
+												},
+											]
+										: []),
+								],
+								periodStart: thisStart,
+								periodEnd,
+								at: changeAt,
+								metadata: metadataOf(family, profile),
+							});
+							event.data.object.currency = p.currency;
+							send(store, event, changeAt);
+						});
+					}
 					if (next.billedNow && charge > credit) {
 						const changeId = `in_${family}_${cycle}_change`;
 						const lines: EventLine[] = [
@@ -592,6 +635,7 @@ export const generateScenario = (scenario: ResolvedScenario): Generated => {
 								amount: charge,
 								proration: true,
 								periodStart: changeAt,
+								...(free ? { discount: charge } : {}),
 							},
 						];
 						const paid = free ? 0 : charge - credit;
@@ -621,7 +665,7 @@ export const generateScenario = (scenario: ResolvedScenario): Generated => {
 							if (paid > 0) stats.paidInvoices += 1;
 						});
 					}
-					if (!next.billedNow || charge > credit) {
+					if (applies) {
 						tierId = next.tierId;
 						tier = nextTier;
 						price = nextPrice;

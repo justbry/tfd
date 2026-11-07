@@ -390,6 +390,8 @@ describe("fixtures normalize to their facts", () => {
 					lookupKey: "vol_sparkle_2s_month",
 					interval: "month",
 					quantity: 1,
+					unitAmount: 26000,
+					intervalCount: 1,
 				},
 			],
 			currentPeriodStart: 1793491200000,

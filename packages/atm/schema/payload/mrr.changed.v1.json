@@ -1,0 +1,81 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://b4uni.com/_schema/payload/mrr.changed.v1.json",
+	"title": "mrr.changed payload v1",
+	"description": "A subscription's monthly recurring revenue (MRR) as the books hold it, after the Stripe fact that moved it: a USD invoice that billed its recurring lines in full (create or cycle), a customer.subscription.* event whose items changed, or the subscription's end. Each item is a recurring price on the subscription: its amount less its discount, over the months of its interval, rounded half up to whole cents a month. One-time lines are not items. The postings move `mrr:recurring:<holder>` by after - before in the MRR commodity (whole cents), against `mrr:movement:<movement>`.",
+	"type": "object",
+	"required": ["subscription", "from", "before", "after", "items"],
+	"properties": {
+		"subscription": {
+			"description": "Stripe's subscription id (sub_...).",
+			"type": "string",
+			"minLength": 1
+		},
+		"from": {
+			"description": "What moved it: a paid invoice (`invoice` names it), a customer.subscription.* event whose items changed, or the subscription's end.",
+			"enum": ["invoice", "subscription", "ended"]
+		},
+		"invoice": {
+			"description": "The invoice (in_...), when `from` is invoice.",
+			"type": "string",
+			"minLength": 1
+		},
+		"before": {
+			"description": "MRR before, whole cents a month (0 for a subscription first seen).",
+			"type": "integer",
+			"minimum": 0
+		},
+		"after": {
+			"description": "MRR after, whole cents a month: the sum of the items' cents (0 once the subscription ended).",
+			"type": "integer",
+			"minimum": 0
+		},
+		"items": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [
+					"price",
+					"interval",
+					"months",
+					"quantity",
+					"amount",
+					"discount",
+					"cents"
+				],
+				"properties": {
+					"price": { "type": "string", "minLength": 1 },
+					"interval": {
+						"description": "The price's interval.",
+						"enum": ["month", "year"]
+					},
+					"months": {
+						"description": "Months of one period: 1 a month, 12 a year, times the price's interval count.",
+						"type": "integer",
+						"minimum": 1
+					},
+					"quantity": { "type": "integer", "minimum": 0 },
+					"amount": {
+						"description": "What a full period of the item costs: the invoice line's amount, or unit_amount x quantity from the subscription event (cents).",
+						"type": "integer",
+						"minimum": 0
+					},
+					"discount": {
+						"description": "What discounts take off that amount (cents): the line's discount_amounts, or the same share of a changed item as the last full invoice gave.",
+						"type": "integer",
+						"minimum": 0
+					},
+					"cents": {
+						"description": "(amount - discount) / months, rounded half up: what the item adds a month.",
+						"type": "integer",
+						"minimum": 0
+					}
+				}
+			}
+		},
+		"ended": {
+			"description": "The subscription ended (customer.subscription.deleted, or status canceled): after is 0.",
+			"type": "boolean"
+		}
+	}
+}

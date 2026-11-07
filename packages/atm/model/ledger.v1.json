@@ -82,6 +82,23 @@
 			"links": { "closeMatch": ["schema:PayAction"] }
 		},
 		{
+			"id": "Subscription",
+			"kind": "thing",
+			"description": "A member's Stripe subscription: the recurring prices it bills, as its invoices and its customer.subscription.* events say them. The books hold what it bills a month (MRR) in `mrr:recurring:<holder>` and each change as an `mrr.changed`, which names it by its Stripe id.",
+			"synonyms": [
+				"recurring plan",
+				"membership subscription",
+				"recurring gift"
+			],
+			"key": {
+				"eventTypes": ["mrr.changed"],
+				"fields": ["labels.subscription"],
+				"example": "sub_fam_015"
+			},
+			"eventTypes": ["mrr.changed"],
+			"source": "Stripe subscriptions, by id"
+		},
+		{
 			"id": "Refund",
 			"kind": "thing",
 			"description": "Money handed back on a payment's charge.",
@@ -646,6 +663,108 @@
 			"rollup": "last",
 			"disclosure": { "class": "cash" },
 			"synonyms": ["credit liability", "deferred credits"]
+		},
+		{
+			"id": "mrr",
+			"source": "kpiSpec",
+			"entity": "Subscription",
+			"dimensions": [],
+			"format": "money",
+			"grain": "month",
+			"rollup": "last",
+			"disclosure": {
+				"class": "income"
+			},
+			"document": {
+				"title": "MRR",
+				"position": 27
+			},
+			"synonyms": ["monthly recurring revenue", "recurring revenue", "run rate"]
+		},
+		{
+			"id": "new_mrr",
+			"source": "kpiSpec",
+			"entity": "Subscription",
+			"dimensions": [],
+			"format": "money",
+			"grain": "month",
+			"rollup": "sum",
+			"disclosure": {
+				"class": "income"
+			},
+			"document": {
+				"title": "New MRR",
+				"position": 29
+			},
+			"synonyms": ["new recurring revenue"]
+		},
+		{
+			"id": "expansion_mrr",
+			"source": "kpiSpec",
+			"entity": "Subscription",
+			"dimensions": [],
+			"format": "money",
+			"grain": "month",
+			"rollup": "sum",
+			"disclosure": {
+				"class": "income"
+			},
+			"document": {
+				"title": "Expansion MRR",
+				"position": 30
+			},
+			"synonyms": ["upgrades", "upsell"]
+		},
+		{
+			"id": "contraction_mrr",
+			"source": "kpiSpec",
+			"entity": "Subscription",
+			"dimensions": [],
+			"format": "money",
+			"grain": "month",
+			"rollup": "sum",
+			"disclosure": {
+				"class": "income"
+			},
+			"document": {
+				"title": "Contraction MRR",
+				"position": 31
+			},
+			"synonyms": ["downgrades"]
+		},
+		{
+			"id": "churned_mrr",
+			"source": "kpiSpec",
+			"entity": "Subscription",
+			"dimensions": [],
+			"format": "money",
+			"grain": "month",
+			"rollup": "sum",
+			"disclosure": {
+				"class": "income"
+			},
+			"document": {
+				"title": "Churned MRR",
+				"position": 32
+			},
+			"synonyms": ["lost recurring revenue", "cancellations"]
+		},
+		{
+			"id": "net_new_mrr",
+			"source": "kpiSpec",
+			"entity": "Subscription",
+			"dimensions": [],
+			"format": "money",
+			"grain": "month",
+			"rollup": "sum",
+			"disclosure": {
+				"class": "income"
+			},
+			"document": {
+				"title": "Net new MRR",
+				"position": 28
+			},
+			"synonyms": ["MRR growth", "net MRR change"]
 		},
 		{
 			"id": "dispute_cost",

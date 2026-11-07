@@ -25,7 +25,13 @@
 			"gross_collected",
 			"revenue_by_kind",
 			"revenue_by_tier",
-			"net_income"
+			"net_income",
+			"mrr",
+			"new_mrr",
+			"expansion_mrr",
+			"contraction_mrr",
+			"churned_mrr",
+			"net_new_mrr"
 		],
 		"losses": [
 			"refunds",

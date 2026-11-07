@@ -30,9 +30,9 @@
     "seatChangeRate": 0.12,
     "upgradeRate": 0.04
   },
-  "fixtureHash": "f0631b6b5d76a914f7533c9f8733a8d99bd1f090ffa66a82db274bf2b58697d3",
-  "kpisHash": "050a56609229d386f66492eb084cfb418ca8a2671a31d7d2b2cb00739552cf38",
-  "events": 4711,
+  "fixtureHash": "d8254d535d955dd7e9ea196eadd5976ee05f5e485beff8003e98588fdf88859f",
+  "kpisHash": "2a8acedb84951f6fd2867e3f6681039f89282d8393ba054498541f95a12274e6",
+  "events": 4856,
   "periods": 12,
   "summary": {
     "gross_collected": 6952100,
