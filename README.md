@@ -38,4 +38,4 @@ Work goes on a feature branch with a pull request against `dev`. Nothing is push
 
 ## License
 
-Apache License 2.0 (`LICENSE`). Where the inherited code comes from, and every upstream file this repository changes, is recorded in [`UPSTREAM.md`](UPSTREAM.md).
+More than one license; [`LICENSING.md`](LICENSING.md) maps each path to its license. The Trifold engine (`packages/atm`) is FSL-1.1-ALv2, and each release becomes Apache-2.0 two years after it ships; its receipt and seal format, verifier and test vectors are Apache-2.0 and CC0-1.0. Everything else is Apache-2.0 (`LICENSE`). Where the inherited code comes from, and every upstream file this repository changes, is recorded in [`UPSTREAM.md`](UPSTREAM.md).
