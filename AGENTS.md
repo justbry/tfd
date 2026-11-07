@@ -28,8 +28,8 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 | tfd engine and CLI (`packages/atm`, except the next two rows) | **FSL-1.1-ALv2**: source-available; no Competing Use; each release becomes Apache-2.0 two years after it ships | `packages/atm/LICENSE.md` |
 | Receipt and seal format, spec and verifier (`schema/receipt.v1.json`, `schema/seal.v1.json`, `docs/receipts.md`, `src/ledger/{receipt,seal,sign,util}.ts`) | **Apache-2.0** | SPDX headers; `packages/atm/REUSE.toml` |
 | Receipt test vectors (`packages/atm/tests/golden/receipt/`) | **CC0-1.0** | `packages/atm/REUSE.toml` |
-| The website (`apps/trifold-site`): code, copy, design, images | **Proprietary**, all rights reserved | `apps/trifold-site/LICENSE` |
-| The website's in-browser verifier (`apps/trifold-site/src/lib/verify/`) | **Apache-2.0** | SPDX headers; `apps/trifold-site/LICENSE` |
+| The website (`apps/trifold-site`): all of it, code, copy, design, images | **Proprietary**, all rights reserved | `apps/trifold-site/LICENSE` |
+| The verifier SDK `tfd-verify` (`packages/verify`): tfd's receipt and seal checks for browsers and other WebCrypto runtimes; the website's verifier comes from it | **Apache-2.0** | SPDX headers; `packages/verify/LICENSE`, `packages/verify/REUSE.toml` |
 | Hosted service, Rifo, the witness | Proprietary, not in this repo | — |
 
 `packages/atm/LICENSING.md` explains the package's licenses in prose. `REUSE.toml` is the machine-readable map: keep both in step when files move.
@@ -39,6 +39,8 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 **Rules for code:**
 - A new file that implements receipt or seal *verification* or the format belongs with the Apache-2.0 files: give it an `SPDX-License-Identifier: Apache-2.0` header and add it to `LICENSING.md` and `REUSE.toml`. It must not import FSL code.
 - Apache-2.0 files under `packages/atm` must import only other Apache-2.0 files, or third-party packages.
+- `packages/verify` is Apache-2.0 throughout and must not import from `packages/atm`. Verification code the website needs goes there, not into `apps/trifold-site`, which keeps no Apache-2.0 files.
+- The website's build ships third-party code, so it writes `/licenses.txt` (`apps/trifold-site/third-party-notices.ts`) with every bundled package's license text; the legal page links to it.
 - Don't copy FSL code into Apache-2.0 files, or into other packages.
 - Mark an Autumn file you modify at its top and list it in `UPSTREAM.md` (Apache-2.0 section 4).
 

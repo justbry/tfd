@@ -1,13 +1,13 @@
-// SPDX-License-Identifier: Apache-2.0
 /**
  * One verifier's state, shared by the inline (homepage) and full (/verify) verifiers. The crypto loads on the first
  * check, so pages that only show the verifier pay nothing for it up front.
  */
+
+import type { PublicKeys } from "tfd-verify";
+import type { Books, Outcome } from "tfd-verify/check";
 import publicKey from "#lib/samples/public-key.json";
 import sample from "#lib/samples/receipt.json";
 import tampered from "#lib/samples/receipt-tampered.json";
-import type { Books, Outcome } from "./check";
-import type { PublicKeys } from "./core";
 
 const SAMPLE_KEYS = publicKey.keys as PublicKeys;
 const SWEEP_MS = 1200;
@@ -21,7 +21,7 @@ const loadBooks = async (school: string): Promise<Books | null> => {
 	return (await import("#lib/samples/books.json")).default as unknown as Books;
 };
 
-export const preloadVerifier = () => import("./check");
+export const preloadVerifier = () => import("tfd-verify/check");
 
 export class VerifierSession {
 	text = $state("");

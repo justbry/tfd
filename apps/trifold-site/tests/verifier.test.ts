@@ -1,9 +1,19 @@
 /**
- * The browser verifier (src/lib/verify) against tfd's own checks (packages/atm/src): it must accept the sample receipt,
+ * The site's verifier (tfd-verify) against tfd's own checks (packages/atm/src): it must accept the sample receipt,
  * reject the tampered copy, and agree with tfd on every case here, including edge cases of the signature's spelling.
+ * packages/verify/tests runs tfd's receipt test vectors against tfd-verify on its own.
  */
 import { describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
+import {
+	type BooksEvent,
+	canonicalize,
+	checkReceiptAgainstEvents,
+	verifyReceipt,
+	verifySealChain,
+} from "tfd-verify";
+import { checkReceipt } from "tfd-verify/check";
+import { decodeReceiptParam, encodeReceiptParam } from "tfd-verify/link";
 import {
 	checkReceiptAgainstEvents as atmCheckAgainstEvents,
 	verifyReceipt as atmVerifyReceipt,
@@ -17,15 +27,6 @@ import books from "../src/lib/samples/books.json";
 import publicKey from "../src/lib/samples/public-key.json";
 import sample from "../src/lib/samples/receipt.json";
 import tampered from "../src/lib/samples/receipt-tampered.json";
-import { checkReceipt } from "../src/lib/verify/check";
-import {
-	type BooksEvent,
-	canonicalize,
-	checkReceiptAgainstEvents,
-	verifyReceipt,
-	verifySealChain,
-} from "../src/lib/verify/core";
-import { decodeReceiptParam, encodeReceiptParam } from "../src/lib/verify/link";
 
 const keys = publicKey.keys as Record<string, string>;
 const events = books.events as unknown as BooksEvent[];

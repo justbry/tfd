@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * The browser's copy of tfd's receipt and seal checks (packages/atm/src/ledger/receipt.ts, seal.ts, sign.ts, util.ts),
- * ported line for line so a receipt verifies here exactly when it verifies with tfd:
+ * tfd-verify: tfd's receipt and seal checks (packages/atm/src/ledger/receipt.ts, seal.ts, sign.ts, util.ts) for any
+ * JavaScript runtime with WebCrypto, ported line for line so a receipt verifies here exactly when it verifies with tfd:
  *
  * - canonical bytes: JSON.stringify with object keys sorted (UTF-16 code unit order) and undefined values dropped;
  * - event_hash and events_hash: sha256 (hex) of those bytes as UTF-8;
  * - sig: Ed25519 (RFC 8032, strict) over the receipt's canonical bytes, base64url without padding, one spelling only;
  * - keys: key id to an Ed25519 SPKI PEM.
  *
- * It runs entirely in the browser: no network, nothing uploaded. Hashing uses WebCrypto; Ed25519 uses @noble/ed25519,
- * whose own SHA-512 also comes from WebCrypto, so the code shipped is small.
+ * In a browser it runs entirely on the page: no network, nothing uploaded. Hashing uses WebCrypto; Ed25519 uses
+ * @noble/ed25519, whose own SHA-512 also comes from WebCrypto, so the code shipped is small. No node:* imports.
+ * tests/golden.test.ts runs tfd's receipt test vectors against it.
  */
 import { verifyAsync } from "@noble/ed25519";
 
@@ -46,7 +47,7 @@ export type Seal = {
 
 export type SignedSeal = { seal: Seal; key_id: string; sig: string };
 
-/** The fields of an tfd event the checks read. Everything else is hashed as given. */
+/** The fields of a tfd event the checks read. Everything else is hashed as given. */
 export type BooksEvent = {
 	id: string;
 	event_type: string;

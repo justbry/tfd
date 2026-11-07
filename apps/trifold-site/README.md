@@ -35,8 +35,11 @@ bun run check        # svelte-check
 - SvelteKit 3 removed `$lib`; this app uses Node subpath imports (`#lib/...`, see `package.json` `imports`).
 - `src/routes/` pages; long-form copy lives in markdown under `src/content/` (mdsvex), so it can be edited as text.
 - `src/lib/components/` header, footer, hero canvas (`HeroField`), ledger panel, receipt card, verifiers, pricing.
-- `src/lib/verify/` the in-browser verifier: `core.ts` is a line-for-line port of tfd's canonical bytes, sha256,
-  Ed25519 (strict RFC 8032) and schema checks; `check.ts` adds the books and seal checks. It loads on first use.
+- `src/lib/verify/session.svelte.ts` the in-browser verifier's state and sample receipts. The checks come from
+  `tfd-verify` (`packages/verify`, Apache-2.0), a line-for-line port of tfd's canonical bytes, sha256, Ed25519 (strict
+  RFC 8032) and schema checks: `tfd-verify/check` runs one whole check (signature, then the books and seal) and loads on
+  the first Verify, with the crypto; `tfd-verify/link` encodes `/verify?r=` links without any crypto.
+  `tfd-verify` is a `file:` dependency, so bun copies it into `node_modules`: run `bun install` here after changing it.
 - `src/lib/samples/` the sample receipt, a tampered copy, the demo public key, the sample school's October books and
   seal, all made by `scripts/make-samples.ts` from `packages/atm/src`. The private key is generated in memory and
   discarded; it is never written.
@@ -50,7 +53,7 @@ bun run check        # svelte-check
 
 ## Licensing
 
-The site's verifier (`src/lib/verify/*.ts`) is Apache-2.0 and carries an SPDX header. The tfd engine it ports is FSL-1.1-ALv2 (source-available; each release becomes Apache-2.0 two years after it ships), except the receipt and seal format, spec and verifier, which are Apache-2.0, and the test vectors, which are CC0-1.0. In copy, never call the engine "open source"; say "source-available" or "free to self-host". The engine is `tfd` (the `atm` command until the rename lands); keep `packages/atm/...` paths and `justbry/atm` links as they are.
+The site is proprietary, all of it (`LICENSE`). The receipt verifier it runs comes from `tfd-verify` (`packages/verify`), which is Apache-2.0. The tfd engine that package ports is FSL-1.1-ALv2 (source-available; each release becomes Apache-2.0 two years after it ships), except the receipt and seal format, spec and verifier, which are Apache-2.0, and the test vectors, which are CC0-1.0. In copy, never call the engine "open source"; say "source-available" or "free to self-host". The engine is `tfd` (the `atm` command until the rename lands); keep `packages/atm/...` paths and `justbry/atm` links as they are.
 
 ## Agent files
 

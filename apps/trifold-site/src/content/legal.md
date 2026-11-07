@@ -14,8 +14,8 @@
 
 <h2 id="copyright">Copyright</h2>
 
-This website, its code, copy, design and images are © 2026 Trifold. All rights reserved. The one exception is the in-browser receipt verifier, which is Apache-2.0 so that anyone can check a receipt.
+This website, its code, copy, design and images are © 2026 Trifold. All rights reserved. The in-browser receipt verifier it runs is tfd-verify, a separate package under Apache-2.0, so that anyone can check a receipt.
 
 <h2 id="notices">Open source and third-party notices</h2>
 
-This site uses open-source software, including Svelte and SvelteKit (MIT), @noble/ed25519 (MIT), and the Fraunces, Inter and JetBrains Mono typefaces (SIL Open Font License 1.1). The in-browser verifier on this site is Apache-2.0.
+This site uses open-source software, including Svelte and SvelteKit (MIT), @noble/ed25519 (MIT), tfd-verify (Apache-2.0), and the Fraunces, Inter and JetBrains Mono typefaces (SIL Open Font License 1.1). Every package in the site's browser code is listed with its license text in [licenses.txt](/licenses.txt).
