@@ -1,6 +1,5 @@
 import {
 	type Audience,
-	type AudienceView,
 	audiencesOf,
 	type Disclosure,
 	type ViewAs,
@@ -10,53 +9,20 @@ import {
 } from "../data/disclosure.ts";
 import { notAvailable } from "./errors.ts";
 import type { LedgerSchoolClaim } from "./ledger-token.ts";
-import type { WorkerDisclosure } from "./worker-source.ts";
+import type { WorkerDisclosure, WorkerViewAsRow } from "./worker-source.ts";
 
 /**
- * `disclosure(school)` (S8-contract section 11): the Worker sends the file, size, year, source and override; the
- * adapter adds `viewer` and `viewAs` from the ledger token's claim with `audiencesOf`. The ledger token carries no
- * membership level, so until it carries a tier audience an admin without the finance grant holds `public` only
- * (D7, and the Worker serves them no finer): the adapter caps them there too, so View as never offers a view the
- * Worker refuses.
- *
- * `views` (each audience's periods, presets and copy) come from the Worker's answer (`audienceViews` of `atm/worker`,
- * S8c2). Each View as row's name, summary and locks are worked out by the server in the contract, and the viewer's
- * display name comes from the roster: no route or Worker endpoint gives them yet, so they come from a
- * `DisclosurePresentationSource`, whose default is not available. Its `views` stand in only for a Worker that sends
- * none.
+ * `disclosure(school)` (S8-contract section 11): the Worker sends the file, size, year, source, override, each
+ * audience's `views` and each View as row's name, summary and locks (`audienceViews` and `viewAsRows` of
+ * `atm/worker`). The adapter adds `viewer` and each row's `held`, `audience` and `admin` from the ledger token's
+ * claim with `audiencesOf`. The ledger token carries no membership level, so until it carries a tier audience an
+ * admin without the finance grant holds `public` only (D7, and the Worker serves them no finer): the adapter caps them
+ * there too, so View as never offers a view the Worker refuses. No route gives the signed-in person's name, so
+ * `viewer.name` is null.
  */
 
-export type ViewAsCopy = Pick<ViewAsOption, "name" | "summary" | "locks">;
-
-export type DisclosurePresentation = {
-	viewerName: string;
-	/** Used only when the Worker's answer has no `views`. */
-	views?: Record<Audience, AudienceView>;
-	rows: Record<ViewAs, ViewAsCopy>;
-};
-
-export type DisclosurePresentationSource = {
-	presentation(query: {
-		school: string;
-		disclosure: WorkerDisclosure;
-		viewer: Omit<Viewer, "name">;
-	}): Promise<DisclosurePresentation>;
-};
-
-export const noDisclosurePresentation: DisclosurePresentationSource = {
-	presentation: async () => {
-		throw notAvailable(
-			"disclosure",
-			"no source gives the View as copy or the viewer's name (the Worker sends the file and the views; buzz-school build list groups 4 and 8)",
-		);
-	},
-};
-
 /** The signed-in person as the ledger token says they are at this school. */
-export function viewerOf(
-	subject: string,
-	claim: LedgerSchoolClaim,
-): Omit<Viewer, "name"> {
+export function viewerOf(subject: string, claim: LedgerSchoolClaim): Viewer {
 	const audiences = audiencesOf({
 		role: claim.role,
 		financeGrant: claim.role === "admin" && claim.finance,
@@ -68,6 +34,7 @@ export function viewerOf(
 	if (claim.role === "owner")
 		return {
 			id: subject,
+			name: null,
 			role: "owner",
 			financeGrant: false,
 			audience,
@@ -78,6 +45,7 @@ export function viewerOf(
 	if (claim.finance)
 		return {
 			id: subject,
+			name: null,
 			role: "admin",
 			financeGrant: true,
 			audience,
@@ -87,6 +55,7 @@ export function viewerOf(
 		};
 	return {
 		id: subject,
+		name: null,
 		role: "admin",
 		financeGrant: false,
 		audience,
@@ -99,8 +68,8 @@ export function viewerOf(
 const adminRows: ReadonlySet<ViewAs> = new Set(["owner", "finance", "admin"]);
 
 export function viewAsOf(
-	viewer: Omit<Viewer, "name">,
-	rows: Record<ViewAs, ViewAsCopy>,
+	viewer: Viewer,
+	rows: Record<ViewAs, WorkerViewAsRow>,
 ): ViewAsOption[] {
 	return viewAsValues.map((value) => {
 		const isAdminRow = value === "admin";
@@ -110,26 +79,33 @@ export function viewAsOf(
 				? viewer.audience
 				: "member"
 			: value;
+		const { name, summary, locks } = rows[value];
 		return {
 			value,
-			...rows[value],
+			name,
+			summary,
 			held: isAdminRow ? true : viewer.audiences.includes(value),
 			audience,
 			admin: adminRows.has(value),
+			locks,
 		};
 	});
 }
 
 export function assembleDisclosure(
 	answer: WorkerDisclosure,
-	viewer: Omit<Viewer, "name">,
-	presentation: DisclosurePresentation,
+	viewer: Viewer,
 ): Disclosure {
-	const views = answer.views ?? presentation.views;
+	const { views, viewAs } = answer;
 	if (!views)
 		throw notAvailable(
 			"disclosure",
 			"the Worker's answer has no views (a Worker older than S8c2)",
+		);
+	if (!viewAs)
+		throw notAvailable(
+			"disclosure",
+			"the Worker's answer has no View as rows (a Worker older than S8e part 3)",
 		);
 	return {
 		school: answer.school,
@@ -138,8 +114,8 @@ export function assembleDisclosure(
 		file: answer.file,
 		// No stored override is the B4 Uni defaults: an override with no differences.
 		override: answer.override ?? {},
-		viewer: { ...viewer, name: presentation.viewerName },
+		viewer,
 		views,
-		viewAs: viewAsOf(viewer, presentation.rows),
+		viewAs: viewAsOf(viewer, viewAs),
 	};
 }

@@ -10,6 +10,8 @@ import {
 	incomeStatement,
 	ledgerRows,
 	membersIncome,
+	viewAsRows,
+	viewAsValues,
 } from "atm/worker";
 import { DISCLOSURE_FILE, sizeOf } from "../src/data/disclosure.js";
 import {
@@ -235,7 +237,7 @@ describe("disclosure", () => {
 			source: "defaults",
 		});
 		expect(data.file).toMatchObject({ version: 1, catalog: "school.v1" });
-		// the five audiences' views, from audienceViews of atm/worker; viewer and viewAs are the adapter's
+		// the five audiences' views, from audienceViews of atm/worker; the viewer is the adapter's
 		expect(Object.keys(data.views as object)).toEqual([
 			"public",
 			"member",
@@ -258,7 +260,61 @@ describe("disclosure", () => {
 			),
 		);
 		expect(data).not.toHaveProperty("viewer");
-		expect(data).not.toHaveProperty("viewAs");
+	});
+
+	test("viewAs: each View as row's name, summary and locks, from viewAsRows of atm/worker", async () => {
+		const reply = await get("/schools/monthly-members/disclosure");
+		const data = reply.body.data as {
+			views: Parameters<typeof viewAsRows>[0]["views"];
+			viewAs: Record<string, { name: string; summary: string }>;
+		};
+		expect(Object.keys(data.viewAs)).toEqual([...viewAsValues]);
+		// an owner previews the Admin row at `member`
+		expect(data.viewAs).toEqual(
+			wire(
+				viewAsRows({
+					file: DISCLOSURE_FILE,
+					override: {},
+					views: data.views,
+					adminAudience: "member",
+				}),
+			),
+		);
+		expect(data.viewAs.member?.name).toBe(data.views.member.name);
+		expect(data.viewAs.admin).toMatchObject({
+			name: "Admin",
+			summary:
+				"Sees roster, plans, bookings and balances. Cannot see money per person, the ledger or names.",
+		});
+		// held, audience and admin are the adapter's, from the token's viewer
+		expect(data.viewAs.owner).not.toHaveProperty("held");
+	});
+
+	test("viewAs: an admin without the finance grant gets their own (public) audience's Admin row", async () => {
+		const adminToken = await harness.mintToken({
+			sub: "profile_admin",
+			schools: [{ id: "monthly-members", role: "admin", finance: false }],
+		});
+		const reply = await call(
+			harness,
+			adminToken,
+			"/v1/schools/monthly-members/disclosure",
+		);
+		expect(reply.status).toBe(200);
+		const data = reply.body.data as {
+			views: Parameters<typeof viewAsRows>[0]["views"];
+			viewAs: unknown;
+		};
+		expect(data.viewAs).toEqual(
+			wire(
+				viewAsRows({
+					file: DISCLOSURE_FILE,
+					override: {},
+					views: data.views,
+					adminAudience: "public",
+				}),
+			),
+		);
 	});
 });
 

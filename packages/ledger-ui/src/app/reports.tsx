@@ -43,6 +43,10 @@ const grainWords = { year: "years", quarter: "quarters", month: "months" };
 /** A figure the source does not record yet (the Worker answers null): never shown as 0. */
 const notAvailableText = "—";
 const donorsNotAvailableText = "Not available yet: no source records donors.";
+/** The statement as Reports shows it: a school with no published menu has no statement currency or unit, so the
+ * school's own stand in (as the Ledger's do). */
+type ShownStatement = IncomeStatement & { currency: string; unit: CreditUnit };
+
 const statementAmount = (cents: number | null, currency: string): string =>
 	cents === null ? notAvailableText : formatMoney(cents, currency);
 const whoSees: Record<AudienceReport["audience"], string> = {
@@ -307,7 +311,7 @@ function StatementBody({
 	onDrill,
 	onPromos,
 }: {
-	statement: IncomeStatement;
+	statement: ShownStatement;
 	period: Period;
 	onDrill: (drill: LedgerDrill) => void;
 	onPromos: () => void;
@@ -431,7 +435,7 @@ function Statement({
 	period,
 	onDrill,
 }: {
-	statement: IncomeStatement;
+	statement: ShownStatement;
 	period: Period;
 	onDrill: (drill: LedgerDrill) => void;
 }): JSX.Element {
@@ -896,7 +900,12 @@ export function Reports({
 		return <LoadFailed what="the report" onRetry={status.retry} />;
 	if (!loaded) return null;
 
-	const { rules, donors, statement, document } = loaded;
+	const { rules, donors, document } = loaded;
+	const statement: ShownStatement | null = loaded.statement && {
+		...loaded.statement,
+		currency: loaded.statement.currency ?? school.currency,
+		unit: loaded.statement.unit ?? school.creditUnit,
+	};
 	const openLedger = (drill: LedgerDrill): void =>
 		navigate(ledgerRoute(route, drill));
 	const download = statement ? (

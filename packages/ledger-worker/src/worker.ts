@@ -13,6 +13,7 @@ import {
 	audiences,
 	type Caller,
 	callerOf,
+	maxAudienceOf,
 	type SchoolGrant,
 } from "./auth/claims.js";
 import { JwksCache, JwksUnavailable } from "./auth/jwks.js";
@@ -65,6 +66,7 @@ type RouteContext = {
 	query: URLSearchParams;
 	now: number;
 	key: string | null;
+	grant: SchoolGrant;
 };
 
 type Route = {
@@ -109,7 +111,15 @@ const routes: Record<string, Route> = {
 	},
 	disclosure: {
 		gate: "any",
-		handle: ({ snapshot, now }) => disclosureRoute(snapshot, now),
+		handle: ({ snapshot, now, grant }) =>
+			disclosureRoute(
+				snapshot,
+				now,
+				// D7: an admin without the finance grant reads the books at their own (public) audience
+				grant.role === "owner" || grant.finance
+					? "member"
+					: maxAudienceOf(grant),
+			),
 	},
 	"audience-report": {
 		gate: "any",
@@ -275,6 +285,7 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 			query: url.searchParams,
 			now,
 			key: moneyKey === undefined ? null : decode(moneyKey),
+			grant,
 		});
 		return okResponse(data, {
 			asOf: snapshot.asOf,

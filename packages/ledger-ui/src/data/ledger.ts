@@ -335,8 +335,10 @@ export type IncomeStatement = {
 	school: string;
 	from: string;
 	to: string;
-	currency: string;
-	unit: CreditUnit;
+	/** ISO 4217. The school's currency and credit unit come from its latest published menu: null when it has none, and
+	 * Reports uses the school's own (`School.currency`, `School.creditUnit`). */
+	currency: string | null;
+	unit: CreditUnit | null;
 	basis: { kind: "cash" } | { kind: "deferred"; from: string };
 	/** True when the period is whole months and atm's reconciliation matches Stripe: "Matches Stripe · …"; otherwise
 	 * the "Partial month" line. */
@@ -631,7 +633,7 @@ export const statementLines: ReadonlyArray<
 export type StatementCsvRow = { line: string; amountCents: number | null };
 
 export const statementColumns = (
-	statement: Pick<IncomeStatement, "currency" | "from" | "to">,
+	statement: Pick<IncomeStatement, "from" | "to"> & { currency: string },
 ): Array<CsvColumn<StatementCsvRow>> => [
 	{ header: "line", kind: "text", value: (row) => row.line },
 	{ header: "amount", kind: "money", value: (row) => row.amountCents },

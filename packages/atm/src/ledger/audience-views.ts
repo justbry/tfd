@@ -513,6 +513,65 @@ export function surfaceLocks(
 	return locks;
 }
 
+/** The View as dropdown's rows, in the mockup's order (`SUBS`): the five audiences and Admin, an admin without the
+ * finance grant. */
+export const viewAsValues = [
+	"owner",
+	"finance",
+	"admin",
+	"governance",
+	"member",
+	"public",
+] as const;
+export type ViewAs = (typeof viewAsValues)[number];
+/** What the server words for a View as row (`ViewAsOption` without `value`, `held`, `audience` and `admin`, which the
+ * UI's adapter works out from the viewer). */
+export type ViewAsRow = {
+	name: string;
+	summary: string;
+	locks: Partial<Record<GatedSurface, LockPanel>>;
+};
+
+/** The Admin row's copy (mockup `plans/ledger-ui/design/mockup.html`: `SUB_NAME.admin` from `SUBS`, and `vaSummary`'s
+ * `admin`): the same at every school, because an admin's books audience is not a file rule. */
+const ADMIN_ROW_NAME = "Admin";
+const ADMIN_ROW_SUMMARY =
+	"Sees roster, plans, bookings and balances. Cannot see money per person, the ledger or names.";
+const ADMIN_ROWS: ReadonlySet<ViewAs> = new Set(["owner", "finance", "admin"]);
+
+export type ViewAsRowsInput = {
+	file: DisclosureFile;
+	override: DisclosureOverride;
+	/** `audienceViews` of the same file and override: each audience row's name and summary are its view's. */
+	views: Record<Audience, AudienceView>;
+	/** The books audience the Admin row shows (mockup `VW`): an admin's own, `member` when an owner or a finance admin
+	 * previews it. */
+	adminAudience?: Audience;
+};
+
+/** Each View as row's name, summary and lock panels. Pure. */
+export function viewAsRows(input: ViewAsRowsInput): Record<ViewAs, ViewAsRow> {
+	const { file, override, views } = input;
+	const rows = {} as Record<ViewAs, ViewAsRow>;
+	for (const value of viewAsValues) {
+		const isAdminRow = value === "admin";
+		const audience: Audience = isAdminRow
+			? (input.adminAudience ?? "member")
+			: value;
+		rows[value] = {
+			name: isAdminRow ? ADMIN_ROW_NAME : views[value].name,
+			summary: isAdminRow ? ADMIN_ROW_SUMMARY : views[value].summary,
+			locks: surfaceLocks({
+				file,
+				override,
+				audience,
+				admin: ADMIN_ROWS.has(value),
+			}),
+		};
+	}
+	return rows;
+}
+
 /** The school's size for a year (spec "Rounding"): large from `rounding.largeFrom` of income in the last closed year, small
  * below it and for a school with no closed year (`null`). */
 export function schoolSize(

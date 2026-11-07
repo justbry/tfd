@@ -12,6 +12,7 @@ import {
 	type KpiDocumentContext,
 	type KpiDocumentRow,
 	kpiDocument,
+	viewAsRows,
 } from "atm/worker";
 import { mapLimited } from "../data/concurrency.js";
 import { disclosureOf } from "../data/disclosure.js";
@@ -137,11 +138,15 @@ export const kpiRoute = async (
 export const disclosureRoute = async (
 	snapshot: SchoolSnapshot,
 	now: number,
+	/** The books audience the View as dropdown's Admin row shows this caller: their own as an admin without the
+	 * finance grant, `member` when an owner or a finance admin previews it. */
+	adminAudience: Audience,
 ) => {
 	const rows = await snapshot.kpiRows();
 	const clock = await clockOf(snapshot, now);
 	const year = Number(clock.today.slice(0, 4));
 	const { size, file, override } = disclosureOf(rows, year);
+	const views = audienceViews({ file, override, size, year, clock });
 	return {
 		school: snapshot.school,
 		year,
@@ -150,8 +155,9 @@ export const disclosureRoute = async (
 		// no stored override yet (build list group 8): the B4 Uni defaults, which the UI says
 		override: null,
 		source: "defaults" as const,
-		// worded by atm/worker at the school's clock; the adapter adds `viewer` and `viewAs`
-		views: audienceViews({ file, override, size, year, clock }),
+		// worded by atm/worker at the school's clock; the adapter adds `viewer` and each row's `held`, `audience`, `admin`
+		views,
+		viewAs: viewAsRows({ file, override, views, adminAudience }),
 	};
 };
 
