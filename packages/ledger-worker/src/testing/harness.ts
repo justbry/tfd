@@ -4,8 +4,11 @@
  * Wrangler deploys, with a clock this harness controls) beside a test Ed25519 key pair and a JWKS endpoint, and hands
  * back the Worker's URL, a token minter and `stop()`. README.md, "Test harness".
  */
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { AtmEvent } from "atm";
 import type { R2BucketBinding } from "atm/worker";
 import { Miniflare } from "miniflare";
@@ -27,6 +30,10 @@ const DEFAULT_LIFETIME_SECONDS = 300;
 const MS_PER_MINUTE = 60_000;
 const MS_PER_SECOND = 1000;
 const DEFAULT_KEY_FILL = 1;
+const PLACEHOLDER_PAGE =
+	"<!doctype html><title>ledger</title><p>ledger ui</p>\n";
+/** `run_worker_first` of `wrangler.jsonc`. */
+const WORKER_FIRST = ["/v1/*", "/healthz"];
 
 export type SchoolGrantInput = {
 	id: string;
@@ -49,6 +56,11 @@ export type StartOptions = {
 	schools?: readonly string[];
 	/** The Worker's clock to start with (ISO instant); default one minute after the latest seeded `asOf`. */
 	now?: string;
+	/**
+	 * The directory served as the UI's static assets, as `wrangler.jsonc` binds them (`ASSETS`, single-page fallback,
+	 * `/v1/*` and `/healthz` to the Worker first). Default: a directory with a one-line `index.html`.
+	 */
+	assetsDirectory?: string;
 };
 
 export type LedgerHarness = {
@@ -114,6 +126,13 @@ export const startLedgerWorker = async (
 	if (new Set(ids).size !== ids.length)
 		throw new Error("two presets would be seeded as one school id");
 
+	let placeholderAssets: string | null = null;
+	if (options.assetsDirectory === undefined) {
+		placeholderAssets = await mkdtemp(join(tmpdir(), "ledger-assets-"));
+		await writeFile(join(placeholderAssets, "index.html"), PLACEHOLDER_PAGE);
+	}
+	const assetsDirectory =
+		options.assetsDirectory ?? (placeholderAssets as string);
 	const signer = await testSigner(DEFAULT_KEY_FILL);
 	let keys: readonly TestJwk[] = [signer.jwk];
 	let jwksFetches = 0;
@@ -152,6 +171,15 @@ export const startLedgerWorker = async (
 		// IPv4 explicitly: "localhost" has intermittently failed to connect while Miniflare started
 		host: HOST,
 		r2Buckets: [BUCKET_BINDING],
+		assets: {
+			directory: assetsDirectory,
+			binding: "ASSETS",
+			routerConfig: {
+				has_user_worker: true,
+				static_routing: { user_worker: WORKER_FIRST },
+			},
+			assetConfig: { not_found_handling: "single-page-application" },
+		},
 		bindings: {
 			LEDGER_ISS: TEST_ISSUER,
 			LEDGER_JWKS_URL: `${origin}/jwks.json`,
@@ -228,11 +256,15 @@ export const startLedgerWorker = async (
 			async stop() {
 				await miniflare.dispose();
 				await new Promise<void>((resolve) => server.close(() => resolve()));
+				if (placeholderAssets !== null)
+					await rm(placeholderAssets, { recursive: true, force: true });
 			},
 		};
 	} catch (error) {
 		await miniflare.dispose().catch(() => undefined);
 		server.close();
+		if (placeholderAssets !== null)
+			await rm(placeholderAssets, { recursive: true, force: true });
 		throw error;
 	}
 };

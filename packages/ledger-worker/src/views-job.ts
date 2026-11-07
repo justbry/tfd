@@ -6,6 +6,7 @@
 import { runViews } from "atm/worker";
 import { jobStatusKey, readJobProblem } from "./data/job-status.js";
 import { putText, type Store } from "./data/store-io.js";
+import { asOfFor } from "./data/watermark.js";
 
 const SCHOOLS_PREFIX = "schools/";
 
@@ -58,7 +59,11 @@ const runOne = async (
 	asOf: Date,
 ): Promise<ViewsJobResult> => {
 	try {
-		const run = await runViews(store, school, asOf);
+		const run = await runViews(
+			store,
+			school,
+			await asOfFor(store, school, asOf),
+		);
 		if (!run.ok) {
 			await recordOutcome(store, school, { kind: run.error.kind }, asOf);
 			console.error(`views job failed for school ${school}`);

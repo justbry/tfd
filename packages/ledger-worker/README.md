@@ -32,20 +32,34 @@ logged as `views job failed for school <id>` and nothing else (a job message can
 
 | Name | Kind | Value |
 | --- | --- | --- |
-| `LEDGER_BUCKET` | R2 binding | the environment's bucket (`b4uni-staging-ledger`, `b4uni-production-ledger`: to confirm in the setup step) |
+| `LEDGER_BUCKET` | R2 binding | the environment's bucket (`b4uni-stg-ledger` exists; `b4uni-prod-ledger` does not, and production stays off) |
 | `LEDGER_ISS` | var | the family service's `API_BASE` for the environment |
 | `LEDGER_JWKS_URL` | var | its `/.well-known/ledger-jwks.json` |
-| `ASSETS` | assets binding | optional: the UI build |
+| `ASSETS` | assets binding | `../ledger-ui/dist`, single-page-application fallback, `/v1/*` and `/healthz` run the Worker first |
 | cron | trigger | `*/5 * * * *` |
 | route | custom domain | `ledger-staging.b4uni.com`, `ledger.b4uni.com` |
 
 `nodejs_compat` is on (`atm/worker` imports `node:crypto`). `atm/worker` is aliased to its source in the config, so the
 bundle does not need atm's `dist`. No secret is needed. `bun run check:bundle` runs `wrangler deploy --dry-run` for both
-environments (through `bunx wrangler@4.90.0`: the repo's esbuild override breaks a local wrangler).
+environments (through `bunx wrangler@4.90.0`: the repo's esbuild override breaks a local wrangler). Wrangler needs the
+assets directory to exist: the check uses `../ledger-ui/dist` if it is built, builds the UI first when its dependencies are
+installed, and otherwise checks against a placeholder page (`--assets`) and says so. A real deploy must build the UI first.
 
-**UI assets.** The UI build is not wired in yet, so a path outside `/v1` is a 404. When `packages/ledger-ui` builds to `dist`,
-add to each environment `"assets": { "directory": "../ledger-ui/dist", "binding": "ASSETS", "not_found_handling":
-"single-page-application" }`; the Worker serves `ASSETS` for every path that is not `/healthz` or `/v1`.
+**Assets.** A page that is not a file in the UI build gets `index.html`. `/v1/*` and `/healthz` run the Worker first, so an
+unknown `/v1/x` is the Worker's JSON 404, never a page. The harness serves a placeholder `index.html` the same way (or the
+`assetsDirectory` it is given).
+
+## The views job and `asOf`
+
+Every 5 minutes the job runs `runViews` for each school prefix in the bucket, with `asOf` set to the earlier of the scheduled
+time and the school's ship watermark: the object `schools/<id>/events/_shipped-through.json`,
+`{ "school", "env", "shippedThrough": "<ISO instant>" }`, that the buzz-school shipper writes after each run (one constant,
+`watermarkKey` in `src/data/watermark.ts`). `asOf` is what the UI's pending state waits for, so a write must not look shipped
+before it is.
+
+**Without a watermark, `asOf` can run ahead of unshipped events**: the job then uses the scheduled time. It does the same for
+a watermark that is unreadable, not JSON, another school's, or without an instant, and a watermark dated after the
+scheduled time never raises `asOf` above it.
 
 Not implemented: rate limiting (`429 rate_limited` is in the table and is never sent).
 

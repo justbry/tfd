@@ -13,7 +13,7 @@
 	"scripts": {
 		"ts": "tsc --noEmit",
 		"test": "bun test tests",
-		"check:bundle": "bunx wrangler@4.90.0 deploy --dry-run --outdir dist/staging --env staging && bunx wrangler@4.90.0 deploy --dry-run --outdir dist/production --env production"
+		"check:bundle": "bun scripts/check-bundle.ts"
 	},
 	"dependencies": {
 		"atm": "workspace:*"
