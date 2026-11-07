@@ -18,6 +18,9 @@ export const STAGING_API = "https://api-staging.b4uni.com";
 /** The origin the browser UI calls the family service from, and the one production must not have there. */
 export const LEDGER_ORIGIN = STAGING_WORKER;
 export const PRODUCTION_LEDGER_ORIGIN = "https://ledger.b4uni.com";
+/** The web app's origin: a person signs in there, and the session cookie then carries to the ledger origin (same site).
+ * `/family/verify` is outside LEDGER_ROUTES, so the family service refuses it from the ledger origin (403 origin). */
+export const STAGING_WEB_ORIGIN = "https://staging.b4uni.com";
 const FLY_APP = "b4uni-stg-family";
 const QA_OPERATOR = "s8f";
 const FIXTURE_READER = join(
@@ -442,6 +445,7 @@ class Session {
 		const reply = await this.api("/family/verify", {
 			method: "POST",
 			body: { token: minted.token },
+			headers: { origin: STAGING_WEB_ORIGIN },
 		});
 		if (reply.status !== 200)
 			return {
@@ -1049,61 +1053,85 @@ export const stage2 = async (context: Context): Promise<void> => {
 		});
 	}
 
+	// Finance gating needs a token that is finance:false on some school. A second QA admin without the grant gives one;
+	// so does the first account's own token when it lists a school it administers without the grant.
+	let gate: { session: Session; schoolId: string; source: string } | null =
+		null;
 	const admin = adminSession(context);
-	if (admin === null) {
+	if (admin !== null) {
+		if (!(await admin.open(stage, report))) return;
+		const adminChoice = targetSchool(
+			{ ...context, inputs: { ...context.inputs, schoolId: school.id } },
+			admin,
+		);
+		if ("blocked" in adminChoice) {
+			report.add(stage, "finance-gating", "BLOCKED", adminChoice.blocked);
+			return;
+		}
+		if (adminChoice.grant.finance) {
+			report.add(
+				stage,
+				"finance-gating",
+				"BLOCKED",
+				`S8F_QA_EMAIL_ADMIN holds the finance grant (or owns) on ${school.id}: the school's owner removes the grant, or supplies an admin without it`,
+			);
+			return;
+		}
+		gate = {
+			session: admin,
+			schoolId: school.id,
+			source: "S8F_QA_EMAIL_ADMIN",
+		};
+	} else {
+		const withoutGrant = owner.schools.find((grant) => !grant.finance);
+		if (withoutGrant)
+			gate = {
+				session: owner,
+				schoolId: withoutGrant.id,
+				source: "the first account's token, finance:false on this school",
+			};
+	}
+	if (gate === null) {
 		report.add(
 			stage,
 			"finance-gating",
 			"BLOCKED",
-			"needs a second QA account that administers the school without the finance grant (S8F_QA_EMAIL_ADMIN, and S8F_PIN_ADMIN when its PIN differs): the school's owner creates it and the platform owner lists it in QA_EMAILS",
+			"needs a token that is finance:false on a school: a second QA account that administers the school without the finance grant (S8F_QA_EMAIL_ADMIN, and S8F_PIN_ADMIN when its PIN differs), or a school the first account administers without the grant",
 		);
 		return;
 	}
-	if (!(await admin.open(stage, report))) return;
-	const adminChoice = targetSchool(
-		{ ...context, inputs: { ...context.inputs, schoolId: school.id } },
-		admin,
-	);
-	if ("blocked" in adminChoice) {
-		report.add(stage, "finance-gating", "BLOCKED", adminChoice.blocked);
-		return;
-	}
-	if (adminChoice.grant.finance) {
-		report.add(
-			stage,
-			"finance-gating",
-			"BLOCKED",
-			`S8F_QA_EMAIL_ADMIN holds the finance grant (or owns) on ${school.id}: the school's owner removes the grant, or supplies an admin without it`,
-		);
-		return;
-	}
+	const { session: gatedSession, schoolId: gatedSchool, source } = gate;
 	const { from, to } = currentMonthRange();
 	const gated: [string, string, number, string][] = [
 		[
 			"finance-ledger",
-			`/v1/schools/${school.id}/ledger?from=${from}&to=${to}`,
+			`/v1/schools/${gatedSchool}/ledger?from=${from}&to=${to}`,
 			403,
 			"finance_required",
 		],
 		[
 			"finance-income-statement",
-			`/v1/schools/${school.id}/income-statement?from=${from}&to=${to}`,
+			`/v1/schools/${gatedSchool}/income-statement?from=${from}&to=${to}`,
 			403,
 			"finance_required",
 		],
 		[
 			"audience-finance",
-			`/v1/schools/${school.id}/kpi?audience=finance&pin=open`,
+			`/v1/schools/${gatedSchool}/kpi?audience=finance&pin=open`,
 			403,
 			"audience_not_allowed",
 		],
 	];
 	for (const [name, path, status, code] of gated)
 		await check(context, stage, name, async () => {
-			const result = expectStatus(await admin.worker(path), status, code);
+			const result = expectStatus(
+				await gatedSession.worker(path),
+				status,
+				code,
+			);
 			return {
 				...result,
-				why: `finance:false ${path.split("?")[0]?.split("/").pop()} ${result.why}`,
+				why: `finance:false (${source}) ${path.split("?")[0]?.split("/").pop()} ${result.why}`,
 			};
 		});
 };
