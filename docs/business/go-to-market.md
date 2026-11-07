@@ -1,6 +1,6 @@
 # Trifold go-to-market: channels, the firm program and referrals
 
-Status: draft, 2026-11-07. Every price and rate here is an assumption to test with design partners, not a decision. The phases and growth loops are in `business-plan.md` §7; prices are in `pricing-strategy.md`. This doc covers who brings schools to Trifold, and what they get for it.
+Status: draft, 2026-11-07. Every price and rate here is an assumption to test with design partners, not a decision, with one exception: affiliate cash commissions last 24 months (owner's decision, 2026-11-07). Nothing in this doc is built; the engine pieces it reuses (`tfd share`, credits, organizations) are noted where they exist. The phases and growth loops are in `business-plan.md` §7; prices are in `pricing-strategy.md`. This doc covers who brings schools to Trifold, and what they get for it.
 
 ## 1. Channels
 
@@ -40,7 +40,7 @@ Tiers are ranked by active paying clients, like Xero's partner tiers.
 | **Practice** | 5 active clients | $99/mo + **30% off** each client's plan (like QuickBooks' ProAdvisor discount) | One firm bill, a dashboard across clients, books templates, Rifo closing months in a batch |
 | **Practice Pro** | 15 active clients, or pay to unlock | $399/mo + wholesale per client (e.g. Pro $49, Witnessed $99) | The firm's own prices and checkout, branded portal, credit re-billing with markup, client books created from a template on payment, white-label verify page (badge kept) |
 
-**Example:** a firm with 30 schools on Practice Pro charges each $300/mo for bookkeeping plus software. Trifold earns about 30 × $55 + $399 ≈ **$2,050/mo** with no sales cost. Selling direct at about $76 a school would earn ≈ $2,280, but Trifold would have to win all 30 itself. The firm keeps ≈ $7,000/mo for its labor. This is the Witnessed + Bookkeeper bundle (~$349) turned into a program any vetted firm can run.
+**Example:** a firm with 30 schools on Practice Pro charges each $300/mo for bookkeeping plus software. At an average wholesale of about $55 a client (mostly Pro at $49, a few Witnessed at $99), Trifold earns about 30 × $55 + $399 ≈ **$2,050/mo** with no sales cost. Selling direct at about $76 a school would earn ≈ $2,280, but Trifold would have to win all 30 itself. The firm keeps ≈ $7,000/mo for its labor. This is the Witnessed + Bookkeeper bundle (~$349) turned into a program any vetted firm can run.
 
 ### Build order
 
@@ -55,7 +55,7 @@ Tiers are ranked by active paying clients, like Xero's partner tiers.
 GoHighLevel pays **40% for as long as the customer pays**, plus **5% of the sales of affiliates you recruit**, with a 90-day last-click cookie and monthly Net-30 payouts over $50. Accounting vendors pay much less: Xero doesn't publish a rate (listings show 10% for 6 months, or $160 flat), and QuickBooks pays up to 10% with a 30-day cookie. Neither pays CPAs in cash; they pay through discounts and tiers.
 
 Trifold changes three things:
-- **Cash is limited to 24 months,** matching the FSL's two years, so the company has one number for how long its protections last. 40% for life is about $30 a month per school forever, at a ~$76 average.
+- **Cash is limited to 24 months** (owner's decision, 2026-11-07; it was 12 in the first draft), matching the FSL's two years, so the company has one number for how long its protections last. 40% for life is about $30 a month per school forever, at a ~$76 average.
 - **There is no second tier** (3.4).
 - **Accountants get no cash** (section 4).
 
@@ -139,7 +139,7 @@ A lawyer reviews the affiliate terms, the disclosures and the FTC wording before
 
 ## 6. Open decisions
 
-1. Rates and tier thresholds, after design-partner tests.
+1. Rates (25%, 30%, 35%) and tier thresholds, after design-partner tests. The 24-month length is decided (2026-11-07).
 2. Whether to offer the one-time recruit bonus (3.4, item 3), or nothing at all.
 3. Whether accountants stay cash-free, or get cash with the Idaho and Utah disclosures (section 4).
 4. Practice and Practice Pro prices, and wholesale per plan.

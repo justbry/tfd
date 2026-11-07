@@ -160,7 +160,7 @@
 
   <header class="hero">
     <div class="wordmark">Tri<b>fold</b> &nbsp;<span class="draft">Draft pricing</span></div>
-    <h1>Books you can prove. Priced so anyone can start.</h1>
+    <h1>Priced so anyone can start.</h1>
     <p>The tfd engine is free to self-host. Pay when you want Trifold to host it, automate it, and stand behind it as an independent witness.</p>
   </header>
 
@@ -229,7 +229,7 @@
       <div><b>Export everything</b>Your books are yours, in open formats.</div>
       <div><b>Erasure &amp; privacy</b>Delete personal data without breaking your books.</div>
       <div><b>Security fixes</b>For every plan and every self-hosted install.</div>
-      <div><b>Open standards</b>The receipt, seal and KPI specs are open to anyone.</div>
+      <div><b>Open formats</b>The receipt and seal formats are open to anyone.</div>
     </div>
   </section>
 
@@ -238,20 +238,20 @@
     <details><summary>What's a ledger event?</summary>
       <p>One thing that happened to your money: a payment, a refund, a credit used, a booking. A typical family or member makes about 7 a month, so Free's 1,000 events covers about 140 families. Most organizations upgrade for features, not limits.</p></details>
     <details><summary>What happens if I go over my limit?</summary>
-      <p>Your books keep running. On Free you get a warning and a read-only prompt to upgrade. On paid plans, extra events are $2 per 10,000, and only if you turn overage on. By default there's a hard cap with alerts at 80% and 100%, so there are no surprise bills.</p></details>
+      <p>Nothing stops and nothing is billed. Event limits are soft on Free, Starter, Pro and Witnessed: your books keep running, and if you stay over for two months we'll suggest a plan that fits. There is no metered overage. Only Platform pays per event, about $1 per 10,000.</p></details>
     <details><summary>Who qualifies for non-profit &amp; co-op pricing?</summary>
-      <p>US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). Non-profits with gross receipts of $50,000 or less get Witnessed free on the Free plan, with up to about 200 witnessed receipts a month.</p></details>
+      <p>US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). Non-profits with gross receipts of $50,000 or less get Witnessed free on the Free plan, with up to about 200 witnessed receipts a month, once the witness ships.</p></details>
     <details><summary>Do the annual and non-profit discounts stack?</summary>
       <p>Yes. Annual billing is ten months' price for twelve months, applied to whichever price you qualify for.</p></details>
-    <details><summary>What does "Witnessed" mean? Is it an audit?</summary>
-      <p>It isn't an audit. Trifold countersigns each receipt and monthly seal and logs it publicly, which proves Trifold saw that exact record at that time and that nobody changed it afterwards. It doesn't prove the money moved or that the books are complete. That's what makes your auditor's job faster, not unnecessary.</p></details>
+    <details><summary>What will "Witnessed" mean? Is it an audit?</summary>
+      <p>It isn't an audit. Once it ships, Trifold will countersign each receipt and monthly seal and log it publicly, which proves Trifold saw that exact record at that time and that nobody changed it afterwards. It doesn't prove the money moved or that the books are complete. That makes your auditor's job faster, not unnecessary.</p></details>
     <details><summary>Can I self-host for free?</summary>
       <p>Yes. The whole engine and the <code>tfd</code> CLI are free to run yourself, including receipts, seals, reconcile and simulate. tfd is source-available under the Functional Source License. The license lets you use and change it for your own organization, for non-commercial education and research, and for professional services to a licensee; it doesn't allow selling it as a competing hosted service. Every tfd release becomes Apache-2.0 two years after it ships. The verifier and receipt format are Apache-2.0 today.</p></details>
     <details><summary>Does Trifold file my taxes?</summary>
       <p>No. Trifold keeps provable books and prepares the reports your CPA or enrolled agent needs. Partner bookkeepers can close the month for you.</p></details>
   </section>
 
-  <p class="fine">Draft for internal review, 2026-11-06. Prices in USD, before any sales tax. Features marked "soon" aren't available yet. Non-profit and co-op pricing requires verification. Donation acknowledgments are written to meet IRS written-acknowledgment requirements; Trifold doesn't guarantee any donor's deduction.</p>
+  <p class="fine">Draft for internal review, 2026-11-06; synced with pricing-strategy.md and the site's pricing data on 2026-11-07 (the site's version is the current one). Prices in USD, before any sales tax. Features marked "soon" aren't available yet. Non-profit and co-op pricing requires verification. Donation acknowledgments are written to meet IRS written-acknowledgment requirements; Trifold doesn't guarantee any donor's deduction.</p>
 </div>
 
 <script>
@@ -261,18 +261,18 @@
 
   const PLANS = [
     { id: "free", name: "Free", tagline: "Hosted books for small organizations getting started.", price: { std: 0, np: 0 },
-      events: 1000, limits: "1,000 events · 200 credits · 2 seats", cta: "Start free",
+      events: 1000, limits: "1,000 events · 200 credits · 2 seats", cta: "Get early access",
       features: ["Books built from your Stripe events", "Self-signed receipts and sealed months", "Reports and on-demand reconcile", "1 Pricing Lab forecast a month",
         { text: "Witnessed free for non-profits under $50K a year", np: true, plus: true }] },
     { id: "starter", name: "Starter", tagline: "Signed receipts on top of the books you already keep.", price: { std: 29, np: 15 },
-      events: 5000, limits: "5,000 events · 1,000 credits · 5 seats", cta: "Choose Starter",
+      events: 5000, limits: "5,000 events · 1,000 credits · 5 seats", cta: "Get early access",
       features: ["Everything in Free", { text: "QuickBooks or Xero sync", soon: true }, "Email support", "Free seats for your CPA"] },
-    { id: "pro", name: "Pro", tagline: "Replace QuickBooks. Your month closes itself.", price: { std: 79, np: 39 }, badge: "Most popular", featured: true,
-      events: 25000, limits: "25,000 events · 5,000 credits · unlimited seats", cta: "Choose Pro",
-      features: ["Everything in Starter", "Pricing Lab: forecasts and saved scenarios", "Daily reconcile with alerts", "Scheduled monthly close", "Roles, approvals and Google sign-in",
-        { text: "Rifo, your AI bookkeeper", soon: true }, { text: "Public \"open books\" page", np: true, soon: true }] },
+    { id: "pro", name: "Pro", tagline: "Your month closes on a schedule.", price: { std: 79, np: 39 }, badge: "Recommended", featured: true,
+      events: 25000, limits: "25,000 events · 5,000 credits · unlimited seats", cta: "Get early access",
+      features: ["Everything in Starter", "Up to 3 organizations", "Pricing Lab: forecasts and saved scenarios", "Daily reconcile with alerts", "Scheduled monthly close", "Roles, approvals and Google sign-in",
+        { text: "Bank-statement import (CSV/OFX)", soon: true }, { text: "Rifo drafts. You approve. The engine does the math.", soon: true }, { text: "Public \"open books\" page", np: true, soon: true }] },
     { id: "witnessed", name: "Witnessed", tagline: "Books an auditor, grantor or state program can verify.", price: { std: 149, np: 79 }, badge: "Early access", witness: true,
-      events: 25000, limits: "25,000 events · 8,000 credits · unlimited seats", cta: "Join early access",
+      events: 25000, limits: "25,000 events · 8,000 credits · unlimited seats", cta: "Get early access",
       features: ["Everything in Pro", { text: "Trifold countersigns every receipt and seal", soon: true, plus: true }, { text: "Public transparency log", soon: true, plus: true },
         { text: "Auditor portal", soon: true, plus: true }, { text: "Daily matching to Stripe payouts", soon: true, plus: true }, "Priority support",
         { text: "Donation receipts use no credits", np: true, plus: true }, { text: "Unlimited board and member seats", np: true, plus: true }] },
@@ -310,7 +310,7 @@
       ["Credits a month", "For Rifo and witness signatures", ["—", "200", "1,000", "5,000", "8,000", "Pooled"]],
       ["Seats", "CPA and auditor seats never count", ["Yours", "2", "5", "Unlimited", "Unlimited", "Unlimited"]],
       ["Storage and compute", "", ["Your own", "Included", "Included", "Included", "Included", "Included"]],
-      ["Over the event limit", "Opt-in; hard cap by default", ["—", "Warning, books keep running", "$2 / 10K", "$2 / 10K", "$2 / 10K", "~$1 / 10K"]],
+      ["Over the event limit", "No metered overage", ["—", "Soft limit: books keep running", "Soft limit: books keep running", "Soft limit: books keep running", "Soft limit: books keep running", "~$1 / 10K"]],
     ]],
     ["Books", [
       ["Billing engine", "Credits, plans, bookings, codes, memberships", [true, true, true, true, true, true]],

@@ -46,8 +46,8 @@ Deferred until after launch: `/rifo` (folded into Close and Roadmap), `/standard
 3. **Chapters 01–06** with the fold line running down the margin. One pinned visual (a ledger panel) changes state through 01–03; 04–06 are cards in ember and outline.
    - **01 · MONEY IN** (lit): tuition, memberships, packs, bookings, through Stripe.
    - **02 · BOOKS** (lit): balanced, append-only, replayable. Durable: export to Parquet, hledger, CSV; self-host the engine.
-   - **03 · PROOF** (lit): a signed receipt for every payment, a sealed month. **Inline verifier** with a sample receipt and a tampered one. Resilient: rebuild everything from the events. "Not even Trifold can quietly change your books."
-   - **04 · CLOSE** (ember, NEXT): Rifo reconciles and closes; daily payout matching; Trifold as witness. Fast: a year rebuilt in seconds today.
+   - **03 · PROOF** (lit): a signed receipt for every payment, a sealed month. **Inline verifier** with a sample receipt and a tampered one. Resilient: rebuild everything from the events.
+   - **04 · CLOSE** (ember, NEXT): Rifo reconciles and closes; daily payout matching; Trifold as witness. Fast: a year rebuilt locally today (no speed numbers).
    - **05 · TAXES** (outline, LATER): tax-ready packages for your CPA.
    - **06 · FINANCE** (outline, LATER): your finance warehouse, forecasts, agents.
 4. **Who can check.** Parent, treasurer, CPA, auditor, donor; one line each.
