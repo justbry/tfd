@@ -24,6 +24,7 @@ tests/
 !packages/balance-worker-client/tests
 !packages/auto-topup/tests
 !packages/cache/tests
+!packages/ledger-worker/tests
 !packages/encryption/tests
 !packages/sqs/tests
 !packages/catalog-lru/tests
