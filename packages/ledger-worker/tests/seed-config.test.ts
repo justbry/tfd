@@ -136,26 +136,38 @@ describe("seedSchoolFixtures", () => {
 			new TextEncoder().encode("{}\n"),
 			stored?.etag as string,
 		);
+		const kept = await seedSchoolFixtures(store, {
+			schools: [{ id, fixture: "b4u" }],
+			now: LATER_RUN,
+		});
+		// by default an object that differs is left alone: an owner may have edited it
+		expect(kept.kept).toBe(1);
+		// the manifest follows the bytes that are there; no config object is rewritten
+		expect(
+			kept.objects
+				.filter((entry) => entry.action === "written")
+				.map((entry) => entry.name),
+		).toEqual(["manifest"]);
+		expect((await readStored(store, key))?.text).toBe("{}\n");
 		const report = await seedSchoolFixtures(store, {
 			schools: [{ id, fixture: "b4u" }],
 			now: LATER_RUN,
+			overwrite: true,
 		});
 		expect(
 			report.objects
 				.filter((entry) => entry.action === "written")
 				.map((entry) => entry.name),
-		).toEqual(["promos"]);
+		).toEqual(["promos", "manifest"]);
 		expect((await readStored(store, key))?.text).toBe(
 			canonicalJson(fixtureObjects(id, "b4u").promos),
 		);
 		const manifest = JSON.parse(
 			(await readStored(store, configKey(id, "manifest")))?.text as string,
 		) as ConfigManifest;
-		// the restored bytes are the ones the manifest already lists: it is right, so it stays as it was
-		expect(manifest.objects.promos?.updatedAt).toBe(FIRST_RUN);
-		expect(
-			report.objects.find((entry) => entry.name === "manifest")?.action,
-		).toBe("unchanged");
+		expect(manifest.objects.promos?.sha256).toBe(
+			sha256(canonicalJson(fixtureObjects(id, "b4u").promos)),
+		);
 	});
 
 	test("runs at the same time are safe: each object is written once and the end state is the fixture's", async () => {
@@ -335,7 +347,7 @@ describe("the seed:r2 command", () => {
 		expect(code).toBe(0);
 		expect(spy.counts.puts).toBe(0);
 		expect(text).toContain(`seed:r2 ${STAGING_BUCKET} (dry run)`);
-		expect(text).toContain("dry run: would-write:6 unchanged:0");
+		expect(text).toContain("dry run: would-write:6 unchanged:0 kept:0");
 		for (const secret of [
 			ENV.R2_LEDGER_ACCESS_KEY_ID,
 			ENV.R2_LEDGER_SECRET_ACCESS_KEY,
@@ -347,9 +359,11 @@ describe("the seed:r2 command", () => {
 	test("a real run on Miniflare reports written:N, then written:0 unchanged:N", async () => {
 		const first = await run(["--school", "har"]);
 		expect(first.code).toBe(0);
-		expect(first.text).toContain("written:6 unchanged:0");
+		expect(first.text).toContain("written:6 unchanged:0 kept:0");
 		const second = await run(["--school", "har"]);
-		expect(second.text).toContain(`written:0 unchanged:${OBJECTS_PER_SCHOOL}`);
+		expect(second.text).toContain(
+			`written:0 unchanged:${OBJECTS_PER_SCHOOL} kept:0`,
+		);
 	});
 
 	test("production, another bucket, another host and a missing variable are refused before any store is made", async () => {
@@ -417,12 +431,15 @@ describe("the seed:r2 command", () => {
 		expect(parseSeedArgs([])).toEqual({
 			schools: fixtureSchoolIds(),
 			dryRun: false,
+			overwrite: false,
 		});
+		expect(parseSeedArgs(["--overwrite"]).overwrite).toBe(true);
 		expect(
 			parseSeedArgs(["--school", "vol", "--school", "nw", "--dry-run"]),
 		).toEqual({
 			schools: ["vol", "nw"],
 			dryRun: true,
+			overwrite: false,
 		});
 		expect(connectionOf(ENV).bucket).toBe(STAGING_BUCKET);
 		expect(() => connectionOf({})).toThrow(UsageError);

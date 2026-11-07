@@ -131,7 +131,7 @@ export const fixtureObjects = (id: string, fixture: string): ConfigValues => {
 	};
 };
 
-export type SeedAction = "written" | "unchanged" | "would-write";
+export type SeedAction = "written" | "unchanged" | "would-write" | "kept";
 export type SeededObject = {
 	school: string;
 	name: ConfigName | "manifest";
@@ -141,6 +141,8 @@ export type SeededObject = {
 export type SeedReport = {
 	written: number;
 	unchanged: number;
+	/** Objects that differ from the fixture and were left alone (see `SeedOptions.overwrite`). */
+	kept: number;
 	/** Only a dry run: what a real run would write. */
 	wouldWrite: number;
 	objects: SeededObject[];
@@ -152,6 +154,8 @@ export type SeedOptions = {
 	now: Date | string;
 	/** Read only: report what would be written. */
 	dryRun?: boolean;
+	/** Replace an object whose bytes differ from the fixture's. Default: keep it (an owner may have edited it). */
+	overwrite?: boolean;
 };
 
 const targetOf = (target: SeedTarget): { id: string; fixture: string } =>
@@ -163,11 +167,13 @@ const landObject = async (
 	text: string,
 	sha256: string,
 	dryRun: boolean,
+	overwrite: boolean,
 ): Promise<SeedAction> => {
 	for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
 		const current = await readStored(store, key);
 		// equal bytes: either they were always there or a run at the same time put them
 		if (current?.sha256 === sha256) return "unchanged";
+		if (current && !overwrite) return "kept";
 		if (dryRun) return "would-write";
 		if (await putConditionally(store, key, text, expectationOf(current)))
 			return "written";
@@ -188,6 +194,7 @@ export const seedSchoolFixtures = async (
 	const report: SeedReport = {
 		written: 0,
 		unchanged: 0,
+		kept: 0,
 		wouldWrite: 0,
 		objects: [],
 	};
@@ -195,6 +202,7 @@ export const seedSchoolFixtures = async (
 		report.objects.push(entry);
 		if (entry.action === "written") report.written += 1;
 		else if (entry.action === "unchanged") report.unchanged += 1;
+		else if (entry.action === "kept") report.kept += 1;
 		else report.wouldWrite += 1;
 	};
 	for (const target of options.schools) {
@@ -221,8 +229,9 @@ export const seedSchoolFixtures = async (
 				text,
 				sha256,
 				dryRun,
+				options.overwrite === true,
 			);
-			if (action !== "unchanged") anyWrite = true;
+			if (action === "written" || action === "would-write") anyWrite = true;
 			count({ school: id, name, action, sha256 });
 		}
 		const manifest = await updateManifest(store, id, {

@@ -24,17 +24,23 @@ const EXIT_USAGE = 2;
 
 export class UsageError extends Error {}
 
-export type SeedArgs = { schools: string[]; dryRun: boolean };
+export type SeedArgs = {
+	schools: string[];
+	dryRun: boolean;
+	overwrite: boolean;
+};
 
 export const USAGE =
-	"usage: seed:r2 [--env staging] [--school <id>]... [--dry-run]";
+	"usage: seed:r2 [--env staging] [--school <id>]... [--dry-run] [--overwrite]";
 
 export const parseSeedArgs = (argv: readonly string[]): SeedArgs => {
 	const schools: string[] = [];
 	let dryRun = false;
+	let overwrite = false;
 	for (let index = 0; index < argv.length; index += 1) {
 		const flag = argv[index];
 		if (flag === "--dry-run") dryRun = true;
+		else if (flag === "--overwrite") overwrite = true;
 		else if (flag === "--env") {
 			index += 1;
 			const environment = argv[index];
@@ -57,6 +63,7 @@ export const parseSeedArgs = (argv: readonly string[]): SeedArgs => {
 	return {
 		schools: schools.length === 0 ? fixtureSchoolIds() : schools,
 		dryRun,
+		overwrite,
 	};
 };
 
@@ -118,8 +125,8 @@ export const reportLines = (report: SeedReport, dryRun: boolean): string[] => [
 		(entry) => `${entry.action.padEnd(11)} ${entry.school}/${entry.name}`,
 	),
 	dryRun
-		? `dry run: would-write:${report.wouldWrite} unchanged:${report.unchanged}`
-		: `written:${report.written} unchanged:${report.unchanged}`,
+		? `dry run: would-write:${report.wouldWrite} unchanged:${report.unchanged} kept:${report.kept}`
+		: `written:${report.written} unchanged:${report.unchanged} kept:${report.kept}`,
 ];
 
 /** Runs the command and answers its exit code. Nothing it prints holds a credential. */
@@ -134,6 +141,7 @@ export const runSeed = async (command: SeedCommand): Promise<number> => {
 			schools: args.schools,
 			now: command.now(),
 			dryRun: args.dryRun,
+			overwrite: args.overwrite,
 		});
 		for (const line of reportLines(report, args.dryRun))
 			command.write(`${line}\n`);
