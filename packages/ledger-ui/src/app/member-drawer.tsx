@@ -133,7 +133,7 @@ function BookingRow({
 	booking: MemberBooking;
 	context: PersonContext;
 	unit: DrawerProps["unit"];
-	currency: string;
+	currency: string | null;
 	busy: DrawerProps["busy"];
 	onAction: DrawerProps["onBookingAction"];
 }): JSX.Element {

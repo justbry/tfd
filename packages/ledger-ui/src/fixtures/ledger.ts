@@ -725,14 +725,18 @@ function donorSpread(
 
 // ---- The Reader methods.
 
+/** A fixture school: every one has a currency (`School.currency` is null only for a real school with no menu and no
+ * Stripe account). */
+export type FixtureSchool = School & { currency: string };
+
 export function createLedgerReader(options: {
 	clock: Clock;
-	schools: School[];
+	schools: FixtureSchool[];
 	/** The KPI document the Dashboard shows for this school and audience: Reports reads its cells. */
 	reportDocument: (query: AudienceReportQuery) => KpiDocument;
 }): LedgerReader {
 	const { clock, schools } = options;
-	const schoolOf = (id: string): School => {
+	const schoolOf = (id: string): FixtureSchool => {
 		const school = schools.find((candidate) => candidate.id === id);
 		if (!school) throw new Error(`no school ${id}`);
 		return school;

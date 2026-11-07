@@ -58,6 +58,8 @@ const grants: LedgerSchoolClaim[] = [
 	{ id: owned, role: "owner", finance: true },
 	{ id: gated, role: "admin", finance: false },
 ];
+/** The school whose `ledger/school` answers as staging's school with no menu and no Stripe account does. */
+const noCurrency = gated;
 const pin = "246810";
 const qaLinkToken = ["qa", "link", "for", "stage", "five"].join("-");
 const sessionCookie = ["session", "of", "the", "qa", "account"].join("-");
@@ -127,6 +129,16 @@ const startFamilyService = (seeded: LedgerHarness) => {
 				return answer(versionsAnswer);
 			if (route && school && route[2] === "bookings")
 				return answer(bookingsAnswer([bookingRow({ attendance: null })]));
+			// buzz-school with no menu and no Stripe account (S8-contract section 11): the time zone defaults to UTC and
+			// the credit unit to credit/credits, and the currency is null. On staging this one school made schools() reject.
+			if (route && school?.id === noCurrency && route[2] === "ledger/school")
+				return answer({
+					school: school.id,
+					name: `School ${school.id}`,
+					timeZone: "UTC",
+					currency: null,
+					creditUnit: { one: "credit", other: "credits" },
+				});
 			const faked = await buzzSchool.fetch(request.url, {
 				method: request.method,
 			});
@@ -181,7 +193,7 @@ const byCheck = (results: readonly Result[]) =>
 
 describe.skipIf(skip)("stage 5 on the local Worker", () => {
 	test(
-		"every check passes through the UI's adapters, the Reader, C5, C4, the gating and the HTTP build's entry",
+		"every check passes through the UI's adapters, the Reader, C5, C4, the gating and the HTTP build's entry, with a second school that has no currency",
 		async () => {
 			const lines: string[] = [];
 			const context = contextFor(lines);
@@ -238,6 +250,10 @@ describe.skipIf(skip)("stage 5 on the local Worker", () => {
 			for (const audience of ["governance", "finance", "owner"])
 				expect(checks[`c4-${audience}-locked`]?.status).toBe("PASS");
 			expect(checks["c4-owner-open"]?.why).toContain("render(s)");
+			// Both schools are answered, the one with no currency as null.
+			expect(checks["reader-schools"]?.why).toContain("School[] of 2");
+			expect(checks["reader-schools"]?.why).toContain("1 with no currency");
+			expect(checks["reader-schools"]?.why).not.toContain("left out");
 			expect(checks["reader-settings"]?.why).toContain("not_available");
 			expect(checks["gating-ledger"]?.why).toContain("finance_required");
 			expect(checks["gating-ledger-mount"]?.why).toContain("lock shown");
