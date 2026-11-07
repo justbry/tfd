@@ -2,7 +2,7 @@ import { Layer } from "effect";
 import type { Reader as ReaderContract } from "$contract/data/reader.ts";
 import type { Writer as WriterContract } from "$contract/data/writer.ts";
 import { liveClockLayer } from "./clock.ts";
-import { memoryLogLayer } from "./log.ts";
+import { memoryLog } from "./log.ts";
 import {
 	type Clock,
 	type Log,
@@ -25,7 +25,7 @@ export const appLayer = (options: {
 	Layer.mergeAll(
 		Layer.succeed(Reader, options.reader),
 		Layer.succeed(Writer, options.writer),
-		Layer.mergeAll(toastsLayer, memoryLogLayer).pipe(
+		Layer.mergeAll(toastsLayer, memoryLog().layer).pipe(
 			Layer.provideMerge(options.clockLayer ?? liveClockLayer),
 		),
 	);

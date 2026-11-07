@@ -85,8 +85,11 @@
 		{/each}
 		<Table.Row class="border-0 font-semibold hover:bg-transparent" data-test="all-schools-total">
 			<Table.Cell class={cell}>Total</Table.Cell>
-			<Table.Cell class={cell}></Table.Cell>
-			<Table.Cell class={cell}></Table.Cell>
+			{#each ["outstanding", "income"] as column (column)}
+				<Table.Cell class={[cell, "text-right tabular-nums font-normal text-muted-foreground"]}>
+					<span aria-hidden="true" title={pending}>—</span><span class="sr-only">{pending}</span>
+				</Table.Cell>
+			{/each}
 			<Table.Cell class={[cell, "text-right tabular-nums"]}>{counted ? attentionTotal : "—"}</Table.Cell>
 			<Table.Cell class={cell}></Table.Cell>
 		</Table.Row>

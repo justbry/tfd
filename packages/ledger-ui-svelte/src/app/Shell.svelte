@@ -73,15 +73,18 @@
 	$effect(() => {
 		const schoolId = school?.id;
 		if (!schoolId) return;
-		let current = true;
-		retryingRead(app, () => read((reader) => reader.disclosure(schoolId)), {
-			value: (loaded) => {
-				if (current) disclosure = loaded;
+		const reading = retryingRead(
+			app,
+			() => read((reader) => reader.disclosure(schoolId)),
+			{
+				value: (loaded) => {
+					disclosure = loaded;
+				},
 			},
-		})();
-		return () => {
-			current = false;
-		};
+		);
+		reading.run();
+		// Another school, or the shell leaving: this read's failure toast goes, and its Retry no longer runs.
+		return reading.cancel;
 	});
 	const periodNote = $derived.by(() => {
 		if (!school || disclosure?.school !== school.id) return null;

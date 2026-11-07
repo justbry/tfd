@@ -83,7 +83,6 @@ export const toastsLayer = Layer.effect(
 					if (toast) yield* startTimer(toast);
 				}),
 			dismiss: (id) => Effect.andThen(stopTimer(id), removeNow(id)),
-			current: () => Ref.getUnsafe(state),
 			subscribe: (listener) => {
 				listeners.add(listener);
 				listener(Ref.getUnsafe(state));

@@ -32,7 +32,13 @@ export const reportFailure = (
 			detail: message.what,
 			doThis: message.doThis,
 			...(message.action && handler
-				? { action: { label: actionLabels[message.action], run: handler } }
+				? {
+						action: {
+							label: actionLabels[message.action],
+							run: handler,
+							keep: message.action === "retry",
+						},
+					}
 				: {}),
 		}),
 	);

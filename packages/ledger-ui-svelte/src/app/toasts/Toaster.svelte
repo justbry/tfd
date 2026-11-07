@@ -49,6 +49,8 @@
 	let frameBox = $state<Box>({ left: 0, top: 0, right: 0, bottom: 0 });
 	let barsBottom = $state(0);
 	let focused = $state<Box | null>(null);
+	/** The control that had focus before it went into the stack: it gets focus back when a toast leaves. */
+	let focusBefore: HTMLElement | null = null;
 
 	const visible = $derived(store.state.visible);
 	const layout = $derived<Layout>({
@@ -99,11 +101,28 @@
 		untrack(measure);
 	});
 
+	/** Takes a toast down from its own button. When that button still has focus (the action moved it nowhere),
+	 * focus goes back to the control that had it before, else to the next toast's Dismiss, so that a keyboard user is
+	 * never dropped on the page's body. */
+	const leave = (id: string, event: MouseEvent): void => {
+		// Svelte delegates clicks, so the button is found from the target rather than `currentTarget`.
+		const button = event.target instanceof Element ? event.target.closest("button") : null;
+		if (button && document.activeElement === button) {
+			const neighbours = [
+				...(region?.querySelectorAll<HTMLElement>("[data-test=toast-dismiss]") ?? []),
+			].filter((candidate) => !button.closest("[data-test=toast]")?.contains(candidate));
+			const target = focusBefore?.isConnected ? focusBefore : neighbours[0];
+			target?.focus();
+		}
+		store.dismiss(id);
+	};
+
 	onMount(() => {
 		const onFocusIn = (event: FocusEvent): void => {
 			const target = event.target;
 			if (!(target instanceof Element) || region?.contains(target)) return;
 			focused = boxOf(target);
+			if (target instanceof HTMLElement) focusBefore = target;
 		};
 		const onFocusOut = (event: FocusEvent): void => {
 			if (event.relatedTarget === null) focused = null;
@@ -173,9 +192,9 @@
 						type="button"
 						class="mt-1 rounded-md border border-background/40 px-2 py-0.5 font-semibold hover:bg-background/10 focus-visible:outline-2 focus-visible:outline-background"
 						data-test="toast-action"
-						onclick={() => {
+						onclick={(event) => {
 							toast.action?.run();
-							store.dismiss(toast.id);
+							if (!toast.action?.keep) leave(toast.id, event);
 						}}>{toast.action.label}</button
 					>
 				{/if}
@@ -185,7 +204,7 @@
 				class="-mr-1 grid size-6 place-items-center rounded-md opacity-75 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-background"
 				aria-label={`Dismiss: ${toast.title}`}
 				data-test="toast-dismiss"
-				onclick={() => store.dismiss(toast.id)}
+				onclick={(event) => leave(toast.id, event)}
 			>
 				<Icon name="x" />
 			</button>

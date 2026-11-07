@@ -29,10 +29,10 @@ export function useApp(): AppContext {
 }
 
 /** A run's end: its value, or its error and the toast that reported it (so that a later success can take the toast
- * down: errors stay until dismissed or fixed). */
+ * down: errors stay until dismissed or fixed); no toast when the screen no longer wanted the run. */
 export type Outcome<A> =
 	| { ok: true; value: A }
-	| { ok: false; error: UiError; toastId: string };
+	| { ok: false; error: UiError; toastId: string | null };
 
 /** The `UiError` a failed run ends with: its typed failure, or for a defect (a bug in an adapter, an interrupted
  * fiber) an `unexpected` one, written to the log since nothing upstream did. */
@@ -52,21 +52,24 @@ const uiErrorOf = (
 
 /** Runs an effect of the app; any failure, typed or a defect, is shown as a toast (with the handlers the screen
  * offers) and returned, so the screen can show the same message in place. The promise never rejects: nothing fails
- * silently. */
+ * silently. `wanted` false at the failure (the screen moved on) returns it without a toast. */
 export const perform = <A>(
 	{ runtime }: Pick<AppContext, "runtime">,
 	effect: Effect.Effect<A, UiError, AppServices>,
 	handlers: ActionHandlers = {},
+	wanted: () => boolean = () => true,
 ): Promise<Outcome<A>> =>
 	runtime.runPromise(
 		effect.pipe(
 			Effect.map((value): Outcome<A> => ({ ok: true, value })),
 			Effect.catchCause((cause) =>
 				Effect.flatMap(uiErrorOf(cause), (error) =>
-					Effect.map(
-						reportFailure(error, handlers),
-						(toastId): Outcome<A> => ({ ok: false, error, toastId }),
-					),
+					wanted()
+						? Effect.map(
+								reportFailure(error, handlers),
+								(toastId): Outcome<A> => ({ ok: false, error, toastId }),
+							)
+						: Effect.succeed<Outcome<A>>({ ok: false, error, toastId: null }),
 				),
 			),
 		),

@@ -30,7 +30,7 @@
 	/** The bottom edge of the shell's bars (the tabs row, or the top bar on All schools): the toasts sit below it. */
 	let chrome = $state<HTMLElement | null>(null);
 
-	const loadSchools = retryingRead(
+	const schoolsRead = retryingRead(
 		// svelte-ignore state_referenced_locally
 		context,
 		() => read((reader) => reader.schools()),
@@ -53,8 +53,11 @@
 			hash = window.location.hash;
 		};
 		window.addEventListener("hashchange", onHashChange);
-		loadSchools();
-		return () => window.removeEventListener("hashchange", onHashChange);
+		schoolsRead.run();
+		return () => {
+			window.removeEventListener("hashchange", onHashChange);
+			schoolsRead.cancel();
+		};
 	});
 
 	const route = $derived(
@@ -85,7 +88,7 @@
 </script>
 
 {#if failure}
-	<LoadFailed error={failure} onRetry={loadSchools} busy={loading} />
+	<LoadFailed error={failure} onRetry={schoolsRead.run} busy={loading} />
 {:else if schools}
 	<Shell {route} {schools} {navigate} bind:chrome />
 {/if}

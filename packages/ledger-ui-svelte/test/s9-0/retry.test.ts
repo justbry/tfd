@@ -10,7 +10,7 @@ import {
 } from "../../src/effect/retry.ts";
 import { run } from "../../src/effect/run.ts";
 import { toUiError } from "../../src/effect/ui-error.ts";
-import { toastRuntime } from "../helpers.ts";
+import { toastRuntime, toastState } from "../helpers.ts";
 
 const read: Attempted = { kind: "read" };
 const fast = { baseMilliseconds: 1 };
@@ -75,7 +75,7 @@ describe("withRetry", () => {
 			"Retrying (2 of 3)",
 			"Retrying (3 of 3)",
 		]);
-		expect(toasts.current().visible).toEqual([]);
+		expect(toastState(toasts).visible).toEqual([]);
 	});
 	test("a read that recovers succeeds and its retry toast leaves", async () => {
 		const { runtime, toasts } = toastRuntime();
@@ -83,7 +83,7 @@ describe("withRetry", () => {
 		const value = await runtime.runPromise(withRetry(effect, read, fast));
 		expect(value).toBe("done");
 		expect(counter.calls).toBe(2);
-		expect(toasts.current().visible).toEqual([]);
+		expect(toastState(toasts).visible).toEqual([]);
 	});
 	test("a kind that is not retryable is tried once", async () => {
 		const { runtime, toasts } = toastRuntime();
@@ -93,7 +93,7 @@ describe("withRetry", () => {
 		);
 		expect(failed.kind).toBe("forbidden");
 		expect(counter.calls).toBe(1);
-		expect(toasts.current().visible).toEqual([]);
+		expect(toastState(toasts).visible).toEqual([]);
 	});
 	test("a write without an Idempotency-Key is never retried", async () => {
 		const { runtime } = toastRuntime();

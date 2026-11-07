@@ -60,7 +60,6 @@ const allowedPackages = [
 	/^clsx$/,
 	/^tailwind-merge$/,
 	/^tailwind-variants$/,
-	/^@lucide\/svelte\/icons\/[a-z-]+$/,
 	/^tailwindcss$/,
 	/^tw-animate-css$/,
 ];

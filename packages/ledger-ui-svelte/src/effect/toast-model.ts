@@ -6,6 +6,9 @@ export type ToastTone = "error" | "warning" | "success" | "info";
 export type ToastAction = {
 	label: string;
 	run: () => void;
+	/** The toast stays when its action runs: the action settles it (a retry's success takes it down, the same failure
+	 * merges into it), so a click while the retry is still on its way loses nothing. */
+	keep?: boolean;
 };
 
 export type ToastInput = {

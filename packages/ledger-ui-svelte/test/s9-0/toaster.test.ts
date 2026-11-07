@@ -20,6 +20,8 @@ function renderToaster() {
 		target: document.getElementById("target") as HTMLElement,
 		props: { store, anchor: null, frame: null },
 	});
+	// Runs the toaster's mount effects (its focus listeners) before the test moves focus.
+	flushSync();
 	cleanup = () => {
 		unmount(component);
 		store.close();
@@ -176,6 +178,62 @@ describe("the toaster", () => {
 		await clock.advance(5000);
 		flushSync();
 		expect(queryAll("[data-test=toast]")).toHaveLength(0);
+	});
+});
+
+describe("the toaster and focus", () => {
+	test("a toast that leaves from its own button gives focus back to the control that had it", async () => {
+		const { runtime, toasts } = renderToaster();
+		const before = document.createElement("button");
+		before.textContent = "Save";
+		document.body.append(before);
+		before.focus();
+		await runtime.runPromise(
+			toasts.show({ tone: "error", title: "Server failed" }),
+		);
+		flushSync();
+		const dismiss = document.querySelector<HTMLButtonElement>(
+			"[data-test=toast-dismiss]",
+		);
+		dismiss?.focus();
+		expect(document.activeElement).toBe(dismiss);
+		dismiss?.click();
+		expect(document.activeElement).toBe(before);
+	});
+	test("with nothing to go back to, focus goes to the next toast's Dismiss", async () => {
+		const { runtime, toasts } = renderToaster();
+		await runtime.runPromise(toasts.show({ tone: "error", title: "First" }));
+		await runtime.runPromise(toasts.show({ tone: "error", title: "Second" }));
+		flushSync();
+		const [first, second] = queryAll("[data-test=toast-dismiss]");
+		first?.focus();
+		first?.click();
+		expect(document.activeElement === second).toBe(true);
+	});
+	test("an action that keeps its toast leaves it on screen", async () => {
+		const { runtime, toasts } = renderToaster();
+		let runs = 0;
+		await runtime.runPromise(
+			toasts.show({
+				tone: "error",
+				title: "No connection",
+				action: {
+					label: "Retry",
+					keep: true,
+					run: () => {
+						runs += 1;
+					},
+				},
+			}),
+		);
+		flushSync();
+		document
+			.querySelector<HTMLButtonElement>("[data-test=toast-action]")
+			?.click();
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		flushSync();
+		expect(runs).toBe(1);
+		expect(queryAll("[data-test=toast]")).toHaveLength(1);
 	});
 });
 

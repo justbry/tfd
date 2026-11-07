@@ -93,7 +93,16 @@ describe("the shell", () => {
 			"Data",
 		]);
 		expect(queryAll("[data-test=all-schools-row]")).toHaveLength(5);
-		expect(textOf("[data-test=all-schools-total]")).toBe("Total 7");
+		expect(textOf("[data-test=all-schools-total] td:first-child")).toBe(
+			"Total",
+		);
+		expect(textOf("[data-test=all-schools-total] td:nth-child(4)")).toBe("7");
+		for (const column of [2, 3])
+			expect(
+				textOf(
+					`[data-test=all-schools-total] td:nth-child(${column}) .sr-only`,
+				),
+			).toBe("Not shown yet: it arrives with the Dashboard (S9.1).");
 		expect(
 			textOf("[data-test=all-schools-row][data-school=map] td:last-child"),
 		).toBe("26 min · stale");
@@ -240,6 +249,41 @@ describe("the shell", () => {
 });
 
 describe("a failed disclosure read", () => {
+	test("leaves with its school: the toast goes, and its Retry can no longer run", async () => {
+		let volCalls = 0;
+		const { app } = await open("#/vol/plans", {
+			reader: (fixture) => ({
+				...fixture,
+				disclosure: (schoolId) => {
+					if (schoolId !== "vol") return fixture.disclosure(schoolId);
+					volCalls += 1;
+					return Promise.reject(new AdapterError("network", "offline"));
+				},
+			}),
+		});
+		await until(
+			() => query("[data-test=toast-action]") !== null,
+			"the failure toast",
+			1000,
+		);
+		const callsBefore = volCalls;
+		const oldRetry = app.toasts.state.visible[0]?.action?.run;
+		expect(oldRetry).toBeDefined();
+		click("[data-test=school-switcher]");
+		await until(
+			() => queryAll("[data-test=school-option]").length > 0,
+			"the switcher",
+		);
+		click("[data-test=school-option][data-school=b4u]");
+		await until(
+			() => queryAll("[data-test=toast]").length === 0,
+			"the old school's toast to leave",
+		);
+		oldRetry?.();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(volCalls).toBe(callsBefore);
+		expect(queryAll("[data-test=toast]")).toEqual([]);
+	});
 	test("is retried, then toasts with Retry; the retry fills the period line and takes the toast down", async () => {
 		let calls = 0;
 		const triesBeforeTheToast = 3;
@@ -279,6 +323,70 @@ describe("a failed disclosure read", () => {
 });
 
 describe("a failed schools read", () => {
+	test("failing the same way again keeps one toast, its count up and announced", async () => {
+		let calls = 0;
+		await open("#/vol/plans", {
+			waitForRoute: false,
+			reader: (fixture) => ({
+				...fixture,
+				schools: () => {
+					calls += 1;
+					return calls <= 2
+						? Promise.reject(
+								new AdapterError("not_found", "404", { status: 404 }),
+							)
+						: fixture.schools();
+				},
+			}),
+		});
+		await until(() => query("[data-test=load-failed]") !== null, "the failure");
+		click("[data-test=load-retry]");
+		await until(
+			() => calls === 2 && query("[data-test=toast-count]") !== null,
+			"the second failure",
+		);
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		flushSync();
+		expect(queryAll("[data-test=toast]")).toHaveLength(1);
+		expect(textOf("[data-test=toast-count] .sr-only")).toBe("2 times");
+		expect(textOf("[data-test=toasts-assertive]")).toContain("2 times");
+		expect(query("[data-test=load-failed]")).not.toBeNull();
+	});
+	test("a toast's Retry while the read is still on its way loses nothing", async () => {
+		let calls = 0;
+		const triesBeforeTheToast = 3;
+		let release = (): void => undefined;
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const { root } = await open("#/vol/plans", {
+			waitForRoute: false,
+			reader: (fixture) => ({
+				...fixture,
+				schools: () => {
+					calls += 1;
+					return calls <= triesBeforeTheToast
+						? Promise.reject(new AdapterError("network", "offline"))
+						: held.then(() => fixture.schools());
+				},
+			}),
+		});
+		await until(
+			() => query("[data-test=toast-action]") !== null,
+			"the failure toast",
+			1000,
+		);
+		click("[data-test=toast-action]");
+		click("[data-test=toast-action]");
+		expect(calls).toBe(triesBeforeTheToast + 1);
+		expect(textOf("[data-test=toast-title]")).toBe("No connection");
+		release();
+		await until(() => root.dataset.route === "#/vol/plans", "the retried read");
+		await until(
+			() => queryAll("[data-test=toast]").length === 0,
+			"the toast to leave",
+		);
+	});
 	test("shows the message in place and in an alert toast, and Retry reads again", async () => {
 		let calls = 0;
 		let release = (): void => undefined;

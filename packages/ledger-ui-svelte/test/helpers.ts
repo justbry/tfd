@@ -1,33 +1,46 @@
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Layer, ManagedRuntime } from "effect";
 import type { AppServices } from "../src/effect/app-layer.ts";
 import { manualClock } from "../src/effect/clock.ts";
 import { fixtureLayer } from "../src/effect/layers.ts";
-import { memoryLogLayer } from "../src/effect/log.ts";
+import { memoryLog } from "../src/effect/log.ts";
 import { Toasts } from "../src/effect/services.ts";
+import { emptyToastState, type ToastState } from "../src/effect/toast-model.ts";
 import { toastsLayer } from "../src/effect/toasts.ts";
 
 export const calendar = { today: "2026-11-05", now: "2026-11-05T12:00" };
 
-/** The toasts and log over a clock moved by hand. */
+/** The queue's state now, read through `subscribe` as the rune store reads it. */
+export function toastState(toasts: Toasts["Service"]): ToastState {
+	let state = emptyToastState;
+	toasts.subscribe((next) => {
+		state = next;
+	})();
+	return state;
+}
+
+/** The toasts and a readable log over a clock moved by hand. */
 export function toastRuntime() {
 	const clock = manualClock();
+	const log = memoryLog();
 	const runtime = ManagedRuntime.make(
-		Layer.mergeAll(toastsLayer, memoryLogLayer).pipe(
+		Layer.mergeAll(toastsLayer, log.layer).pipe(
 			Layer.provideMerge(clock.layer),
 		),
 	);
 	const toasts = runtime.runSync(Toasts.useSync((service) => service));
-	return { clock, runtime, toasts };
+	return { clock, runtime, toasts, log };
 }
 
-/** The fixture layer over a clock moved by hand. */
+/** The fixture layer over a clock moved by hand, its log replaced by one the test can read. */
 export function fixtureRuntime() {
 	const clock = manualClock();
+	const log = memoryLog();
 	const runtime = ManagedRuntime.make<AppServices, never>(
-		fixtureLayer({ calendar, clockLayer: clock.layer }),
+		Layer.mergeAll(
+			fixtureLayer({ calendar, clockLayer: clock.layer }),
+			log.layer,
+		),
 	);
-	return { clock, runtime };
+	const toasts = runtime.runSync(Toasts.useSync((service) => service));
+	return { clock, runtime, log, toasts };
 }
-
-export const runTo = <A, E>(effect: Effect.Effect<A, E, never>) =>
-	Effect.runPromise(Effect.result(effect));

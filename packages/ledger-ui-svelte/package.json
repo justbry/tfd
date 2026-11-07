@@ -21,7 +21,6 @@
 		"@biomejs/biome": "2.2.2",
 		"@happy-dom/global-registrator": "20.0.10",
 		"@internationalized/date": "3.12.4",
-		"@lucide/svelte": "1.70.0",
 		"@sveltejs/vite-plugin-svelte": "7.3.1",
 		"@tailwindcss/vite": "4.3.5",
 		"@types/bun": "1.4.2",

@@ -8,7 +8,7 @@ import {
 	type ToastInput,
 	type ToastState,
 } from "../../src/effect/toast-model.ts";
-import { toastRuntime } from "../helpers.ts";
+import { toastRuntime, toastState } from "../helpers.ts";
 
 const error = (title: string, detail?: string): ToastInput => ({
 	tone: "error",
@@ -79,9 +79,9 @@ describe("the Toasts service", () => {
 		await runtime.runPromise(toasts.show(success("Saved")));
 		await runtime.runPromise(toasts.show({ tone: "info", title: "Copied" }));
 		await clock.advance(autoDismissMilliseconds - 1);
-		expect(toasts.current().visible).toHaveLength(2);
+		expect(toastState(toasts).visible).toHaveLength(2);
 		await clock.advance(1);
-		expect(toasts.current().visible).toEqual([]);
+		expect(toastState(toasts).visible).toEqual([]);
 	});
 	test("errors and warnings stay until dismissed", async () => {
 		const { clock, runtime, toasts } = toastRuntime();
@@ -90,12 +90,12 @@ describe("the Toasts service", () => {
 			toasts.show({ tone: "warning", title: "No data yet" }),
 		);
 		await clock.advance(60_000);
-		expect(toasts.current().visible.map((toast) => toast.tone)).toEqual([
+		expect(toastState(toasts).visible.map((toast) => toast.tone)).toEqual([
 			"error",
 			"warning",
 		]);
 		await runtime.runPromise(toasts.dismiss(id));
-		expect(toasts.current().visible.map((toast) => toast.tone)).toEqual([
+		expect(toastState(toasts).visible.map((toast) => toast.tone)).toEqual([
 			"warning",
 		]);
 	});
@@ -105,7 +105,7 @@ describe("the Toasts service", () => {
 			toasts.show({ tone: "info", title: "Retrying", sticky: true }),
 		);
 		await clock.advance(60_000);
-		expect(toasts.current().visible).toHaveLength(1);
+		expect(toastState(toasts).visible).toHaveLength(1);
 	});
 	test("a merged success starts its 5 s again", async () => {
 		const { clock, runtime, toasts } = toastRuntime();
@@ -113,9 +113,9 @@ describe("the Toasts service", () => {
 		await clock.advance(4000);
 		await runtime.runPromise(toasts.show(success("Saved")));
 		await clock.advance(4000);
-		expect(toasts.current().visible[0]?.count).toBe(2);
+		expect(toastState(toasts).visible[0]?.count).toBe(2);
 		await clock.advance(1000);
-		expect(toasts.current().visible).toEqual([]);
+		expect(toastState(toasts).visible).toEqual([]);
 	});
 	test("a waiting success does not count down until it is on screen", async () => {
 		const { clock, runtime, toasts } = toastRuntime();
@@ -123,17 +123,17 @@ describe("the Toasts service", () => {
 		for (const title of ["a", "b", "c", "d"])
 			errors.push(await runtime.runPromise(toasts.show(error(title))));
 		await runtime.runPromise(toasts.show(success("Saved")));
-		expect(toasts.current().waiting.map((toast) => toast.title)).toEqual([
+		expect(toastState(toasts).waiting.map((toast) => toast.title)).toEqual([
 			"Saved",
 		]);
 		await clock.advance(10_000);
-		expect(toasts.current().waiting).toHaveLength(1);
+		expect(toastState(toasts).waiting).toHaveLength(1);
 		await runtime.runPromise(toasts.dismiss(errors[0] ?? ""));
-		expect(toasts.current().visible.map((toast) => toast.title)).toContain(
+		expect(toastState(toasts).visible.map((toast) => toast.title)).toContain(
 			"Saved",
 		);
 		await clock.advance(autoDismissMilliseconds);
-		expect(toasts.current().visible.map((toast) => toast.title)).toEqual([
+		expect(toastState(toasts).visible.map((toast) => toast.title)).toEqual([
 			"b",
 			"c",
 			"d",

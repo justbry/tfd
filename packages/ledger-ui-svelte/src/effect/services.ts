@@ -21,14 +21,14 @@ export class Clock extends Context.Service<
 	{ readonly sleep: (milliseconds: number) => Effect.Effect<void> }
 >()("ledger-ui-svelte/Clock") {}
 
-/** The toast queue (section 5). `subscribe` and `current` are the synchronous edge the Svelte rune store reads. */
+/** The toast queue (section 5). `subscribe` is the synchronous edge the Svelte rune store reads: it hands the
+ * listener the current state at once, then every change. */
 export class Toasts extends Context.Service<
 	Toasts,
 	{
 		readonly show: (toast: ToastInput) => Effect.Effect<string>;
 		readonly update: (id: string, patch: ToastPatch) => Effect.Effect<void>;
 		readonly dismiss: (id: string) => Effect.Effect<void>;
-		readonly current: () => ToastState;
 		readonly subscribe: (listener: (state: ToastState) => void) => () => void;
 	}
 >()("ledger-ui-svelte/Toasts") {}
@@ -39,11 +39,8 @@ export type LogEntry = {
 	cause?: unknown;
 };
 
-/** Where an unexpected failure is written (never `console`): kept in memory, newest last, for a support view. */
+/** Where an unexpected failure is written, never `console` (log.ts keeps it in memory). */
 export class Log extends Context.Service<
 	Log,
-	{
-		readonly write: (entry: LogEntry) => Effect.Effect<void>;
-		readonly entries: () => readonly LogEntry[];
-	}
+	{ readonly write: (entry: LogEntry) => Effect.Effect<void> }
 >()("ledger-ui-svelte/Log") {}
