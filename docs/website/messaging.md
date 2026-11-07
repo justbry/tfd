@@ -27,8 +27,8 @@ For schools and membership businesses that take payments through Stripe, **Trifo
 | Primary CTA | **Get early access** (design-partner program: founder onboarding, free during the pilot) |
 | Secondary CTA | **Verify a sample receipt** |
 | Developer CTA | **Install the CLI, free** (the only "free" button; it's true today) |
-| Tagline | Three sides of every dollar. |
-| Closing line | Every dollar, three ways. Every month, sealed. |
+| Tagline | Books that show their work. ("Three sides of every dollar" is retired as a headline until milestone 3; `../brand/trifold-brand-and-messaging.md`) |
+| Closing line | Every payment gives the payer a receipt they can check, and every closed month is sealed, so a later change shows. |
 
 Headline alternatives kept for testing: "Don't trust the books. Check them." · "Signed, sealed, checkable." · "Proof, not promises."
 
@@ -43,7 +43,7 @@ The owner's direction: trust means **durable, fast and resilient**, and on top o
 | **Resilient** | Lose everything but the events and rebuild it all, exactly | Replay rebuilds balances and journals byte-for-byte; seals still verify after a key rotation | 03 Proof |
 | **Fast** | A year of books rebuilt on your own machine | Replay (`tfd simulate`) runs a year of events locally; no speed numbers (`AGENTS.md`). The month-close by Rifo is marked Next | 04 Close |
 
-The sentence to carry everywhere: open. The earlier carry line, "Not even Trifold can quietly change your books", is banned by `AGENTS.md` (corrected 2026-11-07): Trifold would hold the signing key, and there is no per-event chain or witness yet, so it isn't true of what's shipped. Until the owner picks another, reuse the hero line, **"Books that show their work."**
+The sentence to carry everywhere: open. The earlier carry line, "Not even Trifold can quietly change your books", is banned by `AGENTS.md` (corrected 2026-11-07): Trifold would hold the signing key, and there is no per-event chain or witness yet, so it isn't true of what's shipped. Use the hero line, **"Books that show their work."**, and in one sentence: "Every payment gives the payer a receipt they can check, and every closed month is sealed, so a later change shows."
 
 Low cost appears only as a fact on the pricing page.
 
@@ -105,7 +105,7 @@ Two front doors for launch: **owners** (schools first) and **their accountants**
 | QuickBooks, Xero with AI | AI inside your existing books | Keep them; add books that show their work. |
 | Digits, Puzzle, Basis | AI-native bookkeeping | Fast, but you trust their output. Ours anyone can check. |
 | Airtight | Triple-entry with cryptographic receipts | Open standard and free verifier anyone can run, Stripe-native, self-hostable engine. |
-| Pilot and bookkeeping services | A human closes your month | Witnessed + Bookkeeper: a human closes it on books anyone can check. |
+| Pilot and bookkeeping services | A human closes your month | Audited + Bookkeeper: a human closes it on books anyone can check. |
 
 ## 10. Go-to-market, in order
 
@@ -115,7 +115,7 @@ Two front doors for launch: **owners** (schools first) and **their accountants**
 4. **The receipt is the ad**: every receipt carries a plain "Verify this receipt" link; verify-page visits are the top-of-funnel metric. The verify page must work for a parent in 10 seconds.
 5. **Month-end proof moment**: "October sealed · 214 payments · verified", shareable with the bookkeeper.
 6. **Developer credibility**: source-available engine (FSL, free to self-host), `tfd` CLI, Apache-2.0 spec and verifier, CC0 test vectors on GitHub; one Show HN when the verifier is polished.
-7. **Non-profit loop**: free Witnessed for non-profits under $50K once the witness ships; every donation acknowledgment is a verify link.
+7. **Non-profit loop**: the witness free for non-profits under $50K once it ships; every donation acknowledgment is a verify link.
 8. **Public changelog and roadmap**: chapters light up as they ship.
 
 ## 11. Words
