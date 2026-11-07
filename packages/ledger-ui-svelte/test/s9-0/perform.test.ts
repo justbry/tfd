@@ -15,7 +15,7 @@ describe("perform", () => {
 			retryable: false,
 		});
 		const outcome = await perform({ runtime }, Effect.fail(error));
-		expect(outcome).toEqual({ ok: false, error });
+		expect(outcome).toEqual({ ok: false, error, toastId: expect.any(String) });
 		const titles = runtime.runSync(
 			Toasts.useSync((toasts) =>
 				toasts.current().visible.map((toast) => toast.title),

@@ -1,21 +1,35 @@
 <script lang="ts">
-	import { onMount } from "svelte";
+	import { onMount, untrack } from "svelte";
 	import type { Toast } from "../../effect/toast-model.ts";
 	import Icon from "../Icon.svelte";
 	import type { IconName } from "../icons.ts";
 	import type { ToastStore } from "../toast-store.svelte.ts";
-	import { type Box, edgeFor, positionStyle, usualBox } from "./placement.ts";
+	import {
+		type Box,
+		edgeFor,
+		type Layout,
+		positionStyle,
+		usualBox,
+		visiblePart,
+	} from "./placement.ts";
 
 	/** The toast stack (S9-plan section 5). Two live regions exist from mount: `role=alert` (assertive) announces
 	 * errors, `role=status` (polite) the rest, each line re-announced when a merge bumps its count; the visible toasts
 	 * are plain content with ordinary buttons for their action and Dismiss. Top right below the top bar on wide
 	 * screens, along the bottom on narrow ones, above dialogs (`--layer-toast`); while a toast covers the focused
 	 * control the stack takes the other edge (placement.ts). */
-	let { store, anchor }: { store: ToastStore; anchor: HTMLElement | null } =
-		$props();
+	let {
+		store,
+		anchor,
+		frame,
+	}: {
+		store: ToastStore;
+		/** The last of the bars: the stack sits below it on wide screens. */
+		anchor: HTMLElement | null;
+		/** The app's frame: the stack stays inside it; the viewport when there is none. */
+		frame: HTMLElement | null;
+	} = $props();
 
-	const gap = 8;
-	const fallbackTop = 12;
 	const toneIcons: Record<Toast["tone"], IconName> = {
 		error: "alert",
 		warning: "alert",
@@ -32,16 +46,19 @@
 	let region: HTMLElement | undefined = $state();
 	let regionHeight = $state(0);
 	let viewport = $state({ width: 0, height: 0 });
-	let top = $state(fallbackTop);
+	let frameBox = $state<Box>({ left: 0, top: 0, right: 0, bottom: 0 });
+	let barsBottom = $state(0);
 	let focused = $state<Box | null>(null);
 
 	const visible = $derived(store.state.visible);
+	const layout = $derived<Layout>({
+		viewport,
+		frame: frameBox,
+		barsBottom,
+		height: regionHeight,
+	});
 	const edge = $derived(
-		edgeFor({
-			toastCount: visible.length,
-			focused,
-			usual: usualBox(viewport, regionHeight, top),
-		}),
+		edgeFor({ toastCount: visible.length, focused, usual: usualBox(layout) }),
 	);
 	const announce = (toast: Toast): string =>
 		[toast.title, toast.detail, toast.doThis, toast.count > 1 ? `${toast.count} times` : ""]
@@ -52,10 +69,22 @@
 		const { left, top: boxTop, right, bottom } = element.getBoundingClientRect();
 		return { left, top: boxTop, right, bottom };
 	};
+	/** Reads the page's geometry into the stack's state; it reads none of that state, so it never loops. */
 	const measure = (): void => {
-		viewport = { width: window.innerWidth, height: window.innerHeight };
-		top = anchor ? Math.max(gap, anchor.getBoundingClientRect().bottom + gap) : fallbackTop;
+		const nextViewport = { width: window.innerWidth, height: window.innerHeight };
+		const nextFrame = visiblePart(
+			frame
+				? boxOf(frame)
+				: { left: 0, top: 0, right: nextViewport.width, bottom: nextViewport.height },
+			nextViewport,
+		);
 		const active = document.activeElement;
+		viewport = nextViewport;
+		frameBox = nextFrame;
+		barsBottom = Math.max(
+			nextFrame.top,
+			anchor ? anchor.getBoundingClientRect().bottom : nextFrame.top,
+		);
 		focused =
 			active instanceof Element && active !== document.body && !region?.contains(active)
 				? boxOf(active)
@@ -63,10 +92,11 @@
 	};
 
 	$effect(() => {
-		// The anchor appears once the shell renders, and the stack's height changes with its toasts.
+		// Measured again when the bars appear (the shell renders), the frame changes, or the stack's toasts change.
 		void anchor;
+		void frame;
 		void visible.length;
-		measure();
+		untrack(measure);
 	});
 
 	onMount(() => {
@@ -98,7 +128,7 @@
 	data-test="toasts"
 	data-edge={edge}
 	class="pointer-events-none fixed z-(--layer-toast) flex max-w-[calc(100vw-16px)] flex-col gap-2"
-	style={positionStyle(edge, viewport.width, top)}
+	style={positionStyle(edge, layout)}
 >
 	<div class="sr-only" role="alert" data-test="toasts-assertive">
 		{#each visible.filter((toast) => toast.tone === "error") as toast (`${toast.id}-${toast.count}`)}
@@ -115,7 +145,7 @@
 			data-test="toast"
 			data-tone={toast.tone}
 			class={[
-				"pointer-events-auto flex items-start gap-2 rounded-lg border-l-[3px] bg-foreground px-3 py-2 text-background shadow-[0_8px_24px_rgba(0,0,0,0.3)]",
+				"pointer-events-auto flex items-start gap-2 rounded-lg border-l-[3px] bg-foreground px-3 py-2 text-background shadow-toast",
 				toneStripes[toast.tone],
 			]}
 		>
@@ -126,8 +156,9 @@
 					{#if toast.count > 1}
 						<span
 							class="rounded-4xl border border-background/40 px-1.5 text-[10px]"
-							data-test="toast-count"
-							aria-label={`${toast.count} times`}>×{toast.count}</span
+							data-test="toast-count"><span aria-hidden="true">×{toast.count}</span><span class="sr-only"
+								>{toast.count} times</span
+							></span
 						>
 					{/if}
 				</div>

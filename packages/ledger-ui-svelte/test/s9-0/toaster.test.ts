@@ -18,7 +18,7 @@ function renderToaster() {
 	const store = new ToastStore(toasts);
 	const component = mount(Toaster, {
 		target: document.getElementById("target") as HTMLElement,
-		props: { store, anchor: null },
+		props: { store, anchor: null, frame: null },
 	});
 	cleanup = () => {
 		unmount(component);
@@ -114,12 +114,12 @@ describe("the toaster", () => {
 				toasts.show({ tone: "error", title: "No connection" }),
 			);
 		flushSync();
-		expect(textOf("[data-test=toast-count]")).toBe("×3");
-		expect(
-			document
-				.querySelector("[data-test=toast-count]")
-				?.getAttribute("aria-label"),
-		).toBe("3 times");
+		const count = document.querySelector("[data-test=toast-count]");
+		expect(count?.querySelector('[aria-hidden="true"]')?.textContent).toBe(
+			"×3",
+		);
+		expect(count?.querySelector(".sr-only")?.textContent).toBe("3 times");
+		expect(count?.hasAttribute("aria-label")).toBe(false);
 	});
 	test("the action runs and the toast leaves; Dismiss is a named button", async () => {
 		const { runtime, toasts } = renderToaster();

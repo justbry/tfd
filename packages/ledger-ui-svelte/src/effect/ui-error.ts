@@ -57,11 +57,3 @@ export function toUiError(thrown: unknown): UiError {
 		thrown,
 	});
 }
-
-/** The field problems of an error: its `problems[]`, else its single `field`. */
-export function fieldProblems(error: UiError): readonly FieldProblem[] {
-	if (error.detail.problems?.length) return error.detail.problems;
-	if (error.detail.field)
-		return [{ path: error.detail.field, message: error.reason }];
-	return [];
-}

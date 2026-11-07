@@ -1,5 +1,11 @@
 import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/** tailwind-merge told about the theme's own shadows (app.css), so `shadow-popover` replaces a component's
+ * `shadow-md` instead of sitting beside it. */
+const twMerge = extendTailwindMerge({
+	extend: { theme: { shadow: ["popover", "toast"] } },
+});
 
 /** shadcn-svelte's class joiner: later Tailwind classes win over earlier ones. */
 export function cn(...inputs: ClassValue[]): string {

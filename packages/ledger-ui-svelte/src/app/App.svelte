@@ -7,11 +7,11 @@
 		themeOf,
 	} from "$contract/app/route.ts";
 	import type { School } from "$contract/data/types.ts";
-	import { withRetry } from "../effect/retry.ts";
 	import { read } from "../effect/run.ts";
 	import type { UiError } from "../effect/ui-error.ts";
-	import { type AppContext, perform, provideApp } from "./context.ts";
+	import { type AppContext, provideApp } from "./context.ts";
 	import LoadFailed from "./LoadFailed.svelte";
+	import { retryingRead } from "./retrying-read.ts";
 	import Shell from "./Shell.svelte";
 	import Toaster from "./toasts/Toaster.svelte";
 
@@ -27,25 +27,26 @@
 	let failure = $state<UiError | null>(null);
 	/** A schools read is on its way: a failed one stays on screen, its Retry busy, until the retry resolves. */
 	let loading = $state(false);
-	let topBar = $state<HTMLElement | null>(null);
+	/** The bottom edge of the shell's bars (the tabs row, or the top bar on All schools): the toasts sit below it. */
+	let chrome = $state<HTMLElement | null>(null);
 
-	const loadSchools = async (): Promise<void> => {
-		if (loading) return;
-		loading = true;
-		const outcome = await perform(
-			context,
-			withRetry(
-				read((reader) => reader.schools()),
-				{ kind: "read" },
-			),
-			{ retry: loadSchools, reload: () => window.location.reload() },
-		);
-		loading = false;
-		if (outcome.ok) {
-			schools = outcome.value;
-			failure = null;
-		} else failure = outcome.error;
-	};
+	const loadSchools = retryingRead(
+		// svelte-ignore state_referenced_locally
+		context,
+		() => read((reader) => reader.schools()),
+		{
+			value: (loaded) => {
+				schools = loaded;
+				failure = null;
+			},
+			failure: (error) => {
+				failure = error;
+			},
+			busy: (busy) => {
+				loading = busy;
+			},
+		},
+	);
 
 	onMount(() => {
 		const onHashChange = (): void => {
@@ -86,6 +87,6 @@
 {#if failure}
 	<LoadFailed error={failure} onRetry={loadSchools} busy={loading} />
 {:else if schools}
-	<Shell {route} {schools} {navigate} bind:topBar />
+	<Shell {route} {schools} {navigate} bind:chrome />
 {/if}
-<Toaster store={context.toasts} anchor={topBar} />
+<Toaster store={context.toasts} anchor={chrome} frame={root} />

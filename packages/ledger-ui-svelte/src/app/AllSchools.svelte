@@ -16,18 +16,18 @@
 	}: { schools: School[]; period: Period; onOpen: (schoolId: string) => void } =
 		$props();
 
-	const staleMinutes = 15;
 	const counted = $derived(
 		schools.every((school) => school.attentionCount !== null),
 	);
 	const attentionTotal = $derived(
 		schools.reduce((total, school) => total + (school.attentionCount ?? 0), 0),
 	);
+	/** Headers and cells wrap as the mockup's do, so that at phone widths every column stays in view; only badges
+	 * keep to one line. */
 	const header =
-		"h-auto border-b border-border px-2 py-1.5 text-left text-[10.5px] font-medium text-muted-foreground";
-	const cell =
-		"border-b border-border px-2 py-[7px] align-middle whitespace-nowrap";
-	const pending = "Shown from S9.1, with the Dashboard's documents";
+		"h-auto border-b border-border px-2 py-1.5 text-left align-bottom text-[10.5px] font-medium whitespace-normal text-muted-foreground";
+	const cell = "border-b border-border px-2 py-[7px] align-middle whitespace-normal";
+	const pending = "Not shown yet: it arrives with the Dashboard (S9.1).";
 </script>
 
 <Table.Root class="text-[12px]" data-test="all-schools">
@@ -53,13 +53,20 @@
 					</button>
 					<div class="font-mono text-[10.5px] leading-tight text-muted-foreground">{school.timeZone}</div>
 				</Table.Cell>
-				<Table.Cell class={[cell, "text-right tabular-nums text-muted-foreground"]} title={pending}>—</Table.Cell>
-				<Table.Cell class={[cell, "text-right tabular-nums text-muted-foreground"]} title={pending}>—</Table.Cell>
+				{#each ["outstanding", "income"] as column (column)}
+					<Table.Cell class={[cell, "text-right tabular-nums text-muted-foreground"]}>
+						<span aria-hidden="true" title={pending}>—</span><span class="sr-only">{pending}</span>
+					</Table.Cell>
+				{/each}
 				<Table.Cell class={[cell, "text-right tabular-nums"]}>
 					{#if school.attentionCount === null}
-						<span class="text-muted-foreground" title="No source counts this yet">—</span>
+						<span class="text-muted-foreground"
+							><span aria-hidden="true" title="No source counts this yet">—</span><span class="sr-only"
+								>No source counts this yet.</span
+							></span
+						>
 					{:else if school.attentionCount > 0}
-						<Badge class={[mockBadge, badgeTones.warning, "gap-0.5"]}>
+						<Badge class={[mockBadge, badgeTones.warning, "gap-0.5 whitespace-nowrap"]}>
 							<Icon name="alert" class="size-[11px]" />{school.attentionCount}
 						</Badge>
 					{:else}
@@ -70,9 +77,9 @@
 					<span
 						class={[
 							"mr-1 inline-block size-[7px] rounded-full",
-							school.lagMinutes > staleMinutes ? "bg-warning" : "bg-success",
+							school.stale ? "bg-warning" : "bg-success",
 						]}
-					></span>{school.lagMinutes} min{school.lagMinutes > staleMinutes ? " · stale" : ""}
+					></span>{school.lagMinutes} min{school.stale ? " · stale" : ""}
 				</Table.Cell>
 			</Table.Row>
 		{/each}

@@ -8,8 +8,12 @@ import { Reader } from "../src/effect/services.ts";
 import { calendar } from "./helpers.ts";
 
 /** Waits for `check` to hold, flushing Svelte between turns. */
-export async function until(check: () => boolean, what: string): Promise<void> {
-	for (let turn = 0; turn < 400; turn += 1) {
+export async function until(
+	check: () => boolean,
+	what: string,
+	turns = 400,
+): Promise<void> {
+	for (let turn = 0; turn < turns; turn += 1) {
 		flushSync();
 		if (check()) return;
 		await new Promise((resolve) => setTimeout(resolve, 5));

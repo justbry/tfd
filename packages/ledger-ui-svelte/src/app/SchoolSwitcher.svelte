@@ -17,8 +17,9 @@
 
 	/** The school switcher (mockup `#sw`, `#sp`, `renderSP`): a search field, then a listbox whose rows are
 	 * `role=option`. The listbox is one Tab stop (the current school's row, or the first shown); Arrow Up and Down,
-	 * Home and End move between rows; Enter and Space choose; Arrow Down in the search enters the list; Escape closes
-	 * and returns focus to the button. */
+	 * Home and End move between rows; Enter and Space choose; Arrow Down in the search enters the list and Enter there
+	 * opens the first match; a search that matches nothing says so (in a status region there from the start); Escape
+	 * closes and returns focus to the button. */
 	let {
 		schools,
 		current,
@@ -88,7 +89,15 @@
 		event.preventDefault();
 		choose(schoolId);
 	};
+	/** Arrow Down enters the list; Enter opens the first school the search shows. */
 	const onSearchKeyDown = (event: KeyboardEvent): void => {
+		if (event.key === "Enter") {
+			const first = shownIds[0];
+			if (first === undefined) return;
+			event.preventDefault();
+			choose(first);
+			return;
+		}
 		if (event.key !== "ArrowDown") return;
 		event.preventDefault();
 		rows()
@@ -166,7 +175,9 @@
 					<span class="text-muted-foreground">{schools.length}</span>
 				</button>
 			{/if}
-			<hr class={popoverRule} aria-hidden="true" />
+			{#if allShown && shownSchools.length > 0}
+				<hr class={popoverRule} aria-hidden="true" />
+			{/if}
 			{#each shownSchools as school (school.id)}
 				<button
 					type="button"
@@ -189,6 +200,11 @@
 					{/if}
 				</button>
 			{/each}
+		</div>
+		<div role="status" data-test="school-none">
+			{#if shownIds.length === 0}
+				<p class="m-0 px-2 py-1.5 text-muted-foreground">No school matches “{search.trim()}”</p>
+			{/if}
 		</div>
 	</Popover.Content>
 </Popover.Root>

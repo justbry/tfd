@@ -28,7 +28,11 @@ export function useApp(): AppContext {
 	return context;
 }
 
-export type Outcome<A> = { ok: true; value: A } | { ok: false; error: UiError };
+/** A run's end: its value, or its error and the toast that reported it (so that a later success can take the toast
+ * down: errors stay until dismissed or fixed). */
+export type Outcome<A> =
+	| { ok: true; value: A }
+	| { ok: false; error: UiError; toastId: string };
 
 /** The `UiError` a failed run ends with: its typed failure, or for a defect (a bug in an adapter, an interrupted
  * fiber) an `unexpected` one, written to the log since nothing upstream did. */
@@ -59,10 +63,10 @@ export const perform = <A>(
 			Effect.map((value): Outcome<A> => ({ ok: true, value })),
 			Effect.catchCause((cause) =>
 				Effect.flatMap(uiErrorOf(cause), (error) =>
-					Effect.as(reportFailure(error, handlers), {
-						ok: false,
-						error,
-					} satisfies Outcome<A>),
+					Effect.map(
+						reportFailure(error, handlers),
+						(toastId): Outcome<A> => ({ ok: false, error, toastId }),
+					),
 				),
 			),
 		),

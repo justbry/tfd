@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { flushSync } from "svelte";
 import { schoolTabs } from "$contract/app/route.ts";
 import { AdapterError } from "$contract/http/errors.ts";
 import type { MountedApp } from "../../src/app/mount.ts";
@@ -93,6 +94,14 @@ describe("the shell", () => {
 		]);
 		expect(queryAll("[data-test=all-schools-row]")).toHaveLength(5);
 		expect(textOf("[data-test=all-schools-total]")).toBe("Total 7");
+		expect(
+			textOf("[data-test=all-schools-row][data-school=map] td:last-child"),
+		).toBe("26 min · stale");
+		expect(
+			textOf(
+				"[data-test=all-schools-row][data-school=vol] td:nth-child(2) .sr-only",
+			),
+		).toBe("Not shown yet: it arrives with the Dashboard (S9.1).");
 		expect(textOf("[data-test=school-name]")).toBe("All schools");
 	});
 	test("a school opened from All schools goes to its Plans", async () => {
@@ -170,6 +179,54 @@ describe("the shell", () => {
 		click("[data-test=school-option][data-school=map]");
 		expect(window.location.hash).toBe("#/map/plans");
 	});
+	test("a search that matches nothing says so; Enter opens the first match", async () => {
+		await open("#/vol/plans");
+		click("[data-test=school-switcher]");
+		await until(() => query("input[type=search]") !== null, "the switcher");
+		const search = query<HTMLInputElement>("input[type=search]");
+		if (!search) throw new Error("no search field");
+		const type = (text: string): void => {
+			search.value = text;
+			search.dispatchEvent(new Event("input", { bubbles: true }));
+			flushSync();
+		};
+		expect(query("[data-test=school-none]")?.getAttribute("role")).toBe(
+			"status",
+		);
+		expect(textOf("[data-test=school-none]")).toBe("");
+		type("zzz");
+		expect(queryAll("[data-test=school-option]")).toEqual([]);
+		expect(queryAll("[data-test=school-panel] hr")).toEqual([]);
+		expect(textOf("[data-test=school-none]")).toBe("No school matches “zzz”");
+		type("lotus");
+		expect(queryAll("[data-test=school-panel] hr")).toEqual([]);
+		search.dispatchEvent(
+			new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+		);
+		flushSync();
+		expect(window.location.hash).toBe("#/nw/plans");
+	});
+	test("the active tab is underlined in the primary colour in both themes", async () => {
+		await open("#/vol/plans?theme=dark");
+		const active = query("[data-tab=plans]");
+		expect(active?.getAttribute("data-state")).toBe("active");
+		/** Every class that colours the border while the tab is active, whatever its theme or group variant. */
+		const activeBorderColours = (active?.className.split(/\s+/) ?? []).filter(
+			(name) => {
+				const variants = name.split(":");
+				const utility = variants.pop() ?? "";
+				return (
+					variants.some((variant) => variant.endsWith("data-active")) &&
+					/^border-(?!\d|[xytblr]-|0$)[a-z]/.test(utility)
+				);
+			},
+		);
+		expect(activeBorderColours.length).toBeGreaterThan(0);
+		expect(
+			new Set(activeBorderColours.map((name) => name.split(":").pop())),
+		).toEqual(new Set(["border-primary"]));
+		expect(activeBorderColours).toContain("dark:data-active:border-primary");
+	});
 	test("another school keeps only the theme", async () => {
 		await open("#/vol/ledger?theme=dark&month=2026-09");
 		click("[data-test=school-switcher]");
@@ -179,6 +236,45 @@ describe("the shell", () => {
 		);
 		click("[data-test=school-option][data-school=nw]");
 		expect(window.location.hash).toBe("#/nw/plans?theme=dark");
+	});
+});
+
+describe("a failed disclosure read", () => {
+	test("is retried, then toasts with Retry; the retry fills the period line and takes the toast down", async () => {
+		let calls = 0;
+		const triesBeforeTheToast = 3;
+		await open("#/vol/plans", {
+			reader: (fixture) => ({
+				...fixture,
+				disclosure: (schoolId) => {
+					calls += 1;
+					return calls <= triesBeforeTheToast
+						? Promise.reject(new AdapterError("network", "offline"))
+						: fixture.disclosure(schoolId);
+				},
+			}),
+		});
+		await until(
+			() => query("[data-test=toast-action]") !== null,
+			"the failure toast",
+			1000,
+		);
+		expect(calls).toBe(triesBeforeTheToast);
+		expect(textOf("[data-test=toast-title]")).toBe("No connection");
+		expect(textOf("[data-test=toast-action]")).toBe("Retry");
+		click("[data-test=toast-action]");
+		await until(
+			() =>
+				calls === triesBeforeTheToast + 1 &&
+				queryAll("[data-test=toast]").length === 0,
+			"the retry",
+		);
+		click("[data-test=period-button]");
+		await until(
+			() => query("[data-test=period-note]") !== null,
+			"the period note",
+		);
+		expect(textOf("[data-test=period-note]")).toStartWith("Owner:");
 	});
 });
 
@@ -219,5 +315,11 @@ describe("a failed schools read", () => {
 		await until(() => root.dataset.route === "#/vol/plans", "the retried read");
 		expect(query("[data-test=load-failed]")).toBeNull();
 		expect(calls).toBe(2);
+		// The failure is fixed, so its toast leaves with it.
+		await until(
+			() => queryAll("[data-test=toast]").length === 0,
+			"the toast to leave",
+		);
+		expect(textOf("[data-test=toasts-assertive]")).toBe("");
 	});
 });

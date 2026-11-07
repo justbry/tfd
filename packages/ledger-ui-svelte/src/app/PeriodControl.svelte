@@ -37,7 +37,7 @@
 		changed: boolean;
 		compare: boolean;
 		timeZoneNote: string;
-		onChoose: (period: Period, close: boolean) => void;
+		onChoose: (period: Period) => void;
 		onCompareChange: (compare: boolean) => void;
 	} = $props();
 
@@ -65,7 +65,7 @@
 
 	const pick = (chosen: Period, close: boolean): void => {
 		if (close) open = false;
-		onChoose(chosen, close);
+		onChoose(chosen);
 	};
 </script>
 

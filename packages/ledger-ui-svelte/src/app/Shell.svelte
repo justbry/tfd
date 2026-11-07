@@ -11,16 +11,16 @@
 	import type { School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import * as Tabs from "$lib/components/ui/tabs/index.ts";
-	import { withRetry } from "../effect/retry.ts";
 	import { read } from "../effect/run.ts";
 	import { Toasts } from "../effect/services.ts";
 	import type { ToastInput } from "../effect/toast-model.ts";
 	import { toUiError } from "../effect/ui-error.ts";
 	import AllSchools from "./AllSchools.svelte";
-	import { perform, useApp } from "./context.ts";
+	import { useApp } from "./context.ts";
 	import EmptyPane from "./EmptyPane.svelte";
 	import Icon from "./Icon.svelte";
 	import LoadFailed from "./LoadFailed.svelte";
+	import { retryingRead } from "./retrying-read.ts";
 	import { shownPeriod, staleText, tabBadge, tabNames } from "./shell-model.ts";
 	import { badgeTones, mockBadge } from "./styles.ts";
 	import TopBar from "./TopBar.svelte";
@@ -31,19 +31,25 @@
 		route,
 		schools,
 		navigate,
-		topBar = $bindable(null),
+		chrome = $bindable(null),
 	}: {
 		route: Route;
 		schools: School[];
 		navigate: (route: Route) => void;
-		/** The top bar's element, for the toast stack that sits below it. */
-		topBar?: HTMLElement | null;
+		/** The last of the bars (the tabs row, or the top bar on All schools), for the toast stack that sits below
+		 * it so that it never covers a tab or a top-bar button. */
+		chrome?: HTMLElement | null;
 	} = $props();
 
 	const app = useApp();
 	const { today } = app.calendar;
 	let settingsOpen = $state(false);
 	let topBarHeight = $state(0);
+	let topBar = $state<HTMLElement | null>(null);
+	let tabsList = $state<HTMLElement | null>(null);
+	$effect(() => {
+		chrome = school ? tabsList : topBar;
+	});
 	/** The settings sheet loads the first time it opens, so that the first page load is the bar, the tabs and the pane
 	 * only (as the Preact shell loads its settings after the first paint). */
 	let settingsSheet: Promise<typeof import("./SettingsSheet.svelte")> | null =
@@ -68,15 +74,11 @@
 		const schoolId = school?.id;
 		if (!schoolId) return;
 		let current = true;
-		perform(
-			app,
-			withRetry(
-				read((reader) => reader.disclosure(schoolId)),
-				{ kind: "read" },
-			),
-		).then((outcome) => {
-			if (current && outcome.ok) disclosure = outcome.value;
-		});
+		retryingRead(app, () => read((reader) => reader.disclosure(schoolId)), {
+			value: (loaded) => {
+				if (current) disclosure = loaded;
+			},
+		})();
 		return () => {
 			current = false;
 		};
@@ -135,6 +137,7 @@
 {#if school}
 	<Tabs.Root value={route.tab} onValueChange={chooseTab} class="gap-0" data-test="school">
 		<Tabs.List
+			bind:ref={tabsList}
 			variant="line"
 			aria-label={school.name}
 			class="h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b border-border p-0 px-2.5 group-data-horizontal/tabs:h-auto"

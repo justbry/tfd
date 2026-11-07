@@ -6,11 +6,7 @@ import { httpLayer } from "../../src/effect/layers.ts";
 import { memoryLogLayer } from "../../src/effect/log.ts";
 import { read, run } from "../../src/effect/run.ts";
 import { Log } from "../../src/effect/services.ts";
-import {
-	fieldProblems,
-	toUiError,
-	UiError,
-} from "../../src/effect/ui-error.ts";
+import { toUiError, UiError } from "../../src/effect/ui-error.ts";
 import { fixtureRuntime } from "../helpers.ts";
 
 const logRuntime = () => ManagedRuntime.make(memoryLogLayer);
@@ -75,17 +71,6 @@ describe("run", () => {
 	test("a success passes through", async () => {
 		const value = await logRuntime().runPromise(run(() => Promise.resolve(7)));
 		expect(value).toBe(7);
-	});
-	test("a field problem comes from problems[] or from field", () => {
-		const one = toUiError(
-			new AdapterError("bad_request", "Pick a date", { field: "from" }),
-		);
-		expect(fieldProblems(one)).toEqual([
-			{ path: "from", message: "Pick a date" },
-		]);
-		expect(
-			fieldProblems(toUiError(new AdapterError("server", "boom"))),
-		).toEqual([]);
 	});
 });
 
