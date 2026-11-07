@@ -45,7 +45,7 @@ export type HttpReader = Reader & {
 	/** The school's writes not yet shipped (the pending store), oldest first. */
 	pendingWrites(school: string): PendingWrite[];
 	/** The not-available reasons of the last `schools()`: each school it left out, and the null that left it out
-	 * (`<id>.timeZone`, `<id>.creditUnit`, `<id>.lagMinutes`). Empty when every school was answered. */
+	 * (`<id>.timeZone`, `<id>.creditUnit`). Empty when every school was answered. */
 	schoolsLeftOut(): string[];
 };
 
@@ -131,7 +131,8 @@ export function createHttpReader(options: {
 			// Name, time zone, currency and credit unit come from ledger/school, stale and lag from the Worker.
 			// `attentionCount` and `tabBadges` have no source on either side: null, so no badge shows. A null currency
 			// is a school with no menu and no Stripe account (S8-contract section 11): it passes through, and its money
-			// reads "—". A null time zone, credit unit or lag leaves only that school out, with the reason kept in
+			// reads "—". A school the Worker has no views for yet (nothing shipped) is listed with a null lag and not
+			// stale. A null time zone or credit unit leaves only that school out, with the reason kept in
 			// `schoolsLeftOut`: one school never blocks the others.
 			const missing: string[] = [];
 			const schools: School[] = [];
@@ -142,15 +143,7 @@ export function createHttpReader(options: {
 				for (const field of ["timeZone", "creditUnit"] as const)
 					if (!fact || fact[field] === null)
 						missing.push(`${claim.id}.${field}`);
-				if (!row || row.lagMinutes === null)
-					missing.push(`${claim.id}.lagMinutes`);
-				if (
-					!fact?.timeZone ||
-					!fact.creditUnit ||
-					!row ||
-					row.lagMinutes === null
-				)
-					return;
+				if (!fact?.timeZone || !fact.creditUnit) return;
 				schools.push({
 					id: claim.id,
 					name: fact.name,
@@ -158,8 +151,8 @@ export function createHttpReader(options: {
 					currency: fact.currency,
 					role: claim.role,
 					creditUnit: fact.creditUnit,
-					stale: row.stale,
-					lagMinutes: row.lagMinutes,
+					stale: row?.stale ?? false,
+					lagMinutes: row?.lagMinutes ?? null,
 					attentionCount: null,
 					tabBadges: null,
 				});

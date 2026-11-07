@@ -19,7 +19,8 @@ export type School = {
 	dashboardOpensOn?: string;
 	/** The ledger shipper is behind; `lagMinutes` says by how much. */
 	stale: boolean;
-	lagMinutes: number;
+	/** Null when the school has no ledger views yet (nothing has shipped): it is listed all the same. */
+	lagMinutes: number | null;
 	/** Members that need attention; null when no source counts them (the HTTP build): no badge, never 0. */
 	attentionCount: number | null;
 	/** Null when no source has them (the HTTP build): the tabs show no badge. */
