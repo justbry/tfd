@@ -8,6 +8,10 @@
  * (runbook: plans/ledger-ui/S8f-staging-runbook.md). Every check prints one line `PASS|FAIL|BLOCKED  <stage>.<check>
  * <why>`; BLOCKED says what is missing and who supplies it. Tokens, cookies, links and PINs are never printed in full
  * (the first four characters at most) and the cookie jar lives in memory.
+ *
+ * Stage 5, the ledger UI's own HTTP adapters on staging, runs from the UI package (`bun run --cwd packages/ledger-ui
+ * staging-ui`, `packages/ledger-ui/scripts/staging-ui.ts`): Bun takes the JSX settings of the directory it starts in.
+ * It signs in with this file's `Session` and prints the same lines.
  */
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -37,7 +41,7 @@ const POLL_INTERVAL_MS = 30_000;
 const POLL_TIMEOUT_MS = 15 * 60_000;
 /** Days each side of today for the bookings listing: the route takes at most 62 days from `from` to `to` inclusive
  * (buzz-school `MAX_BOOKING_DAYS`, 400 `bad_range` beyond), so ±30 is 61. */
-const BOOKING_WINDOW_DAYS = 30;
+export const BOOKING_WINDOW_DAYS = 30;
 const SECRET_PREFIX_LENGTH = 4;
 const EMAIL_PREFIX_LENGTH = 3;
 const STATUS_WIDTH = 7;
@@ -72,10 +76,10 @@ export const registerSecret = (value: string | null | undefined): void => {
 		knownSecrets.add(value);
 };
 
-const prefixOf = (value: string): string =>
+export const prefixOf = (value: string): string =>
 	`${value.slice(0, SECRET_PREFIX_LENGTH)}…`;
 
-const maskEmail = (email: string): string =>
+export const maskEmail = (email: string): string =>
 	`${email.slice(0, EMAIL_PREFIX_LENGTH)}…`;
 
 export const scrub = (text: string): string => {
@@ -124,7 +128,7 @@ const originOf = (raw: string, role: string): string => {
  * wrong role are refused. `extraAllowedOrigins` exists for the test suite alone: the CLI never passes it.
  */
 export const resolveTargets = (
-	raw: { worker?: string; api?: string },
+	raw: { worker?: string | undefined; api?: string | undefined },
 	options: TargetOptions = {},
 ): Targets => {
 	const extra = options.extraAllowedOrigins ?? [];
@@ -202,7 +206,7 @@ export const exitCodeOf = (
 
 // ---- http
 
-type Reply = {
+export type Reply = {
 	status: number;
 	headers: Headers;
 	text: string;
@@ -219,25 +223,50 @@ const asRecord = (value: unknown): Json =>
 const asArray = (value: unknown): unknown[] =>
 	Array.isArray(value) ? value : [];
 
-const errorCodeOf = (reply: Reply): string => {
+export const errorCodeOf = (reply: Reply): string => {
 	const error = asRecord(asRecord(reply.json).error);
 	if (typeof error.code === "string") return error.code;
 	const flat = asRecord(reply.json).error;
 	return typeof flat === "string" ? flat : "";
 };
 
-const describe = (reply: Reply): string => {
+export const describe = (reply: Reply): string => {
 	const code = errorCodeOf(reply);
 	return code === "" ? `${reply.status}` : `${reply.status} ${code}`;
 };
 
-const send = async (url: string, init: RequestInit = {}): Promise<Reply> => {
-	const response = await fetch(url, {
-		redirect: "manual",
-		signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-		...init,
+/**
+ * `work` or a rejection after REQUEST_TIMEOUT_MS. Bun's own fetch and no `AbortSignal`: stage 5 runs under happy-dom,
+ * whose `fetch` and `AbortSignal` replace the globals, and Bun's fetch takes no happy-dom signal. The request is not
+ * aborted at the deadline; the check reports and the run moves on.
+ */
+const withDeadline = <Answer>(
+	work: Promise<Answer>,
+	url: string,
+): Promise<Answer> => {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const deadline = new Promise<never>((_, reject) => {
+		timer = setTimeout(
+			() =>
+				reject(
+					new Error(
+						`no answer from ${new URL(url).host} within ${REQUEST_TIMEOUT_MS / MS_PER_SECOND} s`,
+					),
+				),
+			REQUEST_TIMEOUT_MS,
+		);
 	});
-	const text = await response.text();
+	return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
+};
+
+const send = async (url: string, init: RequestInit = {}): Promise<Reply> => {
+	const { response, text } = await withDeadline(
+		(async () => {
+			const answer = await Bun.fetch(url, { redirect: "manual", ...init });
+			return { response: answer, text: await answer.text() };
+		})(),
+		url,
+	);
 	let json: unknown = null;
 	try {
 		json = JSON.parse(text);
@@ -310,9 +339,9 @@ const tamperToken = (token: string, change: (claims: Json) => void): string => {
 
 // ---- the family service session (cookie jar in memory)
 
-type Grant = { id: string; role: string; finance: boolean };
+export type Grant = { id: string; role: string; finance: boolean };
 
-type Step =
+export type Step =
 	| { ok: true; reply: Reply }
 	| { ok: false; status: "FAIL" | "BLOCKED"; why: string };
 
@@ -386,9 +415,27 @@ export type Inputs = {
 	paymentId: string | undefined;
 	refundCents: number | undefined;
 	bookingId: string | undefined;
+	/** Stage 5: a school where the account's token is finance:false; else the token's first such school. */
+	schoolIdNoFinance: string | undefined;
 };
 
-class Session {
+/** The headers of a `RequestInit` as a plain record, without the global `Headers` (happy-dom's under stage 5). */
+const headerRecord = (
+	headers: HeadersInit | undefined,
+): Record<string, string> => {
+	if (headers === undefined) return {};
+	if (Array.isArray(headers)) return Object.fromEntries(headers);
+	if (typeof (headers as Headers).forEach === "function") {
+		const record: Record<string, string> = {};
+		(headers as Headers).forEach((value, name) => {
+			record[name] = value;
+		});
+		return record;
+	}
+	return { ...(headers as Record<string, string>) };
+};
+
+export class Session {
 	readonly jar = new Map<string, string>();
 	token: string | null = null;
 	expiresAt = 0;
@@ -403,29 +450,13 @@ class Session {
 		registerSecret(pin);
 	}
 
-	async api(
-		path: string,
-		init: {
-			method?: string;
-			body?: unknown;
-			headers?: Record<string, string>;
-		} = {},
-	): Promise<Reply> {
+	private cookieHeader(): Record<string, string> {
 		const cookie = [...this.jar].map(([name, value]) => `${name}=${value}`);
-		const reply = await send(`${this.context.targets.api}${path}`, {
-			method: init.method ?? "GET",
-			headers: {
-				origin: LEDGER_ORIGIN,
-				"x-b4u": "1",
-				...(init.body === undefined
-					? {}
-					: { "content-type": "application/json" }),
-				...(cookie.length === 0 ? {} : { cookie: cookie.join("; ") }),
-				...init.headers,
-			},
-			body: init.body === undefined ? undefined : JSON.stringify(init.body),
-		});
-		for (const line of reply.headers.getSetCookie()) {
+		return cookie.length === 0 ? {} : { cookie: cookie.join("; ") };
+	}
+
+	private keepCookies(headers: Headers): void {
+		for (const line of headers.getSetCookie()) {
 			const [pair = ""] = line.split(";");
 			const separator = pair.indexOf("=");
 			if (separator <= 0) continue;
@@ -437,7 +468,58 @@ class Session {
 				registerSecret(value);
 			}
 		}
+	}
+
+	async api(
+		path: string,
+		init: {
+			method?: string;
+			body?: unknown;
+			headers?: Record<string, string>;
+		} = {},
+	): Promise<Reply> {
+		const reply = await send(`${this.context.targets.api}${path}`, {
+			method: init.method ?? "GET",
+			headers: {
+				origin: LEDGER_ORIGIN,
+				"x-b4u": "1",
+				...(init.body === undefined
+					? {}
+					: { "content-type": "application/json" }),
+				...this.cookieHeader(),
+				...init.headers,
+			},
+			body: init.body === undefined ? null : JSON.stringify(init.body),
+		});
+		this.keepCookies(reply.headers);
 		return reply;
+	}
+
+	/**
+	 * `fetch` as the ledger UI's browser build makes it from the ledger origin (stage 5): on the family service this
+	 * session's cookies and the browser's `Origin` (LEDGER_ORIGIN), and the cookies it sets are kept; on the Worker
+	 * nothing is added. A URL on any other origin is refused before a request is made.
+	 */
+	async browserFetch(url: string, init: RequestInit = {}): Promise<Response> {
+		const { api, worker } = this.context.targets;
+		const onApi = url.startsWith(`${api}/`);
+		if (!(onApi || url.startsWith(`${worker}/`)))
+			throw new UsageError(
+				`${url.split("/")[2] ?? url} is not one of the two allow-listed hosts`,
+			);
+		const response = await withDeadline(
+			Bun.fetch(url, {
+				...init,
+				redirect: "manual",
+				headers: {
+					...headerRecord(init.headers),
+					...(onApi ? { origin: LEDGER_ORIGIN, ...this.cookieHeader() } : {}),
+				},
+			}),
+			url,
+		);
+		if (onApi) this.keepCookies(response.headers);
+		return response;
 	}
 
 	/** Mints a link over fly ssh and redeems it on the family service with this session's jar. */
@@ -616,7 +698,7 @@ const qaLinkFailure = (code: string, email: string): Step => {
 
 // ---- helpers shared by the stages
 
-const currentMonthRange = (): { from: string; to: string } => {
+export const currentMonthRange = (): { from: string; to: string } => {
 	const today = new Date();
 	const iso = (date: Date) => date.toISOString().slice(0, 10);
 	return {
@@ -640,7 +722,7 @@ const requireEnvelope = (reply: Reply): string | null => {
 };
 
 /** Runs one check; an exception is a FAIL with its message. */
-const check = async (
+export const check = async (
 	context: Context,
 	stage: number,
 	name: string,
@@ -939,14 +1021,14 @@ export const stage1 = async (context: Context): Promise<void> => {
 
 // ---- stage 2: a QA account, the token and the Worker
 
-const missingAccount = (inputs: Inputs): string | null =>
+export const missingAccount = (inputs: Inputs): string | null =>
 	inputs.qaEmail === undefined || inputs.pin === undefined
 		? "S8F_QA_EMAIL and S8F_PIN are not set: the owner supplies a QA address listed in QA_EMAILS on b4uni-stg-family whose account owns or administers a staging school and has a PIN set"
 		: null;
 
 const sessions = new WeakMap<Context, { owner?: Session; admin?: Session }>();
 
-const ownerSession = (context: Context): Session | null => {
+export const ownerSession = (context: Context): Session | null => {
 	const { qaEmail, pin } = context.inputs;
 	if (qaEmail === undefined || pin === undefined) return null;
 	const held = sessions.get(context) ?? {};
@@ -966,7 +1048,7 @@ const adminSession = (context: Context): Session | null => {
 };
 
 /** The school this run works on: S8F_SCHOOL_ID when it is in the token, else the first. */
-const targetSchool = (
+export const targetSchool = (
 	context: Context,
 	session: Session,
 ): { grant: Grant } | { blocked: string } => {
@@ -1470,6 +1552,8 @@ const STAGES: Record<number, (context: Context) => Promise<void>> = {
 };
 /** Stage 4 moves (test) money, so only `--stage 4` runs it. */
 const DEFAULT_STAGES = [1, 2, 3];
+/** packages/ledger-ui/scripts/staging-ui.ts. */
+const UI_STAGE = 5;
 
 export const runStages = async (
 	context: Context,
@@ -1496,6 +1580,10 @@ export const parseArgs = (
 			const value = argv[index + 1];
 			index += 1;
 			stages = (value ?? "").split(",").map(Number);
+			if (stages.includes(UI_STAGE))
+				throw new UsageError(
+					`stage ${UI_STAGE} (the ledger UI's HTTP adapters) runs from the UI package: bun run --cwd packages/ledger-ui staging-ui`,
+				);
 			if (stages.some((stage) => !STAGES[stage]))
 				throw new UsageError(
 					"--stage takes numbers from 1 to 4, e.g. --stage 1,2",
@@ -1544,15 +1632,30 @@ export const inputsFrom = (env: Record<string, string | undefined>): Inputs => {
 		bookingId: inputFrom(env, "S8F_BOOKING_ID", (value) =>
 			UUID_PATTERN.test(value),
 		)?.toLowerCase(),
+		schoolIdNoFinance: inputFrom(env, "S8F_SCHOOL_ID_NO_FINANCE", (value) =>
+			UUID_PATTERN.test(value),
+		)?.toLowerCase(),
 	};
 };
 
-const main = async (): Promise<number> => {
-	const env = process.env;
-	let args: ReturnType<typeof parseArgs>;
+export type Arguments = { stages: number[]; json: boolean; strict: boolean };
+
+/**
+ * The command line around a run: the inputs from `env`, the allow-list, the lines, the table and the exit code. Stage
+ * 5's script (packages/ledger-ui/scripts/staging-ui.ts) runs through it with its own `parse` and `run`.
+ */
+export const runCommand = async (options: {
+	title: string;
+	argv: readonly string[];
+	env: Record<string, string | undefined>;
+	parse(argv: readonly string[]): Arguments;
+	run(context: Context, stages: readonly number[]): Promise<void>;
+}): Promise<number> => {
+	const { env } = options;
+	let args: Arguments;
 	let context: Context;
 	try {
-		args = parseArgs(process.argv.slice(2));
+		args = options.parse(options.argv);
 		const targets = resolveTargets({
 			worker: env.S8F_WORKER,
 			api: env.S8F_API,
@@ -1570,9 +1673,7 @@ const main = async (): Promise<number> => {
 			qaLink: flyQaLink,
 			sleep: (milliseconds) =>
 				new Promise((resolve) => setTimeout(resolve, milliseconds)),
-			log: args.json
-				? (line) => console.error(line)
-				: (line) => console.log(line),
+			log: print,
 		};
 	} catch (error) {
 		if (error instanceof UsageError) {
@@ -1582,9 +1683,9 @@ const main = async (): Promise<number> => {
 		throw error;
 	}
 	console.error(
-		`S8f staging e2e: worker ${context.targets.worker}, api ${context.targets.api}, stages ${args.stages.join(",")}`,
+		`${options.title}: worker ${context.targets.worker}, api ${context.targets.api}, stages ${args.stages.join(",")}`,
 	);
-	await runStages(context, args.stages);
+	await options.run(context, args.stages);
 	const { results } = context.report;
 	const table = summarize(results);
 	if (args.json)
@@ -1602,4 +1703,13 @@ const main = async (): Promise<number> => {
 	return exitCodeOf(results, args.strict);
 };
 
-if (import.meta.main) process.exit(await main());
+if (import.meta.main)
+	process.exit(
+		await runCommand({
+			title: "S8f staging e2e",
+			argv: process.argv.slice(2),
+			env: process.env,
+			parse: parseArgs,
+			run: runStages,
+		}),
+	);
