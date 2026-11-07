@@ -1,0 +1,120 @@
+{
+	"version": 1,
+	"catalog": "school.v1",
+	"audiences": {
+		"public": {},
+		"member": {
+			"parent": "public"
+		},
+		"governance": {
+			"parent": "member"
+		},
+		"finance": {
+			"parent": "governance",
+			"fixed": true,
+			"identities": true
+		},
+		"owner": {
+			"parent": "finance",
+			"fixed": true,
+			"identities": true
+		}
+	},
+	"classes": {
+		"income": [
+			"gross_collected",
+			"revenue_by_kind",
+			"revenue_by_tier",
+			"net_income"
+		],
+		"losses": [
+			"refunds",
+			"disputes_lost",
+			"dispute_fees",
+			"stripe_fees",
+			"refund_rate",
+			"dispute_rate"
+		],
+		"cash": ["payouts", "closing_balance_usd", "credits_outstanding"],
+		"people": ["paying_members", "new_paying_members", "arpa"],
+		"activity": [
+			"payments_count",
+			"refunds_count",
+			"disputes_opened",
+			"credits_granted",
+			"credits_consumed",
+			"credits_expired",
+			"breakage_rate"
+		],
+		"personal": ["closing_balance_credits"]
+	},
+	"disclose": {
+		"income": {
+			"public": {
+				"detail": "categories",
+				"every": "year",
+				"after": "12 months"
+			},
+			"member": {
+				"detail": "categories",
+				"every": "quarter",
+				"after": "6 weeks"
+			},
+			"governance": {
+				"detail": "breakdown",
+				"every": "month"
+			}
+		},
+		"losses": {
+			"member": {
+				"detail": "total",
+				"every": "quarter",
+				"after": "6 weeks"
+			},
+			"governance": {
+				"detail": "breakdown",
+				"every": "month"
+			}
+		},
+		"cash": {
+			"governance": {
+				"detail": "categories",
+				"every": "month"
+			}
+		},
+		"people": {
+			"public": {
+				"detail": "total",
+				"every": "quarter"
+			},
+			"governance": {
+				"detail": "spread",
+				"every": "month"
+			}
+		},
+		"activity": {
+			"public": {
+				"detail": "categories",
+				"every": "month"
+			},
+			"governance": {
+				"detail": "breakdown",
+				"every": "month"
+			}
+		}
+	},
+	"rounding": {
+		"small": {
+			"public": 10000,
+			"member": 10000
+		},
+		"large": {
+			"public": 100000,
+			"member": 10000
+		},
+		"largeFrom": 10000000
+	},
+	"counts": {
+		"failingRoundTo": 10
+	}
+}

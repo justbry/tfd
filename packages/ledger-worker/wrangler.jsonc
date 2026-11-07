@@ -1,0 +1,44 @@
+// The ledger Worker (contract plans/ledger-ui/S8-contract.md section 11). Nothing here is a secret.
+//
+// `LEDGER_ISS` is the family service's API_BASE for the environment and `LEDGER_JWKS_URL` its
+// /.well-known/ledger-jwks.json. The bucket names are the staging setup step's to confirm (D2: one bucket per
+// environment). The UI build is not wired yet: when `packages/ledger-ui` builds to `dist`, add to each environment
+//   "assets": { "directory": "../ledger-ui/dist", "binding": "ASSETS", "not_found_handling": "single-page-application" }
+// (see README). Until then a path outside /v1 is a 404.
+{
+	"name": "ledger",
+	"main": "src/main.ts",
+	"compatibility_date": "2026-07-01",
+	"compatibility_flags": ["nodejs_compat"],
+	// `atm/worker` resolves to its source, so the bundle does not need atm's `dist`
+	"alias": { "atm/worker": "../atm/src/worker.ts" },
+	"observability": { "enabled": true },
+	"env": {
+		"staging": {
+			"name": "ledger-staging",
+			"routes": [
+				{ "pattern": "ledger-staging.b4uni.com", "custom_domain": true }
+			],
+			"triggers": { "crons": ["*/5 * * * *"] },
+			"r2_buckets": [
+				{ "binding": "LEDGER_BUCKET", "bucket_name": "b4uni-staging-ledger" }
+			],
+			"vars": {
+				"LEDGER_ISS": "https://api-staging.b4uni.com",
+				"LEDGER_JWKS_URL": "https://api-staging.b4uni.com/.well-known/ledger-jwks.json"
+			}
+		},
+		"production": {
+			"name": "ledger",
+			"routes": [{ "pattern": "ledger.b4uni.com", "custom_domain": true }],
+			"triggers": { "crons": ["*/5 * * * *"] },
+			"r2_buckets": [
+				{ "binding": "LEDGER_BUCKET", "bucket_name": "b4uni-production-ledger" }
+			],
+			"vars": {
+				"LEDGER_ISS": "https://api.b4uni.com",
+				"LEDGER_JWKS_URL": "https://api.b4uni.com/.well-known/ledger-jwks.json"
+			}
+		}
+	}
+}

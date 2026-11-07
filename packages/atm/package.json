@@ -19,6 +19,11 @@
 			"types": "./dist/worker.d.ts",
 			"bun": "./src/worker.ts",
 			"default": "./dist/worker.js"
+		},
+		"./scenarios": {
+			"types": "./src/scenario/api.ts",
+			"bun": "./src/scenario/api.ts",
+			"default": "./src/scenario/api.ts"
 		}
 	},
 	"files": [

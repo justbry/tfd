@@ -406,8 +406,8 @@
       },
       "devDependencies": {
         "@types/bun": "1.4.2",
-        "esbuild": "^0.25.0",
-        "miniflare": "^4.20260730.0",
+        "esbuild": "0.25.0",
+        "miniflare": "4.20260730.0",
         "typescript": "~5.8.3",
       },
     },
@@ -862,6 +862,20 @@
     "packages/ksuid": {
       "name": "@autumn/ksuid",
       "version": "1.0.0",
+    },
+    "packages/ledger-worker": {
+      "name": "ledger-worker",
+      "version": "0.1.0",
+      "dependencies": {
+        "atm": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.2",
+        "@types/node": "24.13.3",
+        "esbuild": "0.25.0",
+        "miniflare": "4.20260730.0",
+        "typescript": "~5.8.3",
+      },
     },
     "packages/logging": {
       "name": "@autumn/logging",
@@ -5533,6 +5547,8 @@
     "lcm": ["lcm@0.0.3", "", { "dependencies": { "gcd": "^0.0.1" } }, "sha512-TB+ZjoillV6B26Vspf9l2L/vKaRY/4ep3hahcyVkCGFgsTNRUQdc24bQeNFiZeoxH0vr5+7SfNRMQuPHv/1IrQ=="],
 
     "leac": ["leac@0.6.0", "", {}, "sha512-y+SqErxb8h7nE/fiEX07jsbuhrpO9lL8eca7/Y1nuWV2moNlXhyd59iDGcRf6moVyDMbmTNzL40SUyrFU/yDpg=="],
+
+    "ledger-worker": ["ledger-worker@workspace:packages/ledger-worker"],
 
     "leven": ["leven@4.1.0", "", {}, "sha512-KZ9W9nWDT7rF7Dazg8xyLHGLrmpgq2nVNFUckhqdW3szVP6YhCpp/RAnpmVExA9JvrMynjwSLVrEj3AepHR6ew=="],
 

@@ -18,6 +18,7 @@ export * from "./ledger/read.js";
 export * from "./ledger/run-views.js";
 export * from "./ledger/summary.js";
 export * from "./ledger/views.js";
+export { atmChannel } from "./scenario/channels/atm.js";
 export * from "./scenario/kpi-evaluate.js";
 export * from "./scenario/suppress-core.js";
 export * from "./store/r2-binding-store.js";
