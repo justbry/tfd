@@ -148,4 +148,4 @@ finance-false guarantees; `cron.test.ts` the views job; `consumer.test.ts` uses 
 
 ## Staging end-to-end (S8f)
 
-`bun run staging-e2e [--stage N[,N]] [--json] [--strict]` (`scripts/staging-e2e.ts`) checks the deployed staging Worker and family service; it refuses any host but the two staging ones. `tests/staging-e2e.test.ts` runs its stage 1 against the harness. Inputs, owner steps and expected output: `plans/ledger-ui/S8f-staging-runbook.md`.
+`bun run staging-e2e [--stage N[,N]] [--json] [--strict]` (`scripts/staging-e2e.ts`) checks the deployed staging Worker and family service; it refuses any host but the two staging ones. `tests/staging-e2e.test.ts` runs its stage 1 against the harness. Stage 6 (S8d, `scripts/staging-s8d.ts`, only with `--stage 6`) publishes the menu and refunds through buzz-school's routes and follows both events through `ledger-status`, the bucket, the watermark and the Worker's ledger; `tests/staging-s8d.test.ts` covers its readers and a whole run on fakes. Inputs, owner steps and expected output: `plans/ledger-ui/S8f-staging-runbook.md`.
