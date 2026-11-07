@@ -47,6 +47,11 @@ export type MintOptions = {
 	schools: SchoolGrantInput[];
 	/** Seconds the token lives from the harness clock; default 300 (the most the Worker accepts). Negative: already expired. */
 	expiresInSeconds?: number;
+	/**
+	 * The `su` claim: unix seconds of the PIN step-up the family service vouches for. Config writes need one within the
+	 * last 10 minutes of the harness clock; omit it to mint a token as today's family service does (no `su`).
+	 */
+	stepUpAt?: number;
 };
 
 export type StartOptions = {
@@ -212,7 +217,7 @@ export const startLedgerWorker = async (
 			seeded,
 			signer,
 			bucket,
-			async mintToken({ sub, schools, expiresInSeconds }) {
+			async mintToken({ sub, schools, expiresInSeconds, stepUpAt }) {
 				const issuedAt = Math.floor(now / MS_PER_SECOND);
 				return signToken(signer, {
 					iss: TEST_ISSUER,
@@ -222,6 +227,7 @@ export const startLedgerWorker = async (
 					nbf: issuedAt,
 					exp: issuedAt + (expiresInSeconds ?? DEFAULT_LIFETIME_SECONDS),
 					schools,
+					...(stepUpAt === undefined ? {} : { su: stepUpAt }),
 				});
 			},
 			signRaw: (claims, header) => signToken(signer, claims, header),

@@ -193,7 +193,7 @@ Not verified by that plan, to check before building: the Stripe dashboard URL fo
 
 ## 11. The ledger Worker's read endpoints (S8c)
 
-This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orchestrator's) is built against, and what S8c builds. Package `packages/ledger-worker`; entry `src/worker.ts`; staging at `https://ledger-staging.b4uni.com/v1`, production `https://ledger.b4uni.com/v1`. The Worker serves the UI's static assets and `/v1` from one origin, so there is no CORS. Reads only: every write goes to `api.b4uni.com` (section 2).
+This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orchestrator's) is built against, and what S8c builds. Package `packages/ledger-worker`; entry `src/worker.ts`; staging at `https://ledger-staging.b4uni.com/v1`, production `https://ledger.b4uni.com/v1`. The Worker serves the UI's static assets and `/v1` from one origin, so there is no CORS. Reads only, except the school's config objects (S9.6, `S9-plan.md` section 4, the last three rows of the endpoints table): every other write goes to `api.b4uni.com` (section 2).
 
 **Test harness (a deliverable of S8c).** `packages/ledger-worker/src/testing/harness.ts` exports `startLedgerWorker({ presets, schools })`, which seeds an R2 bucket on Miniflare with the events, `runViews` output and `catalog.published` for the named presets (the 15 mart presets), starts the Worker with a test JWKS, and returns `{ url, mintToken({ sub, schools: [{ id, role, finance }], expiresInSeconds? }), stop() }`. The UI's C1 to C5 gates run S8e against it.
 
@@ -216,6 +216,9 @@ This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orc
 | 429 | `rate_limited` | `retryAfterSeconds` is set. |
 | 501 | `not_available` | D12 and the rows below. `message` says why in one sentence. |
 | 503 | `views_unavailable` | The log cannot be replayed (`SummaryProblem.kind`) or R2 failed. |
+| 403 | `owner_only`, `step_up_required` | A config verify or put by someone who is not the school's owner; a config put whose token has no `su` claim within the last 10 minutes (D22; until buzz-school sends `su`, every put). |
+| 412 | `stale_etag` | A config put whose `If-Match` is not the object's current sha256, or `If-None-Match: *` for an object that exists. |
+| 422 | `invalid_config` | A config put whose value fails its validator (`error.problems[]`: `{path, message, hint}`), or whose `verifiedHash` is not the hash of the canonical value (problem path `verifiedHash`). |
 
 ### Endpoints
 
@@ -230,6 +233,9 @@ This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orc
 | `GET /v1/schools/:school/members-income?from=&to=` | finance | `{ cents: number }` | `membersIncome` | |
 | `GET /v1/schools/:school/members/:key/money` | finance | `{ payments: PaymentRow[], history: HistoryEvent[] }` | the money half of `memberDetail` | `:key` is `family:<id>` URL-encoded. Shapes as in `members.ts`; a field with no source is `null`. `refundable` and `stripeDashboardUrl` come from the family service, not here. Money events only in phase 1, so `history` has no credit events. Unknown key: `404 not_found`. |
 | `GET /v1/schools/:school/fundraising?from=&to=` | finance | `{ campaigns: [{ campaign, receivedCents, count }], paidOutCents: number }` | none yet (optional UI hook) | From `fundraise.received` and `fundraise.paid_out`; payouts name no campaign. |
+| `GET /v1/schools/:school/config/:name` | any listed school; `finance` for `promos` | The object as stored (`settings`, `disclosure`, `booking-rules`, `plans-draft`, `promos`, or `manifest`), header `ETag: "<sha256 of the bytes>"` | `settings`, `schoolRules`, `promos`, `planSummary` (the config part) | Not read from the views, so `asOf` and `lagMinutes` are the views' when the school has them and `null` when it has none. Unwritten: `404 not_found`. |
+| `POST /v1/schools/:school/config/:name/verify` | owner; `finance` for `promos` | `{ ok, problems: [{path, message, hint}], diff: [{path, change, before?, after?}], verifiedHash, baseEtag }`; body `{ value }` | none | Writes nothing. `ok:false` is a `200` with `verifiedHash: null` and `diff: []`. `baseEtag` is the stored sha256, or `null` for an unwritten object. |
+| `PUT /v1/schools/:school/config/:name` | owner with a fresh `su` (<= 10 minutes); `finance` for `promos` | `{ name, sha256, bytes, changed }`, header `ETag` | none | Body `{ value, verifiedHash }`, header `If-Match: "<baseEtag>"` (`If-None-Match: *` for an object not written yet). Re-validates, checks `verifiedHash`, conditional put, one audit line `config/audit/YYYY-MM.jsonl` (`at`, opaque `by`, `name`, `before`, `after`), then `config/manifest.json`. A value equal to the stored one answers `changed: false` and writes nothing. |
 | `GET /healthz` | none | `{ ok: true }` (no `asOf`) | | |
 
 **`501 not_available`, today:** `donors` (names have no source anywhere and a spread needs donor identity, so the Worker has no `donors` endpoint and the adapter answers the UI's not-available state without a request), `promos`, `schoolRules`, `memberPortal`, `auditMember`, every credit figure (D12: `used`, `granted`, `rolledOver`, `Booking.billing`), `Person` rows and the members summary (family service). The Worker serves none of these and has no route for them.
