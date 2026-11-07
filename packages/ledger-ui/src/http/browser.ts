@@ -6,7 +6,7 @@ import { createHttpAdapters } from "./adapters.ts";
 import { memoryStorage, type StorageLike } from "./pending.ts";
 import { localWallTime } from "./school-routes.ts";
 import { timerScheduler } from "./transport.ts";
-import { notConnectedWorker } from "./worker-source.ts";
+import { createFetchWorkerSource } from "./worker-source.ts";
 import type { FileSaver } from "./writer.ts";
 
 const millisecondsPerSecond = 1000;
@@ -48,25 +48,33 @@ function pendingStorage(): StorageLike {
 }
 
 /**
- * The HTTP build (`VITE_LEDGER_SOURCE=http`, `VITE_API_BASE`): buzz-school's routes on `apiBase`, the ledger Worker
- * not connected yet (S8e part 2). Gate H allows this file alone the browser's persistent storage and one system clock
- * read: the pending store lives in `localStorage`, and the clock is the instant of the mount as the wall time of the
- * first school's time zone (the browser's when there is no school). The schools read for that zone is the one the
- * app then shows. No PIN dialog is wired for the writes that do not collect one: such a write that answers
- * `pin_required` rejects `pin_required`.
+ * The HTTP build (`VITE_LEDGER_SOURCE=http`, `VITE_API_BASE`, `VITE_LEDGER_WORKER_BASE`): buzz-school's routes on
+ * `apiBase`, the ledger Worker's reads (S8-contract section 11) on `workerBase`, `/v1` on the UI's own origin by
+ * default, with the ledger token as their bearer. Gate H allows this file alone the browser's persistent storage and
+ * one system clock read: the pending store lives in `localStorage`, and the clock is the instant of the mount as the
+ * wall time of the first school's time zone (the browser's when there is no school). The schools read for that zone
+ * is the one the app then shows. No PIN dialog is wired for the writes that do not collect one: once a books pane's
+ * PIN lock has opened the session (`unlockBooks`) they go through; before, such a write rejects `pin_required`.
  */
 export function mountHttpApp(
 	root: HTMLElement,
-	options: { apiBase: string },
+	options: { apiBase: string; workerBase: string },
 ): void {
 	const mountedAt = Date.now() / millisecondsPerSecond;
+	const browserFetch = (url: string, init: RequestInit) => fetch(url, init);
 	const { reader, writer } = createHttpAdapters({
-		fetch: (url, init) => fetch(url, init),
+		fetch: browserFetch,
 		apiBase: options.apiBase,
 		scheduler: timerScheduler,
 		storage: pendingStorage(),
 		newKey: () => crypto.randomUUID(),
-		worker: () => notConnectedWorker(),
+		worker: (tokens) =>
+			createFetchWorkerSource({
+				fetch: browserFetch,
+				base: options.workerBase,
+				tokens,
+				scheduler: timerScheduler,
+			}),
 		files: browserFileSaver(root.ownerDocument),
 	});
 	let firstSchools: Promise<School[]> | undefined = reader.schools();

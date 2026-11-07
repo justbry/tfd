@@ -42,6 +42,7 @@ const financeOnlyTitle = "Finance admins only: the rows behind a figure";
 const grainWords = { year: "years", quarter: "quarters", month: "months" };
 /** A figure the source does not record yet (the Worker answers null): never shown as 0. */
 const notAvailableText = "—";
+const donorsNotAvailableText = "Not available yet: no source records donors.";
 const statementAmount = (cents: number | null, currency: string): string =>
 	cents === null ? notAvailableText : formatMoney(cents, currency);
 const whoSees: Record<AudienceReport["audience"], string> = {
@@ -842,11 +843,15 @@ export function Reports({
 		if (pinLocked) return null;
 		const [rules, donors] = await Promise.all([
 			reader.schoolRules(school.id),
-			reader.donors({
-				school: school.id,
-				audience,
-				year: Number(clock.today.slice(0, 4)),
-			}),
+			// Donor names have no source yet (S8-contract section 11): a donors read that fails leaves the card not
+			// available and the rest of the report as it is.
+			reader
+				.donors({
+					school: school.id,
+					audience,
+					year: Number(clock.today.slice(0, 4)),
+				})
+				.catch(() => null),
 		]);
 		const common = { rules, donors };
 		return documentAudience === null
@@ -880,7 +885,8 @@ export function Reports({
 			<PinLock
 				key={audience}
 				levelName={audienceNames[audience]}
-				onUnlock={() => {
+				unlock={(pin) => writer.unlockBooks(school.id, pin)}
+				onUnlocked={() => {
 					navigate(withQuery(route, "pin", null));
 					onToast("Books unlocked for this session.");
 				}}
@@ -960,14 +966,25 @@ export function Reports({
 				/>
 			</div>
 			<div class="card" data-test="donors" style="margin-top:10px">
-				<Donors
-					report={donors}
-					audience={audience}
-					currency={school.currency}
-					today={clock.today}
-					writer={writer}
-					onToast={onToast}
-				/>
+				{donors ? (
+					<Donors
+						report={donors}
+						audience={audience}
+						currency={school.currency}
+						today={clock.today}
+						writer={writer}
+						onToast={onToast}
+					/>
+				) : (
+					<>
+						<h5 data-test="donors-title">
+							<Icon name="users" /> Donors and payers
+						</h5>
+						<div class="mut" data-test="donors-not-available">
+							{donorsNotAvailableText}
+						</div>
+					</>
+				)}
 			</div>
 		</>
 	);

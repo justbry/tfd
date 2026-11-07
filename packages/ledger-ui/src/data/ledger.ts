@@ -697,7 +697,17 @@ export interface LedgerReader {
 	): Promise<{ rules: SchoolRules | null; unit: CreditUnit | null }>;
 }
 
+/** The server's answer to the family PIN typed on a PIN-locked books pane: open, or why not (`pin_wrong`: not the
+ * family PIN; `pin_locked`: too many tries, the PIN is locked for a while). Any other failure rejects. */
+export type BooksUnlock =
+	| { unlocked: true }
+	| { unlocked: false; reason: "pin_wrong" | "pin_locked" };
+
 export interface LedgerWriter {
+	/** Opens the books with the family PIN for this session (mockup `bkLock`'s Unlock). buzz-school checks the PIN on the
+	 * session (`POST /family/pin/verify`): the session stays open for its money writes (refund, adjust, invoice) and for
+	 * the Worker reads of an audience that opens the books with the PIN. Never stored or recorded. */
+	unlockBooks(schoolId: string, pin: string): Promise<BooksUnlock>;
 	download(file: DownloadFile): Promise<void>;
 	createPromo(request: CreatePromo): Promise<Promo>;
 	disablePromo(request: DisablePromo): Promise<Promo>;

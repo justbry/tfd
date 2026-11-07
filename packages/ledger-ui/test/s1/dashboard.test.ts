@@ -224,6 +224,8 @@ test("the PIN applies only from Governance up, and unlocking says so", async () 
 	input.dispatchEvent(new Event("input", { bubbles: true }));
 	await macrotask();
 	await click("[data-test=pin-unlock]");
+	// The Writer answers the PIN asynchronously (unlockBooks): the route changes after it does.
+	await settle();
 	expect(window.location.hash).not.toContain("pin=");
 	expect(text(".toast")).toBe("Books unlocked for this session.");
 	expect(text('[data-test=kpi-value][data-kpi="gross_collected"]')).toBe(
