@@ -5,10 +5,10 @@
 
 /** One sample school year (growth-12mo, seed 7) through the engine, hledger and DuckDB: the same KPI hash from each. */
 export const SEED_7_HASH =
-	"19f08b808b15d1fce659314f23067a48424b1dc16d51e2a3e79c599a673b7d48";
+	"96d0613ce7b2c30f3b45cb7ec712296e81c028087d9bf1e4359aa06b827a1f8a";
 /** The hash as the diagram prints it: first eight and last four characters. */
 export const SEED_7_HASH_SHORT = `${SEED_7_HASH.slice(0, 8)}…${SEED_7_HASH.slice(-4)}`;
-export const SEED_7_EVENTS = 1964;
+export const SEED_7_EVENTS = 2142;
 
 /** The one line that ties the verticals together. */
 export const UNIFIED_LINE =

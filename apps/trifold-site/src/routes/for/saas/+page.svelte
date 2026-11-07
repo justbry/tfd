@@ -1,12 +1,13 @@
 <script lang="ts">
 	import ForPage from "#lib/components/ForPage.svelte";
 	import SimulatedSection from "#lib/components/SimulatedSection.svelte";
+	import { MRR_LIMITS } from "#lib/verticals";
 	import Body from "../../../content/for/saas.md";
 
 	const faq = [
 		{
-			q: "Is there a recurring-revenue number?",
-			a: "Not yet: there's no MRR KPI yet. The simulations report gross collected, net income, refunds, disputes, Stripe fees, payouts, payments, paying members and credits.",
+			q: "Is there an MRR number?",
+			a: `Yes. The books record each subscription's recurring price from Stripe, and MRR, new, expansion, contraction, churned and net new MRR are computed from them by the engine, hledger and DuckDB, with the same hash. ${MRR_LIMITS}`,
 		},
 		{
 			q: "Does Trifold do revenue recognition?",

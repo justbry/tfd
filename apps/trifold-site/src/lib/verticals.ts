@@ -1,16 +1,24 @@
 /**
- * The simulated verticals: one demo org per kind of organization, run through the same engine and the same three-way
- * KPI check (the engine's fold, hledger, DuckDB). Every org is synthetic: invented names, prices and ids, never a
- * customer. Source: packages/atm/docs/scenario-orgs.md (SCENARIO_ORGS_URL).
+ * The demo verticals: one demo org per kind of organization, run through the same engine and the same three-way KPI
+ * check (the engine's fold, hledger, DuckDB). Every org is synthetic: invented names, prices and ids, never a customer.
+ * Source: packages/atm/docs/scenario-orgs.md (SCENARIO_ORGS_URL).
  *
- * The school has a live dashboard (DEMO_URL). The other four are "simulated": numbers from the CLI, no dashboard and
- * no demo link. Preset numbers are copied from verified runs on atm dev; tests/proof.test.ts checks them against that
- * run and against every page and llms.txt that shows them. Copy rules: describe only what the generator models (no
- * win-back, pledges, refund windows or failed payments) and use only KPIs the engine computes (no MRR, no retention).
+ * All five have a demo dashboard: a static page per org under /demo/orgs/ (`dashboard`), copied byte for byte from
+ * plans/ledger-ui/design/mart/orgs/ by scripts/sync-org-demos.ts. The school also has a live demo (DEMO_URL): the real
+ * app, on staging. Preset numbers are copied from verified runs on atm dev; tests/proof.test.ts checks them against
+ * that run and against every page and llms.txt that shows them, and tests/org-demos.test.ts checks each preset's KPI
+ * hash against its dashboard page. Copy rules: describe only what the generator models (no win-back, pledges, refund
+ * windows or failed payments) and use only KPIs the engine computes (MRR and its movements, but no ARR, no logo churn and
+ * no retention).
  */
 import { DEMO_URL, GITHUB_URL } from "#lib/config";
 
 export const SCENARIO_ORGS_URL = `${GITHUB_URL}/blob/dev/packages/atm/docs/scenario-orgs.md`;
+
+/** The demo orgs' dashboards, one static page each, and their gallery (static/demo/orgs/). */
+export type DemoOrg = "school" | "studio" | "church" | "saas" | "creator";
+export const dashboardPath = (org: DemoOrg) => `/demo/orgs/${org}.html`;
+export const DASHBOARDS_GALLERY = "/demo/orgs/index.html";
 
 /** One verified preset run. `hash` is the KPI hash, first eight and last four characters. */
 export type Preset = {
@@ -29,11 +37,13 @@ export type Preset = {
 	payingLastMonth: number;
 	/** Why paying_members_last_month reads as it does, when it needs saying. */
 	payingNote?: string;
+	/** mrr in the last month, in dollars as the KPI table holds it (cents dropped when zero). */
+	mrr: string;
 	hash: string;
 	what: string;
 };
 
-export type StatKey = "grossCollected" | "members" | "payingLastMonth";
+export type StatKey = "grossCollected" | "members" | "payingLastMonth" | "mrr";
 /** A headline number's label and the engine's KPI name, shown beside it in mono. */
 export const STATS: Record<StatKey, { label: string; kpi: string }> = {
 	grossCollected: { label: "Gross collected", kpi: "gross_collected" },
@@ -42,12 +52,21 @@ export const STATS: Record<StatKey, { label: string; kpi: string }> = {
 		label: "Paying members last month",
 		kpi: "paying_members_last_month",
 	},
+	mrr: { label: "MRR last month", kpi: "mrr" },
 };
 export const STAT_KEYS: StatKey[] = [
 	"grossCollected",
 	"members",
 	"payingLastMonth",
+	"mrr",
 ];
+
+/**
+ * What MRR does and doesn't cover, said wherever MRR is described. The engine records each subscription's recurring
+ * price from Stripe, and the engine, hledger and DuckDB each compute MRR from the books.
+ */
+export const MRR_LIMITS =
+	"There's no ARR yet and no logo churn yet. For a full invoice, the billing interval comes from the billing handler's published price list, because this Stripe API version gives invoice lines only a price id.";
 
 /** The KPIs every simulated preset produces (the engine's own list; nothing else is claimed). */
 export const SIMULATED_KPIS = [
@@ -60,6 +79,9 @@ export const SIMULATED_KPIS = [
 	"Payments",
 	"New paying members",
 	"Paying members last month",
+	"MRR",
+	"New, expansion, contraction and churned MRR",
+	"Net new MRR",
 	"Credits granted, consumed and expired",
 ];
 
@@ -74,9 +96,15 @@ export type Vertical = {
 	vocabulary: string[];
 	/** What the scenario models, honestly. */
 	simulates: string[];
-	/** For "dashboard": what the demo shows. For "simulated": SIMULATED_KPIS, in the org's words where they differ. */
+	/** The school: what its live demo shows. The others: SIMULATED_KPIS, in the org's words where they differ. */
 	kpis: string[];
-	status: "dashboard" | "simulated";
+	/** Every vertical has a demo dashboard (static, synthetic data). */
+	status: "dashboard";
+	/** Which page under /demo/orgs/ is this org's dashboard. */
+	demoOrg: DemoOrg;
+	/** The demo dashboard: dashboardPath(demoOrg). */
+	dashboard: string;
+	/** The live demo, the real app on synthetic data: the school only. */
 	demoUrl?: string;
 	/** The audience page, when there is one. */
 	forPage?: string;
@@ -103,6 +131,8 @@ export const VERTICALS: Vertical[] = [
 		],
 		kpis: ["Collected", "Net income", "Stripe fees", "Payouts"],
 		status: "dashboard",
+		demoOrg: "school",
+		dashboard: dashboardPath("school"),
 		demoUrl: DEMO_URL,
 		forPage: "/for/schools",
 		presets: [],
@@ -121,7 +151,9 @@ export const VERTICALS: Vertical[] = [
 			"About 1 in 16 cancels each month",
 		],
 		kpis: SIMULATED_KPIS,
-		status: "simulated",
+		status: "dashboard",
+		demoOrg: "studio",
+		dashboard: dashboardPath("studio"),
 		forPage: "/for/studios",
 		presets: [
 			{
@@ -134,7 +166,8 @@ export const VERTICALS: Vertical[] = [
 				disputes: 1,
 				grossCollected: "$47,527",
 				payingLastMonth: 45,
-				hash: "c315b659…ca91",
+				mrr: "$4,060.67",
+				hash: "4d2a1faf…27f9",
 				what: "A year of memberships, add-ons and class credits.",
 			},
 			{
@@ -147,7 +180,8 @@ export const VERTICALS: Vertical[] = [
 				disputes: 2,
 				grossCollected: "$17,771.63",
 				payingLastMonth: 22,
-				hash: "cdbb0c6d…587e",
+				mrr: "$1,989",
+				hash: "5f1c2862…96ad",
 				what: "Nine months of five-class packs, bought one or two at a time; unused classes roll over two months, then expire.",
 			},
 		],
@@ -157,7 +191,7 @@ export const VERTICALS: Vertical[] = [
 		name: "Churches",
 		org: "Cedar Hill Community Church",
 		orgKind: "a simulated church",
-		vocabulary: ["givers", "recurring giving", "gifts", "roof campaign"],
+		vocabulary: ["givers", "giving", "gifts", "roof campaign"],
 		simulates: [
 			"Sixty households give $25, $50, $100 or $250 a month, or the same yearly",
 			"About a quarter give yearly",
@@ -176,14 +210,20 @@ export const VERTICALS: Vertical[] = [
 			"Payments",
 			"New givers",
 			"Givers giving last month",
+			"Recurring giving (MRR)",
+			"New, expansion, contraction and churned MRR",
+			"Net new MRR",
 			"Credits granted, consumed and expired",
 		],
-		status: "simulated",
+		status: "dashboard",
+		demoOrg: "church",
+		dashboard: dashboardPath("church"),
 		forPage: "/for/churches",
 		labels: {
 			grossCollected: "Giving collected",
 			members: "New givers",
 			payingLastMonth: "Givers giving last month",
+			mrr: "Recurring giving last month",
 		},
 		presets: [
 			{
@@ -196,8 +236,9 @@ export const VERTICALS: Vertical[] = [
 				disputes: 0,
 				grossCollected: "$68,050",
 				payingLastMonth: 52,
-				hash: "b87fa3cb…7904",
-				what: "A year of recurring giving at four fixed levels, with one-time and roof-campaign gifts.",
+				mrr: "$5,655",
+				hash: "7e300ea9…1c08",
+				what: "A year of giving at four fixed levels, monthly or yearly, with one-time and roof-campaign gifts.",
 			},
 		],
 	},
@@ -216,7 +257,9 @@ export const VERTICALS: Vertical[] = [
 			"Boost packs and support add-ons",
 		],
 		kpis: SIMULATED_KPIS,
-		status: "simulated",
+		status: "dashboard",
+		demoOrg: "saas",
+		dashboard: dashboardPath("saas"),
 		forPage: "/for/saas",
 		presets: [
 			{
@@ -229,7 +272,8 @@ export const VERTICALS: Vertical[] = [
 				disputes: 1,
 				grossCollected: "$69,521",
 				payingLastMonth: 49,
-				hash: "cd0acf28…69f6",
+				mrr: "$7,401.01",
+				hash: "2a8acedb…74e6",
 				what: "A year of seat plans, seats added and dropped, upgrades and API credits.",
 			},
 			{
@@ -242,8 +286,9 @@ export const VERTICALS: Vertical[] = [
 				disputes: 0,
 				grossCollected: "$52,993",
 				payingLastMonth: 0,
+				mrr: "$2,046.67",
 				payingNote: "every plan is yearly, so nobody pays in a given month",
-				hash: "84d6c33c…3f36",
+				hash: "e816e133…e4ee",
 				what: "Everyone prepays a year, over 24 months so the renewals show.",
 			},
 		],
@@ -262,7 +307,9 @@ export const VERTICALS: Vertical[] = [
 			"About 1 in 12 leaves each month",
 		],
 		kpis: SIMULATED_KPIS,
-		status: "simulated",
+		status: "dashboard",
+		demoOrg: "creator",
+		dashboard: dashboardPath("creator"),
 		forPage: "/for/creators",
 		presets: [
 			{
@@ -275,7 +322,8 @@ export const VERTICALS: Vertical[] = [
 				disputes: 6,
 				grossCollected: "$25,297",
 				payingLastMonth: 66,
-				hash: "38e8325c…62ad",
+				mrr: "$1,460.85",
+				hash: "04940170…d901",
 				what: "A launch month, a steady trickle after it, course sales and refunds.",
 			},
 		],
@@ -292,7 +340,10 @@ export const verticalBySlug = (slug: string): Vertical => {
 export const statOf = (vertical: Vertical, preset: Preset, key: StatKey) => ({
 	label: vertical.labels?.[key] ?? STATS[key].label,
 	kpi: STATS[key].kpi,
-	value: key === "grossCollected" ? preset.grossCollected : String(preset[key]),
+	value:
+		key === "grossCollected" || key === "mrr"
+			? preset[key]
+			: String(preset[key]),
 });
 
 /** A preset as a card shows it: its run and its three headline numbers in the org's words. */
@@ -315,7 +366,14 @@ export const presetView = (vertical: Vertical, preset: Preset): PresetView => ({
  */
 export type GalleryCard = Pick<
 	Vertical,
-	"slug" | "name" | "org" | "orgKind" | "status" | "demoUrl" | "forPage"
+	| "slug"
+	| "name"
+	| "org"
+	| "orgKind"
+	| "status"
+	| "dashboard"
+	| "demoUrl"
+	| "forPage"
 > & {
 	vocabulary?: string[];
 	simulates?: string[];
@@ -330,6 +388,7 @@ export const galleryCards = (): GalleryCard[] =>
 			org,
 			orgKind,
 			status,
+			dashboard,
 			demoUrl,
 			forPage,
 			vocabulary,
@@ -344,9 +403,11 @@ export const galleryCards = (): GalleryCard[] =>
 			org,
 			orgKind,
 			status,
+			dashboard,
 			demoUrl,
 			forPage,
-			...(status === "dashboard" ? { vocabulary, simulates, kpis } : {}),
+			// The school's card describes its live demo; the others show their headline preset.
+			...(demoUrl ? { vocabulary, simulates, kpis } : {}),
 			...(headline ? { preset: presetView(vertical, headline) } : {}),
 		};
 	});
@@ -359,8 +420,8 @@ export const SIMPLIFICATIONS = [
 	"Everyone who pays is a member.",
 	"A one-time purchase (a gift, a course, a drop-in) comes only with a member's first invoice, and each member has one add-on at most.",
 	"Add-on money is booked to the member's tier, not a separate income line.",
-	"Church giving is four fixed recurring amounts: no pledges, no custom amounts, no campaign goals.",
+	"Monthly and yearly church giving comes at four fixed amounts: no pledges, no custom amounts, no campaign goals.",
 	"SaaS usage is counted in blocks of 1,000 calls.",
 	"A launch spike is the founding month.",
-	"There's no MRR KPI yet.",
+	`MRR is computed three ways, like every KPI. ${MRR_LIMITS}`,
 ];

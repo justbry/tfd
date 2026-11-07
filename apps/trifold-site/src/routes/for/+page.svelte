@@ -38,7 +38,7 @@
 							>
 								<span class="flex flex-wrap items-center justify-between gap-2">
 									<span class="text-[21px] font-[420] [font-family:var(--font-display)]">{item.label}</span>
-									{#if vertical?.status === "dashboard"}<Tag tone="today">Live dashboard</Tag>{:else if vertical}<Tag
+									{#if vertical?.demoUrl}<Tag tone="today">Live dashboard</Tag>{:else if vertical}<Tag
 											>Simulated</Tag
 										>{/if}
 								</span>

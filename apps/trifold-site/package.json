@@ -15,6 +15,7 @@
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"samples": "bun ./scripts/make-samples.ts",
+		"org-demos:sync": "bun ./scripts/sync-org-demos.ts",
 		"test": "bun test tests",
 		"prepare": "svelte-kit sync || echo ''"
 	},

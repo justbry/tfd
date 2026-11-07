@@ -14,4 +14,4 @@ Teams add seats mid-month and drop them at renewal. Upgrades bill at once, with 
 
 **How Trifold answers it** (chapter 03, Proof): every number traces to the Stripe payment behind it, each payment has a signed receipt, and sealed months show any later change. Replay the events and you get the same books.
 
-What it doesn't do: Trifold doesn't recognise revenue or make ASC 606 claims, and there's no MRR KPI yet. It keeps the books of what Stripe charged, collected and refunded.
+What it doesn't do: Trifold doesn't recognise revenue or make ASC 606 claims. It keeps the books of what Stripe charged, collected and refunded, and computes MRR from each subscription's recurring price. There's no ARR yet and no logo churn yet.

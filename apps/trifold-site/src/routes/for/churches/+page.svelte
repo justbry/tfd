@@ -28,7 +28,7 @@
 	seoTitle="For churches"
 	description="Giving records your treasurer can trust: every gift through Stripe becomes a signed receipt givers can check and a line in sealed, replayable books."
 	title="Giving records your treasurer can trust."
-	subhead="Every gift paid through Stripe, recurring giving or a one-time gift, becomes a signed receipt and a line in sealed, replayable books. Givers can check their own receipts, no account."
+	subhead="Every gift paid through Stripe, monthly, yearly or one-time, becomes a signed receipt and a line in sealed, replayable books. Givers can check their own receipts, no account."
 	points={[
 		{ text: "Signed receipts givers can check themselves." },
 		{ text: "A sealed month for every board meeting, not a spreadsheet." },

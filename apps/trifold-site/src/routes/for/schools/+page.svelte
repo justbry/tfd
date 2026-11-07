@@ -1,8 +1,12 @@
 <script lang="ts">
 	import ForPage from "#lib/components/ForPage.svelte";
+	import OrgDashboard from "#lib/components/OrgDashboard.svelte";
 	import ReceiptCard from "#lib/components/ReceiptCard.svelte";
 	import { DEMO_URL } from "#lib/config";
+	import { verticalBySlug } from "#lib/verticals";
 	import Body from "../../../content/for/schools.md";
+
+	const school = verticalBySlug("schools");
 
 	const faq = [
 		{
@@ -61,6 +65,15 @@
 				</p>
 			</div>
 			<ReceiptCard />
+		</div>
+		<div class="mt-[clamp(48px,6vw,88px)] border-t border-border pt-[clamp(48px,6vw,88px)]">
+			<p class="label-mono">A sample school's KPIs · synthetic data</p>
+			<h2 class="display-3 mt-3.5 mb-4">The month, at a glance.</h2>
+			<p class="mb-8 max-w-[64ch] text-muted-foreground">
+				{school.org}'s dashboard as a demo page: two simulated school years, run through the engine, as money, families,
+				risk and payment KPIs. No login. The live demo above is the real app, on synthetic data too.
+			</p>
+			<OrgDashboard org={school.demoOrg} name={school.org} />
 		</div>
 	{/snippet}
 </ForPage>

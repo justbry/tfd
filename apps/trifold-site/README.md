@@ -14,6 +14,7 @@ bun run build        # prerender every route into build/
 bun run preview      # serve build/ on http://localhost:4173
 bun test             # browser verifier vs tfd's own checks; the agent files (run `bun run build` first)
 bun run samples      # regenerate src/lib/samples/*.json with tfd (new demo key each run)
+bun run org-demos:sync  # copy the demo orgs' dashboards into static/demo/orgs/
 bun run check        # svelte-check
 ```
 
@@ -43,8 +44,8 @@ bun run check        # svelte-check
   `PAGES` (every page; the build fails if one is missing).
 - `src/lib/content/proof.ts` the verified simulator runs, try-it commands, knobs and the golden end-to-end check with
   its findings, shared by `/proof`, `/for/developers` and `llms.txt` (`proof-summary.ts` holds the part the homepage
-  shows). `src/lib/verticals.ts` the verticals: the school's live dashboard and four simulated orgs with their verified preset
-  numbers. The homepage gallery gets a compact copy inlined by `vite.config.ts` (`__GALLERY__`, `src/lib/gallery.ts`), so
+  shows). `src/lib/verticals.ts` the verticals: five demo orgs, each with a demo dashboard (the school also has the live
+  demo), and the four simulated orgs' verified preset numbers. The homepage gallery gets a compact copy inlined by `vite.config.ts` (`__GALLERY__`, `src/lib/gallery.ts`), so
   it doesn't ship the module; restart `bun run dev` after editing it.
 
 ## Licensing
@@ -60,6 +61,16 @@ page; `llms-full.txt`; `llms.txt` (llmstxt.org: summary and facts from `src/lib/
 keep it out of the mirrors (canvas, toggles, duplicate visuals), or `data-agent-md="<name>"` to replace it with markdown
 from a data module (the pricing cards, which show one toggle state, become every price). `/brand` is mirrored but left
 out of llms.txt (`AGENT_EXCLUDED`). The footer's "For agents" note (`AgentNote.svelte`) is skipped in the mirrors.
+
+## Demo dashboards
+
+`static/demo/orgs/` holds the five demo orgs' KPI dashboards and their gallery (`index.html`): self-contained pages, one
+file each, made in `plans/ledger-ui/design/mart/orgs/` (see its README). After `cd packages/atm && bun run org-demos`,
+run `bun run org-demos:sync` here; `tests/org-demos.test.ts` fails while a copy differs from its source by one byte, or
+while a preset's KPI hash in `src/lib/verticals.ts` is missing from its org's page. `OrgDashboard.svelte` frames a page
+on the audience pages (after mount; the prerendered HTML has a link), in the site's theme, sized by the page's
+`tfd-demo:height` message. `static/_headers` swaps the site's CSP and `X-Frame-Options: DENY` for a policy that lets
+only this origin frame them. They are static files, not pages: no .md mirror, not in the sitemap, linked from llms.txt.
 
 ## Comparisons
 
