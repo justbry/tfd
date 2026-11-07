@@ -15,7 +15,7 @@ export const dayMonthYear = (isoDate: string): string =>
 export function cellText(
 	cell: ReportCell,
 	money: boolean,
-	currency: string,
+	currency: string | null,
 	whole: boolean,
 ): { value: string; hidden: string } {
 	if (typeof cell === "number")
@@ -54,7 +54,7 @@ export function Figure({
 }: {
 	cell: ReportCell;
 	money: boolean;
-	currency: string;
+	currency: string | null;
 	whole: boolean;
 	/** What a count under the minimum counts, for its title. */
 	noun: string;

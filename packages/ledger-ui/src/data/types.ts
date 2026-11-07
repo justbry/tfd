@@ -8,8 +8,9 @@ export type School = {
 	name: string;
 	/** IANA time zone, e.g. `America/Denver`. */
 	timeZone: string;
-	/** ISO 4217 code, e.g. `USD`. */
-	currency: string;
+	/** ISO 4217 code, e.g. `USD`. Null when nothing gives the school one (no published menu and no Stripe account,
+	 * S8-contract section 11): it has no money to show, so every money figure reads "—", never `$0.00`. */
+	currency: string | null;
 	role: "owner" | "admin";
 	/** What the school calls a held credit (mockup `unit`): "1 session held", "2 sessions held". */
 	creditUnit: { one: string; other: string };
