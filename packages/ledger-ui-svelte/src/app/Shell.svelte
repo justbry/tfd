@@ -1,3 +1,11 @@
+<script lang="ts" module>
+	/** Where the panes loaded on demand come from; a test swaps one for a chunk that fails. */
+	export const chunks = {
+		dashboard: () => import("./dashboard/Dashboard.svelte"),
+		allSchools: () => import("./AllSchools.svelte"),
+	};
+</script>
+
 <script lang="ts">
 	import {
 		formatPeriod,
@@ -148,26 +156,49 @@
 		navigate(target);
 	};
 
-	/** The Dashboard, loaded the first time it is shown, so that the first page load carries none of it. */
+	/** The Dashboard, loaded the first time it is shown, so that the first page load carries none of it. A chunk that
+	 * fails to load is the pane's message, with Retry loading it again. */
 	let dashboardModule: Promise<
 		typeof import("./dashboard/Dashboard.svelte")
 	> | null = $state(null);
+	let dashboardChunkError = $state<UiError | null>(null);
+	const loadDashboard = (): void => {
+		const loading = chunks.dashboard();
+		dashboardChunkError = null;
+		dashboardModule = loading;
+		loading.catch((failure: unknown) => {
+			if (dashboardModule === loading) dashboardChunkError = toUiError(failure);
+		});
+	};
 	$effect(() => {
 		if (school && route.tab === "dashboard" && !dashboardModule)
-			dashboardModule = import("./dashboard/Dashboard.svelte");
+			loadDashboard();
 	});
 	/** All schools, loaded the first time it is shown, as the Dashboard is: a school's page does not carry it. */
 	let allSchoolsModule: Promise<typeof import("./AllSchools.svelte")> | null =
 		$state(null);
+	let allSchoolsChunkError = $state<UiError | null>(null);
+	const loadAllSchools = (): void => {
+		const loading = chunks.allSchools();
+		allSchoolsChunkError = null;
+		allSchoolsModule = loading;
+		loading.catch((failure: unknown) => {
+			if (allSchoolsModule === loading)
+				allSchoolsChunkError = toUiError(failure);
+		});
+	};
 	$effect(() => {
-		if (!school && !allSchoolsModule)
-			allSchoolsModule = import("./AllSchools.svelte");
+		if (!school && !allSchoolsModule) loadAllSchools();
+	});
+	/** A chunk that did not load is the pane's message: the route is on screen. */
+	$effect(() => {
+		if (!school && allSchoolsChunkError) onPaneRendered(formatRoute(route));
 	});
 
-	/** The Dashboard cannot show without the disclosure: its failure is the pane's message, and the route is on
-	 * screen. */
+	/** The Dashboard cannot show without the disclosure or its chunk: either failure is the pane's message, and the
+	 * route is on screen. */
 	$effect(() => {
-		if (route.tab === "dashboard" && disclosureError)
+		if (route.tab === "dashboard" && (disclosureError || dashboardChunkError))
 			onPaneRendered(formatRoute(route));
 	});
 
@@ -288,7 +319,7 @@
 									onRendered={onPaneRendered}
 								/>
 							{:catch failure}
-								<LoadFailed error={toUiError(failure)} />
+								<LoadFailed error={toUiError(failure)} onRetry={loadDashboard} />
 							{/await}
 						{:else if disclosureError}
 							<LoadFailed
@@ -315,7 +346,7 @@
 					onRendered={() => onPaneRendered(formatRoute(route))}
 				/>
 			{:catch failure}
-				<LoadFailed error={toUiError(failure)} />
+				<LoadFailed error={toUiError(failure)} onRetry={loadAllSchools} />
 			{/await}
 		{/if}
 	</section>

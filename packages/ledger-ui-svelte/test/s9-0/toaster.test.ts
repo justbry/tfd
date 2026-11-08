@@ -12,6 +12,14 @@ afterEach(() => {
 	cleanup = undefined;
 });
 
+/** A button outside the stack. */
+function outsideControl(): HTMLButtonElement {
+	const button = document.createElement("button");
+	button.textContent = "Save";
+	document.body.append(button);
+	return button;
+}
+
 function renderToaster(options: { frame?: HTMLElement } = {}) {
 	document.body.innerHTML = '<div id="target"></div>';
 	if (options.frame) document.body.append(options.frame);
@@ -300,7 +308,7 @@ describe("focus when a toast leaves without a click", () => {
 		expect(queryAll("[data-test=toast]")).toHaveLength(1);
 		expect(document.activeElement).toBe(before);
 	});
-	test("with nothing before and no other toast, focus goes to the stack's sentinel, never the frame", async () => {
+	test("with nothing before and no other toast, focus goes to the stack itself, never the frame", async () => {
 		const frame = document.createElement("div");
 		const rendered = renderToaster({ frame });
 		const id = await rendered.runtime.runPromise(
@@ -312,10 +320,14 @@ describe("focus when a toast leaves without a click", () => {
 			?.focus();
 		await rendered.runtime.runPromise(rendered.toasts.dismiss(id));
 		flushSync();
-		expect(document.activeElement).toBe(
-			document.querySelector("[data-test=toasts-sentinel]"),
-		);
+		const region = document.querySelector("[data-test=toasts]");
+		expect(document.activeElement).toBe(region);
+		expect(region?.getAttribute("tabindex")).toBe("-1");
+		expect(region?.getAttribute("aria-label")).toBe("Notifications");
+		expect(region?.className).toContain("focus-visible:outline-2");
+		expect(region?.className).toContain("outline-none");
 		expect(frame.hasAttribute("tabindex")).toBe(false);
+		expect(document.querySelector("[data-test=toasts-sentinel]")).toBeNull();
 	});
 	test("the body is never the control to come back to", async () => {
 		const rendered = renderToaster();
@@ -332,7 +344,7 @@ describe("focus when a toast leaves without a click", () => {
 		flushSync();
 		document.body.removeAttribute("tabindex");
 		expect(document.activeElement).toBe(
-			document.querySelector("[data-test=toasts-sentinel]"),
+			document.querySelector("[data-test=toasts]"),
 		);
 	});
 	test("a control that cannot take focus back (disabled meanwhile) passes to the next toast's Dismiss", async () => {
@@ -359,7 +371,7 @@ describe("focus when a toast leaves without a click", () => {
 	});
 });
 
-describe("the stack's place while the frame or the sentinel holds focus", () => {
+describe("the stack's place while the frame or the stack holds focus", () => {
 	const coveringFrame = (): HTMLElement => {
 		const frame = document.createElement("div");
 		frame.getBoundingClientRect = () =>
@@ -419,7 +431,8 @@ describe("announcements", () => {
 		flushSync();
 		const assertive = () =>
 			document.querySelector("[data-test=toasts-assertive] p");
-		const polite = () => document.querySelector("[data-test=toasts-polite] p");
+		const polite = () =>
+			document.querySelector("[data-test=toasts-progress] p");
 		const sentence = assertive();
 		expect(sentence?.textContent).toBe(
 			"No connection. The request got no answer.",
@@ -480,17 +493,123 @@ describe("a busy toast", () => {
 		const action = document.querySelector<HTMLButtonElement>(
 			"[data-test=toast-action]",
 		);
-		expect(action?.getAttribute("aria-busy")).toBe("true");
+		expect(action?.hasAttribute("aria-busy")).toBe(false);
 		expect(action?.getAttribute("aria-disabled")).toBe("true");
+		expect(action?.className).toContain("aria-disabled:opacity-50");
+		expect(action?.className).toContain("aria-disabled:cursor-not-allowed");
 		action?.click();
 		expect(runs).toBe(0);
 		await rendered.runtime.runPromise(
 			rendered.toasts.update(id, { busy: false }),
 		);
 		flushSync();
-		expect(action?.hasAttribute("aria-busy")).toBe(false);
+		expect(action?.hasAttribute("aria-disabled")).toBe(false);
 		action?.click();
 		expect(runs).toBe(1);
+	});
+});
+
+describe("S9.0c: the stack's place and focus", () => {
+	test("focus moving from a covered control to the frame (blank space) brings the stack back", async () => {
+		const frame = document.createElement("div");
+		frame.getBoundingClientRect = () =>
+			({
+				left: 0,
+				top: 0,
+				right: 1024,
+				bottom: 768,
+				width: 1024,
+				height: 768,
+			}) as DOMRect;
+		const rendered = renderToaster({ frame });
+		const covered = outsideControl();
+		covered.getBoundingClientRect = () =>
+			({
+				left: 700,
+				right: 1000,
+				top: 0,
+				bottom: 100,
+				width: 300,
+				height: 100,
+			}) as DOMRect;
+		covered.focus();
+		await rendered.runtime.runPromise(
+			rendered.toasts.show({ tone: "error", title: "Server failed" }),
+		);
+		flushSync();
+		const region = document.querySelector("[data-test=toasts]");
+		expect(region?.getAttribute("data-edge")).toBe("other");
+		frame.tabIndex = -1;
+		frame.focus();
+		flushSync();
+		expect(region?.getAttribute("data-edge")).toBe("usual");
+	});
+	test("a leaving toast hands focus to the toast that just came on screen from the queue", async () => {
+		const rendered = renderToaster();
+		const ids: string[] = [];
+		for (const title of ["a", "b", "c", "d", "e"])
+			ids.push(
+				await rendered.runtime.runPromise(
+					rendered.toasts.show({ tone: "error", title }),
+				),
+			);
+		flushSync();
+		// Another control in between, so that happy-dom's own refocus (to whatever had focus last) is not the answer.
+		const between = document.createElement("button");
+		document.querySelector("[data-test=toasts]")?.append(between);
+		between.focus();
+		document
+			.querySelector<HTMLElement>(
+				`[data-toast-id="${ids[1]}"] [data-test=toast-dismiss]`,
+			)
+			?.focus();
+		await rendered.runtime.runPromise(rendered.toasts.dismiss(ids[1] ?? ""));
+		flushSync();
+		const arrived = document.querySelector(
+			`[data-toast-id="${ids[4]}"] [data-test=toast-dismiss]`,
+		);
+		expect(arrived).not.toBeNull();
+		expect(document.activeElement === arrived).toBe(true);
+	});
+});
+
+describe("S9.0c: progress has its own region", () => {
+	test("a retry stepping on a failure re-reads no sibling toast in the status region", async () => {
+		const rendered = renderToaster();
+		await rendered.runtime.runPromise(
+			rendered.toasts.show({ tone: "warning", title: "Saved" }),
+		);
+		const id = await rendered.runtime.runPromise(
+			rendered.toasts.show({ tone: "error", title: "No connection" }),
+		);
+		flushSync();
+		const status = () => document.querySelector("[data-test=toasts-polite] p");
+		const saved = status();
+		expect(
+			document.querySelector("[data-test=toasts-polite]")?.textContent?.trim(),
+		).toBe("Saved.");
+		for (const progress of ["Retrying (2 of 3)", "Retrying (3 of 3)", ""]) {
+			await rendered.runtime.runPromise(
+				rendered.toasts.update(id, { progress }),
+			);
+			flushSync();
+			expect(status()).toBe(saved);
+			expect(
+				document
+					.querySelector("[data-test=toasts-polite]")
+					?.textContent?.trim(),
+			).toBe("Saved.");
+			expect(
+				document
+					.querySelector("[data-test=toasts-progress]")
+					?.textContent?.trim(),
+			).toBe(progress ? `No connection. ${progress}.` : "");
+		}
+		expect(
+			document
+				.querySelector("[data-test=toasts-progress]")
+				?.getAttribute("role"),
+		).toBe("status");
 	});
 });
 

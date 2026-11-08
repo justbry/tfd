@@ -41,17 +41,24 @@ export const schoolFigures = (
 			: { hidden: incomeLock },
 });
 
-/** The Income total per currency (never summed across currencies), over the schools whose income shows; `partial` when
- * a school's income does not show, so the total says it leaves that school out. */
+/** The Income total per currency (never summed across currencies), over the schools whose income shows, with the
+ * schools it leaves out by reason: one that did not load (failed, or still loading) and one whose income the viewer
+ * does not see. Summing on the client is an exception to "nothing is summed or recomputed" (owner decision
+ * 2026-11-08, S9-plan D23): no server route serves a cross-school total, so the cells shown are added here, in exact
+ * integer minor units, one total per currency. */
 export function incomeTotals(figures: ReadonlyArray<SchoolFigures | null>): {
 	totals: Array<{ currency: string; cents: number }>;
-	partial: boolean;
+	leavesOut: { notLoaded: boolean; hidden: boolean };
 } {
 	const totals = new Map<string, number>();
-	let partial = false;
+	const leavesOut = { notLoaded: false, hidden: false };
 	for (const figure of figures) {
-		if (!figure || "hidden" in figure.income) {
-			partial = true;
+		if (!figure) {
+			leavesOut.notLoaded = true;
+			continue;
+		}
+		if ("hidden" in figure.income) {
+			leavesOut.hidden = true;
 			continue;
 		}
 		const { currency, cents } = figure.income;
@@ -59,7 +66,7 @@ export function incomeTotals(figures: ReadonlyArray<SchoolFigures | null>): {
 	}
 	return {
 		totals: [...totals].map(([currency, cents]) => ({ currency, cents })),
-		partial,
+		leavesOut,
 	};
 }
 
@@ -115,3 +122,16 @@ export const readAllSchools = (
 		const failed = results.find(Result.isFailure);
 		if (failed) return yield* Effect.fail(failed.failure);
 	});
+
+/** The note under a partial Income total, naming each reason a school is left out; null when none is. */
+export function leavesOutNote(
+	leavesOut: { notLoaded: boolean; hidden: boolean },
+	anyTotal: boolean,
+): string | null {
+	const reasons = [
+		leavesOut.notLoaded ? "schools that did not load" : null,
+		leavesOut.hidden ? "schools whose income you do not see" : null,
+	].filter((reason) => reason !== null);
+	if (reasons.length === 0) return null;
+	return anyTotal ? `Leaves out ${reasons.join(" and ")}` : "Not shown";
+}

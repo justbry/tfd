@@ -296,3 +296,92 @@ describe("retryingRead: one failure, one toast", () => {
 		expect(shown()).toEqual([]);
 	});
 });
+
+describe("S9.0c: where a run's progress shows, step by step", () => {
+	test("a failure toast queued behind four that comes on screen mid-run carries the progress", async () => {
+		const { context, toasts } = readContext();
+		const others: string[] = [];
+		for (const title of ["a", "b", "c", "d"])
+			others.push(
+				await context.runtime.runPromise(
+					ToastsService.use((service) =>
+						service.show({ tone: "error", title }),
+					),
+				),
+			);
+		const { load } = scriptedLoad([...offline, ...offline]);
+		const reading = retryingRead(context, load, { value: () => undefined });
+		await reading.run();
+		const failureId = toastState(toasts).waiting[0]?.id;
+		expect(failureId).toBeDefined();
+		const retrying = reading.run();
+		await until(
+			() =>
+				toastState(toasts).waiting.some(
+					(toast) => toast.detail === "Retrying (2 of 3)",
+				),
+			"the run's own retry toast, queued",
+		);
+		context.toasts.dismiss(others[0] ?? "missing");
+		await until(
+			() =>
+				toastState(toasts).visible.some(
+					(toast) =>
+						toast.id === failureId && toast.progress === "Retrying (3 of 3)",
+				),
+			"the progress on the failure toast now on screen",
+			800,
+		);
+		expect(
+			[...toastState(toasts).visible, ...toastState(toasts).waiting].filter(
+				(toast) => toast.detail?.startsWith("Retrying"),
+			),
+		).toEqual([]);
+		reading.cancel();
+		await retrying;
+	});
+	test("a failure toast dismissed during the backoff hands the rest of the run to a retry toast of its own", async () => {
+		const { context, shown } = readContext();
+		const { load } = scriptedLoad([...offline, ...offline]);
+		const reading = retryingRead(context, load, { value: () => undefined });
+		await reading.run();
+		const failureId = shown()[0]?.id ?? "missing";
+		const retrying = reading.run();
+		await until(
+			() => shown()[0]?.progress === "Retrying (2 of 3)",
+			"the progress",
+		);
+		context.toasts.dismiss(failureId);
+		await until(
+			() =>
+				shown().some(
+					(toast) =>
+						toast.tone === "info" && toast.detail === "Retrying (3 of 3)",
+				),
+			"the run's own retry toast",
+			800,
+		);
+		reading.cancel();
+		await retrying;
+	});
+	test("a run interrupted by something other than cancel clears its progress from the failure toast", async () => {
+		const { context, shown } = readContext();
+		let calls = 0;
+		const load = () =>
+			Effect.suspend(() => {
+				calls += 1;
+				if (calls === 5) return Effect.interrupt;
+				return run(() =>
+					Promise.reject(new AdapterError("network", "offline")),
+				);
+			});
+		const reading = retryingRead(context, load, { value: () => undefined });
+		await reading.run();
+		const failureId = shown()[0]?.id;
+		await reading.run();
+		await wait(10);
+		expect(calls).toBe(5);
+		const failure = shown().find((toast) => toast.id === failureId);
+		expect(failure?.progress ?? "").toBe("");
+	});
+});

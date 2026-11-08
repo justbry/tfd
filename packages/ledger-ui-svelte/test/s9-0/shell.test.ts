@@ -100,7 +100,7 @@ describe("the shell", () => {
 		expect(
 			textOf("[data-test=all-schools-row][data-school=map] td:last-child"),
 		).toBe("26 min · stale");
-		// S9.1 fills Outstanding and Income (test/s9-1/all-schools.test.ts checks every cell).
+		// S9.1 fills Outstanding and Income (test/s9-1/dashboard.test.ts checks every cell).
 		await until(
 			() =>
 				textOf(
@@ -409,13 +409,18 @@ describe("a failed schools read", () => {
 		expect(textOf("[data-test=toasts-assertive]")).toContain("Not found");
 		expect(textOf("[data-test=toast-title]")).toBe("Not found");
 		expect(textOf("[data-test=toast-action]")).toBe("Reload");
+		const retry = query<HTMLButtonElement>("[data-test=load-retry]");
+		retry?.focus();
 		click("[data-test=load-retry]");
-		// While the retry is on its way the failure stays on screen, its Retry busy.
+		// While the retry is on its way the failure stays on screen, its Retry busy: aria-disabled, so it keeps focus.
 		expect(query("[data-test=load-failed]")).not.toBeNull();
 		expect(textOf("[data-test=load-retry]")).toBe("Retrying…");
-		expect(query<HTMLButtonElement>("[data-test=load-retry]")?.disabled).toBe(
-			true,
-		);
+		expect(retry?.getAttribute("aria-disabled")).toBe("true");
+		expect(retry?.disabled).toBe(false);
+		expect(retry?.hasAttribute("aria-busy")).toBe(false);
+		expect(document.activeElement).toBe(retry);
+		click("[data-test=load-retry]");
+		expect(calls).toBe(2);
 		release();
 		await until(() => root.dataset.route === "#/vol/plans", "the retried read");
 		expect(query("[data-test=load-failed]")).toBeNull();

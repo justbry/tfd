@@ -118,7 +118,7 @@ describe("perform: nothing fails silently past its handler", () => {
 		});
 		expect(log.entries().map((entry) => entry.cause)).toContain(showBroke);
 	});
-	test("a defect arriving with the abort is logged and shown", async () => {
+	test("a defect arriving with the abort is logged, and no toast is shown for the aborted run", async () => {
 		const { runtime, log, toasts } = fixtureRuntime();
 		const bug = new TypeError("cleanup failed");
 		const controller = new AbortController();
@@ -132,11 +132,9 @@ describe("perform: nothing fails silently past its handler", () => {
 		const outcome = await waiting;
 		expect(outcome).toMatchObject({ ok: false, interrupted: false });
 		expect(log.entries().map((entry) => entry.cause)).toContain(bug);
-		expect(toastState(toasts).visible.map((toast) => toast.title)).toEqual([
-			"Something went wrong",
-		]);
+		expect(toastState(toasts).visible).toEqual([]);
 	});
-	test("an abort whose retry toast cannot be taken down is logged and shown", async () => {
+	test("an abort whose retry toast cannot be taken down is logged, with no toast of its own", async () => {
 		const dismissBroke = new Error("dismiss is broken");
 		const { runtime, log, toasts } = brokenToastsRuntime(() => ({
 			dismiss: () => Effect.die(dismissBroke),
@@ -161,9 +159,19 @@ describe("perform: nothing fails silently past its handler", () => {
 		const outcome = await waiting;
 		expect(outcome).toMatchObject({ ok: false, interrupted: false });
 		expect(log.entries().map((entry) => entry.cause)).toContain(dismissBroke);
-		expect(toastState(toasts).visible.map((toast) => toast.title)).toContain(
-			"Something went wrong",
-		);
+		expect(
+			toastState(toasts).visible.map((toast) => toast.title),
+		).not.toContain("Something went wrong");
+	});
+	test("a defect the handler already logged is logged once when the report then dies", async () => {
+		const showBroke = new Error("toasts are broken");
+		const { runtime, log } = brokenToastsRuntime(() => ({
+			show: () => Effect.die(showBroke),
+		}));
+		const bug = new TypeError("reader.schools is not a function");
+		await perform({ runtime }, Effect.die(bug));
+		const causes = log.entries().map((entry) => entry.cause);
+		expect(causes.filter((cause) => cause === bug)).toHaveLength(1);
 	});
 });
 
