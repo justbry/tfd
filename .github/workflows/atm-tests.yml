@@ -1,11 +1,17 @@
 name: atm tests
 
-# Tests, typecheck, lint and build of packages/atm on a pull request. Nothing else in this repository runs atm's tests:
-# knip.yml and the inherited Autumn workflows do not, and release-atm.yml only builds a tag.
+# On a pull request this runs only `checks`: the typecheck, lint and build of packages/atm, which take about two minutes
+# and download nothing. The test shards and the golden end-to-end check run on a push to dev and by hand (workflow_dispatch),
+# not on a pull request: the pull request's author runs them first, locally, with `just atm check` (lint, typecheck, tests,
+# build and knip; the tests include the golden check). A hosted runner has to download hledger from GitHub Releases for
+# the tests, and when that returns 504 four jobs fail on a change that has nothing to do with atm.
 #
-# Five jobs run side by side. `test` is a matrix of four: two shards of the test files and two of the golden end-to-end
-# check (tests/golden-e2e-check.test.ts, its own file of about five minutes, split with ATM_GOLDEN_E2E_SHARD). `checks`
-# runs the typecheck, lint and build. All of them restore Bun's install cache, keyed on bun.lock and .bun-version.
+# Nothing else in this repository runs atm's tests: knip.yml and the inherited Autumn workflows do not, and release-atm.yml
+# only builds a tag.
+#
+# Five jobs in all. `test` is a matrix of four: two shards of the test files and two of the golden end-to-end check
+# (tests/golden-e2e-check.test.ts, its own file of about five minutes, split with ATM_GOLDEN_E2E_SHARD). `checks` runs
+# the typecheck, lint and build. All of them restore Bun's install cache, keyed on bun.lock and .bun-version.
 #
 # The test shards are balanced with tests/test-timings.json, each file's serial time on a hosted runner: a file left out of
 # it (a new one, or one that skips on a runner) still runs, in whichever shard bun puts it. To refresh it, run every file
@@ -63,7 +69,8 @@ concurrency:
 jobs:
   test:
     name: atm (${{ matrix.part }})
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # Not on a pull request: run `just atm check` locally first (see the header).
+    if: github.event_name != 'pull_request'
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
     timeout-minutes: 20
     strategy:
