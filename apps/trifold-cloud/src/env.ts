@@ -65,4 +65,8 @@ export type CloudEnv = {
 	LEDGER_HOST: string;
 	/** The API host, e.g. staging-api.trifold.app. */
 	API_HOST: string;
+	/** Trifold's own billing (PLAN.md section 5), a Worker secret: a TEST-mode key on staging (`sk_test_` or `rk_test_`). */
+	STRIPE_SECRET_KEY?: string;
+	/** The signing secret of the `/webhooks/billing` endpoint, a Worker secret. */
+	STRIPE_BILLING_WEBHOOK_SECRET?: string;
 };

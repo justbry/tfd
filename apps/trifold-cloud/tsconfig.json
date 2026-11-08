@@ -9,7 +9,14 @@
 		"strict": true,
 		"target": "ES2022",
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
-		"types": ["bun"]
+		"types": ["bun"],
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"paths": {
+			"@api/*": ["../../shared/api/*"],
+			"@models/*": ["../../shared/models/*"],
+			"@utils/*": ["../../shared/utils/*"]
+		}
 	},
-	"include": ["src/**/*.ts", "tests/**/*.ts"]
+	"include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"]
 }
