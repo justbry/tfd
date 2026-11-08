@@ -8,7 +8,7 @@ import {
 } from "../../src/http/disclosure.ts";
 import { AdapterError } from "../../src/http/errors.ts";
 import type { WorkerLedgerPage } from "../../src/http/worker-source.ts";
-import { familyId, profileId, schoolId } from "./helpers.ts";
+import { familyId, otherSchoolId, profileId, schoolId } from "./helpers.ts";
 import {
 	issuedAt,
 	ledgerTokenAnswer,
@@ -377,7 +377,92 @@ describe("the fetch WorkerSource over section 11", () => {
 		]);
 	});
 
-	test("schools: a null lag or school fact is not available, never a made-up value", async () => {
+	/** Two schools: the recorded one and `otherSchoolId`, whose ledger/school answers `otherFacts`. */
+	const twoSchools = (otherFacts: Record<string, unknown>) => {
+		const both = adapters({
+			worker: "fetch",
+			schools: [
+				{ id: schoolId, role: "owner", finance: true },
+				{ id: otherSchoolId, role: "admin", finance: false },
+			],
+		});
+		both.http.always("GET", new RegExp(`${otherSchoolId}/ledger/school$`), {
+			status: 200,
+			body: { ...schoolFactsAnswer, school: otherSchoolId, ...otherFacts },
+		});
+		both.http.always("GET", /ledger\/school$/, {
+			status: 200,
+			body: schoolFactsAnswer,
+		});
+		return both;
+	};
+	const schoolRow = (id: string, lagMinutes: number | null = 3) => ({
+		id,
+		asOf: lagMinutes === null ? null : "2026-11-07T12:00:00Z",
+		lagMinutes,
+		stale: lagMinutes === null,
+	});
+
+	test("schools: a null currency (no menu, no Stripe) comes through as null, and every school is answered", async () => {
+		const { reader, http } = twoSchools({
+			name: "Buzz Studio",
+			currency: null,
+		});
+		http.on("GET", workerPath("/schools"), {
+			status: 200,
+			body: envelope({
+				schools: [schoolRow(schoolId), schoolRow(otherSchoolId)],
+			}),
+		});
+		const schools = await reader.schools();
+		expect(schools.map(({ id, currency }) => [id, currency])).toEqual([
+			[schoolId, "usd"],
+			[otherSchoolId, null],
+		]);
+		expect(schools[1]).toMatchObject({
+			name: "Buzz Studio",
+			timeZone: "America/Denver",
+			creditUnit: { one: "session", other: "sessions" },
+			role: "admin",
+		});
+		expect(reader.schoolsLeftOut()).toEqual([]);
+	});
+
+	test("schools: a school with no ledger views yet is listed with a null lag, never left out", async () => {
+		const { reader, http } = twoSchools({
+			name: "Buzz Studio",
+			currency: null,
+		});
+		http.on("GET", workerPath("/schools"), {
+			status: 200,
+			body: envelope({
+				schools: [schoolRow(schoolId), schoolRow(otherSchoolId, null)],
+			}),
+		});
+		const schools = await reader.schools();
+		expect(schools.map(({ id, lagMinutes }) => [id, lagMinutes])).toEqual([
+			[schoolId, 3],
+			[otherSchoolId, null],
+		]);
+		expect(reader.schoolsLeftOut()).toEqual([]);
+	});
+
+	test("schools: a null time zone or credit unit leaves only that school out, and says why", async () => {
+		const { reader, http } = twoSchools({ timeZone: null, creditUnit: null });
+		http.on("GET", workerPath("/schools"), {
+			status: 200,
+			body: envelope({
+				schools: [schoolRow(schoolId), schoolRow(otherSchoolId, null)],
+			}),
+		});
+		expect((await reader.schools()).map(({ id }) => id)).toEqual([schoolId]);
+		expect(reader.schoolsLeftOut()).toEqual([
+			`${otherSchoolId}.timeZone`,
+			`${otherSchoolId}.creditUnit`,
+		]);
+	});
+
+	test("schools: when every school has a null school fact, not available, never an empty list or a made-up value", async () => {
 		const { reader, http } = adapters({ worker: "fetch" });
 		http.always("GET", /ledger\/school$/, {
 			status: 200,
@@ -392,7 +477,7 @@ describe("the fetch WorkerSource over section 11", () => {
 		const error = await rejection(reader.schools());
 		expect(error.kind).toBe("not_available");
 		expect(error.message).toContain(`${schoolId}.timeZone`);
-		expect(error.message).toContain(`${schoolId}.lagMinutes`);
+		expect(reader.schoolsLeftOut()).toEqual([`${schoolId}.timeZone`]);
 	});
 
 	test("disclosure without its views and copy is not available; never an invented view", async () => {

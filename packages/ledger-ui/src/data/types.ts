@@ -8,8 +8,9 @@ export type School = {
 	name: string;
 	/** IANA time zone, e.g. `America/Denver`. */
 	timeZone: string;
-	/** ISO 4217 code, e.g. `USD`. */
-	currency: string;
+	/** ISO 4217 code, e.g. `USD`. Null when nothing gives the school one (no published menu and no Stripe account,
+	 * S8-contract section 11): it has no money to show, so every money figure reads "—", never `$0.00`. */
+	currency: string | null;
 	role: "owner" | "admin";
 	/** What the school calls a held credit (mockup `unit`): "1 session held", "2 sessions held". */
 	creditUnit: { one: string; other: string };
@@ -18,7 +19,8 @@ export type School = {
 	dashboardOpensOn?: string;
 	/** The ledger shipper is behind; `lagMinutes` says by how much. */
 	stale: boolean;
-	lagMinutes: number;
+	/** Null when the school has no ledger views yet (nothing has shipped): it is listed all the same. */
+	lagMinutes: number | null;
 	/** Members that need attention; null when no source counts them (the HTTP build): no badge, never 0. */
 	attentionCount: number | null;
 	/** Null when no source has them (the HTTP build): the tabs show no badge. */

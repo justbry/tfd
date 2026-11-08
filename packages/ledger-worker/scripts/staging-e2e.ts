@@ -8,6 +8,13 @@
  * (runbook: plans/ledger-ui/S8f-staging-runbook.md). Every check prints one line `PASS|FAIL|BLOCKED  <stage>.<check>
  * <why>`; BLOCKED says what is missing and who supplies it. Tokens, cookies, links and PINs are never printed in full
  * (the first four characters at most) and the cookie jar lives in memory.
+ *
+ * Stage 5, the ledger UI's own HTTP adapters on staging, runs from the UI package (`bun run --cwd packages/ledger-ui
+ * staging-ui`, `packages/ledger-ui/scripts/staging-ui.ts`): Bun takes the JSX settings of the directory it starts in.
+ * It signs in with this file's `Session` and prints the same lines.
+ *
+ * Stage 6, S8d (buzz-school's own money and catalog routes to the ledger), is `scripts/staging-s8d.ts`; it moves test
+ * money, so only `--stage 6` runs it.
  */
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -21,7 +28,7 @@ export const PRODUCTION_LEDGER_ORIGIN = "https://ledger.b4uni.com";
 /** The web app's origin: a person signs in there, and the session cookie then carries to the ledger origin (same site).
  * `/family/verify` is outside LEDGER_ROUTES, so the family service refuses it from the ledger origin (403 origin). */
 export const STAGING_WEB_ORIGIN = "https://staging.b4uni.com";
-const FLY_APP = "b4uni-stg-family";
+export const FLY_APP = "b4uni-stg-family";
 const QA_OPERATOR = "s8f";
 const FIXTURE_READER = join(
 	import.meta.dir,
@@ -30,12 +37,15 @@ const FIXTURE_READER = join(
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const FLY_TIMEOUT_MS = 120_000;
-const MS_PER_SECOND = 1000;
+export const MS_PER_SECOND = 1000;
 const SECONDS_PER_DAY = 86_400;
 const TOKEN_REFRESH_MARGIN_SECONDS = 60;
-const POLL_INTERVAL_MS = 30_000;
-const POLL_TIMEOUT_MS = 15 * 60_000;
-const BOOKING_WINDOW_DAYS = 31;
+const MS_PER_MINUTE = 60_000;
+export const POLL_INTERVAL_MS = 30_000;
+export const POLL_TIMEOUT_MS = 15 * MS_PER_MINUTE;
+/** Days each side of today for the bookings listing: the route takes at most 62 days from `from` to `to` inclusive
+ * (buzz-school `MAX_BOOKING_DAYS`, 400 `bad_range` beyond), so ±30 is 61. */
+export const BOOKING_WINDOW_DAYS = 30;
 const SECRET_PREFIX_LENGTH = 4;
 const EMAIL_PREFIX_LENGTH = 3;
 const STATUS_WIDTH = 7;
@@ -70,10 +80,10 @@ export const registerSecret = (value: string | null | undefined): void => {
 		knownSecrets.add(value);
 };
 
-const prefixOf = (value: string): string =>
+export const prefixOf = (value: string): string =>
 	`${value.slice(0, SECRET_PREFIX_LENGTH)}…`;
 
-const maskEmail = (email: string): string =>
+export const maskEmail = (email: string): string =>
 	`${email.slice(0, EMAIL_PREFIX_LENGTH)}…`;
 
 export const scrub = (text: string): string => {
@@ -122,7 +132,7 @@ const originOf = (raw: string, role: string): string => {
  * wrong role are refused. `extraAllowedOrigins` exists for the test suite alone: the CLI never passes it.
  */
 export const resolveTargets = (
-	raw: { worker?: string; api?: string },
+	raw: { worker?: string | undefined; api?: string | undefined },
 	options: TargetOptions = {},
 ): Targets => {
 	const extra = options.extraAllowedOrigins ?? [];
@@ -200,7 +210,7 @@ export const exitCodeOf = (
 
 // ---- http
 
-type Reply = {
+export type Reply = {
 	status: number;
 	headers: Headers;
 	text: string;
@@ -209,33 +219,58 @@ type Reply = {
 
 type Json = Record<string, unknown>;
 
-const asRecord = (value: unknown): Json =>
+export const asRecord = (value: unknown): Json =>
 	typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Json)
 		: {};
 
-const asArray = (value: unknown): unknown[] =>
+export const asArray = (value: unknown): unknown[] =>
 	Array.isArray(value) ? value : [];
 
-const errorCodeOf = (reply: Reply): string => {
+export const errorCodeOf = (reply: Reply): string => {
 	const error = asRecord(asRecord(reply.json).error);
 	if (typeof error.code === "string") return error.code;
 	const flat = asRecord(reply.json).error;
 	return typeof flat === "string" ? flat : "";
 };
 
-const describe = (reply: Reply): string => {
+export const describe = (reply: Reply): string => {
 	const code = errorCodeOf(reply);
 	return code === "" ? `${reply.status}` : `${reply.status} ${code}`;
 };
 
-const send = async (url: string, init: RequestInit = {}): Promise<Reply> => {
-	const response = await fetch(url, {
-		redirect: "manual",
-		signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-		...init,
+/**
+ * `work` or a rejection after REQUEST_TIMEOUT_MS. Bun's own fetch and no `AbortSignal`: stage 5 runs under happy-dom,
+ * whose `fetch` and `AbortSignal` replace the globals, and Bun's fetch takes no happy-dom signal. The request is not
+ * aborted at the deadline; the check reports and the run moves on.
+ */
+const withDeadline = <Answer>(
+	work: Promise<Answer>,
+	url: string,
+): Promise<Answer> => {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const deadline = new Promise<never>((_, reject) => {
+		timer = setTimeout(
+			() =>
+				reject(
+					new Error(
+						`no answer from ${new URL(url).host} within ${REQUEST_TIMEOUT_MS / MS_PER_SECOND} s`,
+					),
+				),
+			REQUEST_TIMEOUT_MS,
+		);
 	});
-	const text = await response.text();
+	return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
+};
+
+const send = async (url: string, init: RequestInit = {}): Promise<Reply> => {
+	const { response, text } = await withDeadline(
+		(async () => {
+			const answer = await Bun.fetch(url, { redirect: "manual", ...init });
+			return { response: answer, text: await answer.text() };
+		})(),
+		url,
+	);
 	let json: unknown = null;
 	try {
 		json = JSON.parse(text);
@@ -308,9 +343,9 @@ const tamperToken = (token: string, change: (claims: Json) => void): string => {
 
 // ---- the family service session (cookie jar in memory)
 
-type Grant = { id: string; role: string; finance: boolean };
+export type Grant = { id: string; role: string; finance: boolean };
 
-type Step =
+export type Step =
 	| { ok: true; reply: Reply }
 	| { ok: false; status: "FAIL" | "BLOCKED"; why: string };
 
@@ -319,10 +354,12 @@ type QaLinkRunner = (
 	purpose: "login" | "step_up",
 ) => Promise<{ token: string } | { error: string }>;
 
-const flyQaLink: QaLinkRunner = async (email, purpose) => {
-	if (!EMAIL_PATTERN.test(email))
-		return { error: "the QA address is not a plain email address" };
-	const command = `bun src/ops/cli.ts qa-link --email ${email} --purpose ${purpose} --by ${QA_OPERATOR} --apply`;
+export type FlyAnswer =
+	| { stdout: string; stderr: string; exitCode: number }
+	| { error: string };
+
+/** One ops command on the staging family service's machine, over `fly ssh console` (the `fly` CLI must be logged in). */
+export const runFly = async (command: string): Promise<FlyAnswer> => {
 	let process: ReturnType<typeof Bun.spawn>;
 	try {
 		process = Bun.spawn(
@@ -340,7 +377,17 @@ const flyQaLink: QaLinkRunner = async (email, purpose) => {
 		new Response(process.stdout as ReadableStream).text(),
 		new Response(process.stderr as ReadableStream).text(),
 	]);
-	const exitCode = await process.exited;
+	return { stdout, stderr, exitCode: await process.exited };
+};
+
+const flyQaLink: QaLinkRunner = async (email, purpose) => {
+	if (!EMAIL_PATTERN.test(email))
+		return { error: "the QA address is not a plain email address" };
+	const answer = await runFly(
+		`bun src/ops/cli.ts qa-link --email ${email} --purpose ${purpose} --by ${QA_OPERATOR} --apply`,
+	);
+	if ("error" in answer) return answer;
+	const { stdout, stderr, exitCode } = answer;
 	for (const line of stdout.split("\n").reverse()) {
 		const trimmed = line.trim();
 		if (!trimmed.startsWith("{")) continue;
@@ -384,9 +431,27 @@ export type Inputs = {
 	paymentId: string | undefined;
 	refundCents: number | undefined;
 	bookingId: string | undefined;
+	/** Stage 5: a school where the account's token is finance:false; else the token's first such school. */
+	schoolIdNoFinance: string | undefined;
 };
 
-class Session {
+/** The headers of a `RequestInit` as a plain record, without the global `Headers` (happy-dom's under stage 5). */
+const headerRecord = (
+	headers: HeadersInit | undefined,
+): Record<string, string> => {
+	if (headers === undefined) return {};
+	if (Array.isArray(headers)) return Object.fromEntries(headers);
+	if (typeof (headers as Headers).forEach === "function") {
+		const record: Record<string, string> = {};
+		(headers as Headers).forEach((value, name) => {
+			record[name] = value;
+		});
+		return record;
+	}
+	return { ...(headers as Record<string, string>) };
+};
+
+export class Session {
 	readonly jar = new Map<string, string>();
 	token: string | null = null;
 	expiresAt = 0;
@@ -401,29 +466,13 @@ class Session {
 		registerSecret(pin);
 	}
 
-	async api(
-		path: string,
-		init: {
-			method?: string;
-			body?: unknown;
-			headers?: Record<string, string>;
-		} = {},
-	): Promise<Reply> {
+	private cookieHeader(): Record<string, string> {
 		const cookie = [...this.jar].map(([name, value]) => `${name}=${value}`);
-		const reply = await send(`${this.context.targets.api}${path}`, {
-			method: init.method ?? "GET",
-			headers: {
-				origin: LEDGER_ORIGIN,
-				"x-b4u": "1",
-				...(init.body === undefined
-					? {}
-					: { "content-type": "application/json" }),
-				...(cookie.length === 0 ? {} : { cookie: cookie.join("; ") }),
-				...init.headers,
-			},
-			body: init.body === undefined ? undefined : JSON.stringify(init.body),
-		});
-		for (const line of reply.headers.getSetCookie()) {
+		return cookie.length === 0 ? {} : { cookie: cookie.join("; ") };
+	}
+
+	private keepCookies(headers: Headers): void {
+		for (const line of headers.getSetCookie()) {
 			const [pair = ""] = line.split(";");
 			const separator = pair.indexOf("=");
 			if (separator <= 0) continue;
@@ -435,7 +484,58 @@ class Session {
 				registerSecret(value);
 			}
 		}
+	}
+
+	async api(
+		path: string,
+		init: {
+			method?: string;
+			body?: unknown;
+			headers?: Record<string, string>;
+		} = {},
+	): Promise<Reply> {
+		const reply = await send(`${this.context.targets.api}${path}`, {
+			method: init.method ?? "GET",
+			headers: {
+				origin: LEDGER_ORIGIN,
+				"x-b4u": "1",
+				...(init.body === undefined
+					? {}
+					: { "content-type": "application/json" }),
+				...this.cookieHeader(),
+				...init.headers,
+			},
+			body: init.body === undefined ? null : JSON.stringify(init.body),
+		});
+		this.keepCookies(reply.headers);
 		return reply;
+	}
+
+	/**
+	 * `fetch` as the ledger UI's browser build makes it from the ledger origin (stage 5): on the family service this
+	 * session's cookies and the browser's `Origin` (LEDGER_ORIGIN), and the cookies it sets are kept; on the Worker
+	 * nothing is added. A URL on any other origin is refused before a request is made.
+	 */
+	async browserFetch(url: string, init: RequestInit = {}): Promise<Response> {
+		const { api, worker } = this.context.targets;
+		const onApi = url.startsWith(`${api}/`);
+		if (!(onApi || url.startsWith(`${worker}/`)))
+			throw new UsageError(
+				`${url.split("/")[2] ?? url} is not one of the two allow-listed hosts`,
+			);
+		const response = await withDeadline(
+			Bun.fetch(url, {
+				...init,
+				redirect: "manual",
+				headers: {
+					...headerRecord(init.headers),
+					...(onApi ? { origin: LEDGER_ORIGIN, ...this.cookieHeader() } : {}),
+				},
+			}),
+			url,
+		);
+		if (onApi) this.keepCookies(response.headers);
+		return response;
 	}
 
 	/** Mints a link over fly ssh and redeems it on the family service with this session's jar. */
@@ -614,7 +714,7 @@ const qaLinkFailure = (code: string, email: string): Step => {
 
 // ---- helpers shared by the stages
 
-const currentMonthRange = (): { from: string; to: string } => {
+export const currentMonthRange = (): { from: string; to: string } => {
 	const today = new Date();
 	const iso = (date: Date) => date.toISOString().slice(0, 10);
 	return {
@@ -625,7 +725,7 @@ const currentMonthRange = (): { from: string; to: string } => {
 	};
 };
 
-const dayOffset = (days: number): string =>
+export const dayOffset = (days: number): string =>
 	new Date(Date.now() + days * SECONDS_PER_DAY * MS_PER_SECOND)
 		.toISOString()
 		.slice(0, 10);
@@ -638,7 +738,7 @@ const requireEnvelope = (reply: Reply): string | null => {
 };
 
 /** Runs one check; an exception is a FAIL with its message. */
-const check = async (
+export const check = async (
 	context: Context,
 	stage: number,
 	name: string,
@@ -937,14 +1037,14 @@ export const stage1 = async (context: Context): Promise<void> => {
 
 // ---- stage 2: a QA account, the token and the Worker
 
-const missingAccount = (inputs: Inputs): string | null =>
+export const missingAccount = (inputs: Inputs): string | null =>
 	inputs.qaEmail === undefined || inputs.pin === undefined
 		? "S8F_QA_EMAIL and S8F_PIN are not set: the owner supplies a QA address listed in QA_EMAILS on b4uni-stg-family whose account owns or administers a staging school and has a PIN set"
 		: null;
 
 const sessions = new WeakMap<Context, { owner?: Session; admin?: Session }>();
 
-const ownerSession = (context: Context): Session | null => {
+export const ownerSession = (context: Context): Session | null => {
 	const { qaEmail, pin } = context.inputs;
 	if (qaEmail === undefined || pin === undefined) return null;
 	const held = sessions.get(context) ?? {};
@@ -964,7 +1064,7 @@ const adminSession = (context: Context): Session | null => {
 };
 
 /** The school this run works on: S8F_SCHOOL_ID when it is in the token, else the first. */
-const targetSchool = (
+export const targetSchool = (
 	context: Context,
 	session: Session,
 ): { grant: Grant } | { blocked: string } => {
@@ -1216,7 +1316,7 @@ export const stage3 = async (context: Context): Promise<void> => {
 
 // ---- stage 4: a refund and a booking cancel (staging, Stripe TEST mode)
 
-const missingForRefund = (inputs: Inputs): string[] => {
+export const missingForRefund = (inputs: Inputs): string[] => {
 	const missing: string[] = [];
 	if (inputs.qaEmail === undefined || inputs.pin === undefined)
 		missing.push(
@@ -1237,7 +1337,12 @@ const missingForRefund = (inputs: Inputs): string[] => {
 	return missing;
 };
 
-type LedgerHit = { found: boolean; detail: string; entryTime: string | null };
+/** A ledger entry a poll looks for: `detail` names it in the line ("payment.refunded for payment ch_…"). */
+export type LedgerHit = {
+	found: boolean;
+	detail: string;
+	entryTime: string | null;
+};
 
 const refundEntryIn = (
 	page: unknown,
@@ -1258,11 +1363,97 @@ const refundEntryIn = (
 					found: true,
 					entryTime: String(event.event_time),
 					detail: byPayment
-						? `payment ${paymentId}`
-						: `payment ${String(entry.paymentId)} (matched by amount -${refundCents} and time: the event names another id than S8F_PAYMENT_ID)`,
+						? `payment.refunded for payment ${paymentId}`
+						: `payment.refunded for payment ${String(entry.paymentId)} (matched by amount -${refundCents} and time: the event names another id than S8F_PAYMENT_ID)`,
 				};
 		}
 	return { found: false, detail: "", entryTime: null };
+};
+
+export type RefundRequest = {
+	schoolId: string;
+	paymentId: string;
+	refundCents: number;
+	idempotencyKey: string;
+	note: string;
+};
+
+/** `POST /school-admin/schools/<id>/billing/refunds` with the Idempotency-Key (the PIN open and a step-up first). */
+export const postRefund = (
+	owner: Session,
+	request: RefundRequest,
+): Promise<Reply> =>
+	owner.api(`/school-admin/schools/${request.schoolId}/billing/refunds`, {
+		method: "POST",
+		body: {
+			...(request.paymentId.startsWith("pi_")
+				? { paymentIntentId: request.paymentId }
+				: { chargeId: request.paymentId }),
+			amountCents: request.refundCents,
+			reason: "requested_by_customer",
+			note: request.note,
+		},
+		headers: { "idempotency-key": request.idempotencyKey },
+	});
+
+/** The refund route's answer: the refund id and Stripe's status, or why there is none. */
+export const refundOutcome = (
+	reply: Reply,
+):
+	| { refundId: string; stripeStatus: string | null; why: string }
+	| { refundId: null; why: string } => {
+	const answer = asRecord(reply.json);
+	if (reply.status !== 200 || typeof answer.refundId !== "string")
+		return {
+			refundId: null,
+			why: `POST billing/refunds answered ${describe(reply)}`,
+		};
+	return {
+		refundId: answer.refundId,
+		stripeStatus: typeof answer.status === "string" ? answer.status : null,
+		why: `refund ${answer.refundId} Stripe status ${String(answer.status)}, refunded ${String(answer.refundedCents)} cents, remaining ${String(answer.remainingCents)}, replayed ${String(answer.replayed)}`,
+	};
+};
+
+/**
+ * Polls the Worker's ledger at `path` every 30 s for up to 15 minutes until `find` sees the entry and `asOf` is after
+ * `after` (ms): what a write must reach before the UI's pending state clears. Each poll is logged.
+ */
+export const pollLedger = async (
+	context: Context,
+	owner: Session,
+	options: {
+		path: string;
+		find: (page: unknown) => LedgerHit;
+		after: number;
+		label: string;
+		afterWhat: string;
+	},
+): Promise<{ status: Status; why: string }> => {
+	const started = Date.now();
+	let attempt = 0;
+	let last = "no answer yet";
+	while (Date.now() - started < POLL_TIMEOUT_MS) {
+		attempt += 1;
+		const reply = await owner.worker(options.path);
+		const body = asRecord(reply.json);
+		const hit = options.find(body.data);
+		const asOf = typeof body.asOf === "string" ? Date.parse(body.asOf) : null;
+		last = `ledger ${describe(reply)}, asOf ${String(body.asOf)}, ${options.label} ${hit.found ? "present" : "absent"}`;
+		context.log(
+			`  poll ${attempt} (${Math.round((Date.now() - started) / MS_PER_SECOND)} s): ${last}`,
+		);
+		if (hit.found && asOf !== null && asOf > options.after)
+			return {
+				status: "PASS",
+				why: `${hit.detail} at ${hit.entryTime} is in the ledger and asOf ${String(body.asOf)} is after ${options.afterWhat} (${Math.round((Date.now() - started) / MS_PER_SECOND)} s)`,
+			};
+		await context.sleep(POLL_INTERVAL_MS);
+	}
+	return {
+		status: "FAIL",
+		why: `no ${options.label} with asOf after ${options.afterWhat} within ${POLL_TIMEOUT_MS / MS_PER_MINUTE} minutes; last: ${last} (check ledger_export, the webhook, ledger-status and the cron)`,
+	};
 };
 
 export const stage4 = async (context: Context): Promise<void> => {
@@ -1325,54 +1516,33 @@ export const stage4 = async (context: Context): Promise<void> => {
 
 	let refundId: string | null = null;
 	let refundedAt = 0;
-	const idempotencyKey = `s8f-${randomUUID()}`;
+	const refundRequest: RefundRequest = {
+		schoolId,
+		paymentId,
+		refundCents,
+		idempotencyKey: `s8f-${randomUUID()}`,
+		note: "S8f staging e2e",
+	};
 	await check(context, stage, "refund", async () => {
 		if (!(stripeReady && steppedUp))
 			return {
 				status: "BLOCKED",
 				why: "needs Stripe connected on the school and a step-up (lines above)",
 			};
-		const body = {
-			...(paymentId.startsWith("pi_")
-				? { paymentIntentId: paymentId }
-				: { chargeId: paymentId }),
-			amountCents: refundCents,
-			reason: "requested_by_customer",
-			note: "S8f staging e2e",
-		};
-		const reply = await owner.api(
-			`/school-admin/schools/${schoolId}/billing/refunds`,
-			{ method: "POST", body, headers: { "idempotency-key": idempotencyKey } },
-		);
+		const outcome = refundOutcome(await postRefund(owner, refundRequest));
 		refundedAt = Date.now();
-		const answer = asRecord(reply.json);
-		if (reply.status !== 200 || typeof answer.refundId !== "string")
-			return {
-				status: "FAIL",
-				why: `POST billing/refunds answered ${describe(reply)}`,
-			};
-		refundId = answer.refundId;
+		if (outcome.refundId === null) return { status: "FAIL", why: outcome.why };
+		refundId = outcome.refundId;
 		return {
-			status: typeof answer.status === "string" ? "PASS" : "FAIL",
-			why: `refund ${refundId} Stripe status ${String(answer.status)}, refunded ${String(answer.refundedCents)} cents, remaining ${String(answer.remainingCents)}, replayed ${String(answer.replayed)}`,
+			status: outcome.stripeStatus === null ? "FAIL" : "PASS",
+			why: outcome.why,
 		};
 	});
 
 	await check(context, stage, "refund-replay", async () => {
 		if (refundId === null)
 			return { status: "BLOCKED", why: "needs the refund line above to pass" };
-		const body = {
-			...(paymentId.startsWith("pi_")
-				? { paymentIntentId: paymentId }
-				: { chargeId: paymentId }),
-			amountCents: refundCents,
-			reason: "requested_by_customer",
-			note: "S8f staging e2e",
-		};
-		const reply = await owner.api(
-			`/school-admin/schools/${schoolId}/billing/refunds`,
-			{ method: "POST", body, headers: { "idempotency-key": idempotencyKey } },
-		);
+		const reply = await postRefund(owner, refundRequest);
 		const answer = asRecord(reply.json);
 		const same = reply.status === 200 && answer.refundId === refundId;
 		return {
@@ -1389,36 +1559,19 @@ export const stage4 = async (context: Context): Promise<void> => {
 				status: "BLOCKED",
 				why: `account ${maskEmail(owner.email)} has finance:false on ${schoolId}: the ledger needs finance`,
 			};
-		const started = Date.now();
-		const path = `/v1/schools/${schoolId}/ledger?from=${dayOffset(-2)}&to=${dayOffset(1)}`;
-		let attempt = 0;
-		let last = "no answer yet";
-		while (Date.now() - started < POLL_TIMEOUT_MS) {
-			attempt += 1;
-			const reply = await owner.worker(path);
-			const body = asRecord(reply.json);
-			const hit = refundEntryIn(
-				body.data,
-				paymentId,
-				refundCents,
-				refundedAt - POLL_INTERVAL_MS,
-			);
-			const asOf = typeof body.asOf === "string" ? Date.parse(body.asOf) : null;
-			last = `ledger ${describe(reply)}, asOf ${String(body.asOf)}, refund entry ${hit.found ? "present" : "absent"}`;
-			context.log(
-				`  poll ${attempt} (${Math.round((Date.now() - started) / MS_PER_SECOND)} s): ${last}`,
-			);
-			if (hit.found && asOf !== null && asOf > refundedAt)
-				return {
-					status: "PASS",
-					why: `payment.refunded for ${hit.detail} at ${hit.entryTime} is in the ledger and asOf ${String(body.asOf)} is after the refund (${Math.round((Date.now() - started) / MS_PER_SECOND)} s)`,
-				};
-			await context.sleep(POLL_INTERVAL_MS);
-		}
-		return {
-			status: "FAIL",
-			why: `no payment.refunded entry with asOf after the refund within ${POLL_TIMEOUT_MS / 60_000} minutes; last: ${last} (check ledger_export, the webhook, ledger-status and the cron)`,
-		};
+		return pollLedger(context, owner, {
+			path: `/v1/schools/${schoolId}/ledger?from=${dayOffset(-2)}&to=${dayOffset(1)}`,
+			find: (page) =>
+				refundEntryIn(
+					page,
+					paymentId,
+					refundCents,
+					refundedAt - POLL_INTERVAL_MS,
+				),
+			after: refundedAt,
+			label: "payment.refunded entry",
+			afterWhat: "the refund",
+		});
 	});
 
 	await check(context, stage, "booking-cancel", async () => {
@@ -1460,14 +1613,29 @@ export const stage4 = async (context: Context): Promise<void> => {
 
 // ---- the run
 
+/**
+ * Stage 6 (S8d) is loaded when it runs: `staging-s8d.ts` imports this file. The path is a constant so that the UI
+ * package's type check, which reaches this file through stage 5's script, does not follow it into the Worker's R2 code.
+ */
+const S8D_MODULE = "./staging-s8d.js";
+const stage6 = async (context: Context): Promise<void> => {
+	const loaded = (await import(S8D_MODULE)) as {
+		stage6(context: Context): Promise<void>;
+	};
+	await loaded.stage6(context);
+};
+
 const STAGES: Record<number, (context: Context) => Promise<void>> = {
 	1: stage1,
 	2: stage2,
 	3: stage3,
 	4: stage4,
+	6: stage6,
 };
-/** Stage 4 moves (test) money, so only `--stage 4` runs it. */
-const DEFAULT_STAGES = [1, 2, 3];
+/** Stages 4 and 6 move (test) money, so only `--stage 4` or `--stage 6` runs them. */
+export const DEFAULT_STAGES: readonly number[] = [1, 2, 3];
+/** packages/ledger-ui/scripts/staging-ui.ts. */
+const UI_STAGE = 5;
 
 export const runStages = async (
 	context: Context,
@@ -1483,7 +1651,7 @@ export const runStages = async (
 export const parseArgs = (
 	argv: readonly string[],
 ): { stages: number[]; json: boolean; strict: boolean } => {
-	let stages = DEFAULT_STAGES;
+	let stages = [...DEFAULT_STAGES];
 	let json = false;
 	let strict = false;
 	for (let index = 0; index < argv.length; index += 1) {
@@ -1494,10 +1662,12 @@ export const parseArgs = (
 			const value = argv[index + 1];
 			index += 1;
 			stages = (value ?? "").split(",").map(Number);
-			if (stages.some((stage) => !STAGES[stage]))
+			if (stages.includes(UI_STAGE))
 				throw new UsageError(
-					"--stage takes numbers from 1 to 4, e.g. --stage 1,2",
+					`stage ${UI_STAGE} (the ledger UI's HTTP adapters) runs from the UI package: bun run --cwd packages/ledger-ui staging-ui`,
 				);
+			if (stages.some((stage) => !STAGES[stage]))
+				throw new UsageError("--stage takes 1 to 4 or 6, e.g. --stage 1,2");
 		} else throw new UsageError(`unknown argument ${argument}`);
 	}
 	return { stages, json, strict };
@@ -1542,15 +1712,30 @@ export const inputsFrom = (env: Record<string, string | undefined>): Inputs => {
 		bookingId: inputFrom(env, "S8F_BOOKING_ID", (value) =>
 			UUID_PATTERN.test(value),
 		)?.toLowerCase(),
+		schoolIdNoFinance: inputFrom(env, "S8F_SCHOOL_ID_NO_FINANCE", (value) =>
+			UUID_PATTERN.test(value),
+		)?.toLowerCase(),
 	};
 };
 
-const main = async (): Promise<number> => {
-	const env = process.env;
-	let args: ReturnType<typeof parseArgs>;
+export type Arguments = { stages: number[]; json: boolean; strict: boolean };
+
+/**
+ * The command line around a run: the inputs from `env`, the allow-list, the lines, the table and the exit code. Stage
+ * 5's script (packages/ledger-ui/scripts/staging-ui.ts) runs through it with its own `parse` and `run`.
+ */
+export const runCommand = async (options: {
+	title: string;
+	argv: readonly string[];
+	env: Record<string, string | undefined>;
+	parse(argv: readonly string[]): Arguments;
+	run(context: Context, stages: readonly number[]): Promise<void>;
+}): Promise<number> => {
+	const { env } = options;
+	let args: Arguments;
 	let context: Context;
 	try {
-		args = parseArgs(process.argv.slice(2));
+		args = options.parse(options.argv);
 		const targets = resolveTargets({
 			worker: env.S8F_WORKER,
 			api: env.S8F_API,
@@ -1568,9 +1753,7 @@ const main = async (): Promise<number> => {
 			qaLink: flyQaLink,
 			sleep: (milliseconds) =>
 				new Promise((resolve) => setTimeout(resolve, milliseconds)),
-			log: args.json
-				? (line) => console.error(line)
-				: (line) => console.log(line),
+			log: print,
 		};
 	} catch (error) {
 		if (error instanceof UsageError) {
@@ -1580,9 +1763,9 @@ const main = async (): Promise<number> => {
 		throw error;
 	}
 	console.error(
-		`S8f staging e2e: worker ${context.targets.worker}, api ${context.targets.api}, stages ${args.stages.join(",")}`,
+		`${options.title}: worker ${context.targets.worker}, api ${context.targets.api}, stages ${args.stages.join(",")}`,
 	);
-	await runStages(context, args.stages);
+	await options.run(context, args.stages);
 	const { results } = context.report;
 	const table = summarize(results);
 	if (args.json)
@@ -1600,4 +1783,13 @@ const main = async (): Promise<number> => {
 	return exitCodeOf(results, args.strict);
 };
 
-if (import.meta.main) process.exit(await main());
+if (import.meta.main)
+	process.exit(
+		await runCommand({
+			title: "S8f staging e2e",
+			argv: process.argv.slice(2),
+			env: process.env,
+			parse: parseArgs,
+			run: runStages,
+		}),
+	);

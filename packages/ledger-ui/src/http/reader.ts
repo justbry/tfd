@@ -44,6 +44,9 @@ const membersPageLimit = "100";
 export type HttpReader = Reader & {
 	/** The school's writes not yet shipped (the pending store), oldest first. */
 	pendingWrites(school: string): PendingWrite[];
+	/** The not-available reasons of the last `schools()`: each school it left out, and the null that left it out
+	 * (`<id>.timeZone`, `<id>.creditUnit`). Empty when every school was answered. */
+	schoolsLeftOut(): string[];
 };
 
 export function createHttpReader(options: {
@@ -53,6 +56,7 @@ export function createHttpReader(options: {
 	pending: PendingStore;
 }): HttpReader {
 	const { api, worker, tokens, pending } = options;
+	let leftOut: string[] = [];
 
 	/** A Worker answer has shipped every write its `asOf` passes. */
 	const seen = <Data>(school: string, answer: WorkerAnswer<Data>): Data => {
@@ -108,10 +112,14 @@ export function createHttpReader(options: {
 
 	return {
 		pendingWrites: (school) => pending.forSchool(school),
+		schoolsLeftOut: () => [...leftOut],
 
 		schools: async () => {
 			const token = await tokens.current();
-			if (!token) return [];
+			if (!token) {
+				leftOut = [];
+				return [];
+			}
 			const [facts, status] = await Promise.all([
 				Promise.all(
 					token.schools.map(async ({ id }) =>
@@ -121,26 +129,21 @@ export function createHttpReader(options: {
 				worker.schools(),
 			]);
 			// Name, time zone, currency and credit unit come from ledger/school, stale and lag from the Worker.
-			// `attentionCount` and `tabBadges` have no source on either side: null, so no badge shows.
+			// `attentionCount` and `tabBadges` have no source on either side: null, so no badge shows. A null currency
+			// is a school with no menu and no Stripe account (S8-contract section 11): it passes through, and its money
+			// reads "—". A school the Worker has no views for yet (nothing shipped) is listed with a null lag and not
+			// stale. A null time zone or credit unit leaves only that school out, with the reason kept in
+			// `schoolsLeftOut`: one school never blocks the others.
 			const missing: string[] = [];
 			const schools: School[] = [];
 			token.schools.forEach((claim, index) => {
 				const fact = facts[index];
 				const row = status.data.schools.find(({ id }) => id === claim.id);
 				if (row?.asOf) pending.clearShipped(claim.id, row.asOf);
-				for (const field of ["timeZone", "currency", "creditUnit"] as const)
+				for (const field of ["timeZone", "creditUnit"] as const)
 					if (!fact || fact[field] === null)
 						missing.push(`${claim.id}.${field}`);
-				if (!row || row.lagMinutes === null)
-					missing.push(`${claim.id}.lagMinutes`);
-				if (
-					!fact?.timeZone ||
-					!fact.currency ||
-					!fact.creditUnit ||
-					!row ||
-					row.lagMinutes === null
-				)
-					return;
+				if (!fact?.timeZone || !fact.creditUnit) return;
 				schools.push({
 					id: claim.id,
 					name: fact.name,
@@ -148,13 +151,15 @@ export function createHttpReader(options: {
 					currency: fact.currency,
 					role: claim.role,
 					creditUnit: fact.creditUnit,
-					stale: row.stale,
-					lagMinutes: row.lagMinutes,
+					stale: row?.stale ?? false,
+					lagMinutes: row?.lagMinutes ?? null,
 					attentionCount: null,
 					tabBadges: null,
 				});
 			});
-			if (missing.length)
+			leftOut = missing;
+			// Every school left out is not "no schools": the token has some, and none can be shown.
+			if (!schools.length && missing.length)
 				throw notAvailable("schools", `null: ${missing.join(", ")}`);
 			return schools;
 		},

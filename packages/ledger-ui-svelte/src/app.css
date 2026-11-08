@@ -1,0 +1,217 @@
+/* Tailwind 4, CSS-first. The mockup's tokens (plans/ledger-ui/design/mockup.html and mockup-host.css, as
+   packages/ledger-ui/src/theme.css carries them) are the variables below, one set per theme; `@theme inline` names
+   them for Tailwind and for the shadcn-svelte components (bg-background, text-muted-foreground, border-border…).
+   The theme class sits on <html> (light, dark or system), so dialogs and sheets portalled to <body> take it too;
+   `system` follows the operating system's scheme. */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark {
+	&:where(.dark, .dark *) {
+		@slot;
+	}
+	@media (prefers-color-scheme: dark) {
+		&:where(.system, .system *) {
+			@slot;
+		}
+	}
+}
+
+/* The shadcn-svelte registry's classes name states as bare attributes (data-open, data-active, data-horizontal);
+   bits-ui 2.20 writes data-state and data-orientation. These variants read what bits-ui writes. */
+@custom-variant data-open (&[data-state="open"]);
+@custom-variant data-closed (&[data-state="closed"]);
+@custom-variant data-active (&[data-state="active"]);
+@custom-variant data-checked (&[data-state="checked"]);
+@custom-variant data-unchecked (&[data-state="unchecked"]);
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
+:root {
+	--radius: 10px;
+	/* Stacking, lowest first: popovers, the settings sheet, toasts (always above both). */
+	--layer-popover: 70;
+	--layer-sheet: 80;
+	--layer-toast: 95;
+}
+
+:root,
+.light {
+	color-scheme: light;
+	--background: #ffffff;
+	--foreground: #16161a;
+	--card: #f5f5f7;
+	--popover: #ffffff;
+	--secondary: #ececf0;
+	--muted-foreground: #6b6b78;
+	--border: #dadae0;
+	--ring: #8f9bb3;
+	--primary: #2563eb;
+	--primary-foreground: #ffffff;
+	--destructive: #d92d20;
+	--warning: #b45309;
+	--success: #047857;
+	--info: #2563eb;
+	--code-background: #eeeef2;
+	--chart-1: #2563eb;
+	--chart-2: #0d9488;
+	--chart-3: #d97706;
+	--chart-4: #9333ea;
+	--chart-5: #db2777;
+}
+
+.dark {
+	color-scheme: dark;
+	--background: #0b0b0d;
+	--foreground: #ededf0;
+	--card: #141418;
+	--popover: #17171c;
+	--secondary: #1d1d23;
+	--muted-foreground: #9a9aa6;
+	--border: #2a2a32;
+	--ring: #555a70;
+	--primary: #4c7dff;
+	--primary-foreground: #ffffff;
+	--destructive: #f0524a;
+	--warning: #f0a020;
+	--success: #2fbf8a;
+	--info: #5b9dff;
+	--code-background: #1a1a20;
+	--chart-1: #4c7dff;
+	--chart-2: #2dd4bf;
+	--chart-3: #fbbf24;
+	--chart-4: #c084fc;
+	--chart-5: #f472b6;
+}
+
+@media (prefers-color-scheme: dark) {
+	.system {
+		color-scheme: dark;
+		--background: #0b0b0d;
+		--foreground: #ededf0;
+		--card: #141418;
+		--popover: #17171c;
+		--secondary: #1d1d23;
+		--muted-foreground: #9a9aa6;
+		--border: #2a2a32;
+		--ring: #555a70;
+		--primary: #4c7dff;
+		--primary-foreground: #ffffff;
+		--destructive: #f0524a;
+		--warning: #f0a020;
+		--success: #2fbf8a;
+		--info: #5b9dff;
+		--code-background: #1a1a20;
+		--chart-1: #4c7dff;
+		--chart-2: #2dd4bf;
+		--chart-3: #fbbf24;
+		--chart-4: #c084fc;
+		--chart-5: #f472b6;
+	}
+}
+
+@theme inline {
+	--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--foreground);
+	--color-muted: var(--secondary);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--secondary);
+	--color-accent-foreground: var(--foreground);
+	--color-destructive: var(--destructive);
+	--color-warning: var(--warning);
+	--color-success: var(--success);
+	--color-info: var(--info);
+	--color-code: var(--code-background);
+	--color-border: var(--border);
+	--color-input: var(--border);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+
+	/* The mockup's corners: menu rows 5px, buttons and fields 6px, icon buttons 8px, badges 9px, panels 10px. */
+	--radius-sm: 5px;
+	--radius-md: 6px;
+	--radius-lg: 8px;
+	--radius-xl: var(--radius);
+	--radius-4xl: 9px;
+
+	--shadow-popover: 0 10px 30px rgba(0, 0, 0, 0.25);
+	--shadow-toast: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+@layer base {
+	* {
+		box-sizing: border-box;
+		border-color: var(--color-border);
+	}
+	html {
+		background: var(--background);
+	}
+	body {
+		margin: 0;
+		font-family: var(--font-sans);
+		font-size: 12px;
+		line-height: 1.4;
+		background: var(--background);
+		color: var(--foreground);
+	}
+	button {
+		cursor: pointer;
+	}
+}
+
+/* The mockup's frame (`.app`): the host draws it as a card with a 1px border and rounded corners. */
+@layer components {
+	.app {
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		overflow: hidden;
+		position: relative;
+		min-height: 780px;
+		background: var(--background);
+		color: var(--foreground);
+	}
+	/* The mockup's stroke icons (`.i`). */
+	.icon {
+		width: 14px;
+		height: 14px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		flex: none;
+	}
+}
+
+/* The Dashboard's hatching (mockup `.kwait` and `.kmonths button.kopen`): a period inside its delay, and the live
+   audiences' open month. */
+@utility hatch-wait {
+	background: repeating-linear-gradient(
+		135deg,
+		transparent 0 5px,
+		color-mix(in srgb, var(--ring) 45%, transparent) 5px 6px
+	);
+	color: var(--muted-foreground);
+}
+@utility hatch-open {
+	background: repeating-linear-gradient(
+		135deg,
+		rgba(240, 160, 32, 0.25) 0 3px,
+		transparent 3px 6px
+	);
+}

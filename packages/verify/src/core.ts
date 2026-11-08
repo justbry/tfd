@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
  * tfd-verify: tfd's receipt and seal checks (packages/atm/src/ledger/receipt.ts, seal.ts, sign.ts, util.ts) for any
- * JavaScript runtime with WebCrypto, ported line for line so a receipt verifies here exactly when it verifies with tfd:
+ * JavaScript runtime with WebCrypto, ported line for line so a receipt gets the verdict here that it gets from tfd:
  *
  * - canonical bytes: JSON.stringify with object keys sorted (UTF-16 code unit order) and undefined values dropped;
  * - event_hash and events_hash: sha256 (hex) of those bytes as UTF-8;
  * - sig: Ed25519 (RFC 8032, strict) over the receipt's canonical bytes, base64url without padding, one spelling only;
- * - keys: key id to an Ed25519 SPKI PEM.
+ * - keys: key id to a PEM, read as tfd's createPublicKey reads it under Bun (ed25519FromPem has the one difference).
  *
  * In a browser it runs entirely on the page: no network, nothing uploaded. Hashing uses WebCrypto; Ed25519 uses
  * @noble/ed25519, whose own SHA-512 also comes from WebCrypto, so the code shipped is small. No node:* imports.
- * tests/golden.test.ts runs tfd's receipt test vectors against it.
+ * tests/golden.test.ts runs tfd's receipt test vectors against it; tests/pem.test.ts holds its key reading to tfd's verdicts.
  */
-import { verifyAsync } from "@noble/ed25519";
+import { getPublicKeyAsync, verifyAsync } from "@noble/ed25519";
 
 export type PublicKeys = Record<string, string>;
 
@@ -144,30 +144,187 @@ const base64urlEncode = (bytes: Uint8Array): string => {
 	return text;
 };
 
+// ---- PEM, as tfd's createPublicKey reads it (BoringSSL under Bun: PEM_read_bio, PEM_bytes_read_bio) ----
+
+const BEGIN = "-----BEGIN ";
+const END = "-----END ";
+const TAIL = "-----\n";
+/** BIO_gets(bio, buffer, 254) reads at most 253 bytes: a longer line comes in pieces. */
+const PEM_PIECE_BYTES = 253;
+/** After a header's blank line, every data line but the last is 64 characters and a newline. */
+const PEM_DATA_LINE = 65;
+const PEM_BASE64 =
+	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+type PemBlock = { name: string; header: string; data: Uint8Array };
+
+/** The text's UTF-8 bytes, one character per byte, in the pieces BIO_gets reads: up to and including a newline. */
+const pemPieces = (text: string): string[] => {
+	let bytes = "";
+	for (const byte of encoder.encode(text)) bytes += String.fromCharCode(byte);
+	const pieces: string[] = [];
+	let start = 0;
+	while (start < bytes.length) {
+		const newline = bytes.indexOf("\n", start);
+		const lineEnd = newline < 0 ? bytes.length : newline + 1;
+		const end = Math.min(lineEnd, start + PEM_PIECE_BYTES);
+		pieces.push(bytes.slice(start, end));
+		start = end;
+	}
+	return pieces;
+};
+
+/** A piece with trailing bytes up to space dropped, then a newline. `char` is signed, so bytes from 0x80 count too. */
+const stripPiece = (piece: string): string => {
+	let length = piece.length;
+	while (length > 0) {
+		const code = piece.charCodeAt(length - 1);
+		if (code > 0x20 && code < 0x80) break;
+		length--;
+	}
+	return `${piece.slice(0, length)}\n`;
+};
+
+/** EVP_DecodeUpdate then EVP_DecodeFinal: whitespace skipped, whole quads, `=` only to end the last one. */
+const decodePemBase64 = (text: string): Uint8Array | null => {
+	const bytes: number[] = [];
+	let quad: string[] = [];
+	let ended = false;
+	for (const char of text) {
+		if (char === " " || char === "\t" || char === "\r" || char === "\n")
+			continue;
+		if (ended) return null;
+		quad.push(char);
+		if (quad.length < 4) continue;
+		const [a, b, c, d] = quad.map((each) =>
+			each === "=" ? 0 : PEM_BASE64.indexOf(each),
+		) as [number, number, number, number];
+		const padding = quad.map((each) => (each === "=" ? "=" : "x")).join("") as
+			| "xxxx"
+			| "xxx="
+			| "xx==";
+		if (a < 0 || b < 0 || c < 0 || d < 0) return null;
+		if (padding !== "xxxx" && padding !== "xxx=" && padding !== "xx==")
+			return null;
+		const value = (a << 18) | (b << 12) | (c << 6) | d;
+		bytes.push((value >> 16) & 0xff);
+		if (padding !== "xx==") bytes.push((value >> 8) & 0xff);
+		if (padding === "xxxx") bytes.push(value & 0xff);
+		else ended = true;
+		quad = [];
+	}
+	return quad.length === 0 ? Uint8Array.from(bytes) : null;
+};
+
+/**
+ * PEM_read_bio over the whole text: each block's name, header and data in order, up to the first block it cannot read
+ * (the reader stops there, so later blocks are never seen). Text between blocks is skipped.
+ */
+const readPemBlocks = (text: string): PemBlock[] => {
+	const pieces = pemPieces(text);
+	const blocks: PemBlock[] = [];
+	let at = 0;
+	const next = (): string | null =>
+		at < pieces.length ? stripPiece(pieces[at++] as string) : null;
+	for (;;) {
+		let name: string | null = null;
+		for (let line = next(); line !== null && name === null; ) {
+			if (
+				line.startsWith(BEGIN) &&
+				line.length >= BEGIN.length + TAIL.length &&
+				line.endsWith(TAIL)
+			)
+				name = line.slice(BEGIN.length, -TAIL.length);
+			else line = next();
+		}
+		if (name === null) return blocks;
+		// Lines up to a blank one are the header; with no blank line before the end line, they are the data.
+		let header = "";
+		let data = "";
+		let line = next();
+		while (line !== null && line !== "\n" && !line.startsWith(END)) {
+			header += line;
+			line = next();
+		}
+		if (line === null) return blocks;
+		if (line.startsWith(END)) {
+			data = header;
+			header = "";
+		} else {
+			line = next();
+			while (line !== null && !line.startsWith(END)) {
+				if (line.length > PEM_DATA_LINE) break;
+				data += line;
+				if (line.length !== PEM_DATA_LINE) {
+					line = next();
+					break;
+				}
+				line = next();
+			}
+		}
+		if (line !== `${END}${name}${TAIL}`) return blocks;
+		const decoded = decodePemBase64(data);
+		if (!decoded || decoded.length === 0) return blocks;
+		blocks.push({ name, header, data: decoded });
+	}
+};
+
 /** The DER prefix of an Ed25519 SubjectPublicKeyInfo: SEQUENCE { SEQUENCE { OID 1.3.101.112 }, BIT STRING (33 bytes) }. */
 const ED25519_SPKI_PREFIX = [
 	0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
 ];
-const ED25519_SPKI_LENGTH = ED25519_SPKI_PREFIX.length + 32;
-const PEM_PUBLIC_KEY =
-	/^-----BEGIN PUBLIC KEY-----([A-Za-z0-9+/=\s]+)-----END PUBLIC KEY-----\s*$/;
+/** The DER prefix of an Ed25519 PKCS#8 v1 key: SEQUENCE { INTEGER 0, SEQUENCE { OID }, OCTET STRING { OCTET STRING (32) } }. */
+const ED25519_PKCS8_PREFIX = [
+	0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04,
+	0x22, 0x04, 0x20,
+];
+const ED25519_KEY_BYTES = 32;
+/** The private-key names PEM_read_bio_PrivateKey takes; only PKCS#8 can hold an Ed25519 key. */
+const PRIVATE_KEY_NAMES = [
+	"PRIVATE KEY",
+	"ENCRYPTED PRIVATE KEY",
+	"RSA PRIVATE KEY",
+	"EC PRIVATE KEY",
+	"DSA PRIVATE KEY",
+];
 
-/** The raw 32-byte Ed25519 public key of an SPKI PEM, or null for anything else (tfd calls that `unknown_key`). */
-export const ed25519FromPem = (pem: string): Uint8Array | null => {
-	const match = PEM_PUBLIC_KEY.exec(pem.trim());
-	if (!match?.[1]) return null;
-	let der: Uint8Array;
-	try {
-		der = Uint8Array.from(atob(match[1].replace(/\s+/g, "")), (char) =>
-			char.charCodeAt(0),
-		);
-	} catch {
-		return null;
+/** The 32 bytes after `prefix`, which d2i reads as one element: bytes after it are ignored. */
+const keyAfter = (
+	der: Uint8Array,
+	prefix: readonly number[],
+): Uint8Array | null =>
+	der.length >= prefix.length + ED25519_KEY_BYTES &&
+	prefix.every((byte, index) => der[index] === byte)
+		? der.slice(prefix.length, prefix.length + ED25519_KEY_BYTES)
+		: null;
+
+/**
+ * The raw 32-byte Ed25519 public key that tfd's createPublicKey finds in `pem`, or null where tfd gets none or another
+ * kind of key (tfd calls both `unknown_key`). Like node:crypto it takes the first PUBLIC KEY block; failing that, an RSA
+ * PUBLIC KEY or CERTIFICATE block (never Ed25519 here); failing that, the first private key, whose public key it derives.
+ * A block with a header line is skipped by that step. The one difference: an Ed25519 X.509 certificate gives tfd its key
+ * and gives null here.
+ */
+export const ed25519FromPem = async (
+	pem: string,
+): Promise<Uint8Array | null> => {
+	const blocks = readPemBlocks(pem);
+	const first = (names: readonly string[]): PemBlock | undefined =>
+		blocks.find((block) => names.includes(block.name));
+	const publicBlock = first(["PUBLIC KEY"]);
+	if (publicBlock?.header === "")
+		return keyAfter(publicBlock.data, ED25519_SPKI_PREFIX);
+	for (const names of [
+		["RSA PUBLIC KEY"],
+		["CERTIFICATE", "X509 CERTIFICATE"],
+	]) {
+		if (first(names)?.header === "") return null;
 	}
-	if (der.length !== ED25519_SPKI_LENGTH) return null;
-	if (!ED25519_SPKI_PREFIX.every((byte, index) => der[index] === byte))
+	const privateBlock = first(PRIVATE_KEY_NAMES);
+	if (privateBlock?.name !== "PRIVATE KEY" || privateBlock.header !== "")
 		return null;
-	return der.slice(ED25519_SPKI_PREFIX.length);
+	const seed = keyAfter(privateBlock.data, ED25519_PKCS8_PREFIX);
+	return seed ? getPublicKeyAsync(seed) : null;
 };
 
 /** tfd's verifyBytes: the key by id, then the one base64url spelling of 64 bytes, then strict Ed25519. Never throws. */
@@ -179,7 +336,7 @@ export const verifyBytes = async (
 ): Promise<"ok" | "unknown_key" | "bad_signature"> => {
 	const pem = Object.hasOwn(keys, keyId) ? keys[keyId] : undefined;
 	if (typeof pem !== "string") return "unknown_key";
-	const publicKey = ed25519FromPem(pem);
+	const publicKey = await ed25519FromPem(pem);
 	if (!publicKey) return "unknown_key";
 	const bytes = base64urlDecode(sig);
 	if (base64urlEncode(bytes) !== sig) return "bad_signature";
