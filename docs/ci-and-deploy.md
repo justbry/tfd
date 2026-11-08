@@ -7,7 +7,7 @@ What runs where, and the one-time Cloudflare setup the deploy workflows need.
 | What | Workflow | When | Where it goes |
 |---|---|---|---|
 | Website (`apps/trifold-site`) | `trifold-site.yml` | pull request to `dev` | preview: `<branch>.tfd-ledger.pages.dev` |
-| | | push to `dev`, or **Run workflow** | production: `tfd-ledger.pages.dev` (Pages branch `main`) |
+| | | push to `dev`, or **Run workflow** | production: `trifold.app` (Pages project `tfd-ledger`, branch `main`) |
 | Ledger Worker + UI (`packages/ledger-worker`, `packages/ledger-ui`) | `deploy-ledger-worker.yml` | **Run workflow** only, after approval | staging: `ledger-staging.b4uni.com` |
 | `tfd` package | `release-atm.yml` (Release tfd) | a `tfd-v<version>` tag | a release on `justbry/atm` with `tfd-<version>.tgz` |
 
@@ -37,7 +37,7 @@ Each previewed pull request gets one comment from the workflow with two links, e
 A preview is public: anyone with the link can open it, and branch aliases are guessable. Fine for the marketing site;
 not for a branch carrying anything confidential. To restrict previews, turn on Cloudflare Access for them: dashboard,
 **Workers & Pages > tfd-ledger > Settings > General > Access policy > Enable**. That puts every preview
-(`*.tfd-ledger.pages.dev`) behind a Cloudflare login; production (`tfd-ledger.pages.dev`) stays public. The policy it
+(`*.tfd-ledger.pages.dev`) behind a Cloudflare login; production (`trifold.app`, `tfd-ledger.pages.dev`) stays public. The policy it
 creates allows only the account's own email; add others under **Zero Trust > Access > Applications**. Free up to 50
 users.
 
@@ -103,7 +103,15 @@ The workflow deploys production as Pages branch `main`, as the hand deploy did. 
 tfd-ledger > Settings > Builds & deployments > Production branch** should be `main`. If it is anything else, a push to
 `dev` lands as a preview, not production.
 
-### 6. First run
+### 6. The custom domain
+
+`trifold.app` is a zone in the same Cloudflare account. Both `trifold.app` and `www.trifold.app` are custom domains on
+the Pages project (**Workers & Pages > tfd-ledger > Custom domains**), and each needs a proxied CNAME to
+`tfd-ledger.pages.dev` in the zone's DNS (**Activate domain** on that tab adds it). Cloudflare issues the certificates
+once the records resolve. `SITE_ORIGIN` in `apps/trifold-site/src/lib/config.ts` makes `https://trifold.app` the
+canonical for every host.
+
+### 7. First run
 
 ```sh
 gh workflow run trifold-site.yml -R justbry/tfd --ref dev
