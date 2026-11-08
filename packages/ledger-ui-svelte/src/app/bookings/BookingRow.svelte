@@ -95,7 +95,10 @@
 	</Table.Cell>
 	<Table.Cell class={[cell, "text-right whitespace-normal"]}>
 		<div class={smallButtons}>
-			{#if actions === "pending"}
+			<!-- A demo school refuses every write, so its rows offer none. -->
+			{#if school.demo}
+				<!-- no actions -->
+			{:else if actions === "pending"}
 				<Badge class={[paneBadge, badgeTones.warning]}><PaneIcon name="clock" class="mr-[3px] size-[11px]" />waiting to ship</Badge>
 			{:else if actions === "remind"}
 				<Button

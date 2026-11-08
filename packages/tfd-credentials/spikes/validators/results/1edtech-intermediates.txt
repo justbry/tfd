@@ -1,0 +1,14 @@
+webpath.B-jcs.json                       cryptosuite=eddsa-jcs-2022 document=same proofConfig=same hashData=same
+webpath.G-A-field.json                   cryptosuite=eddsa-rdfc-2022 document=same proofConfig=same hashData=same
+didkey.G-A-field.json                    cryptosuite=eddsa-rdfc-2022 document=same proofConfig=same hashData=same
+didkey.B-jcs.json                        cryptosuite=eddsa-jcs-2022 document=same proofConfig=same hashData=same
+webpath.G-C-field.json                   cryptosuite=eddsa-rdfc-2022 document=same proofConfig=same hashData=same
+didkey.G-C-field.json                    cryptosuite=eddsa-rdfc-2022 document=same proofConfig=same hashData=same
+didkey.G-C-strip-rdfc.json               cryptosuite=eddsa-jcs-2022 document=same proofConfig=same hashData=same
+webpath.C-set-jcs-first.json             cryptosuite=eddsa-jcs-2022 document=same proofConfig=same hashData=same
+didkey.C-set-jcs-first.json              cryptosuite=eddsa-jcs-2022 document=same proofConfig=same hashData=same
+webpath.G-C-bad-rdfc.json                cryptosuite=eddsa-rdfc-2022 document=same proofConfig=same hashData=same
+didkey.G-C-bad-rdfc.json                 cryptosuite=eddsa-rdfc-2022 document=same proofConfig=same hashData=same
+didkey.G-A-context-302.json: ours cannot canonicalise (Dereferencing a URL did not result in a valid JSON-LD object. Possible causes are an inaccessible URL perhaps due to a s)
+webpath.G-C-strip-rdfc.json              cryptosuite=eddsa-jcs-2022 document=same proofConfig=same hashData=same
+webpath.G-A-context-302.json: ours cannot canonicalise (Dereferencing a URL did not result in a valid JSON-LD object. Possible causes are an inaccessible URL perhaps due to a s)

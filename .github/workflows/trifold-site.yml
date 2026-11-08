@@ -21,6 +21,7 @@ on:
     branches: [dev]
     paths:
       - "apps/trifold-site/**"
+      - "apps/trifold-apex/**"
       - "packages/atm/**"
       - "catalog/**"
       - "bun.lock"
@@ -30,6 +31,7 @@ on:
     branches: [dev]
     paths:
       - "apps/trifold-site/**"
+      - "apps/trifold-apex/**"
       - "packages/atm/**"
       - "catalog/**"
       - "bun.lock"
@@ -91,6 +93,10 @@ jobs:
       - name: Test
         working-directory: apps/trifold-site
         run: bun run test
+
+      - name: Test the apex Worker (trifold.app, www redirect)
+        working-directory: apps/trifold-apex
+        run: bun test tests
 
       - name: Skip deploy
         if: env.CAN_DEPLOY != 'true'

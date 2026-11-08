@@ -1,0 +1,21 @@
+// trifold.app and www.trifold.app. A Worker custom domain manages its own DNS record, which a Pages custom domain can't
+// without DNS edit access on the zone. The apex passes every request through to the Pages production deploy
+// (tfd-ledger.pages.dev, deployed by .github/workflows/trifold-site.yml); www redirects to the apex; verify.trifold.app
+// points at the site's /verify until the verifier app (apps/trifold-verify) is promoted there.
+{
+	"name": "trifold-apex",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-07-01",
+	"workers_dev": false,
+	"observability": { "enabled": true },
+	"routes": [
+		{ "pattern": "trifold.app", "custom_domain": true },
+		{ "pattern": "www.trifold.app", "custom_domain": true },
+		{ "pattern": "verify.trifold.app", "custom_domain": true }
+	],
+	"vars": {
+		"APEX": "trifold.app",
+		"ORIGIN": "tfd-ledger.pages.dev",
+		"VERIFY": "verify.trifold.app"
+	}
+}

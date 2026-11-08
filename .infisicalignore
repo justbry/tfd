@@ -32,3 +32,6 @@ packages/agent-docs/generated/skills/autumn-integrate/references/tracking-usage.
 packages/agent-docs/generated/mcp/catalog.md:curl-auth-header:3414
 packages/agent-docs/generated/mcp/catalog.md:curl-auth-header:3483
 packages/agent-docs/generated/mcp/catalog.md:curl-auth-header:3660
+# Public did:key values from the W3C did:key and VC Data Integrity specs (test vectors, not secrets).
+packages/tfd-credentials/tests/did.test.ts:generic-api-key:52
+packages/tfd-credentials/tests/vectors/eddsa-rdfc-2022-b2-signed.json:generic-api-key:11

@@ -1,0 +1,85 @@
+didkey.A-rdfc-escapes                      verified=true
+didkey.A-rdfc-nostatus                     verified=true
+didkey.A-rdfc                              verified=true
+didkey.B-jcs                               verified=false
+    cryptographic.proof.signature: Unsupported Proof: This verifier does not support this proof's cryptosuite.
+didkey.C-set-jcs-first                     verified=true
+    cryptographic.proof.unsupported-proofs (advisory): Unsupported Proof: Proof 1 of 2 (DataIntegrityProof, eddsa-jcs-2022): This verifier does not support this proof's cryptosuite.
+didkey.C-set                               verified=true
+    cryptographic.proof.unsupported-proofs (advisory): Unsupported Proof: Proof 2 of 2 (DataIntegrityProof, eddsa-jcs-2022): This verifier does not support this proof's cryptosuite.
+didkey.E-expired                           verified=false
+    cryptographic.proof.validity-period: Credential Expired: The current date time (2026-11-08T08:06:58.521Z) is after "validUntil" (2025-12-31T00:00:00Z).
+didkey.E-revoked                           verified=false
+    cryptographic.status.bitstring: Credential Revoked: The status list https://localhost:8443/status/didkey/revocation-rdfc marks the credential revoked (index 44971).
+didkey.E-standing-ok                       verified=true
+didkey.E-suspended                         verified=false
+    cryptographic.status.bitstring: Credential Suspended: The status list https://localhost:8443/status/didkey/suspension-rdfc marks the credential suspended (index 62894).
+didkey.G-A-context-302                     verified=false
+    cryptographic.proof.signature: JSON-LD Validation Error: Safe mode validation error.
+didkey.G-A-context-copy                    verified=true
+didkey.G-A-field                           verified=false
+    cryptographic.proof.signature: Invalid Signature: Invalid signature.
+didkey.G-A-no-proof                        verified=false
+    cryptographic.core.proof-exists: No Proof: Credential is missing required proof property.
+didkey.G-A-rogue-key                       verified=false
+    cryptographic.proof.signature: Verification Method Error: Credential issuer must match the verification method controller.
+didkey.G-A-unmapped-subject-term           verified=false
+    cryptographic.proof.signature: JSON-LD Validation Error: Safe mode validation error.
+didkey.G-A-unmapped-term                   verified=false
+    cryptographic.proof.signature: JSON-LD Validation Error: Safe mode validation error.
+didkey.G-A-vm-swap                         verified=false
+    cryptographic.proof.signature: Invalid Signature: Invalid signature.
+didkey.G-C-bad-jcs                         verified=true
+    cryptographic.proof.unsupported-proofs (advisory): Unsupported Proof: Proof 2 of 2 (DataIntegrityProof, eddsa-jcs-2022): This verifier does not support this proof's cryptosuite.
+didkey.G-C-bad-rdfc                        verified=false
+    cryptographic.proof.signature: Invalid Signature: Proof 1 of 2 (DataIntegrityProof, eddsa-rdfc-2022): Invalid signature.
+didkey.G-C-field                           verified=false
+    cryptographic.proof.signature: Invalid Signature: Proof 1 of 2 (DataIntegrityProof, eddsa-rdfc-2022): Invalid signature.
+didkey.G-C-rogue-rdfc                      verified=false
+    cryptographic.proof.signature: Verification Method Error: Proof 1 of 2 (DataIntegrityProof, eddsa-rdfc-2022): Credential issuer must match the verification method controller.
+didkey.G-C-strip-jcs                       verified=true
+didkey.G-C-strip-rdfc                      verified=false
+    cryptographic.proof.signature: Unsupported Proof: This verifier does not support this proof's cryptosuite.
+webpath.A-rdfc-escapes                     verified=true
+webpath.A-rdfc-nostatus                    verified=true
+webpath.A-rdfc                             verified=true
+webpath.B-jcs                              verified=false
+    cryptographic.proof.signature: Unsupported Proof: This verifier does not support this proof's cryptosuite.
+webpath.C-set-jcs-first                    verified=true
+    cryptographic.proof.unsupported-proofs (advisory): Unsupported Proof: Proof 1 of 2 (DataIntegrityProof, eddsa-jcs-2022): This verifier does not support this proof's cryptosuite.
+webpath.C-set                              verified=true
+    cryptographic.proof.unsupported-proofs (advisory): Unsupported Proof: Proof 2 of 2 (DataIntegrityProof, eddsa-jcs-2022): This verifier does not support this proof's cryptosuite.
+webpath.E-expired                          verified=false
+    cryptographic.proof.validity-period: Credential Expired: The current date time (2026-11-08T08:06:58.783Z) is after "validUntil" (2025-12-31T00:00:00Z).
+webpath.E-revoked                          verified=false
+    cryptographic.status.bitstring: Credential Revoked: The status list https://localhost:8443/status/webpath/revocation-rdfc marks the credential revoked (index 125361).
+webpath.E-standing-ok                      verified=true
+webpath.E-suspended                        verified=false
+    cryptographic.status.bitstring: Credential Suspended: The status list https://localhost:8443/status/webpath/suspension-rdfc marks the credential suspended (index 103240).
+webpath.G-A-context-302                    verified=false
+    cryptographic.proof.signature: JSON-LD Validation Error: Safe mode validation error.
+webpath.G-A-context-copy                   verified=true
+webpath.G-A-field                          verified=false
+    cryptographic.proof.signature: Invalid Signature: Invalid signature.
+webpath.G-A-no-proof                       verified=false
+    cryptographic.core.proof-exists: No Proof: Credential is missing required proof property.
+webpath.G-A-rogue-key                      verified=false
+    cryptographic.proof.signature: Verification Method Error: Verification method "did:web:localhost%3A8443:issuers:webpath#key-2" not authorized by controller for proof purpose "assertionMethod".
+webpath.G-A-unmapped-subject-term          verified=false
+    cryptographic.proof.signature: JSON-LD Validation Error: Safe mode validation error.
+webpath.G-A-unmapped-term                  verified=false
+    cryptographic.proof.signature: JSON-LD Validation Error: Safe mode validation error.
+webpath.G-A-vm-swap                        verified=false
+    cryptographic.proof.signature: Invalid Signature: Invalid signature.
+webpath.G-C-bad-jcs                        verified=true
+    cryptographic.proof.unsupported-proofs (advisory): Unsupported Proof: Proof 2 of 2 (DataIntegrityProof, eddsa-jcs-2022): This verifier does not support this proof's cryptosuite.
+webpath.G-C-bad-rdfc                       verified=false
+    cryptographic.proof.signature: Invalid Signature: Proof 1 of 2 (DataIntegrityProof, eddsa-rdfc-2022): Invalid signature.
+webpath.G-C-field                          verified=false
+    cryptographic.proof.signature: Invalid Signature: Proof 1 of 2 (DataIntegrityProof, eddsa-rdfc-2022): Invalid signature.
+webpath.G-C-rogue-rdfc                     verified=false
+    cryptographic.proof.signature: Verification Method Error: Proof 1 of 2 (DataIntegrityProof, eddsa-rdfc-2022): Verification method "did:web:localhost%3A8443:issuers:webpath#key-2" not authorized by controller for proof purpose "assertionMethod".
+webpath.G-C-strip-jcs                      verified=true
+webpath.G-C-strip-rdfc                     verified=false
+    cryptographic.proof.signature: Unsupported Proof: This verifier does not support this proof's cryptosuite.
+webroot.A-rdfc                             verified=true
