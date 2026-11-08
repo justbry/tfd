@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { Effect } from "effect";
+	import { untrack } from "svelte";
 	import { parsePeriod } from "$contract/app/period.ts";
 	import { formatRoute, type Route, withQuery } from "$contract/app/route.ts";
-	import { audienceNames, audiences } from "$contract/data/disclosure.ts";
+	import { type Audience, audienceNames, audiences } from "$contract/data/disclosure.ts";
 	import type { KpiDocument } from "$contract/data/kpi-document.ts";
 	import type { Preset, School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
@@ -38,7 +39,10 @@
 	 * up read months, the live audiences with the open month and its days. Every figure is a document cell written as the
 	 * mockup writes it: nothing is summed, compared or recomputed, and a hidden or missing cell is never a 0. The
 	 * document is read through the app's Effect layer: a failure is a toast with Retry and the same message here. While
-	 * the next document loads the one before stays on screen; `onRendered` says when the route's own is in. */
+	 * the next document of the same audience loads the one before stays on screen; another audience's never does (it
+	 * would show its figures under the new View as banner), and the other held audiences' documents are read right
+	 * after the first paint, so that picking another View as row is instant. `onRendered` says when the route's own is
+	 * in. */
 	let {
 		route,
 		school,
@@ -57,6 +61,7 @@
 	type Loaded = {
 		key: string;
 		school: string;
+		audience: Audience;
 		presets: Preset[];
 		document: KpiDocument | undefined;
 	};
@@ -65,13 +70,52 @@
 	const audience = $derived(viewing.option.audience);
 	const pinLocked = $derived(viewing.view.pin && route.query.get("pin") === "locked");
 	const presetAsked = $derived(route.query.get("preset"));
-	const key = $derived(`${school.id}/${presetAsked}/${audience}/${pinLocked}`);
+	const keyOf = (schoolId: string, forAudience: Audience, locked: boolean): string =>
+		`${schoolId}/${presetAsked}/${forAudience}/${locked}`;
+	const key = $derived(keyOf(school.id, audience, pinLocked));
 
 	let loaded = $state<Loaded | null>(null);
 	let failure = $state<{ key: string; error: UiError } | null>(null);
 	let busy = $state(false);
 	/** The documents read so far, by the key that asked for them: going back to a view is instant. */
 	const documents = new Map<string, Loaded>();
+
+	/** The other audiences the viewer holds, read (unlocked) once the route's own document is in. A failed read here
+	 * is dropped: picking that row reads it again, with its toast and Retry. */
+	const preRead = (asked: { school: string; audience: Audience }, presets: Preset[]): void => {
+		const preset = presets.find(({ id }) => id === presetAsked) ?? presets[0];
+		const held = untrack(() => viewing.disclosure.viewAs).flatMap((row) =>
+			row.held && row.audience !== asked.audience ? [row.audience] : [],
+		);
+		for (const other of new Set(held)) {
+			const otherKey = keyOf(asked.school, other, false);
+			if (documents.has(otherKey)) continue;
+			app.runtime
+				.runPromise(
+					read((reader) =>
+						reader.kpiDocument({
+							school: asked.school,
+							preset: preset?.id ?? noPreset,
+							audience: other,
+							pinLocked: false,
+						}),
+					),
+				)
+				.then(
+					(document) => {
+						if (document && !documents.has(otherKey))
+							documents.set(otherKey, {
+								key: otherKey,
+								school: asked.school,
+								audience: other,
+								presets,
+								document,
+							});
+					},
+					() => undefined,
+				);
+		}
+	};
 
 	let reading: { run: () => Promise<void> } | null = null;
 	$effect(() => {
@@ -96,13 +140,20 @@
 							pinLocked: asked.pinLocked,
 						}),
 					);
-					return { key: asked.key, school: asked.school, presets, document };
+					return {
+						key: asked.key,
+						school: asked.school,
+						audience: asked.audience,
+						presets,
+						document,
+					};
 				}),
 			{
 				value: (value) => {
 					documents.set(value.key, value);
 					loaded = value;
 					failure = null;
+					preRead(asked, value.presets);
 				},
 				failure: (error) => {
 					failure = { key: asked.key, error };
@@ -120,8 +171,11 @@
 		};
 	});
 
-	/** While the next document loads, the one before (of this school) stays on screen. */
-	const shown = $derived(loaded?.school === school.id ? loaded : null);
+	/** While the next document loads, the one before stays on screen if it is this school's and this audience's;
+	 * otherwise the pane says it is loading. */
+	const shown = $derived(
+		loaded?.school === school.id && loaded.audience === audience ? loaded : null,
+	);
 	const document = $derived(shown?.document);
 	const failed = $derived(failure?.key === key ? failure.error : null);
 	const onScreen = $derived(failed !== null || shown?.key === key);
@@ -187,7 +241,11 @@
 
 {#if failed}
 	<LoadFailed error={failed} onRetry={() => reading?.run()} {busy} />
-{:else if shown && !document}
+{:else if !shown}
+	<p class="m-0 py-6 text-muted-foreground" data-test="dash-loading">
+		<span aria-hidden="true">…</span><span class="sr-only">Loading</span>
+	</p>
+{:else if !document}
 	<div class="flex flex-col items-start gap-1 py-6 text-muted-foreground" data-test="dash-missing">
 		<h2 class="m-0 flex items-center gap-1.5 text-[14px] font-semibold text-foreground">
 			<Icon name="chart" />Not available

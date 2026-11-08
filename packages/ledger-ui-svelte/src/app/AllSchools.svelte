@@ -9,6 +9,7 @@
 	import type { UiError } from "../effect/ui-error.ts";
 	import {
 		incomeTotals,
+		leavesOutNote,
 		type SchoolFigures,
 		schoolFigures,
 		viewerReads,
@@ -24,8 +25,9 @@
 	 * the period's income (memberships and bookings less discounts, `membersIncome`) for a viewer who sees live money:
 	 * the viewer's own audience at each school decides, and a figure they may not see says who may, never 0. Each
 	 * school is read through the app's Effect layer; a failed read is a toast with Retry and "not available" in its
-	 * cells. The Income total is per currency and says when it leaves a school out. A school with no attention count
-	 * (the HTTP build) shows a dash. */
+	 * cells. The Income total is per currency, summed here (owner decision 2026-11-08, S9-plan D23: no server route
+	 * serves a cross-school total), and says which schools it leaves out and why. A school with no attention count (the
+	 * HTTP build) shows a dash. */
 	let {
 		schools,
 		period,
@@ -82,6 +84,7 @@
 		}),
 	);
 	const totals = $derived(incomeTotals(loadedFigures));
+	const partialNote = $derived(leavesOutNote(totals.leavesOut, totals.totals.length > 0));
 	const anyLoading = $derived(
 		schools.some((school) => (shown[school.id]?.state ?? "loading") === "loading"),
 	);
@@ -89,6 +92,8 @@
 	const counted = $derived(
 		schools.every((school) => school.attentionCount !== null),
 	);
+	/** Summed on the client, like the Income total: an exception to "nothing is summed or recomputed" (owner decision
+	 * 2026-11-08, S9-plan D23), since no server route serves a cross-school count. */
 	const attentionTotal = $derived(
 		schools.reduce((total, school) => total + (school.attentionCount ?? 0), 0),
 	);
@@ -186,9 +191,9 @@
 				{:else}
 					{totals.totals.map(({ currency, cents }) => formatMoney(cents, currency)).join(" + ")}
 				{/if}
-				{#if totals.partial && !anyLoading}
+				{#if partialNote && !anyLoading}
 					<div class="text-[10.5px] font-normal text-muted-foreground" data-test="income-partial">
-						{totals.totals.length > 0 ? "Leaves out schools whose income you do not see" : "Not shown"}
+						{partialNote}
 					</div>
 				{/if}
 			</Table.Cell>

@@ -1,3 +1,10 @@
+<script lang="ts" module>
+	/** Where the Dashboard's chunk comes from; a test swaps it for one that fails. */
+	export const chunks = {
+		dashboard: () => import("./dashboard/Dashboard.svelte"),
+	};
+</script>
+
 <script lang="ts">
 	import {
 		formatPeriod,
@@ -149,18 +156,28 @@
 		navigate(target);
 	};
 
-	/** The Dashboard, loaded the first time it is shown, so that the first page load carries none of it. */
+	/** The Dashboard, loaded the first time it is shown, so that the first page load carries none of it. A chunk that
+	 * fails to load is the pane's message, with Retry loading it again. */
 	let dashboardModule: Promise<
 		typeof import("./dashboard/Dashboard.svelte")
 	> | null = $state(null);
+	let dashboardChunkError = $state<UiError | null>(null);
+	const loadDashboard = (): void => {
+		const loading = chunks.dashboard();
+		dashboardChunkError = null;
+		dashboardModule = loading;
+		loading.catch((failure: unknown) => {
+			if (dashboardModule === loading) dashboardChunkError = toUiError(failure);
+		});
+	};
 	$effect(() => {
 		if (school && route.tab === "dashboard" && !dashboardModule)
-			dashboardModule = import("./dashboard/Dashboard.svelte");
+			loadDashboard();
 	});
-	/** The Dashboard cannot show without the disclosure: its failure is the pane's message, and the route is on
-	 * screen. */
+	/** The Dashboard cannot show without the disclosure or its chunk: either failure is the pane's message, and the
+	 * route is on screen. */
 	$effect(() => {
-		if (route.tab === "dashboard" && disclosureError)
+		if (route.tab === "dashboard" && (disclosureError || dashboardChunkError))
 			onPaneRendered(formatRoute(route));
 	});
 
@@ -281,7 +298,7 @@
 									onRendered={onPaneRendered}
 								/>
 							{:catch failure}
-								<LoadFailed error={toUiError(failure)} />
+								<LoadFailed error={toUiError(failure)} onRetry={loadDashboard} />
 							{/await}
 						{:else if disclosureError}
 							<LoadFailed

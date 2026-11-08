@@ -100,7 +100,7 @@ describe("the shell", () => {
 		expect(
 			textOf("[data-test=all-schools-row][data-school=map] td:last-child"),
 		).toBe("26 min · stale");
-		// S9.1 fills Outstanding and Income (test/s9-1/all-schools.test.ts checks every cell).
+		// S9.1 fills Outstanding and Income (test/s9-1/dashboard.test.ts checks every cell).
 		await until(
 			() =>
 				textOf(

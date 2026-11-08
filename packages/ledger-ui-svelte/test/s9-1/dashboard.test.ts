@@ -6,7 +6,9 @@ import type { Writer as WriterContract } from "$contract/data/writer.ts";
 import { createFixtureReader } from "$contract/fixtures/reader.ts";
 import { createFixtureWriter } from "$contract/fixtures/writer.ts";
 import { AdapterError } from "$contract/http/errors.ts";
+import { leavesOutNote } from "../../src/app/all-schools-model.ts";
 import { type MountedApp, mountApp } from "../../src/app/mount.ts";
+import { chunks } from "../../src/app/Shell.svelte";
 import { appLayer } from "../../src/effect/app-layer.ts";
 import { manualClock } from "../../src/effect/clock.ts";
 import { click, query, queryAll, textOf, until } from "../app-harness.ts";
@@ -219,6 +221,54 @@ describe("View as", () => {
 		);
 		expect(query("[data-test=preview-banner]")).toBeNull();
 	});
+	test("another audience's document loading never shows the one before under the new banner", async () => {
+		let release: () => void = () => undefined;
+		const publicHeld = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		let publicAsked = 0;
+		const root = await open("#/b4u/dashboard", {
+			reader: (fixture) => ({
+				...fixture,
+				kpiDocument: async (asked) => {
+					if (asked.audience === "public") {
+						publicAsked += 1;
+						await publicHeld;
+					}
+					return fixture.kpiDocument(asked);
+				},
+			}),
+		});
+		await until(() => publicAsked > 0, "Public's document read ahead");
+		expect(queryAll("[data-test=kpi-card]")).toHaveLength(5);
+		click("[data-test=view-as]");
+		await until(
+			() => query("[data-test=view-as-option][data-as=public]") !== null,
+			"the rows",
+		);
+		click("[data-test=view-as-option][data-as=public]");
+		try {
+			for (let turn = 0; turn < 10; turn += 1) {
+				await new Promise((resolve) => setTimeout(resolve, 5));
+				flushSync();
+				expect(textOf("[data-test=preview-banner]")).toContain(
+					"Preview: this is what Public sees.",
+				);
+				expect(queryAll("[data-test=kpi-card]").length).toBe(0);
+				expect(queryAll("[data-test=dash-period]").length).toBe(0);
+				expect(query("[data-test=dash-loading]")).not.toBeNull();
+				expect(root.dataset.route).not.toBe(window.location.hash);
+			}
+		} finally {
+			release();
+		}
+		await until(
+			() => root.dataset.route === window.location.hash,
+			"the public document",
+		);
+		expect(query("[data-test=dash-loading]")).toBeNull();
+		expect(textOf("[data-test=dash-period][aria-pressed=true]")).toBe("2024");
+	});
 	test("Admin's banner says whose books it shows", async () => {
 		await open("#/b4u/dashboard?as=admin");
 		expect(textOf("[data-test=preview-banner]")).toContain(
@@ -341,8 +391,18 @@ describe("the PIN prompt", () => {
 		);
 	});
 	test("unlocking opens the books with a toast", async () => {
+		const unlocks: Array<[string, string]> = [];
 		const root = await open(
 			"#/b4u/dashboard?preset=monthly-members&as=finance&pin=locked&view=money&month=2026-06",
+			{
+				writer: (fixture) => ({
+					...fixture,
+					unlockBooks: (schoolId, pin) => {
+						unlocks.push([schoolId, pin]);
+						return fixture.unlockBooks(schoolId, pin);
+					},
+				}),
+			},
 		);
 		const input = query<HTMLInputElement>("[data-test=pin-input]");
 		if (!input) throw new Error("no PIN field");
@@ -356,6 +416,7 @@ describe("the PIN prompt", () => {
 				root.dataset.route === window.location.hash,
 			"the books",
 		);
+		expect(unlocks).toEqual([["b4u", "1234"]]);
 		expect(queryAll("[data-test=kpi-card]")).toHaveLength(5);
 		await until(
 			() => textOf("[data-test=toast-title]") !== "",
@@ -417,6 +478,47 @@ describe("All schools", () => {
 		);
 		expect(cellOf("vol", "outstanding")).toBe("63 sessions");
 		expect(textOf("[data-test=toast-title]")).toBe("Not found");
+		expect(textOf("[data-test=all-schools-total] [data-column=income]")).toBe(
+			"$377.00 Leaves out schools that did not load and schools whose income you do not see",
+		);
+	});
+	test("a school that did not load is the total's only reason when every other income shows", async () => {
+		await open("#/all/all", {
+			reader: (fixture) => ({
+				...fixture,
+				disclosure: (schoolId) =>
+					schoolId === "har"
+						? Promise.reject(
+								new AdapterError("not_found", "404", { status: 404 }),
+							)
+						: fixture.disclosure(schoolId),
+			}),
+		});
+		await until(
+			() => !textOf("[data-test=all-schools]").includes("Loading"),
+			"every figure",
+		);
+		expect(cellOf("har", "income")).toBe(
+			"Not available: Not found. This item is gone or was never here.",
+		);
+		expect(textOf("[data-test=all-schools-total] [data-column=income]")).toBe(
+			"$377.00 + C$85.00 Leaves out schools that did not load",
+		);
+	});
+	test("the total's note names each reason a school is left out", () => {
+		expect(leavesOutNote({ notLoaded: false, hidden: false }, true)).toBeNull();
+		expect(leavesOutNote({ notLoaded: true, hidden: false }, true)).toBe(
+			"Leaves out schools that did not load",
+		);
+		expect(leavesOutNote({ notLoaded: false, hidden: true }, true)).toBe(
+			"Leaves out schools whose income you do not see",
+		);
+		expect(leavesOutNote({ notLoaded: true, hidden: true }, true)).toBe(
+			"Leaves out schools that did not load and schools whose income you do not see",
+		);
+		expect(leavesOutNote({ notLoaded: true, hidden: true }, false)).toBe(
+			"Not shown",
+		);
 	});
 	test("the income follows the period", async () => {
 		await open("#/all/all?month=2026-10");
@@ -425,6 +527,36 @@ describe("All schools", () => {
 			"every figure",
 		);
 		expect(textOf("[data-test=income-heading]")).toBe("Income · Oct 2026");
-		expect(cellOf("vol", "income")).not.toBe("");
+		expect(cellOf("vol", "income")).toBe("$310.00");
+		expect(cellOf("map", "income")).toBe("C$210.00");
+	});
+});
+
+describe("the Dashboard's chunk", () => {
+	test("failing to load shows its message with Retry and the route on screen; Retry loads it", async () => {
+		const load = chunks.dashboard;
+		let tries = 0;
+		chunks.dashboard = () => {
+			tries += 1;
+			return tries === 1
+				? Promise.reject(
+						new TypeError("Failed to fetch dynamically imported module"),
+					)
+				: load();
+		};
+		try {
+			const root = await open("#/vol/dashboard");
+			expect(query("[data-test=load-failed]")).not.toBeNull();
+			expect(root.dataset.route).toBe("#/vol/dashboard");
+			click("[data-test=load-retry]");
+			await until(
+				() => queryAll("[data-test=kpi-card]").length === 5,
+				"the cards",
+			);
+			expect(query("[data-test=load-failed]")).toBeNull();
+			expect(tries).toBe(2);
+		} finally {
+			chunks.dashboard = load;
+		}
 	});
 });
