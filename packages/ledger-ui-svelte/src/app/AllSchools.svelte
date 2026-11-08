@@ -1,18 +1,14 @@
 <script lang="ts">
-	import { Effect } from "effect";
 	import { type Period, periodLabel } from "$contract/app/period.ts";
 	import type { School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import * as Table from "$lib/components/ui/table/index.ts";
 	import { messageFor } from "../effect/messages.ts";
-	import { read } from "../effect/run.ts";
-	import type { UiError } from "../effect/ui-error.ts";
 	import {
 		incomeTotals,
 		leavesOutNote,
-		type SchoolFigures,
-		schoolFigures,
-		viewerReads,
+		readAllSchools,
+		type SchoolShown,
 	} from "./all-schools-model.ts";
 	import { useApp } from "./context.ts";
 	import Icon from "./Icon.svelte";
@@ -23,58 +19,47 @@
 	/** The All schools pane (mockup `#all`, `portfolio()`): one row per school, a total row. Outstanding is the
 	 * school's credits outstanding, held included (the Members summary), for a viewer who sees the roster; Income is
 	 * the period's income (memberships and bookings less discounts, `membersIncome`) for a viewer who sees live money:
-	 * the viewer's own audience at each school decides, and a figure they may not see says who may, never 0. Each
-	 * school is read through the app's Effect layer; a failed read is a toast with Retry and "not available" in its
-	 * cells. The Income total is per currency, summed here (owner decision 2026-11-08, S9-plan D23: no server route
-	 * serves a cross-school total), and says which schools it leaves out and why. A school with no attention count (the
-	 * HTTP build) shows a dash. */
+	 * the viewer's own audience at each school decides, and a figure they may not see says who may, never 0. The table
+	 * is read through the app's Effect layer as one read (one toast however many schools fail the same way, its Retry
+	 * reading the table again); a school whose read fails says "not available" in its cells. The Income total is per
+	 * currency, summed here (owner decision 2026-11-08, S9-plan D23: no server route serves a cross-school total), and
+	 * says which schools it leaves out and why. A school with no attention count (the HTTP build) shows a dash. */
 	let {
 		schools,
 		period,
 		onOpen,
-	}: { schools: School[]; period: Period; onOpen: (schoolId: string) => void } =
-		$props();
+		onRendered,
+	}: {
+		schools: School[];
+		period: Period;
+		onOpen: (schoolId: string) => void;
+		/** The table is on screen (its figures follow as they load). */
+		onRendered: () => void;
+	} = $props();
 
 	const app = useApp();
-	type Shown =
-		| { state: "loading" }
-		| { state: "failed"; error: UiError }
-		| { state: "loaded"; figures: SchoolFigures };
-	let shown = $state<Record<string, Shown>>({});
 	$effect(() => {
-		const { from, to } = period;
-		const reads = schools.map((school) => {
-			shown[school.id] = { state: "loading" };
-			const reading = retryingRead(
-				app,
-				() =>
-					Effect.gen(function* () {
-						const disclosure = yield* read((reader) => reader.disclosure(school.id));
-						const may = viewerReads(disclosure);
-						const summary = may.roster
-							? yield* read((reader) => reader.membersSummary({ schoolId: school.id }))
-							: null;
-						const income = may.income
-							? yield* read((reader) =>
-									reader.membersIncome({ schoolId: school.id, from, to }),
-								)
-							: null;
-						return schoolFigures(summary, income, summary?.currency ?? school.currency);
-					}),
-				{
-					value: (figures) => {
-						shown[school.id] = { state: "loaded", figures };
-					},
-					failure: (error) => {
-						shown[school.id] = { state: "failed", error };
-					},
-				},
-			);
-			reading.run();
-			return reading;
-		});
+		onRendered();
+	});
+	let shown = $state<Record<string, SchoolShown>>({});
+	/** One read for the table (one owner, one toast however many schools fail the same way): each school's cell takes
+	 * its own result, and a school that fails makes the read fail, so the toast's Retry reads the table again. */
+	$effect(() => {
+		const asked = { schools, period };
+		for (const school of asked.schools) shown[school.id] = { state: "loading" };
+		let current = true;
+		const reading = retryingRead(
+			app,
+			() =>
+				readAllSchools(asked.schools, asked.period, (schoolId, next) => {
+					if (current) shown[schoolId] = next;
+				}),
+			{ value: () => undefined },
+		);
+		reading.run();
 		return () => {
-			for (const reading of reads) reading.cancel();
+			current = false;
+			reading.cancel();
 		};
 	});
 	const loadedFigures = $derived(

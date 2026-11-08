@@ -1,5 +1,5 @@
 import { type Period, parsePeriod } from "$contract/app/period.ts";
-import type { SchoolTab } from "$contract/app/route.ts";
+import { allSchools, type SchoolTab } from "$contract/app/route.ts";
 import type { School } from "$contract/data/types.ts";
 import type { IconName } from "./icons.ts";
 
@@ -91,7 +91,7 @@ export const schoolLabel = (school: School): string =>
 export const staleText = (school: School): string =>
 	`Data is ${school.lagMinutes} min behind: the shipper may be stuck. Recent events can be missing.`;
 
-/** The tabs whose pane reports its own render (it loads data, so the route is on screen only once that data, or its
- * message, is): the others are on screen as soon as the shell is. */
+/** The tabs whose pane reports its own render (it is loaded on demand, or it loads data, so the route is on screen only
+ * once the pane, its data or its message is): the others are on screen as soon as the shell is. */
 export const reportsItsOwnRender = (tab: string): boolean =>
-	tab === "dashboard";
+	tab === "dashboard" || tab === allSchools;

@@ -1,6 +1,7 @@
 <script lang="ts">
+	import "./dashboard.css";
 	import { Effect } from "effect";
-	import { untrack } from "svelte";
+	import { onDestroy, untrack } from "svelte";
 	import { parsePeriod } from "$contract/app/period.ts";
 	import { formatRoute, type Route, withQuery } from "$contract/app/route.ts";
 	import { type Audience, audienceNames, audiences } from "$contract/data/disclosure.ts";
@@ -80,6 +81,11 @@
 	/** The documents read so far, by the key that asked for them: going back to a view is instant. */
 	const documents = new Map<string, Loaded>();
 
+	/** The pre-reads on their way: the pane leaving lets them go (no toast, no log). */
+	const preReads = new Set<AbortController>();
+	onDestroy(() => {
+		for (const controller of preReads) controller.abort();
+	});
 	/** The other audiences the viewer holds, read (unlocked) once the route's own document is in. A failed read here
 	 * is dropped: picking that row reads it again, with its toast and Retry. */
 	const preRead = (asked: { school: string; audience: Audience }, presets: Preset[]): void => {
@@ -90,6 +96,8 @@
 		for (const other of new Set(held)) {
 			const otherKey = keyOf(asked.school, other, false);
 			if (documents.has(otherKey)) continue;
+			const controller = new AbortController();
+			preReads.add(controller);
 			app.runtime
 				.runPromise(
 					read((reader) =>
@@ -100,7 +108,9 @@
 							pinLocked: false,
 						}),
 					),
+					{ signal: controller.signal },
 				)
+				.finally(() => preReads.delete(controller))
 				.then(
 					(document) => {
 						if (document && !documents.has(otherKey))

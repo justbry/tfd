@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { Layer } from "effect";
 import { flushSync } from "svelte";
 import type { KpiDocument } from "$contract/data/kpi-document.ts";
 import type { Reader as ReaderContract } from "$contract/data/reader.ts";
@@ -11,6 +12,8 @@ import { type MountedApp, mountApp } from "../../src/app/mount.ts";
 import { chunks } from "../../src/app/Shell.svelte";
 import { appLayer } from "../../src/effect/app-layer.ts";
 import { manualClock } from "../../src/effect/clock.ts";
+import { memoryLog } from "../../src/effect/log.ts";
+import type { LogEntry } from "../../src/effect/services.ts";
 import { click, query, queryAll, textOf, until } from "../app-harness.ts";
 import { calendar } from "../helpers.ts";
 
@@ -21,6 +24,9 @@ afterEach(async () => {
 	await mounted?.unmount();
 	mounted = undefined;
 });
+
+/** The app's log in the last `open`, for the tests that check nothing was written. */
+let logEntries: () => readonly LogEntry[] = () => [];
 
 /** Mounts the app at `hash` over the fixture adapters, either changed by the test, and waits for the route. */
 async function open(
@@ -37,12 +43,17 @@ async function open(
 	const root = document.getElementById("app") as HTMLElement;
 	const reader = createFixtureReader({ clock: calendar });
 	const writer = createFixtureWriter({ mode: "instant" });
+	const log = memoryLog();
+	logEntries = log.entries;
 	mounted = mountApp(root, {
-		layer: appLayer({
-			reader: change.reader?.(reader) ?? reader,
-			writer: change.writer?.(writer) ?? writer,
-			clockLayer: manualClock().layer,
-		}),
+		layer: Layer.mergeAll(
+			appLayer({
+				reader: change.reader?.(reader) ?? reader,
+				writer: change.writer?.(writer) ?? writer,
+				clockLayer: manualClock().layer,
+			}),
+			log.layer,
+		),
 		calendar,
 	});
 	if (change.waitForRoute !== false)
@@ -154,6 +165,72 @@ describe("a failed document read", () => {
 			() => queryAll("[data-test=toast]").length === 0,
 			"the toast to leave",
 		);
+	});
+});
+
+describe("a read the Dashboard no longer wants", () => {
+	test("leaving the PIN-locked document while its read retries stops the retries, with no toast and no log entry", async () => {
+		let lockedCalls = 0;
+		const root = await open(
+			"#/b4u/dashboard?preset=monthly-members&as=governance&view=money&month=2026-06",
+			{
+				reader: (fixture) => ({
+					...fixture,
+					kpiDocument: (asked) => {
+						if (!asked.pinLocked) return fixture.kpiDocument(asked);
+						lockedCalls += 1;
+						return Promise.reject(new AdapterError("network", "offline"));
+					},
+				}),
+			},
+		);
+		click("[data-test=pin-chip]");
+		expect(window.location.hash).toContain("pin=locked");
+		await until(
+			() => textOf("[data-test=toasts]").includes("Retrying"),
+			"the retry toast",
+			1000,
+		);
+		// The unlocked document stays on screen while the locked one loads: its chip takes the PIN off again.
+		click("[data-test=pin-chip]");
+		const callsAtCancel = lockedCalls;
+		expect(window.location.hash).not.toContain("pin=");
+		// Well inside the retries' backoff (at least 320 ms): only an aborted read lets its retry toast go this soon.
+		const turnsInsideTheBackoff = 30;
+		await until(
+			() =>
+				root.dataset.route === window.location.hash &&
+				queryAll("[data-test=toast]").length === 0,
+			"the unlocked document and the retry toast to leave",
+			turnsInsideTheBackoff,
+		);
+		// Longer than the retries' backoff: a read that kept going would try again, and fail with a toast.
+		await new Promise((resolve) => setTimeout(resolve, 1500));
+		flushSync();
+		expect(lockedCalls).toBe(callsAtCancel);
+		expect(queryAll("[data-test=toast]")).toEqual([]);
+		expect(query("[data-test=load-failed]")).toBeNull();
+		expect(logEntries()).toEqual([]);
+		expect(queryAll("[data-test=kpi-card]")).toHaveLength(5);
+	});
+	test("unlocking leaves no retry toast and logs nothing", async () => {
+		const root = await open(
+			"#/b4u/dashboard?preset=monthly-members&as=finance&pin=locked&view=money&month=2026-06",
+		);
+		const input = query<HTMLInputElement>("[data-test=pin-input]");
+		if (!input) throw new Error("no PIN field");
+		input.value = "1234";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+		flushSync();
+		click("[data-test=pin-unlock]");
+		await until(
+			() =>
+				!window.location.hash.includes("pin=") &&
+				root.dataset.route === window.location.hash,
+			"the books",
+		);
+		expect(textOf("[data-test=toasts]")).not.toContain("Retrying");
+		expect(logEntries()).toEqual([]);
 	});
 });
 
@@ -518,6 +595,40 @@ describe("All schools", () => {
 		);
 		expect(leavesOutNote({ notLoaded: true, hidden: true }, false)).toBe(
 			"Not shown",
+		);
+	});
+	test("every school failing the same way is one toast, and its Retry reads the table again", async () => {
+		let failing = true;
+		await open("#/all/all", {
+			reader: (fixture) => ({
+				...fixture,
+				membersSummary: (asked) =>
+					failing
+						? Promise.reject(new AdapterError("network", "offline"))
+						: fixture.membersSummary(asked),
+			}),
+		});
+		await until(
+			() => !textOf("[data-test=all-schools]").includes("Loading"),
+			"every figure",
+		);
+		await until(
+			() => textOf("[data-test=toast-action]") === "Retry",
+			"the failure toast",
+			1000,
+		);
+		expect(queryAll("[data-test=toast]")).toHaveLength(1);
+		expect(textOf("[data-test=toast-title]")).toBe("No connection");
+		expect(cellOf("har", "outstanding")).toStartWith("Not available");
+		failing = false;
+		click("[data-test=toast-action]");
+		await until(
+			() => cellOf("har", "outstanding") === "20 credits",
+			"the retry",
+		);
+		await until(
+			() => queryAll("[data-test=toast]").length === 0,
+			"the toast to leave",
 		);
 	});
 	test("the income follows the period", async () => {

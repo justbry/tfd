@@ -4,14 +4,16 @@
 	import { Input } from "$lib/components/ui/input/index.ts";
 	import { messageFor } from "../../effect/messages.ts";
 	import { write } from "../../effect/run.ts";
+	import { onDestroy } from "svelte";
 	import { perform, useApp } from "../context.ts";
 	import Icon from "../Icon.svelte";
 	import InlineError from "../toasts/InlineError.svelte";
 
 	/** The PIN prompt (mockup `bkLock`): Unlock opens once 4 digits are typed and sends the PIN to the server
 	 * (`Writer.unlockBooks`); the books open only when it answers unlocked, else the prompt says why at the field. A
-	 * failed call is a toast from the message table as well, and its text stays at the field. The fixtures check no
-	 * PIN. */
+	 * failed call is a toast from the message table as well (the prompt's own, never merged with another screen's), and
+	 * its text stays at the field. Leaving the prompt while the check is on its way abandons it: no toast, no log. The
+	 * fixtures check no PIN. */
 	let {
 		schoolId,
 		levelName,
@@ -34,18 +36,28 @@
 	let checking = $state(false);
 	let problem = $state<string | null>(null);
 	let input = $state<HTMLInputElement | null>(null);
+	/** The check on its way, abandoned when the prompt goes. */
+	let checkingRun: AbortController | null = null;
+	onDestroy(() => checkingRun?.abort());
 
 	const submit = async (): Promise<void> => {
 		checking = true;
 		problem = null;
+		const controller = new AbortController();
+		checkingRun = controller;
 		const outcome = await perform(
 			app,
 			write((writer) => writer.unlockBooks(schoolId, pin)),
-			{ handlers: { enter_pin: () => input?.focus() } },
+			{
+				handlers: { enter_pin: () => input?.focus() },
+				owner: `pin-lock-${fieldId}`,
+				signal: controller.signal,
+			},
 		);
+		if (checkingRun === controller) checkingRun = null;
+		if (!outcome.ok && outcome.interrupted) return;
 		checking = false;
 		if (!outcome.ok) {
-			if (outcome.interrupted) return;
 			const message = messageFor(outcome.error);
 			problem = `${message.title}. ${message.doThis}`;
 			return;
