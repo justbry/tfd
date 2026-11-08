@@ -38,6 +38,7 @@ import type {
 	StripePayout,
 	SubscriptionFact,
 } from "../types.js";
+import { ADJUST_ROW_PREFIX } from "./adjust.js";
 import {
 	decideBookingRefund,
 	decideCheckoutSession,
@@ -519,6 +520,7 @@ const planOf = ({
 	const addons = [...menu.addons].sort((a, b) => b.id.length - a.id.length);
 	for (const id of rowIds) {
 		if (id.startsWith("ce_gift_")) return "gift";
+		if (id.startsWith(ADJUST_ROW_PREFIX)) return "adjust";
 		if (id.startsWith("ce_tier_") && tierId) return `${tierId}${version}`;
 		const recurring = addons.find((a) => id.startsWith(`ce_addon_${a.id}_`));
 		if (recurring) return `${recurring.id}${version}`;

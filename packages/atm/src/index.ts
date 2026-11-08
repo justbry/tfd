@@ -1,4 +1,5 @@
 import type { WorkerFullSubject } from "@autumn/balance-engine";
+import * as adjust from "./billing/adjust.js";
 import * as adopt from "./billing/adopt.js";
 import * as bookable from "./billing/bookable.js";
 import * as bookingPay from "./billing/booking-pay.js";
@@ -18,6 +19,8 @@ import {
 	HANDLER_DDL as handlerDdl,
 	migrateHandlerSchema as migrateHandlerSchemaImpl,
 } from "./handler/schema.js";
+import { seedHandlerIndexes as seedHandlerIndexesImpl } from "./handler/seed.js";
+import { diffBalances as diffBalancesImpl } from "./handler/shadow.js";
 import * as stripeEndpoint from "./handler/stripe-endpoint.js";
 import * as signature from "./handler/stripe-signature.js";
 import * as webhook from "./handler/stripe-webhook.js";
@@ -93,6 +96,8 @@ import * as folderStore from "./store/folder-store.js";
 import * as r2Store from "./store/r2-store.js";
 import * as store from "./store/store.js";
 import type {
+	AdjustCreditsInput,
+	AdjustCreditsResult,
 	AtmBalance,
 	AtmCatalogRow,
 	AtmCommand,
@@ -122,6 +127,7 @@ import type {
 	AtmSubject,
 	AtmSubjectState,
 	AtmValidation,
+	BalanceDifference,
 	BillingDispute,
 	BillingFact,
 	BillingInvoice,
@@ -149,6 +155,7 @@ import type {
 	CreatedWebhookEndpoint,
 	CreateSessionGiftCodeInput,
 	CreateSessionGiftCodeResult,
+	DiffBalancesInput,
 	DollarGiftInput,
 	DollarGiftResult,
 	ExpiredHold,
@@ -222,6 +229,8 @@ import type {
 	ScenarioBundle,
 	SealOfInput,
 	SealReport,
+	SeedHandlerIndexesInput,
+	SeedHandlerIndexesResult,
 	SettleBookingInput,
 	SettleInputErasuresResult,
 	ShareStatement,
@@ -849,6 +858,26 @@ export const HANDLER_DDL: string = handlerDdl;
 export const migrateHandlerSchema = (db: SqlDatabase): HandlerMigrationResult =>
 	migrateHandlerSchemaImpl(db);
 
+/**
+ * For a school whose credits come in by import: marks the Stripe events the caller already handled as done in
+ * `atm_event_claims` (a redelivery is a `duplicate`), and indexes every invoice paid before the import to its holder,
+ * with the payment intent and charge that paid it, so a later refund or dispute of it is decided instead of waiting
+ * (409 `unmatched_payment`). Run it in the import's transaction; a second run writes nothing.
+ */
+export const seedHandlerIndexes = (
+	db: SqlDatabase,
+	input: SeedHandlerIndexesInput,
+): SeedHandlerIndexesResult => seedHandlerIndexesImpl(db, input);
+
+/**
+ * The compare-only shadow's diff: each member's balances in the shadow database (`atm_rows`, as `balancesOf` counts them
+ * at `now`) against the caller's own sums, one difference per member and feature that is not equal, each tagged with the
+ * reason that excuses it (`admin_adjust`, `unrenewed_cycle`, `upgrade_grant`, `rollover_cap`, `expiry_dst`,
+ * `gift_expiry`) or `unexplained`. Reads only. The recipe is in `UPGRADING.md`.
+ */
+export const diffBalances = (input: DiffBalancesInput): BalanceDifference[] =>
+	diffBalancesImpl(input);
+
 /** Checks a `Stripe-Signature` header against the raw body: HMAC-SHA256 over `t.payload`, constant time, 300 s tolerance. */
 export const verifyStripeSignature = (
 	input: VerifySignatureInput,
@@ -1189,6 +1218,14 @@ export const redeemSessionGiftCode = (
 /** The Stripe steps for a dollar gift certificate: a fixed-amount coupon and a promotion code that works once and ends. */
 export const dollarGiftOps = (input: DollarGiftInput): DollarGiftResult =>
 	codes.dollarGiftOps(input);
+
+/**
+ * An admin's change to a holder's balance of one feature (`goodwill`, `gift` or `correction`). Positive: a new credit row
+ * that never refills and never expires. Negative (a correction): taken from live credits, soonest expiry first, never
+ * below zero (`insufficient_credits`). One `credit.adjusted` with `reason: <kind>`; the same command id again is a replay.
+ */
+export const adjustCredits = (input: AdjustCreditsInput): AdjustCreditsResult =>
+	adjust.adjustCredits(input);
 
 // ---- Reading a school's folder, and the ledger's own helpers (0.9.0) ----
 

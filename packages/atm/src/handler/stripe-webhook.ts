@@ -578,7 +578,8 @@ const assertClaimIsOurs = (
 
 // ---- Rows ----
 
-const loadSubject = (
+/** A subject's stored rows and revision (none: revision 0, no rows). */
+export const loadSubject = (
 	db: SqlDatabase,
 	key: string,
 ): { rows: BillingRow[]; revision: number } => {
