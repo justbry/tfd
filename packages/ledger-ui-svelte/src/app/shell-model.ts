@@ -97,8 +97,8 @@ export type PaneProps = Record<string, unknown>;
 /** The panes that read the school's disclosure (View as, the audience's limits) before they show anything. */
 export const readsDisclosure = (
 	tab: string,
-): tab is "dashboard" | "bookings" | "members" =>
-	tab === "dashboard" || tab === "bookings" || tab === "members";
+): tab is "dashboard" | "bookings" | "members" | "ledger" | "reports" =>
+	/^(dashboard|bookings|members|ledger|reports)$/.test(tab);
 
 /** The tabs whose pane reports its own render (it is loaded on demand, or it loads data, so the route is on screen only
  * once the pane, its data or its message is): the others are on screen as soon as the shell is. */

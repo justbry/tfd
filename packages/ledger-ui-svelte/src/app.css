@@ -27,6 +27,10 @@
 @source not "./app/PaneIcon.svelte";
 @source not "./lib/components/ui/dialog";
 @source not "./lib/components/ui/native-select";
+/* And so do Ledger and Reports (their folders and the parts they share). */
+@source not "./app/ledger";
+@source not "./app/reports";
+@source not "./app/books-shared";
 
 :root {
 	--radius: 10px;

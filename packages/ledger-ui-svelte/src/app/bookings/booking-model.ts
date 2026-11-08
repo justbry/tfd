@@ -48,7 +48,10 @@ export function statusBadges(
 		badges.push({ text: "Needs outcome", tone: "bad" });
 	else if (insideCutoff(booking, clock))
 		badges.push({
-			text: `Inside ${cutoffHours(booking.cutoffMinutes)} cutoff`,
+			text:
+				booking.cutoffMinutes === null
+					? "Inside cutoff"
+					: `Inside ${cutoffHours(booking.cutoffMinutes)} cutoff`,
 			tone: "warning",
 		});
 	else if (booking.attendance)

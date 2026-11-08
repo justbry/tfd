@@ -10,6 +10,7 @@
 		addDays,
 		bookingsDays,
 		bookingsLabel,
+		bookingsOpenOffset,
 		readBookingsPeriod,
 		weekdayName,
 	} from "./period-model.ts";
@@ -105,6 +106,9 @@
 				get timeZone() {
 					return school.timeZone;
 				},
+				get opensOffset() {
+					return opensOffset;
+				},
 				onNavigate: (next: Route) => navigate(next),
 			},
 		});
@@ -127,7 +131,8 @@
 		when: "Not a school-books surface: bookings carry minors' schedules (safeguarding), so they follow ManageBookings, not the audience.",
 	} as const;
 
-	const period = $derived(readBookingsPeriod(route.query));
+	const opensOffset = $derived(bookingsOpenOffset(school, clock.today));
+	const period = $derived(readBookingsPeriod(route.query, opensOffset));
 	const filter = $derived(filterOf(route.query.get("filter")));
 	const days = $derived(bookingsDays(period, clock.today));
 	const { today } = clock;
