@@ -3709,6 +3709,10 @@ export type AtmIdentity = TfdIdentity;
 export type AtmJournalBuild = TfdJournalBuild;
 /** @deprecated Use {@link TfdJournalFiles}. */
 export type AtmJournalFiles = TfdJournalFiles;
+/** @deprecated Use {@link TfdKeyEntry}. */
+export type AtmKeyEntry = TfdKeyEntry;
+/** @deprecated Use {@link TfdKeyPurpose}. */
+export type AtmKeyPurpose = TfdKeyPurpose;
 /** @deprecated Use {@link TfdLapsedRow}. */
 export type AtmLapsedRow = TfdLapsedRow;
 /** @deprecated Use {@link TfdLedgerEventInput}. */
@@ -3721,6 +3725,8 @@ export type AtmPosting = TfdPosting;
 export type AtmPublicKeys = TfdPublicKeys;
 /** @deprecated Use {@link TfdReceipt}. */
 export type AtmReceipt = TfdReceipt;
+/** @deprecated Use {@link TfdReceiptV2}. */
+export type AtmReceiptV2 = TfdReceiptV2;
 /** @deprecated Use {@link TfdReplayResult}. */
 export type AtmReplayResult = TfdReplayResult;
 /** @deprecated Use {@link TfdResult}. */
