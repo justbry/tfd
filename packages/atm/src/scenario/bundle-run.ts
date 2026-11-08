@@ -18,11 +18,14 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { adjustCredits } from "../billing/adjust.js";
+import { grantsStateFromCallerRows } from "../billing/adopt.js";
 import { menuCatalogRows } from "../billing/grants.js";
 import { handleStripeEvent, normalizeStripeEvent } from "../billing/handle.js";
-import { DEFAULT_POLICY } from "../billing/policy.js";
+import { DEFAULT_POLICY, resolvePolicy } from "../billing/policy.js";
 import {
 	type BillingRow,
+	grantsFromRows,
 	StaleRevision,
 	stateFromRows,
 	subjectKey,
@@ -31,6 +34,7 @@ import { menuLineItems } from "../billing/stripe-menu.js";
 import { bunSqlite } from "../handler/bun-sqlite.js";
 import { inputCauseId, recordInput } from "../handler/inputs.js";
 import { HANDLER_DDL } from "../handler/schema.js";
+import { seedHandlerIndexes } from "../handler/seed.js";
 import { signStripePayload } from "../handler/stripe-signature.js";
 import { handleStripeWebhook } from "../handler/stripe-webhook.js";
 import { journalMonth, readEvents } from "../ledger/files.js";
@@ -44,9 +48,12 @@ import { FolderStore } from "../store/folder-store.js";
 import type {
 	AtmEnv,
 	AtmEvent,
+	BillingPolicy,
 	BundleAnswer,
+	BundleScenario,
 	BundleStep,
 	FileTree,
+	Menu,
 	OutboxCheckpointRow,
 	ReconcileResult,
 	ReconcileStripe,
@@ -144,6 +151,9 @@ type Endpoint = {
 	deps: WebhookDeps;
 	clock: { now: number };
 	fees: { failing: boolean };
+	/** The menu version a member with none recorded is served (the school's latest published). */
+	served: { current: string };
+	policy: BillingPolicy;
 };
 
 const makeEndpoint = (
@@ -152,8 +162,20 @@ const makeEndpoint = (
 	databaseFile: string,
 ): Endpoint => {
 	const { scenario } = bundle;
-	const { menu, priceIds, env: explicitEnv } = scenario;
+	const { menu, menus, priceIds, env: explicitEnv } = scenario;
 	const env: AtmEnv = explicitEnv ?? "live";
+	const policy = scenario.policy
+		? resolvePolicy(scenario.policy)
+		: DEFAULT_POLICY;
+	const served = { current: Object.keys(menus ?? {})[0] ?? "" };
+	const priceIdsOf = (published: Menu) =>
+		priceIds ??
+		Object.fromEntries(
+			[...menuLineItems(school, published).keys()].map((key) => [
+				key,
+				priceIdOf(key),
+			]),
+		);
 	const raw = new Database(databaseFile);
 	const db = bunSqlite(raw);
 	db.exec(HANDLER_DDL);
@@ -169,21 +191,31 @@ const makeEndpoint = (
 		nowMs: () => clock.now,
 		workerId: WORKER,
 		...(explicitEnv === undefined ? {} : { env }),
-		context: () => ({
-			menu,
-			menuVersion: MENU_VERSION,
-			policy: DEFAULT_POLICY,
-			policyVersion: POLICY_VERSION,
-			catalog: menuCatalogRows({ menu, school, env }),
-			priceIds:
-				priceIds ??
-				Object.fromEntries(
-					[...menuLineItems(school, menu).keys()].map((key) => [
-						key,
-						priceIdOf(key),
-					]),
-				),
-		}),
+		context: (_school, subject) => {
+			if (menus === undefined)
+				return {
+					menu,
+					menuVersion: MENU_VERSION,
+					policy,
+					policyVersion: POLICY_VERSION,
+					catalog: menuCatalogRows({ menu, school, env }),
+					priceIds: priceIdsOf(menu),
+				};
+			// per-member versions: a member is served the version their state records, a new one the latest published
+			const version = subject?.menuVersion ?? served.current;
+			const published = menus[version];
+			if (!published)
+				throw new Error(`the bundle has no menu version ${version}`);
+			return {
+				menu: published,
+				menuVersion: version,
+				pinMenuVersion: true,
+				policy,
+				policyVersion: POLICY_VERSION,
+				catalog: menuCatalogRows({ menu: published, school, env }),
+				priceIds: priceIdsOf(published),
+			};
+		},
 		...(feeTable
 			? {
 					paymentFee: (event: unknown) => {
@@ -195,7 +227,7 @@ const makeEndpoint = (
 				}
 			: {}),
 	};
-	return { school, raw, db, deps, clock, fees };
+	return { school, raw, db, deps, clock, fees, served, policy };
 };
 
 const outboxOf = (endpoint: Endpoint): OutboxCheckpointRow[] =>
@@ -511,6 +543,105 @@ const deliver = (
 	}
 };
 
+/** The menu of a menu version, else the scenario's one. */
+const menuOfVersion = (scenario: BundleScenario, version: string): Menu =>
+	scenario.menus?.[version] ?? scenario.menu;
+
+/**
+ * The family service imports a member (`grantsStateFromCallerRows`) in one transaction: the rows at the import's revision,
+ * the opening events in the outbox, and the handler's claims and indexes seeded for what was handled or paid before.
+ */
+const importMember = (
+	endpoint: Endpoint,
+	step: Extract<BundleStep, { kind: "import" }>,
+	scenario: BundleScenario,
+	env: AtmEnv,
+): void => {
+	const { membership } = step;
+	const holder = `family:${membership.family_id}`;
+	endpoint.clock.now = step.atMs;
+	endpoint.db.transaction(() => {
+		const imported = grantsStateFromCallerRows({
+			membership,
+			lots: step.lots,
+			menu: menuOfVersion(scenario, String(membership.menu_version)),
+			now: step.atMs,
+			policy: endpoint.policy,
+			env,
+			policyVersion: POLICY_VERSION,
+		});
+		writeRows(endpoint.db, {
+			subjectKey: subjectKey({
+				orgId: membership.school_id,
+				env,
+				customerId: holder,
+				entityId: null,
+			}),
+			expectedRevision: 0,
+			nextRevision: imported.revision,
+			upserts: imported.rows,
+			deletes: [],
+		});
+		appendToOutbox(endpoint.db, imported.events, env);
+		seedHandlerIndexes(endpoint.db, {
+			env,
+			at: step.atMs,
+			eventIds: step.eventIds ?? [],
+			invoices: (step.invoices ?? []).map((invoice) => ({
+				invoiceId: invoice.invoiceId,
+				holder: { orgId: membership.school_id, customerId: holder },
+				paymentRefs: invoice.paymentRefs,
+			})),
+		});
+	});
+};
+
+/** An admin adjusts a family's balance (`adjustCredits`): the rows and the `credit.adjusted` event in one transaction. */
+const adjustFamily = (
+	endpoint: Endpoint,
+	step: Extract<BundleStep, { kind: "adjust" }>,
+	env: AtmEnv,
+): void => {
+	const holder = `family:${step.family}`;
+	const key = subjectKey({
+		orgId: endpoint.school,
+		env,
+		customerId: holder,
+		entityId: null,
+	});
+	endpoint.clock.now = step.atMs;
+	endpoint.db.transaction(() => {
+		const { rows, revision } = loadSubject(endpoint.db, key);
+		const context = endpoint.deps.context(endpoint.school, {
+			subjectKey: key,
+			menuVersion: grantsFromRows(rows).menuVersion ?? null,
+		});
+		if (!context) throw new Error(`no menu context for ${endpoint.school}`);
+		const result = adjustCredits({
+			commandId: step.commandId,
+			kind: step.adjustKind,
+			featureId: step.feature,
+			credits: step.credits,
+			holder: { orgId: endpoint.school, customerId: holder },
+			menu: context.menu,
+			menuVersion: context.menuVersion,
+			policy: context.policy,
+			policyVersion: context.policyVersion,
+			rows,
+			revision,
+			catalog: context.catalog,
+			now: step.atMs,
+			env,
+		});
+		if (!result.ok)
+			throw new Error(
+				`the adjustment ${step.commandId} was refused: ${result.reason}`,
+			);
+		if (result.rowChanges) writeRows(endpoint.db, result.rowChanges);
+		appendToOutbox(endpoint.db, result.events, env);
+	});
+};
+
 const eventsDirectory = (root: string, school: string, date: string): string =>
 	join(root, "schools", school, "events", `date=${date}`);
 
@@ -722,6 +853,12 @@ export const runBundle = async (
 				});
 			} else if (step.kind === "combine") {
 				await combineDay(root, endpoint.school, step.date);
+			} else if (step.kind === "publish") {
+				endpoint.served.current = step.menuVersion;
+			} else if (step.kind === "import") {
+				importMember(endpoint, step, scenario, env);
+			} else if (step.kind === "adjust") {
+				adjustFamily(endpoint, step, env);
 			} else if (step.kind === "lapse") {
 				const holder = `family:${step.family}`;
 				const subjectKey = `${endpoint.school}|${env}|${holder}`;

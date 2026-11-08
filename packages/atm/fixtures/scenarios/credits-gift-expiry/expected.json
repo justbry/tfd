@@ -1,0 +1,34 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:addon:pack": 9000,
+				"income:addon:gift-visit": 13000,
+				"fees": 698,
+				"stripe": 21302,
+				"net": 21302,
+				"avail:family:fam_8k2:visit": 1
+			},
+			"reconcile": {
+				"2026-01": []
+			}
+		}
+	],
+	"notes": [
+		"decision 5, policy rulesVersion 2 and giftSessionMonths null: a one-time add-on lasts its grant's rollover months, a session gift whose grant has none never expires",
+		"pack (90.00, 1 visit, 3 rollover months) paid 15 January 11:00 MST: lapses 15 April 11:00 MDT = 17:00 UTC (the cron at 12:00 UTC on 14 April books nothing, the one at 17:30 UTC on the 15th books 1). gift-visit (130.00, 1 visit, no rollover) is never booked, in April 2026 or January 2028",
+		"money: 90.00 + 130.00 = 220.00; fees 2.91 (9,000 x 2.9% = 261 + 30) + 4.07; cash 213.02. 1 visit left (the gift)"
+	]
+}

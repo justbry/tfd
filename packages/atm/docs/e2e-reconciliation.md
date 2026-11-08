@@ -69,7 +69,7 @@ How to read the table: dollars; `-` is zero; **bold `a / b`** is where the books
 
 ## Discrepancies
 
-Product bugs are reported here, not fixed. `K1` and `K2` were found by the first version of this matrix and are fixed on `dev` since; their sections stay, as the record of what the matrix pinned and what replaced it. `D1`, `D2`, `D5`, `D6` and `D7` are open (`D3` and `D4` are fixed).
+Product bugs are reported here, not fixed. `K1` and `K2` were found by the first version of this matrix and are fixed on `dev` since; their sections stay, as the record of what the matrix pinned and what replaced it. `D1`, `D2`, `D5`, `D6`, `D7` and `D8` are open (`D3` and `D4` are fixed).
 
 ### K1 (KNOWN, resolved by #66): a dispute moved no money in the books, and its fee was never booked
 
@@ -190,6 +190,14 @@ Options for the owner, with what each costs:
 - **Impact:** money is right (a refused paid invoice still books its payment: income 520.00, fees 15.68, net 504.32, reconcile clean), credits are wrong: the holder has 2 visits where the in-order story gives 4, because the create invoice's grant is never made.
 - **Related:** `tests/scenario-order.test.ts` shuffles every bundle whose deliveries are all applied and checks that H4 to H8 do not change; eight bundles (renewal, upgrade, quantity-raise, quantity-decrease, the three dispute cases and duplicate-delivery) do change with the order and are pinned there as `ORDER_SENSITIVE`: a later invoice delivered before its first, or a dispute closing before its opening, makes the credit events cite another delivery as their cause.
 - **Fix:** hold a cycle invoice for a subscription whose create invoice has not been applied (answer 409 until it is), and cite the invoice's own event as the cause of its credits.
+
+### D8: a refund of an invoice paid before the import books no money
+
+- **Case:** `credits-import-refund` (a bundle outside the matrix: `fixtures/scenarios/credits-import-refund/`).
+- **Where:** `src/billing/handle.ts` (`BillingRefund`: `ours` is true only when the grants state holds the invoice's `paid` amount, which `handleStripeEvent` sets when it books the invoice's `payment.succeeded`); `grantsStateFromCallerRows` records an imported invoice's credits but not its payment, because the family service booked the payment itself.
+- **Why:** "a refund takes back only a payment the books hold". The handler holds none for an invoice it never saw.
+- **Impact:** after an import, a refund of an old invoice is found (the index `seedHandlerIndexes` writes names its holder) and takes the credits back, but no `payment.refunded` is booked: refunds, `assets:stripe` and net income are 260.00 off in the case, and `tfd reconcile` prints `missing_in_log refund` and `amount_differs net`. If the family service stops booking money for a school the handler serves (`UPGRADING.md`, "Moving buzz-school's grants onto the handler (D12)", item 2), nobody books it.
+- **Fix:** record the paid amount of a seeded invoice (`seedHandlerIndexes`' `invoices` entry, or the import) so the refund is booked like any other, or keep the family service booking refunds of pre-import invoices.
 
 ### What is not a discrepancy but should be known
 

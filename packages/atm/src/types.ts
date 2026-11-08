@@ -3792,6 +3792,40 @@ export type BundleStep =
 			atMs: number;
 			school?: string;
 			month: string;
+	  }
+	| {
+			/** The school publishes menu version `menuVersion` (a key of the scenario's `menus`): members who bought on another stay on it. */
+			kind: "publish";
+			atMs: number;
+			school?: string;
+			menuVersion: string;
+	  }
+	| {
+			/**
+			 * The family service imports a member from its own rows (`grantsStateFromCallerRows`): the rows are written, the opening
+			 * events appended, and `seedHandlerIndexes` marks the finished Stripe events and the invoices paid before the import. The
+			 * menu is the scenario's `menus` entry for the membership's `menu_version`, else its `menu`.
+			 */
+			kind: "import";
+			atMs: number;
+			school?: string;
+			membership: CallerMembershipRow;
+			lots: CallerCreditLotRow[];
+			/** Stripe event ids the caller already handled. */
+			eventIds?: string[];
+			/** Invoices paid before the import, so a later refund or dispute of one finds its holder. */
+			invoices?: { invoiceId: string; paymentRefs: string[] }[];
+	  }
+	| {
+			/** An admin adjusts a family's balance of one feature (`adjustCredits`). */
+			kind: "adjust";
+			atMs: number;
+			school?: string;
+			family: string;
+			commandId: string;
+			adjustKind: AdjustKind;
+			feature: string;
+			credits: number;
 	  };
 
 export type BundleVerdict = "OK" | "KNOWN" | "DISCREPANCY";
@@ -3802,6 +3836,17 @@ export type BundleScenario = {
 	/** The school the deliveries go to unless a step names another. */
 	school: string;
 	menu: Menu;
+	/**
+	 * The school's policy over the defaults, as `resolvePolicy` takes it (`{ "rulesVersion": 2 }`); left out, the defaults. It
+	 * is the context of every delivery, so a bundle of a rule that sits behind a policy field names it here.
+	 */
+	policy?: Record<string, unknown>;
+	/**
+	 * The menu versions the school has published, by version (the first key is the one served until a `publish` step).
+	 * Present, the endpoint serves each member the version their grants state records and pins a new member's first grant
+	 * to the version served then (`WebhookContext.pinMenuVersion`); `menu` is still the one the books are read in.
+	 */
+	menus?: Record<string, Menu>;
 	profile?: string;
 	seed?: number;
 	params?: Record<string, unknown>;

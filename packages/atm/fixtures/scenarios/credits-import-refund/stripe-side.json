@@ -1,0 +1,41 @@
+{
+	"sch_vol": {
+		"invoices": [
+			{
+				"id": "in_old1",
+				"status": "paid",
+				"amount_paid": 26000,
+				"currency": "usd",
+				"created": 1768499940,
+				"livemode": true,
+				"status_transitions": {
+					"paid_at": 1768500000
+				}
+			}
+		],
+		"refunds": [
+			{
+				"id": "re_1",
+				"amount": 26000,
+				"currency": "usd",
+				"charge": "ch_in_old1",
+				"payment_intent": "pi_in_old1",
+				"created": 1770292800,
+				"status": "succeeded"
+			}
+		],
+		"disputes": [],
+		"payouts": [],
+		"balanceTransactions": [
+			{
+				"id": "txn_re_1",
+				"type": "refund",
+				"amount": -26000,
+				"fee": 0,
+				"net": -26000,
+				"currency": "usd",
+				"created": 1770292800
+			}
+		]
+	}
+}

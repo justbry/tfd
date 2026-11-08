@@ -1,0 +1,40 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-2": 78000,
+				"fees": 2352,
+				"stripe": 75648,
+				"net": 75648,
+				"avail:family:fam_8k2:visit": 2
+			},
+			"reconcile": {
+				"2026-01": [],
+				"2026-02": [],
+				"2026-03": []
+			}
+		}
+	],
+	"notes": [
+		"decision 3, policy rulesVersion 2: a rollover lapses on the menu's calendar (Denver). Denver went forward on 8 March",
+		"the visits rolled over on 15 February (11:00 MST) lapse on 15 March at 11:00 MDT = 17:00 UTC, an hour before the cycle boundary (rules version 1: 18:00 UTC); the cron at 17:30 UTC books them with that instant",
+		"the visits rolled over on 15 March (12:00 MDT) lapse on 15 April at 12:00 MDT = 18:00 UTC: the cron at 17:30 UTC books nothing, the one at 18:30 books 2. 2 are left (the refilling row)",
+		"credits granted 6, expired 4, 2 left; money: 3 x 260.00, fees 3 x 7.84"
+	]
+}

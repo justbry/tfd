@@ -11,7 +11,7 @@ import { menuCatalogRows } from "../src/billing/grants.js";
 import { stateFromRows } from "../src/billing/rows.js";
 import type { Menu } from "../src/billing/types.js";
 import { readEvents } from "../src/ledger/files.js";
-import { balancesOf, replayEvents } from "../src/ledger/replay.js";
+import { balancesOf } from "../src/ledger/replay.js";
 import { toCatalog } from "../src/ledger/run.js";
 import { bundleSchools } from "../src/scenario/bundle.js";
 import type {
@@ -20,7 +20,7 @@ import type {
 	AtmSubjectState,
 	ScenarioBundle,
 } from "../src/types.js";
-import { eventsCsv } from "./e2e-matrix.js";
+import { eventsCsv, replayBalances } from "./e2e-matrix.js";
 import {
 	atm,
 	buildBundleWorld,
@@ -178,12 +178,13 @@ export type Candidate = { name: string; args: string[] };
 export const writeCandidates = async (
 	dir: string,
 	menu: Menu,
+	policy: Record<string, unknown> = {},
 ): Promise<Candidate[]> => {
 	await mkdir(dir, { recursive: true });
 	const out: Candidate[] = [];
 	for (const rule of ["prorated", "full", "none"]) {
 		const file = join(dir, `policy-${rule}.json`);
-		await writeFile(file, JSON.stringify({ upgradeGrant: rule }));
+		await writeFile(file, JSON.stringify({ ...policy, upgradeGrant: rule }));
 		out.push({ name: `upgradeGrant ${rule}`, args: ["--policy", file] });
 	}
 	const dearer: Menu = {
@@ -444,11 +445,9 @@ const availOfLog = (
 	menu: Menu,
 	school: string,
 	env: AtmEnv,
+	menus?: Record<string, Menu>,
 ): { avail: Record<string, number>; asOfMs: number } => {
-	const replayed = replayEvents({
-		events,
-		catalog: menuCatalogRows({ menu, school, env }),
-	});
+	const replayed = replayBalances(events, menu, school, env, menus);
 	return {
 		avail: Object.fromEntries(
 			replayed.balances
@@ -519,6 +518,7 @@ export const checkBundle = async (
 	const candidates = await writeCandidates(
 		join(world.dir, "candidates"),
 		bundle.scenario.menu,
+		bundle.scenario.policy,
 	);
 	for (const school of schools) {
 		const database = world.databaseFor(school);
@@ -739,7 +739,13 @@ export const checkBundle = async (
 		}
 
 		// ---- balances: the log's replay, the database's rows ----
-		const logged = availOfLog(events, bundle.scenario.menu, school, env);
+		const logged = availOfLog(
+			events,
+			bundle.scenario.menu,
+			school,
+			env,
+			bundle.scenario.menus,
+		);
 		const fromRows = balancesFromRows({
 			databaseFile: database,
 			school,
