@@ -31,4 +31,4 @@ How tfd is licensed:
 
 ## Contact
 
-Write to us at [hello@gettrifold.com](mailto:hello@gettrifold.com) (placeholder address until the domain is live), or [request early access](/early-access).
+Write to us at [hello@trifold.app](mailto:hello@trifold.app), or [request early access](/early-access).
