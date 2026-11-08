@@ -72,7 +72,8 @@ Decided by the owner on 2026-11-06.
 | Part | License |
 |---|---|
 | tfd engine and CLI (the `packages/atm` package, except the parts below) | **FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 future license). Source-available: free to use, modify and self-host for your own books, for non-commercial education and research, and for professional services to a licensee (for example an accountant working on a client's own install). Not allowed: offering it to others as a commercial product or service that competes with Trifold. **Each release becomes Apache-2.0 two years after it ships.** |
-| Receipt and seal format, spec and verifier (the receipt and seal JSON schemas, `docs/receipts.md`, the receipt, seal, sign and canonicalisation code, and the website's in-browser verifier) | **Apache-2.0** |
+| Receipt and seal format, spec and verifier (the receipt and seal JSON schemas, `docs/receipts.md`, the receipt, seal, sign and canonicalisation code, and `tfd-verify`, the verifier package the website's in-browser check comes from) | **Apache-2.0** |
+| The website | Proprietary |
 | Test vectors (golden receipt files) | **CC0-1.0** (public domain) |
 | Autumn code this repo forks (`balance-engine`, `shared`, and so on) | **Apache-2.0**, the upstream license, unchanged |
 | Hosted Trifold service, Rifo, the witness | Proprietary |

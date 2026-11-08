@@ -1,71 +1,76 @@
 <script lang="ts">
-	/** /verify: paste, drop or choose a receipt file; a `?r=` link prefills and checks it. Nothing is uploaded. */
-	import { onMount } from "svelte";
-	import { Button } from "#lib/components/ui/button";
-	import { Label } from "#lib/components/ui/label";
-	import { Textarea } from "#lib/components/ui/textarea";
-	import { decodeReceiptParam, encodeReceiptParam } from "#lib/verify/link";
-	import { preloadVerifier, SAMPLE_TEXT, VerifierSession } from "#lib/verify/session.svelte";
-	import ProofLimits from "./ProofLimits.svelte";
-	import VerifierResult from "./VerifierResult.svelte";
+/** /verify: paste, drop or choose a receipt file; a `?r=` link prefills and checks it. Nothing is uploaded. */
+import { onMount } from "svelte";
+import { decodeReceiptParam, encodeReceiptParam } from "tfd-verify/link";
+import { Button } from "#lib/components/ui/button";
+import { Label } from "#lib/components/ui/label";
+import { Textarea } from "#lib/components/ui/textarea";
+import {
+	preloadVerifier,
+	SAMPLE_TEXT,
+	VerifierSession,
+} from "#lib/verify/session.svelte";
+import ProofLimits from "./ProofLimits.svelte";
+import VerifierResult from "./VerifierResult.svelte";
 
-	const MAX_FILE_BYTES = 256 * 1024;
-	const session = new VerifierSession();
-	const area = "mt-2.5";
+const MAX_FILE_BYTES = 256 * 1024;
+const session = new VerifierSession();
+const area = "mt-2.5";
 
-	let dragging = $state(false);
-	let fileError = $state("");
+let dragging = $state(false);
+let fileError = $state("");
 
-	const shareLink = $derived.by(() => {
-		if (!session.text.trim()) return "";
-		let compact = session.text.trim();
-		try {
-			compact = JSON.stringify(JSON.parse(session.text));
-		} catch {}
-		return `/verify?r=${encodeReceiptParam(compact)}`;
-	});
+const shareLink = $derived.by(() => {
+	if (!session.text.trim()) return "";
+	let compact = session.text.trim();
+	try {
+		compact = JSON.stringify(JSON.parse(session.text));
+	} catch {}
+	return `/verify?r=${encodeReceiptParam(compact)}`;
+});
 
-	async function readFile(file: File) {
-		fileError = "";
-		if (file.size > MAX_FILE_BYTES) {
-			fileError = "That file is too large to be a receipt.";
-			return;
-		}
-		session.text = await file.text();
+async function readFile(file: File) {
+	fileError = "";
+	if (file.size > MAX_FILE_BYTES) {
+		fileError = "That file is too large to be a receipt.";
+		return;
+	}
+	session.text = await file.text();
+	session.which = "own";
+	void session.verify();
+}
+
+function onDrop(event: DragEvent) {
+	event.preventDefault();
+	dragging = false;
+	const file = event.dataTransfer?.files?.[0];
+	if (file) {
+		void readFile(file);
+		return;
+	}
+	const dropped = event.dataTransfer?.getData("text/plain");
+	if (dropped) {
+		session.text = dropped;
 		session.which = "own";
 		void session.verify();
 	}
+}
 
-	function onDrop(event: DragEvent) {
-		event.preventDefault();
-		dragging = false;
-		const file = event.dataTransfer?.files?.[0];
-		if (file) {
-			void readFile(file);
-			return;
-		}
-		const dropped = event.dataTransfer?.getData("text/plain");
-		if (dropped) {
-			session.text = dropped;
-			session.which = "own";
-			void session.verify();
-		}
-	}
+function onFileInput(event: Event) {
+	const file = (event.currentTarget as HTMLInputElement).files?.[0];
+	if (file) void readFile(file);
+}
 
-	function onFileInput(event: Event) {
-		const file = (event.currentTarget as HTMLInputElement).files?.[0];
-		if (file) void readFile(file);
-	}
-
-	onMount(() => {
-		void preloadVerifier();
-		const param = new URLSearchParams(location.search).get("r");
-		if (!param) return;
-		const decoded = decodeReceiptParam(param) ?? param;
-		session.text = decoded;
-		session.which = decoded === JSON.stringify(JSON.parse(SAMPLE_TEXT)) ? "sample" : "own";
-		void session.verify(decoded);
-	});
+onMount(() => {
+	void preloadVerifier();
+	const param = new URLSearchParams(location.search).get("r");
+	if (!param) return;
+	const decoded = decodeReceiptParam(param) ?? param;
+	session.text = decoded;
+	session.which =
+		decoded === JSON.stringify(JSON.parse(SAMPLE_TEXT)) ? "sample" : "own";
+	void session.verify(decoded);
+});
 </script>
 
 <div class="grid items-start gap-[clamp(24px,4vw,56px)] md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">

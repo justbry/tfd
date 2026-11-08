@@ -6,7 +6,9 @@ You may not copy, modify, host or redistribute it, in whole or in part,
 without written permission from Trifold. "Trifold", "tfd" and "Rifo" are
 Trifold's brands.
 
-One exception: the in-browser receipt verifier in src/lib/verify/ is
-licensed under the Apache License, Version 2.0 (SPDX-License-Identifier:
-Apache-2.0; the text is in LICENSE at the repository root), so that anyone
-can check a Trifold receipt forever.
+The in-browser receipt verifier the site runs is not part of this directory:
+it comes from the tfd-verify package (packages/verify in this repository),
+which has its own license, the Apache License, Version 2.0 (its text is in
+packages/verify/LICENSE), so that anyone can check a Trifold receipt forever.
+Nothing in this directory is under that license. The build lists every
+third-party package the site ships, with its license, in /licenses.txt.

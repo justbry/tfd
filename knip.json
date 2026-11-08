@@ -116,6 +116,10 @@
 				"scripts/org-demos/dashboard.client.js"
 			]
 		},
+		"packages/verify": {
+			"entry": ["tests/**/*.test.ts"],
+			"project": ["src/**/*.ts"]
+		},
 		"packages/ledger-worker": {
 			"entry": [
 				"src/main.ts",
