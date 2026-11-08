@@ -267,7 +267,13 @@ export function Ledger({
 			/>
 		);
 	if (status.failed)
-		return <LoadFailed what="the ledger" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the ledger"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
 	const { page, promoCode } = loaded;

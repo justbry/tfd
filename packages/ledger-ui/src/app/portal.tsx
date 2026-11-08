@@ -26,6 +26,7 @@ import { focusCloseButton } from "./close-focus.ts";
 import { saveFile } from "./download.ts";
 import { saveCsv } from "./download-button.tsx";
 import { Icon, type IconName } from "./icon.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import { LockPanel } from "./lock-panel.tsx";
 import { rosterLock, viewerOf } from "./members-model.ts";
 import { formatMoney } from "./money.ts";
@@ -54,7 +55,7 @@ import {
 	publishedPeriod,
 } from "./portal-views.tsx";
 import { withQuery } from "./route.ts";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { useViewing } from "./viewing.ts";
 
 const defaultTab: PortalTab = "overview";
@@ -169,8 +170,13 @@ function Portal(
 	const [dialog, setDialog] = useState<Dialog | null>(null);
 	const themeSelectId = useId();
 	const tabsId = useId();
+	const read = useReadFailure(key);
+	const { failFor, attempt } = read;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		let current = true;
+		const failed = failFor(key);
 		const load = async (): Promise<void> => {
 			const portal = await reader.memberPortal({
 				school: school.id,
@@ -203,11 +209,13 @@ function Portal(
 			}
 			if (current) setLoaded({ key, portal, figures, publicYear });
 		};
-		load().catch(keepLoading);
+		load().catch((error: unknown) => {
+			if (current) failed(error);
+		});
 		return () => {
 			current = false;
 		};
-	}, [reader, school.id, profileId, key]);
+	}, [reader, school.id, profileId, key, failFor, attempt]);
 	const shown = loaded?.key === key ? loaded : null;
 	const loadedPortal = shown?.portal;
 	const viewed = loadedPortal?.people.find(
@@ -228,7 +236,7 @@ function Portal(
 	 * render. */
 	const missing = Boolean(shown) && !visible;
 	useLayoutEffect(() => {
-		if (shown && visible) onRendered();
+		if ((shown && visible) || read.failed) onRendered();
 	});
 	const viewingBar = useRef<HTMLSpanElement>(null);
 	const profileShown = visible ? profileId : null;
@@ -257,6 +265,14 @@ function Portal(
 		document.addEventListener("keydown", onKeyDown);
 		return () => document.removeEventListener("keydown", onKeyDown);
 	}, [visible, dialog, exit]);
+	if (read.failed)
+		return (
+			<LoadFailed
+				what="the member portal"
+				error={read.error}
+				onRetry={read.retry}
+			/>
+		);
 	if (missing) return <Pane name="members" {...props} />;
 	if (!(shown && portal && viewed)) return null;
 

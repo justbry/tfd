@@ -903,7 +903,13 @@ export function Reports({
 			/>
 		);
 	if (status.failed)
-		return <LoadFailed what="the report" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the report"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
 	const { rules, donors, document } = loaded;

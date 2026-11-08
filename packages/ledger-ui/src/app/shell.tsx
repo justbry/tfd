@@ -13,13 +13,16 @@ import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
 import { CoreIcon, type CoreIconName } from "./core-icon.tsx";
+import { DemoTabNote, demoNoteTabs } from "./demo-note.tsx";
 import { DialogSlot, useSlotOpener } from "./dialog-slot.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import type { Change as RosterChange } from "./members-model.ts";
 import type { PaneName } from "./panes.tsx";
 import type { AudienceMove, PlansSession } from "./plans-menu.ts";
 import type { Change } from "./portal-format.ts";
 import {
 	allSchools,
+	defaultTabOf,
 	type Route,
 	type SchoolTab,
 	schoolTabs,
@@ -28,7 +31,7 @@ import {
 } from "./route.ts";
 import { SettingsDrawer } from "./settings-drawer.tsx";
 import { TopBar } from "./top-bar.tsx";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { opensOnTabs, ViewingContext, viewedPeriod } from "./viewing.ts";
 
 const toastMilliseconds = 4600;
@@ -241,16 +244,26 @@ export function Shell({
 	const [loadedDisclosure, setLoadedDisclosure] = useState<Disclosure | null>(
 		null,
 	);
+	const disclosureRead = useReadFailure(schoolId ?? allSchools);
+	const { failFor, attempt } = disclosureRead;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		if (!schoolId) return;
 		let current = true;
-		reader.disclosure(schoolId).then((disclosure) => {
-			if (current) setLoadedDisclosure(disclosure);
-		}, keepLoading);
+		const failed = failFor(schoolId);
+		reader.disclosure(schoolId).then(
+			(disclosure) => {
+				if (current) setLoadedDisclosure(disclosure);
+			},
+			(error: unknown) => {
+				if (current) failed(error);
+			},
+		);
 		return () => {
 			current = false;
 		};
-	}, [reader, schoolId]);
+	}, [reader, schoolId, failFor, attempt]);
 	const disclosure =
 		loadedDisclosure?.school === schoolId ? loadedDisclosure : null;
 	const asked = route.query.get("as");
@@ -268,10 +281,15 @@ export function Shell({
 	const theme = themeOf(route.query);
 
 	const ready = Boolean(menus && settingsModule && (!school || viewing));
+	/** A demo school's tab with no data shows the demo note instead of its pane. */
+	const demoNote = Boolean(
+		school?.demo && paneName !== null && demoNoteTabs.has(paneName),
+	);
 	/** Every school tab's pane reports its own render once its data is on screen. */
-	const paneReports = Boolean(school && paneName);
+	const paneReports = Boolean(school && paneName && !demoNote);
+	const disclosureFailed = Boolean(school && disclosureRead.failed);
 	useLayoutEffect(() => {
-		if (ready && !paneReports) onRendered();
+		if ((ready && !paneReports) || (menus && disclosureFailed)) onRendered();
 	});
 
 	/** Each school's last tab, in memory only (mockup `s.last`): switching school, or leaving All schools, returns to
@@ -294,7 +312,9 @@ export function Shell({
 		else
 			navigate({
 				schoolId: chosen,
-				tab: lastTabs.current[chosen] ?? "plans",
+				tab:
+					lastTabs.current[chosen] ??
+					defaultTabOf(schools.find(({ id }) => id === chosen)),
 				query,
 			});
 	};
@@ -422,8 +442,16 @@ export function Shell({
 				aria-labelledby={school ? `tab-${route.tab}` : undefined}
 				aria-label={school ? undefined : "All schools"}
 			>
+				{disclosureFailed && (
+					<LoadFailed
+						what="the school's audiences"
+						error={disclosureRead.error}
+						onRetry={disclosureRead.retry}
+					/>
+				)}
+				{ready && school && demoNote && <DemoTabNote school={school} />}
 				<ViewingContext.Provider value={viewing}>
-					{ready && school && panes && paneName && (
+					{ready && school && panes && paneName && !demoNote && (
 						<panes.Pane
 							key={school.id}
 							name={paneName}

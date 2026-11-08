@@ -10,7 +10,13 @@ import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
 import { LoadFailed } from "./load-failed.tsx";
-import { formatRoute, parseRoute, type Route, themeOf } from "./route.ts";
+import {
+	defaultTabOf,
+	formatRoute,
+	parseRoute,
+	type Route,
+	themeOf,
+} from "./route.ts";
 import { Shell } from "./shell.tsx";
 
 /** Follows `location.hash`; once the schools are loaded, rewrites a hash naming an unknown school or tab to the
@@ -61,7 +67,11 @@ function App({
 	}, [reader, schoolsAttempt]);
 
 	/** Before the schools load the route's school is a placeholder; only its query (the theme) is used then. */
-	const route = parseRoute(hash, schools?.map((school) => school.id) ?? []);
+	const route = parseRoute(
+		hash,
+		schools?.map((school) => school.id) ?? [],
+		(schoolId) => defaultTabOf(schools?.find(({ id }) => id === schoolId)),
+	);
 	const canonical = schools ? formatRoute(route) : null;
 	const theme = themeOf(route.query);
 	useLayoutEffect(() => {

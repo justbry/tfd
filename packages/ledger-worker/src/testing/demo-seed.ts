@@ -39,6 +39,27 @@ export const DEMO_PRESETS = [
 export const demoSchoolIdOf = (preset: string): string =>
 	`${DEMO_PREFIX}${preset}`;
 
+const encoder = new TextEncoder();
+/** Puts at once: a year of daily batches one by one over the S3 API takes minutes per school. */
+const PUT_CONCURRENCY = 16;
+
+const inParallel = async <Item>(
+	items: readonly Item[],
+	work: (item: Item) => Promise<void>,
+): Promise<void> => {
+	let next = 0;
+	const worker = async (): Promise<void> => {
+		while (next < items.length) {
+			const item = items[next] as Item;
+			next += 1;
+			await work(item);
+		}
+	};
+	await Promise.all(
+		Array.from({ length: Math.min(PUT_CONCURRENCY, items.length) }, worker),
+	);
+};
+
 const sha256Of = (body: Uint8Array): string =>
 	createHash("sha256").update(body).digest("hex");
 
@@ -111,15 +132,22 @@ export const seedDemoSchool = async (
 		removed: 0,
 		viewsAsOf: null,
 	};
-	for (const batch of batches) {
+	const missing = batches.filter((batch) => {
 		if (!batch.key.startsWith(eventsPrefix))
 			throw new Error(`batch ${batch.key} is outside ${eventsPrefix}`);
-		if (existing.has(batch.key)) report.unchanged += 1;
-		else {
-			await putText(store, batch.key, batch.text);
-			report.written += 1;
+		return !existing.has(batch.key);
+	});
+	report.unchanged = batches.length - missing.length;
+	// A batch key carries the hash of its bytes, so a create-only put that finds the key has nothing to write.
+	await inParallel(missing, async (batch) => {
+		try {
+			await store.putIfAbsent(batch.key, encoder.encode(batch.text));
+		} catch (error) {
+			if (!(error instanceof Error && error.name === "AlreadyExists"))
+				throw error;
 		}
-	}
+		report.written += 1;
+	});
 	const wanted = new Set(batches.map((batch) => batch.key));
 	for (const key of existing) {
 		if (wanted.has(key)) continue;

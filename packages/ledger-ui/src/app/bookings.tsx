@@ -369,6 +369,7 @@ export function Bookings({
 	const [loaded, setLoaded] = useState<Loaded | null>(null);
 	/** The key whose read was rejected, and the count of tries that asks the effect to read again. */
 	const [failedKey, setFailedKey] = useState<string | null>(null);
+	const [failure, setFailure] = useState<unknown>(null);
 	const [attempt, setAttempt] = useState(0);
 	/** The bookings whose Remind host is on its way. */
 	const [reminding, setReminding] = useState<ReadonlySet<string>>(new Set());
@@ -398,8 +399,10 @@ export function Bookings({
 				});
 			if (current) setFailedKey((before) => (before === key ? null : before));
 		};
-		load().catch(() => {
-			if (current) setFailedKey(key);
+		load().catch((error: unknown) => {
+			if (!current) return;
+			setFailure(error);
+			setFailedKey(key);
 		});
 		return () => {
 			current = false;
@@ -679,6 +682,7 @@ export function Bookings({
 			{failed ? (
 				<LoadFailed
 					what="the bookings"
+					error={failure}
 					onRetry={() => {
 						setFailedKey(null);
 						setAttempt((before) => before + 1);
