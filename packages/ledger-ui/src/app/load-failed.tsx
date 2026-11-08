@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { Icon } from "./icon.tsx";
+import { CoreIcon } from "./core-icon.tsx";
 
 /** The Reader's `not_available` (`http/errors.ts`): nothing provides this read yet, so trying again cannot help. */
 const isNotAvailable = (error: unknown): boolean =>
@@ -24,13 +24,13 @@ export function LoadFailed({
 	if (isNotAvailable(error))
 		return (
 			<output class="note" data-test="not-available">
-				<Icon name="info" />
+				<CoreIcon name="info" />
 				<span>Not available yet: nothing provides {what} here.</span>
 			</output>
 		);
 	return (
 		<div class="note" role="alert">
-			<Icon name="alert" />
+			<CoreIcon name="alert" />
 			<span>Could not load {what}.</span>
 			<span class="sp" />
 			<button type="button" class="btn s" onClick={onRetry}>

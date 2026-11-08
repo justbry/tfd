@@ -10,30 +10,42 @@ const booksTabs: ReadonlyArray<{ tab: SchoolTab; label: string }> = [
 ];
 
 /** What a demo school shows on a tab it has no data for (`shell.tsx` `demoNoteTabs`), with the way to the tabs it
- * has, never an empty pane. Loaded with the panes, not on the first load. */
+ * has, never an empty pane. The links sit on their own line under the text, at its left: the HTTP build's demo alert
+ * (`http/demo-banner.tsx`) is pinned top right and would cover them at the note's right end. Loaded with the panes,
+ * not on the first load. */
 export function DemoTabNote({ school }: { school: School }): JSX.Element {
 	return (
-		<output class="note" data-test="demo-tab-note">
+		<output
+			class="note"
+			data-test="demo-tab-note"
+			style="align-items:flex-start"
+		>
 			<CoreIcon name="alert" />
-			<span>
-				Demo schools show the books only: Dashboard, Ledger and Reports. Plans,
-				Members, Bookings and Promos need a real school.
-			</span>
-			<span class="sp" />
-			{booksTabs.map(({ tab, label }) => (
-				<a
-					key={tab}
-					class="btn s"
-					data-test="demo-tab-link"
-					href={formatRoute({
-						schoolId: school.id,
-						tab,
-						query: new URLSearchParams(),
-					})}
+			<div>
+				<span>
+					Demo schools show the books only: Dashboard, Ledger and Reports.
+					Plans, Members, Bookings and Promos need a real school.
+				</span>
+				<div
+					data-test="demo-tab-links"
+					style="display:flex;gap:8px;margin-top:8px"
 				>
-					{label}
-				</a>
-			))}
+					{booksTabs.map(({ tab, label }) => (
+						<a
+							key={tab}
+							class="btn s"
+							data-test="demo-tab-link"
+							href={formatRoute({
+								schoolId: school.id,
+								tab,
+								query: new URLSearchParams(),
+							})}
+						>
+							{label}
+						</a>
+					))}
+				</div>
+			</div>
 		</output>
 	);
 }
