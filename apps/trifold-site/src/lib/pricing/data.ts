@@ -2,23 +2,33 @@
  * Planned prices, from docs/business/pricing-strategy.md (the owner's plan decisions of 2026-11-07: Free at about 300
  * events, Starter as the wedge plan, Witnessed renamed Audited). Proposals, not offers. CTAs follow the site's rule:
  * nothing says "Start free" for the hosted product, which isn't open yet.
+ *
+ * The plans themselves (which ones, their names and order, prices, events and credits) come from Trifold's tfd catalog,
+ * catalog/trifold/ at the repo root; this module adds the marketing copy. Change a price or a limit there, not here.
  */
 import { CLI_URL } from "#lib/config";
+import {
+	TRIFOLD_ANNUAL_MONTHS,
+	TRIFOLD_PLANS,
+	type TrifoldPlan,
+	trifoldPlan,
+} from "../../../../../catalog/trifold/index.ts";
 
-export const ANNUAL_MONTHS_CHARGED = 10;
+export const ANNUAL_MONTHS_CHARGED = TRIFOLD_ANNUAL_MONTHS;
 export const EVENTS_PER_FAMILY = 7;
+/** Credits a countersigned receipt costs (the CREDITS table and the non-profit FAQ). */
+export const COUNTERSIGNED_RECEIPT_CREDITS = 3;
+
+const count = (value: number) => value.toLocaleString("en-US");
 
 export type Org = "std" | "np";
 export type Feature =
 	| string
 	| { text: string; soon?: boolean; np?: boolean; plus?: boolean };
 
-export type Plan = {
-	id: string;
-	name: string;
+/** A plan's marketing copy: what the catalog does not say. */
+type PlanCopy = {
 	tagline: string;
-	price: Record<Org, number>;
-	events: number;
 	/** What the card shows instead of events, credits and seats (those live in the matrix only). */
 	families: string;
 	cta: { label: string; href: string; external?: boolean };
@@ -28,15 +38,22 @@ export type Plan = {
 	features: Feature[];
 };
 
+export type Plan = PlanCopy & {
+	id: string;
+	name: string;
+	/** Dollars a month. */
+	price: Record<Org, number>;
+	/** Ledger events a month. */
+	events: number;
+	/** Credits a month. */
+	credits: number;
+};
+
 const EARLY = { label: "Get early access", href: "/early-access" };
 
-export const PLANS: Plan[] = [
-	{
-		id: "free",
-		name: "Free",
+const PLAN_COPY: Record<string, PlanCopy> = {
+	free: {
 		tagline: "Hosted books for small organizations getting started.",
-		price: { std: 0, np: 0 },
-		events: 300,
 		families: "About 40 families",
 		cta: EARLY,
 		features: [
@@ -53,14 +70,10 @@ export const PLANS: Plan[] = [
 			},
 		],
 	},
-	{
-		id: "starter",
-		name: "Starter",
+	starter: {
 		tagline: "The plan for small schools: hosted books and signed receipts.",
-		price: { std: 29, np: 15 },
 		badge: "Recommended",
 		featured: true,
-		events: 5000,
 		families: "About 700 families",
 		cta: EARLY,
 		features: [
@@ -74,12 +87,8 @@ export const PLANS: Plan[] = [
 			"Free seats for your CPA",
 		],
 	},
-	{
-		id: "pro",
-		name: "Pro",
+	pro: {
 		tagline: "Your month closes on a schedule. On sale once its features ship.",
-		price: { std: 79, np: 39 },
-		events: 25000,
 		families: "About 3,500 families",
 		cta: EARLY,
 		features: [
@@ -97,15 +106,11 @@ export const PLANS: Plan[] = [
 			{ text: 'Public "open books" page', np: true, soon: true },
 		],
 	},
-	{
-		id: "audited",
-		name: "Audited",
+	audited: {
 		tagline:
 			"Audit-ready books an auditor, grantor or state program can check.",
-		price: { std: 149, np: 79 },
 		badge: "Early access",
 		witness: true,
-		events: 25000,
 		families: "About 3,500 families",
 		cta: EARLY,
 		features: [
@@ -124,7 +129,24 @@ export const PLANS: Plan[] = [
 			{ text: "Unlimited board and member seats", np: true, plus: true },
 		],
 	},
-];
+};
+
+const planOf = (catalog: TrifoldPlan): Plan => {
+	const copy = PLAN_COPY[catalog.id];
+	if (!copy)
+		throw new Error(`No pricing copy for the catalog's plan ${catalog.id}`);
+	return {
+		id: catalog.id,
+		name: catalog.name,
+		price: catalog.monthly,
+		events: catalog.events,
+		credits: catalog.credits,
+		...copy,
+	};
+};
+
+export const PLANS: Plan[] = TRIFOLD_PLANS.map(planOf);
+const FREE = planOf(trifoldPlan("free"));
 
 export const SIDE_PLANS = [
 	{
@@ -205,10 +227,7 @@ export const COLUMNS: {
 	custom?: boolean;
 }[] = [
 	{ id: "community", name: "Community", self: true },
-	{ id: "free", name: "Free", price: { std: 0, np: 0 } },
-	{ id: "starter", name: "Starter", price: { std: 29, np: 15 } },
-	{ id: "pro", name: "Pro", price: { std: 79, np: 39 } },
-	{ id: "audited", name: "Audited", price: { std: 149, np: 79 } },
+	...PLANS.map((plan) => ({ id: plan.id, name: plan.name, price: plan.price })),
 	{ id: "platform", name: "Platform", custom: true },
 ];
 
@@ -219,7 +238,7 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			[
 				"Ledger events a month",
 				"",
-				["Unlimited", "300", "5,000", "25,000", "25,000", "Custom"],
+				["Unlimited", ...PLANS.map((plan) => count(plan.events)), "Custom"],
 			],
 			[
 				"Roughly how many families",
@@ -229,7 +248,7 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			[
 				"Credits a month",
 				"For Rifo and witness signatures",
-				["—", "200", "1,000", "5,000", "8,000", "Pooled"],
+				["—", ...PLANS.map((plan) => count(plan.credits)), "Pooled"],
 			],
 			[
 				"Seats",
@@ -543,7 +562,7 @@ export const CREDITS: [string, string, string][] = [
 	["Pricing Lab forecast", "25", "Replays a year of events under new prices"],
 	[
 		'Countersigned receipt ("Witnessed by Trifold")',
-		"3",
+		String(COUNTERSIGNED_RECEIPT_CREDITS),
 		"Kept cheap on purpose: one per payment",
 	],
 	["Countersigned month seal", "25", "Once a month"],
@@ -580,7 +599,7 @@ export const PRICING_FAQ = [
 	},
 	{
 		q: "What's a ledger event?",
-		a: "One thing that happened to your money: a payment, a refund, a credit used, a booking. A typical family or member makes about 7 a month, so Free's 300 events cover about 40 families. Most organizations upgrade for features, not limits.",
+		a: `One thing that happened to your money: a payment, a refund, a credit used, a booking. A typical family or member makes about ${EVENTS_PER_FAMILY} a month, so Free's ${count(FREE.events)} events cover ${FREE.families.toLowerCase()}. Most organizations upgrade for features, not limits.`,
 	},
 	{
 		q: "What happens if I go over my limit?",
@@ -608,7 +627,7 @@ export const PRICING_FAQ = [
 	},
 	{
 		q: "Who qualifies for non-profit & co-op pricing?",
-		a: "US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). Non-profits with gross receipts of $50,000 or less get Trifold's witness free on the Free plan, up to about 66 countersigned receipts a month (Free's 200 credits at 3 each), once the witness ships.",
+		a: `US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). Non-profits with gross receipts of $50,000 or less get Trifold's witness free on the Free plan, up to about ${count(Math.floor(FREE.credits / COUNTERSIGNED_RECEIPT_CREDITS))} countersigned receipts a month (Free's ${count(FREE.credits)} credits at ${COUNTERSIGNED_RECEIPT_CREDITS} each), once the witness ships.`,
 	},
 	{
 		q: "Do the annual and non-profit discounts stack?",
