@@ -79,6 +79,12 @@ test("Plans: no Edit, Add membership, Add pack, pencils or Review and publish on
 	expect(demo).toEqual(none(selectors));
 	expect(notes).toBe(1);
 	expect(count("[data-test=plan-setup], [data-test=plan-discard]")).toBe(0);
+	// The note sits at the toolbar's left, clear of the demo alert pinned top right: no spacer pushes it right.
+	expect(
+		document
+			.querySelector("[data-test=demo-read-only]")
+			?.parentElement?.querySelector(".sp"),
+	).toBeNull();
 	// The plans are still listed.
 	expect(count("[data-test=plan-row]")).toBeGreaterThan(0);
 	// A row opens nothing.
