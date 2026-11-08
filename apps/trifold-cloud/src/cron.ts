@@ -11,12 +11,11 @@ export const runCron = async (
 	now: Date,
 	log: Pick<Console, "log" | "error"> = console,
 ) => {
-	const configured = Number(
+	const budget = Number(
 		env.BACKUP_SUBREQUEST_BUDGET ?? DEFAULT_SUBREQUEST_BUDGET,
 	);
-	if (!Number.isFinite(configured))
+	if (!Number.isFinite(budget))
 		throw new Error("BACKUP_SUBREQUEST_BUDGET is not a number");
-	const budget = configured;
 	const backup = await runBackup(
 		{ db: env.DB, source: env.BOOKS, backup: env.BACKUPS },
 		now,

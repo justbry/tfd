@@ -60,6 +60,20 @@ describe("pruning superseded copies", () => {
 		expect(backup.objects.has(backupKey("a", etag))).toBe(false);
 	});
 
+	test("a copy restored to the source and deleted again gets a fresh 30 days", async () => {
+		const { source, backup, put, copy, prune } = setup();
+		const etag = put("a", "one", OLD);
+		copy("a", etag, OLD);
+		const stored = source.objects.get("a");
+		source.objects.delete("a");
+		await prune(NOW);
+		if (stored) source.objects.set("a", stored);
+		await prune(new Date(NOW.getTime() + DAY));
+		source.objects.delete("a");
+		expect(await prune(LATER)).toMatchObject({ deleted: 0 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(true);
+	});
+
 	test("a year-old object rewritten just now keeps its old copy for 30 days, and longer until the new version is copied", async () => {
 		const { backup, put, copy, prune } = setup();
 		const first = put("a", "one", OLD);

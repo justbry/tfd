@@ -123,6 +123,22 @@ describe("nightly backup", () => {
 		expect((await readBackupState(db)).watermark).toBe(NOW.toISOString());
 	});
 
+	test("an object R2 stamps just before the watermark (clock skew) is still copied", async () => {
+		const source = memoryBucket(
+			{ late: "x" },
+			() => new Date(NOW.getTime() - 60_000),
+		);
+		const backup = memoryBucket();
+		const result = await backupBucket({
+			source: source.bucket,
+			backup: backup.bucket,
+			state: { watermark: NOW.toISOString() },
+			now: new Date(NOW.getTime() + 3_600_000),
+			log: quiet,
+		});
+		expect(result).toMatchObject({ copied: 1, failed: 0, complete: true });
+	});
+
 	test("a failed object is counted and logged, the rest still copy, and the watermark doesn't move", async () => {
 		const source = memoryBucket({ a: "1", b: "2", c: "3" });
 		const backup = memoryBucket();
@@ -174,6 +190,36 @@ describe("nightly backup", () => {
 			complete: true,
 		});
 		expect((await readBackupState(db)).watermark).toBe(NOW.toISOString());
+	});
+
+	test("a failure in an earlier run of a pass keeps the watermark even when the pass ends clean", async () => {
+		const source = memoryBucket({ a: "1", b: "2" });
+		const backup = memoryBucket();
+		backup.failingPuts.add(
+			backupKey("a", source.objects.get("a")?.etag as string),
+		);
+		const first = await backupBucket({
+			source: source.bucket,
+			backup: backup.bucket,
+			state: { watermark: null },
+			now: NOW,
+			budget: 4,
+			log: quiet,
+		});
+		expect(first).toMatchObject({ failed: 1, complete: false });
+		const second = await backupBucket({
+			source: source.bucket,
+			backup: backup.bucket,
+			state: first.state,
+			now: NOW,
+			budget: 4,
+			log: quiet,
+		});
+		expect(second).toMatchObject({
+			failed: 0,
+			complete: true,
+			state: { watermark: null },
+		});
 	});
 
 	test("an object rewritten between the listing and the copy is not stored under the old ETag", async () => {
