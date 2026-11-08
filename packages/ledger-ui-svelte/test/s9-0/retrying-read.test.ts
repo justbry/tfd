@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Effect } from "effect";
 import { AdapterError, type AdapterErrorKind } from "$contract/http/errors.ts";
 import type { AppContext } from "../../src/app/context.ts";
 import { retryingRead } from "../../src/app/retrying-read.ts";
@@ -14,7 +15,7 @@ const wait = (milliseconds: number) =>
 	new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function readContext() {
-	const { runtime, toasts } = fixtureRuntime();
+	const { runtime, toasts, log } = fixtureRuntime();
 	const context: AppContext = {
 		root: document.createElement("div"),
 		runtime,
@@ -22,7 +23,7 @@ function readContext() {
 		calendar,
 	};
 	const shown = () => toastState(toasts).visible;
-	return { context, toasts, shown };
+	return { context, toasts, log, shown };
 }
 
 /** A load that fails with `kinds` in turn, then answers "done" (or never answers, with `hang`); `calls` counts. */
@@ -116,6 +117,27 @@ describe("retryingRead: cancel interrupts the run", () => {
 		stop();
 		await wait(10);
 		expect(shown()).toEqual([]);
+	});
+	test("a reader that interrupts itself, with no cancel, ends as a failure the screen can retry, and is logged", async () => {
+		const { context, log, shown } = readContext();
+		const failures: string[] = [];
+		const busy: boolean[] = [];
+		const reading = retryingRead(context, () => Effect.interrupt, {
+			value: () => undefined,
+			failure: (error) => failures.push(error.kind),
+			busy: (value) => busy.push(value),
+		});
+		await reading.run();
+		await wait(10);
+		expect(failures).toEqual(["unexpected"]);
+		expect(busy).toEqual([true, false]);
+		expect(shown()).toEqual([]);
+		expect(log.entries()).toEqual([
+			{
+				level: "warning",
+				message: "The read was interrupted before it finished.",
+			},
+		]);
 	});
 	test("a Retry from a cancelled read's toast does nothing", async () => {
 		const { context } = readContext();
@@ -266,7 +288,8 @@ describe("retryingRead: one failure, one toast", () => {
 		const callsAtCancel = counter.calls;
 		reading.cancel();
 		await retrying;
-		expect(busy.at(-1)).toBe(false);
+		// The cancelled run is silent: no late busy(false) to clear a newer read's busy(true).
+		expect(busy).toEqual([true, false, true]);
 		expect(shown()).toEqual([]);
 		await wait(pastTheBackoff);
 		expect(counter.calls).toBe(callsAtCancel);

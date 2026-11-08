@@ -43,10 +43,12 @@ const interrupted = { ok: false, interrupted: true } as const;
  * one, written to the log since nothing upstream did. */
 const uiErrorOf = (
 	cause: Cause.Cause<UiError>,
+	logged: { cause: unknown },
 ): Effect.Effect<UiError, never, Log> => {
 	const squashed = Cause.squash(cause);
 	if (squashed instanceof UiError) return Effect.succeed(squashed);
 	const error = toUiError(squashed);
+	logged.cause = squashed;
 	return Effect.as(
 		Log.use((log) =>
 			log.write({ level: "error", message: error.reason, cause: squashed }),
@@ -72,14 +74,17 @@ async function reportBeyondHandler<A>(
 	runtime: AppContext["runtime"],
 	cause: Cause.Cause<unknown>,
 	options: PerformOptions,
+	logged: { cause: unknown },
 ): Promise<Outcome<A>> {
 	const squashed = Cause.squash(cause);
 	const error = toUiError(squashed);
-	await runtime.runPromiseExit(
-		Log.use((log) =>
-			log.write({ level: "error", message: error.reason, cause: squashed }),
-		),
-	);
+	// The handler already wrote this very defect to the log: once is enough.
+	if (squashed !== logged.cause)
+		await runtime.runPromiseExit(
+			Log.use((log) =>
+				log.write({ level: "error", message: error.reason, cause: squashed }),
+			),
+		);
 	const shown = await runtime.runPromiseExit(
 		reportFailure(error, options.handlers, options.owner),
 	);
@@ -103,7 +108,9 @@ export const perform = async <A>(
 ): Promise<Outcome<A>> => {
 	/** The failure as reported, kept outside the fiber: an abort landing just after the toast showed still hands the
 	 * toast back, so that the caller can take it down. */
-	let reported: Outcome<A> | null = null;
+	let reported = null as Outcome<A> | null;
+	/** The defect the handler wrote to the log, so that a report beyond the handler does not write it again. */
+	const logged: { cause: unknown } = { cause: undefined };
 	const exit = await runtime.runPromiseExit(
 		effect.pipe(
 			Effect.map((value): Outcome<A> => ({ ok: true, value })),
@@ -111,7 +118,7 @@ export const perform = async <A>(
 				Cause.hasInterruptsOnly(cause)
 					? Effect.succeed<Outcome<A>>(interrupted)
 					: Effect.uninterruptible(
-							Effect.flatMap(uiErrorOf(cause), (error) =>
+							Effect.flatMap(uiErrorOf(cause, logged), (error) =>
 								Effect.map(
 									reportFailure(error, options.handlers, options.owner),
 									(toastId): Outcome<A> => {
@@ -133,5 +140,5 @@ export const perform = async <A>(
 	if (Exit.isSuccess(exit)) return exit.value;
 	if (reported) return reported;
 	if (Cause.hasInterruptsOnly(exit.cause)) return interrupted;
-	return reportBeyondHandler(runtime, exit.cause, options);
+	return reportBeyondHandler(runtime, exit.cause, options, logged);
 };

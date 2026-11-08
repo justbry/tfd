@@ -1,8 +1,8 @@
 import type { Effect } from "effect";
 import type { AppServices } from "../effect/app-layer.ts";
 import { withRetry } from "../effect/retry.ts";
-import { Toasts } from "../effect/services.ts";
-import type { UiError } from "../effect/ui-error.ts";
+import { Log, Toasts } from "../effect/services.ts";
+import { UiError } from "../effect/ui-error.ts";
 import { type AppContext, perform } from "./context.ts";
 
 export type RetryingRead = {
@@ -10,9 +10,18 @@ export type RetryingRead = {
 	run: () => Promise<void>;
 	/** The screen no longer wants this read (another school, an unmount): the run on its way is interrupted (its
 	 * retries and waits stop, its retry toast leaves), its failure toast leaves, and a Retry clicked later does
-	 * nothing. */
+	 * nothing. A cancelled run calls none of `on`, `busy(false)` included, so a `busy` callback shared with a newer
+	 * read is never cleared by an old one. */
 	cancel: () => void;
 };
+
+/** What the screen shows when a run is interrupted by something other than `cancel`: a failure it can retry. */
+const interruptedWithoutCancel = new UiError({
+	kind: "unexpected",
+	detail: {},
+	reason: "The read was interrupted before it finished.",
+	retryable: true,
+});
 
 /** Each read's own name for its toasts (`ToastInput.owner`). */
 let readsMade = 0;
@@ -82,7 +91,6 @@ export function retryingRead<A>(
 			},
 		);
 		running = null;
-		on.busy?.(false);
 		if (cancelled) {
 			// The cancel landed after the failure was reported: that toast speaks for nobody now.
 			if (!outcome.ok && !outcome.interrupted && outcome.toastId !== null)
@@ -91,12 +99,27 @@ export function retryingRead<A>(
 		}
 		if (outcome.ok) {
 			settle(null);
+			on.busy?.(false);
 			on.value(outcome.value);
 		} else if (!outcome.interrupted) {
 			settle(outcome.toastId);
 			if (outcome.toastId !== null) markBusy(outcome.toastId, false);
+			on.busy?.(false);
 			on.failure?.(outcome.error);
-		} else if (failureToast !== null) markBusy(failureToast, false);
+		} else {
+			// Interrupted, yet not by `cancel`: the screen would be left with no value, no failure and no toast.
+			if (failureToast !== null) markBusy(failureToast, false);
+			on.busy?.(false);
+			on.failure?.(interruptedWithoutCancel);
+			context.runtime.runFork(
+				Log.use((log) =>
+					log.write({
+						level: "warning",
+						message: interruptedWithoutCancel.reason,
+					}),
+				),
+			);
+		}
 	};
 	const cancel = (): void => {
 		cancelled = true;
