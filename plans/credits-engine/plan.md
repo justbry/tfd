@@ -56,7 +56,7 @@ Tags: 💰 money path, 🗄 migration, 👪 member-visible. Sizes: S (a day or l
 - **Entry:** this plan is merged.
 - **Exit:** every decision in [`decisions.md`](decisions.md) has an answer; O2's counts are recorded in the owner's ops notes (not in this repo); O3 says whether ids match.
 - **Rollback:** none needed.
-- **Risks:** O3 shows different ids at the two endpoints. Then claim seeding (§6) cannot dedupe across endpoints, and cutover relies on `state.invoices` alone, which does not cover events that left no record (§7, race window).
+- **Risks:** O3 shows different ids at the two endpoints. (Retired: O3 showed matching ids in test mode, §4.) Then claim seeding (§6) cannot dedupe across endpoints, and cutover relies on `state.invoices` alone, which does not cover events that left no record (§7, race window).
 
 ### Stage 1: tfd prerequisites, `tfd-v0.11.0`
 
@@ -215,6 +215,20 @@ An endpoint's version can't be updated, so it is recreated. Stripe's documented 
 4. Once the new one has run cleanly, delete the old one.
 
 In stage 3 the clover endpoint is the shadow: it answers 200 (or tfd's 409 waits) and the acacia endpoint stays live. At cutover the roles swap: clover is live, acacia answers 400 for 3 days, then B8 deletes it.
+
+### Dedup across the two endpoints
+
+**Both endpoints receive the same `evt_` id for one event** (O3, verified 2026-11-08 in test mode). Only the payload shape and `api_version` differ. So a claim keyed by `evt_` id dedupes across the two endpoints, and claim seeding (§6, §7) works as planned.
+
+How it was found: one test account, two temporary endpoints created with a restricted key (one at `2025-02-24.acacia`, one at `2025-10-29.clover`), both pointed at a throwaway echo Worker that logged only `{id, type, api_version}`. A 100-cent refund (`re_3UYWsUDsfMqSNUOE1gkNozcg`) produced three events. Each reached both endpoints within a second, with the same id:
+
+| Event type | `evt_` id at both endpoints | `api_version` delivered |
+|---|---|---|
+| `refund.created` | `evt_3UYWsUDsfMqSNUOE1oGMzRBo` | acacia: `2025-02-24.acacia`; clover: `2025-10-29.clover` |
+| `charge.refunded` | `evt_3UYWsUDsfMqSNUOE1KTbKSKh` | acacia: `2025-02-24.acacia`; clover: `2025-10-29.clover` |
+| `charge.refund.updated` | `evt_3UYWsUDsfMqSNUOE1Nnz0m9Q` | acacia: `2025-02-24.acacia`; clover: `2025-10-29.clover` |
+
+The endpoints and the Worker were deleted afterwards. The staging rehearsal (§13, row 1) still checks this on a school's real endpoints.
 
 ### Second secret and route split
 
@@ -396,7 +410,7 @@ Details and reasons in [`decisions.md`](decisions.md). Recommended defaults:
 
 | # | Question | How to settle | Blocks |
 |---|---|---|---|
-| 1 | Do both endpoints deliver the same `evt_` id for one event? Implied by Stripe's docs, not confirmed | O3 in test mode, then the staging rehearsal | the race-window plan (§7) |
+| 1 | Do both endpoints deliver the same `evt_` id for one event? **Yes in test mode** (O3, 2026-11-08): two endpoints at acacia and clover got the same id for each of three refund events, each shaped at its own `api_version` (§4, "Dedup across the two endpoints") | Settled by O3; the staging rehearsal confirms it on a school's real endpoints | nothing now; the race-window plan (§7) can assume matching ids |
 | 2 | How does a prorated raise lot import? | Partly settled here: refused unless whole, else silently wrong (§6). T2's fix needs a test with real `raiseLots` output | stage 2 exit |
 | 3 | Does a money-only log followed by opening credit events replay? | tfd test (§11) | stage 5, and whether imports before T3 are usable |
 | 4 | What replaces the admin-invoice grant (`adminInvoicePaid`, bs `webhook.ts:147`; `invoice.ts:104`)? No tfd handler for it was found. Lead: the admin invoice holds the add-on's published one-time price (`invoice.ts:48`), so tfd's one-time add-on path (`ce_once_*`) may already grant it if the handler can locate the member from the invoice's metadata | a golden bundle with a real admin invoice | B16 |

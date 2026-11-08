@@ -16,8 +16,13 @@ export const importSigningKey = async (pem: string): Promise<CryptoKey> => {
 };
 
 /** The three signing keys of this environment (PLAN.md section 3.5), loaded from Secrets Store. */
-export const loadSigningKeys = async (env: CloudEnv) => ({
-	receipt: await importSigningKey(await env.SIGNING_RECEIPT.get()),
-	seal: await importSigningKey(await env.SIGNING_SEAL.get()),
-	directory: await importSigningKey(await env.SIGNING_DIRECTORY.get()),
-});
+export const loadSigningKeys = async (env: CloudEnv) => {
+	const load = async (secret: CloudEnv["SIGNING_RECEIPT"]) =>
+		importSigningKey(await secret.get());
+	const [receipt, seal, directory] = await Promise.all([
+		load(env.SIGNING_RECEIPT),
+		load(env.SIGNING_SEAL),
+		load(env.SIGNING_DIRECTORY),
+	]);
+	return { receipt, seal, directory };
+};

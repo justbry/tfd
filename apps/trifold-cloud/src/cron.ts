@@ -21,7 +21,10 @@ export const runCron = async (
 	const budget = Number(
 		env.BACKUP_SUBREQUEST_BUDGET ?? DEFAULT_SUBREQUEST_BUDGET,
 	);
-	if (!Number.isFinite(budget) || budget < MIN_SUBREQUEST_BUDGET + STATE_SUBREQUESTS) {
+	if (
+		!Number.isFinite(budget) ||
+		budget < MIN_SUBREQUEST_BUDGET + STATE_SUBREQUESTS
+	) {
 		throw new Error(
 			`BACKUP_SUBREQUEST_BUDGET must be a number of at least ${MIN_SUBREQUEST_BUDGET + STATE_SUBREQUESTS}`,
 		);

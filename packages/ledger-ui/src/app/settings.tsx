@@ -16,6 +16,7 @@ import {
 } from "../data/settings.ts";
 import type { School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
+import { DemoReadOnlyNote } from "./demo-note.tsx";
 import { Icon, type IconName } from "./icon.tsx";
 import { LoadFailed } from "./load-failed.tsx";
 import { LockPanel } from "./lock-panel.tsx";
@@ -892,6 +893,15 @@ function ConnectionsSection({
 	);
 }
 
+function SchoolHeading({ school }: { school: School }): JSX.Element {
+	return (
+		<div class="sechead" data-test="settings-school">
+			<Icon name="building" /> {school.name}{" "}
+			<span class="mut section-note">school settings</span>
+		</div>
+	);
+}
+
 /** The drawer's school settings (mockup `settings()`): the school's heading, the owners-only line, Accounting basis,
  * School books (the disclosure table and its override editor, or a lock panel for a viewer below the admins), Keys
  * and access, Connections. Owners change them with the PIN where the mockup asks for it; an admin reads them; while
@@ -917,6 +927,7 @@ export function SchoolSettings({
 	useEffect(() => {
 		// `attempt` is the Try again counter: each press reads again.
 		void attempt;
+		if (school.demo) return;
 		let current = true;
 		const failed = failFor(school.id);
 		reader.settings(school.id).then(
@@ -930,7 +941,17 @@ export function SchoolSettings({
 		return () => {
 			current = false;
 		};
-	}, [reader, school.id, failFor, attempt]);
+	}, [reader, school.id, school.demo, failFor, attempt]);
+	/** A demo school refuses every write, and every section here is one to change: it shows the note alone. */
+	if (school.demo)
+		return (
+			<>
+				<SchoolHeading school={school} />
+				<p data-test="settings-demo">
+					<DemoReadOnlyNote />
+				</p>
+			</>
+		);
 	if (!settings)
 		return read.failed ? (
 			<LoadFailed
@@ -957,10 +978,7 @@ export function SchoolSettings({
 	const booksLock = viewing.option.locks["settings-books"];
 	return (
 		<>
-			<div class="sechead" data-test="settings-school">
-				<Icon name="building" /> {school.name}{" "}
-				<span class="mut section-note">school settings</span>
-			</div>
+			<SchoolHeading school={school} />
 			{!own && (
 				<div class="lock" data-test="settings-readonly">
 					<Icon name="lock" /> Owners only. You are an admin here: you can look,

@@ -1,5 +1,6 @@
 import { backupKey } from "./backup";
 import type { D1Database, R2Bucket } from "./env";
+import { readMeta, writeMeta } from "./meta";
 
 const STATE_KEY = "prune_state";
 const MAX_PAGE_SIZE = 200;
@@ -19,25 +20,13 @@ export type PruneResult = {
 	state: PruneState;
 };
 
-export const readPruneState = async (db: D1Database): Promise<PruneState> => {
-	const row = await db
-		.prepare("SELECT value FROM schema_meta WHERE key = ?")
-		.bind(STATE_KEY)
-		.first<{ value: string }>();
-	return row ? (JSON.parse(row.value) as PruneState) : {};
-};
+export const readPruneState = async (db: D1Database): Promise<PruneState> =>
+	(await readMeta<PruneState>(db, STATE_KEY)) ?? {};
 
-export const writePruneState = async (
+export const writePruneState = (
 	db: D1Database,
 	state: PruneState,
-): Promise<void> => {
-	await db
-		.prepare(
-			"INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-		)
-		.bind(STATE_KEY, JSON.stringify(state))
-		.run();
-};
+): Promise<void> => writeMeta(db, STATE_KEY, state);
 
 const supersededSince = async (
 	db: D1Database,
