@@ -6,6 +6,7 @@
 @import "tailwindcss/utilities.css" layer(utilities) source(none);
 @import "../../tailwind-shared.css";
 @source "./";
+@source "../config";
 @source "../PaneIcon.svelte";
 @source "../LoadFailed.svelte";
 @source "../../lib/components/ui/table";

@@ -7,7 +7,7 @@
  *   bun scripts/shots.ts [--out shots] [--side app|mock|both] [--app http://localhost:5191] [--nonce K7QX]
  *     [--only dash-]
  * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`, Bookings' with `bk-`,
- * Members' with `mem-`, the Ledger's with `led-`, Reports' with `rep-`).
+ * Members' with `mem-`, the Ledger's with `led-`, Reports' with `rep-`, the member portal's with `por-`, Settings' with `set-`).
  * Needs playwright-core in /tmp/ledger-shots and the cached Chromium headless shell, as shoot.mjs does.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -85,6 +85,16 @@ const membersTab = "document.querySelector('.tab[data-p=mem]').click()";
 const ledgerTab = "document.querySelector('.tab[data-p=led]').click()";
 const reportsTab = "document.querySelector('.tab[data-p=rep]').click()";
 const themes = ["light", "dark"] as const;
+/** S9.5: the member portal of the b4u family (Dana W. s_21, Kai W. s_25, Lia W. s_26), as the S6 golden file's shots open it. */
+const portalOf = (id: string): string =>
+	`document.querySelector('#sw').click();document.querySelector('[data-sc=b4u]').click();document.querySelector('.tab[data-p=mem]').click();document.querySelector('#mb tr.row[data-id=${id}] [data-vm]').click()`;
+const portalTabStep = (tab: string): string =>
+	`document.querySelector('#vm [data-vtab=${tab}]').click()`;
+/** The settings drawer open, scrolled so that the section whose heading contains `heading` is at the top. */
+const settingsAt = (heading: string): string =>
+	`(()=>{const d=document.querySelector('#set');const h=[...d.querySelectorAll('h5')].find(x=>x.textContent.includes(${JSON.stringify(heading)}));d.scrollTop=h.offsetTop-d.offsetTop-14})()`;
+const appSettingsAt = (section: string): string =>
+	`document.querySelector('[data-test=settings-section][data-section=${section}]').scrollIntoView()`;
 
 /** The shell's entries: the S0 golden file's three shots, then the stale banner, All schools, a toast and the
  * settings; then the Dashboard's (S9.1): each viewer state and grain, the PIN prompt and View as; then Bookings' (S9.2)
@@ -94,6 +104,11 @@ const entries: Array<{
 	route: string;
 	clicks: string[];
 	mockupSteps: string;
+	/** Run in the page after the steps, in the app and in the mockup (a drawer is scrolled to the section it shows). */
+	appAfter?: string;
+	/** What the app waits for before `appAfter` (the section is read from the ledger after the drawer opens). */
+	appWait?: string;
+	mockupAfter?: string;
 }> = [
 	{
 		id: "shell-default",
@@ -350,6 +365,93 @@ const entries: Array<{
 		clicks: [],
 		mockupSteps: `setSchool('b4u');${reportsTab};setVa('public')`,
 	},
+	// S9.5: the member portal (each tab, a child's, a site theme, the embed and the change-amount dialogs) and Settings
+	// (the drawer, each section, the Stripe dialog, an admin's read-only view).
+	{
+		id: "por-overview",
+		route: "#/b4u/members?portal=s_21",
+		clicks: [],
+		mockupSteps: portalOf("s_21"),
+	},
+	{
+		id: "por-bookings",
+		route: "#/b4u/members?portal=s_21&portalTab=bookings",
+		clicks: [],
+		mockupSteps: `${portalOf("s_21")};${portalTabStep("bk")}`,
+	},
+	{
+		id: "por-billing",
+		route: "#/b4u/members?portal=s_21&portalTab=billing",
+		clicks: [],
+		mockupSteps: `${portalOf("s_21")};${portalTabStep("bill")}`,
+	},
+	{
+		id: "por-family",
+		route: "#/b4u/members?portal=s_21&portalTab=family",
+		clicks: [],
+		mockupSteps: `${portalOf("s_21")};${portalTabStep("fam")}`,
+	},
+	{
+		id: "por-child",
+		route: "#/b4u/members?portal=s_26",
+		clicks: [],
+		mockupSteps: portalOf("s_26"),
+	},
+	{
+		id: "por-theme-host",
+		route: "#/b4u/members?portal=s_21&siteTheme=host",
+		clicks: [],
+		mockupSteps: `${portalOf("s_21")};var t=document.querySelector('#vth');t.value='host';t.dispatchEvent(new Event('change',{bubbles:true}))`,
+	},
+	{
+		id: "por-embed",
+		route: "#/b4u/members?portal=s_21&siteTheme=dark",
+		clicks: ["[data-test=portal-embed]"],
+		mockupSteps: `${portalOf("s_21")};var t=document.querySelector('#vth');t.value='dark';t.dispatchEvent(new Event('change',{bubbles:true}));document.querySelector('#vemb').click()`,
+	},
+	{
+		id: "por-quantity-dialog",
+		route: "#/b4u/members?portal=s_21",
+		clicks: ["[data-test=portal-action][data-action=quantity]"],
+		mockupSteps: `${portalOf("s_21")};document.querySelector('#vm [data-vact=qty]').click()`,
+	},
+	{
+		id: "set-basis",
+		route: "#/vol/plans",
+		clicks: ["[data-test=settings-button]"],
+		mockupSteps: "document.querySelector('#gb').click()",
+	},
+	{
+		id: "set-books",
+		route: "#/vol/plans",
+		clicks: ["[data-test=settings-button]"],
+		mockupSteps: "document.querySelector('#gb').click()",
+		appWait: "[data-test=disclosure-row]",
+		appAfter: appSettingsAt("books"),
+		mockupAfter: settingsAt("School books"),
+	},
+	{
+		id: "set-keys",
+		route: "#/vol/plans",
+		clicks: ["[data-test=settings-button]"],
+		mockupSteps: "document.querySelector('#gb').click()",
+		appWait: "[data-test=key-row]",
+		appAfter: appSettingsAt("keys"),
+		mockupAfter: settingsAt("Keys and access"),
+	},
+	{
+		id: "set-stripe-dialog",
+		route: "#/vol/plans",
+		clicks: ["[data-test=settings-button]", "[data-test=stripe-connect]"],
+		mockupSteps:
+			"document.querySelector('#gb').click();document.querySelector('[data-skey]').click()",
+	},
+	{
+		id: "set-admin-readonly",
+		route: "#/b4u/plans",
+		clicks: ["[data-test=settings-button]"],
+		mockupSteps: "setSchool('b4u');document.querySelector('#gb').click()",
+	},
 ].filter((entry) => entry.id.startsWith(only));
 
 const writeNonce = (value: string): void => {
@@ -379,6 +481,8 @@ for (const shotSide of sides)
 						route,
 					);
 					for (const click of entry.clicks) await page.click(click);
+					if (entry.appWait) await page.waitForSelector(entry.appWait);
+					if (entry.appAfter) await page.evaluate(entry.appAfter);
 				} else {
 					await page.goto(mockupUrl);
 					await page.waitForSelector(".tab");
@@ -386,6 +490,7 @@ for (const shotSide of sides)
 					await page.evaluate(
 						`theme=${JSON.stringify(theme)};applyTheme();${entry.mockupSteps}`,
 					);
+					if (entry.mockupAfter) await page.evaluate(entry.mockupAfter);
 				}
 				await page.waitForTimeout(250);
 				if ((await page.evaluate(() => innerWidth)) !== width)
