@@ -251,7 +251,12 @@ const entries: Array<{
 		mockupSteps: `${membersTab};setVa('public')`,
 	},
 	// S9.3: the Plans tab (Edit, Preview, Code, the editor and the review) and Promos.
-	{ id: "plans-edit", route: "#/vol/plans", clicks: [], mockupSteps: glowDraft },
+	{
+		id: "plans-edit",
+		route: "#/vol/plans",
+		clicks: [],
+		mockupSteps: glowDraft,
+	},
 	{
 		id: "plans-preview",
 		route: "#/vol/plans?mode=preview",
@@ -276,7 +281,12 @@ const entries: Array<{
 		clicks: ["[data-test=plan-review]"],
 		mockupSteps: `${glowDraft};document.querySelector('#prev').click()`,
 	},
-	{ id: "promos-list", route: "#/vol/promos", clicks: [], mockupSteps: promosTab },
+	{
+		id: "promos-list",
+		route: "#/vol/promos",
+		clicks: [],
+		mockupSteps: promosTab,
+	},
 	{
 		id: "promos-create",
 		route: "#/vol/promos",
