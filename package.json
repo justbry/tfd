@@ -33,6 +33,7 @@
 			"packages/atm",
 			"packages/verify",
 			"packages/ledger-worker",
+			"apps/trifold-cloud",
 			"packages/catalog-lru",
 			"packages/edge-config",
 			"packages/blue-green",

@@ -1,0 +1,92 @@
+name: Trifold cloud
+
+# The hosted product (apps/trifold-cloud, ledger.* and api.*) and its verifier (apps/trifold-verify, verify.*). Plan:
+# plans/trifold-cloud/PLAN.md.
+#   - pull request or push to dev touching either app: typecheck and test
+#   - Run workflow (by hand): the same, then deploy both to staging and check /healthz on every staging host
+# Production is unbound (wrangler.jsonc) until the launch gate. The deploy job runs in the GitHub environment
+# `staging`; its CLOUDFLARE_API_TOKEN needs Workers Scripts, Workers Routes, D1 and R2 edit (docs/ci-and-deploy.md).
+
+on:
+  pull_request:
+    branches: [dev]
+    paths:
+      - apps/trifold-cloud/**
+      - apps/trifold-verify/**
+      - .github/workflows/trifold-cloud.yml
+  push:
+    branches: [dev]
+    paths:
+      - apps/trifold-cloud/**
+      - apps/trifold-verify/**
+      - .github/workflows/trifold-cloud.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trifold-cloud-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: trifold-cloud (test)
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Typecheck
+        working-directory: apps/trifold-cloud
+        run: bun run ts
+      - name: Test
+        working-directory: apps/trifold-cloud
+        run: bun run test
+
+  staging:
+    name: trifold-cloud (staging deploy)
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
+    environment: staging
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Apply D1 migrations
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/trifold-cloud
+          command: d1 migrations apply trifold-cloud-staging --env staging --remote
+      - name: Deploy trifold-cloud
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/trifold-cloud
+          command: deploy --env staging
+      - name: Deploy trifold-verify
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/trifold-verify
+          command: deploy --env staging
+      - name: Check every staging host
+        run: |
+          set -euo pipefail
+          for url in https://staging-ledger.trifold.app/healthz https://staging-api.trifold.app/healthz \
+                     https://staging-verify.trifold.app/.well-known/trifold-keys.json; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 5 --retry-all-errors "$url")
+            echo "$url $code"
+            test "$code" = 200
+          done

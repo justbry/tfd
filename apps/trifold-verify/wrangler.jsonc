@@ -1,0 +1,15 @@
+// verify.trifold.app (plans/trifold-cloud/PLAN.md section 8): static assets only, no Worker code. Only `staging` is
+// bound until the launch gate; apps/trifold-cloud/tests/config.test.ts checks that.
+{
+	"name": "trifold-verify",
+	"compatibility_date": "2026-07-01",
+	"workers_dev": false,
+	"assets": { "directory": "./public", "not_found_handling": "404-page" },
+	"env": {
+		"staging": {
+			"name": "trifold-verify-staging",
+			"workers_dev": false,
+			"routes": [{ "pattern": "staging-verify.trifold.app", "custom_domain": true }]
+		}
+	}
+}

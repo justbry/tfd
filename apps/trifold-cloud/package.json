@@ -1,0 +1,17 @@
+{
+	"name": "trifold-cloud",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "The hosted Trifold product: ledger.trifold.app and api.trifold.app. See plans/trifold-cloud/PLAN.md.",
+	"scripts": {
+		"ts": "tsc --noEmit",
+		"test": "bun test tests",
+		"deploy:staging": "bunx wrangler@4.90.0 deploy --env staging",
+		"migrate:staging": "bunx wrangler@4.90.0 d1 migrations apply trifold-cloud-staging --env staging --remote"
+	},
+	"devDependencies": {
+		"@types/bun": "1.4.2",
+		"typescript": "~5.8.3"
+	}
+}
