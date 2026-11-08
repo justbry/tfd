@@ -6,9 +6,9 @@
  * writes them again whenever it rebuilds the demo school's views.
  */
 import type { AtmEvent } from "tfd";
-import { eventsAsOf, readEventsFromStore } from "tfd/worker";
+import { eventsAsOf } from "tfd/worker";
 import { putText, type Store, textOf } from "../data/store-io.js";
-import { type DemoFacts, demoFactsKey, readDemoFacts } from "../demo.js";
+import { type DemoFacts, demoFactsKey } from "../demo.js";
 import { demoRouteAnswers } from "./route-answers.js";
 
 export const demoApiPrefix = (school: string): string =>
@@ -90,17 +90,3 @@ export const writeDemoApi = async (
 		await putText(store, demoFactsKey(school), factsText);
 	return report;
 };
-
-/** The views job's refresh of a demo school whose views it has just built as of `asOf`: its log and stored facts. */
-export const refreshDemoApi = async (
-	store: Store,
-	school: string,
-	asOf: Date,
-): Promise<DemoApiReport> =>
-	writeDemoApi(
-		store,
-		school,
-		await readEventsFromStore(store, school),
-		await readDemoFacts(store, school),
-		asOf,
-	);

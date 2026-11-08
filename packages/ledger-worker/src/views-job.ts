@@ -7,16 +7,29 @@
  * rebuilds at most one, the one whose views are oldest, and only once they are an hour old. Fifteen demo logs of a
  * year's days each would otherwise cost every run thousands of reads. The run also writes the demo school's route answers
  * again (`demo/demo-api-store.ts`), as of the same instant as its views.
+ *
+ * After a school's views, the run stores the generation's answers and log (`routes/stored.ts`, `data/answers.ts`) from
+ * the events it has just read, for the local day of the run; a school whose views did not change costs one more read
+ * (the pointer). A school whose answers cannot be stored is logged by id and still counts as done: its endpoints
+ * compute. Last, the demo index (`data/demo-index.ts`) is written again when it changed.
  */
-import { readViewsFromStore, runViews } from "tfd/worker";
+import {
+	buildViews,
+	readEventsFromStore,
+	readViewsFromStore,
+	writeViews,
+} from "tfd/worker";
+import { refreshDemoIndex } from "./data/demo-index.js";
 import { jobStatusKey, readJobProblem } from "./data/job-status.js";
+import { schoolIdsIn } from "./data/school-ids.js";
 import { putText, type Store } from "./data/store-io.js";
 import { asOfFor } from "./data/watermark.js";
-import { refreshDemoApi } from "./demo/demo-api-store.js";
-import { DEMO_SCHOOL } from "./demo.js";
+import { writeDemoApi } from "./demo/demo-api-store.js";
+import { DEMO_SCHOOL, readDemoFacts } from "./demo.js";
+import { storeAnswers } from "./routes/stored.js";
 
-const SCHOOLS_PREFIX = "schools/";
-const TRAILING_SLASH = /\/$/;
+export { schoolIdsIn } from "./data/school-ids.js";
+
 const MS_PER_MINUTE = 60_000;
 /** A demo school's views are rebuilt once they are this old. */
 export const DEMO_REBUILD_MINUTES = 60;
@@ -24,24 +37,6 @@ export const DEMO_REBUILD_MINUTES = 60;
 export type ViewsJobResult =
 	| { school: string; ok: true }
 	| { school: string; ok: false; reason: string };
-
-/** Every school id with a prefix under `schools/`, ascending. */
-export const schoolIdsIn = async (store: Store): Promise<string[]> => {
-	const ids: string[] = [];
-	let cursor: string | undefined;
-	for (;;) {
-		const page = await store.list({
-			prefix: SCHOOLS_PREFIX,
-			delimiter: "/",
-			cursor,
-		});
-		for (const prefix of page.prefixes)
-			ids.push(prefix.slice(SCHOOLS_PREFIX.length).replace(TRAILING_SLASH, ""));
-		if (page.next === null) break;
-		cursor = page.next;
-	}
-	return ids.sort();
-};
 
 /** Records or clears the job note: only when the state changes, so a healthy school costs one read per run. */
 const recordOutcome = async (
@@ -71,14 +66,35 @@ const runOne = async (
 ): Promise<ViewsJobResult> => {
 	try {
 		const at = await asOfFor(store, school, asOf);
-		const run = await runViews(store, school, at);
-		if (!run.ok) {
-			await recordOutcome(store, school, { kind: run.error.kind }, asOf);
+		// `runViews`, with the events kept for the answers below
+		const events = await readEventsFromStore(store, school);
+		const built = buildViews(events, { school, asOf: at });
+		if (!built.ok) {
+			await recordOutcome(store, school, { kind: built.error.kind }, asOf);
 			console.error(`views job failed for school ${school}`);
-			return { school, ok: false, reason: run.error.kind };
+			return { school, ok: false, reason: built.error.kind };
 		}
+		const written = await writeViews(store, school, built.views);
 		// A demo school's route answers follow its views, as of the same instant.
-		if (DEMO_SCHOOL.test(school)) await refreshDemoApi(store, school, at);
+		if (DEMO_SCHOOL.test(school))
+			await writeDemoApi(
+				store,
+				school,
+				events,
+				await readDemoFacts(store, school),
+				at,
+			);
+		try {
+			// a run older than the stored views wrote nothing: its events are not the stored generation's
+			await storeAnswers(
+				store,
+				school,
+				asOf,
+				written.stale ? undefined : events,
+			);
+		} catch {
+			console.error(`stored answers failed for school ${school}`);
+		}
 		await recordOutcome(store, school, null, asOf);
 		return { school, ok: true };
 	} catch {
@@ -121,5 +137,9 @@ export const runViewsJob = async (
 		asOf,
 	);
 	if (demo !== null) results.push(await runOne(store, demo, asOf));
+	if (schools.some((id) => DEMO_SCHOOL.test(id)))
+		await refreshDemoIndex(store).catch(() => {
+			console.error("demo index failed");
+		});
 	return results;
 };

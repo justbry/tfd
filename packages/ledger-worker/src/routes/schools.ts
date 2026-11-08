@@ -1,14 +1,16 @@
-/** `GET /v1/schools`: how fresh each of the token's schools' views are, then the demo schools in the bucket. */
+/**
+ * `GET /v1/schools`: how fresh each of the token's schools' views are (each one's manifest: the token lists few, and
+ * they are read at once), then the demo schools in the bucket (the demo index, one read; the bucket when it has none).
+ */
 import { readViewsFromStore } from "tfd/worker";
-import type { Store } from "../data/store-io.js";
 import {
-	DEMO_SCHOOL,
-	type DemoBookingsFact,
-	type DemoFacts,
-	readDemoFacts,
-} from "../demo.js";
+	demoIndexEntryOf,
+	demoSchoolIdsIn,
+	readDemoIndex,
+} from "../data/demo-index.js";
+import type { Store } from "../data/store-io.js";
+import type { DemoBookingsFact, DemoFacts } from "../demo.js";
 import { lagMinutesOf } from "../http.js";
-import { schoolIdsIn } from "../views-job.js";
 
 /** A school whose views are older than this is stale. */
 export const STALE_AFTER_MINUTES = 15;
@@ -56,23 +58,35 @@ export const schoolsRoute = async (
 
 /**
  * Every demo school with a prefix in the bucket, ascending, but those in `listed` (the token's). Never stale: nothing
- * ships to a demo school, and the views job rebuilds its views at its own pace (`views-job.ts`).
+ * ships to a demo school, and the views job rebuilds its views at its own pace (`views-job.ts`). From the demo index
+ * (`data/demo-index.ts`) when there is one, else from the bucket: the same rows either way.
  */
 export const demoSchoolsRoute = async (
 	store: Store,
 	listed: ReadonlySet<string>,
 	now: number,
 ): Promise<DemoSchoolRow[]> => {
-	const ids = (await schoolIdsIn(store)).filter(
-		(id) => DEMO_SCHOOL.test(id) && !listed.has(id),
-	);
-	return Promise.all(
-		ids.map(async (id): Promise<DemoSchoolRow> => {
-			const [freshness, facts] = await Promise.all([
-				freshnessOf(store, id, now),
-				readDemoFacts(store, id),
-			]);
-			return { id, ...freshness, stale: false, demo: true, ...facts };
-		}),
-	);
+	const index = await readDemoIndex(store);
+	const entries =
+		index === null
+			? await Promise.all(
+					(await demoSchoolIdsIn(store)).map(
+						async (id) => [id, await demoIndexEntryOf(store, id)] as const,
+					),
+				)
+			: Object.entries(index.schools).sort(([a], [b]) =>
+					a < b ? -1 : a > b ? 1 : 0,
+				);
+	return entries
+		.filter(([id]) => !listed.has(id))
+		.map(
+			([id, { asOf, ...facts }]): DemoSchoolRow => ({
+				id,
+				asOf,
+				lagMinutes: asOf === null ? null : lagMinutesOf(asOf, now),
+				stale: false,
+				demo: true,
+				...facts,
+			}),
+		);
 };
