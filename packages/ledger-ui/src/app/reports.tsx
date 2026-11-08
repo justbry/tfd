@@ -22,7 +22,7 @@ import { Donors } from "./donors.tsx";
 import { DownloadButton } from "./download-button.tsx";
 import { Icon, type IconName } from "./icon.tsx";
 import { LoadFailed } from "./load-failed.tsx";
-import { formatMoney } from "./money.ts";
+import { csvCurrency, formatMoney } from "./money.ts";
 import {
 	monthAndDay,
 	type Period,
@@ -45,10 +45,12 @@ const notAvailableText = "—";
 const donorsNotAvailableText = "Not available yet: no source records donors.";
 /** The statement as Reports shows it: a school with no published menu has no statement currency or unit, so the
  * school's own stand in (as the Ledger's do). */
-type ShownStatement = IncomeStatement & { currency: string; unit: CreditUnit };
+type ShownStatement = IncomeStatement & { unit: CreditUnit };
 
-const statementAmount = (cents: number | null, currency: string): string =>
-	cents === null ? notAvailableText : formatMoney(cents, currency);
+const statementAmount = (
+	cents: number | null,
+	currency: string | null,
+): string => (cents === null ? notAvailableText : formatMoney(cents, currency));
 const whoSees: Record<AudienceReport["audience"], string> = {
 	public: "Public sees",
 	member: "Members see",
@@ -57,7 +59,7 @@ const whoSees: Record<AudienceReport["audience"], string> = {
 
 /** A money figure of the document, rounded or exact as the document says. */
 const documentFigure =
-	(document: AudienceReport, currency: string) =>
+	(document: AudienceReport, currency: string | null) =>
 	(cell: ReportCell, noun = "payers"): JSX.Element => (
 		<Figure
 			cell={cell}
@@ -86,7 +88,7 @@ function Spark({
 	series: IncomeSeries;
 	previous: IncomeSeries | null;
 	from: string;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	if (series.points.length === 0)
 		return (
@@ -302,7 +304,11 @@ const statementRows: Array<{
 ];
 
 /** "▲ $X vs <period>": the server's change of the line, signed; the UI formats it and never subtracts. */
-const changeText = (change: number, currency: string, label: string): string =>
+const changeText = (
+	change: number,
+	currency: string | null,
+	label: string,
+): string =>
 	`${change >= 0 ? "▲" : "▼"} ${formatMoney(Math.abs(change), currency)} vs ${label}`;
 
 function StatementBody({
@@ -513,7 +519,7 @@ function DocumentBody({
 	currency,
 }: {
 	document: AudienceReport;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	const { audience, grain, figures } = document;
 	const name = audienceNames[audience];
@@ -625,7 +631,7 @@ function DocumentStatement({
 	currency,
 }: {
 	document: AudienceReport;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	const { audience, grain, figures, rounding } = document;
 	const figure = documentFigure(document, currency);
@@ -759,6 +765,7 @@ function Rules({
 	/** Null where no source has the rules (D11). */
 	rules: SchoolRules | null;
 	unit: CreditUnit;
+	/** An admin of a real school; a demo school is read-only, so it has no way to an edit. */
 	canEdit: boolean;
 	onEdit: () => void;
 }): JSX.Element {
@@ -897,7 +904,13 @@ export function Reports({
 			/>
 		);
 	if (status.failed)
-		return <LoadFailed what="the report" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the report"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
 	const { rules, donors, document } = loaded;
@@ -917,7 +930,10 @@ export function Reports({
 			title="Download the income statement as CSV"
 			label="Download"
 			name={csvFileNames.statement(statement.from, statement.to)}
-			columns={statementColumns(statement)}
+			columns={statementColumns({
+				...statement,
+				currency: csvCurrency(statement.currency),
+			})}
 			rows={statementLines.map(([line, field]) => ({
 				line,
 				amountCents: statement.amounts[field],
@@ -970,7 +986,7 @@ export function Reports({
 				<Rules
 					rules={rules.rules}
 					unit={rules.unit ?? school.creditUnit}
-					canEdit={admin}
+					canEdit={admin && !school.demo}
 					onEdit={() => onToast("Opening school settings in buzz-school…")}
 				/>
 			</div>
@@ -1023,7 +1039,7 @@ const documentColumns = (
 /** The document's six figures as `reportDocCsv` lists them. */
 function documentRows(
 	document: AudienceReport,
-	currency: string,
+	currency: string | null,
 ): DocumentRow[] {
 	const { figures } = document;
 	const whole = document.rounding !== null;

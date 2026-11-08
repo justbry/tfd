@@ -91,7 +91,7 @@ export function consequenceLine({
 	const count = creditCount(credits, creditUnit);
 	if (rules.lateCancel === "spend" && !waive)
 		return {
-			before: `Inside the ${cutoffHours(booking.cutoffMinutes)} cutoff, the school's rule `,
+			before: `Inside the ${booking.cutoffMinutes === null ? "" : `${cutoffHours(booking.cutoffMinutes)} `}cutoff, the school's rule `,
 			strong: `forfeits ${count}`,
 			after: '. Tick "Waive" to return them.',
 		};

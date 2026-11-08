@@ -8,7 +8,7 @@ Textarea and Label. A standalone package: its own `package.json` and `bun.lock`,
 ## Commands
 
 ```sh
-bun install          # dependencies
+bun install          # dependencies; run it again after changing packages/verify (see below)
 bun run dev          # dev server on http://localhost:5173
 bun run build        # prerender every route into build/
 bun run preview      # serve build/ on http://localhost:4173
@@ -35,8 +35,13 @@ bun run check        # svelte-check
 - SvelteKit 3 removed `$lib`; this app uses Node subpath imports (`#lib/...`, see `package.json` `imports`).
 - `src/routes/` pages; long-form copy lives in markdown under `src/content/` (mdsvex), so it can be edited as text.
 - `src/lib/components/` header, footer, hero canvas (`HeroField`), ledger panel, receipt card, verifiers, pricing.
-- `src/lib/verify/` the in-browser verifier: `core.ts` is a line-for-line port of tfd's canonical bytes, sha256,
-  Ed25519 (strict RFC 8032) and schema checks; `check.ts` adds the books and seal checks. It loads on first use.
+- `src/lib/verify/session.svelte.ts` the in-browser verifier's state and sample receipts. The checks come from
+  `tfd-verify` (`packages/verify`, Apache-2.0), a line-for-line port of tfd's canonical bytes, sha256, Ed25519 (strict
+  RFC 8032) and schema checks: `tfd-verify/check` runs one whole check (signature, then the books and seal) and loads on
+  the first Verify, with the crypto; `tfd-verify/link` encodes `/verify?r=` links without any crypto.
+  `tfd-verify` is a `file:` dependency, so bun copies it into `node_modules` at install time. **After changing anything
+  in `packages/verify`, run `bun install` in `apps/trifold-site`**, or the site builds and tests the old copy;
+  `tests/verify-copy.test.ts` fails while the copy differs from `packages/verify/src`.
 - `src/lib/samples/` the sample receipt, a tampered copy, the demo public key, the sample school's October books and
   seal, all made by `scripts/make-samples.ts` from `packages/atm/src`. The private key is generated in memory and
   discarded; it is never written.
@@ -50,7 +55,7 @@ bun run check        # svelte-check
 
 ## Licensing
 
-The site's verifier (`src/lib/verify/*.ts`) is Apache-2.0 and carries an SPDX header. The tfd engine it ports is FSL-1.1-ALv2 (source-available; each release becomes Apache-2.0 two years after it ships), except the receipt and seal format, spec and verifier, which are Apache-2.0, and the test vectors, which are CC0-1.0. In copy, never call the engine "open source"; say "source-available" or "free to self-host". The engine is `tfd` (the `atm` command until the rename lands); keep `packages/atm/...` paths and `justbry/atm` links as they are.
+The site is proprietary, all of it (`LICENSE`). The receipt verifier it runs comes from `tfd-verify` (`packages/verify`), which is Apache-2.0. The tfd engine that package ports is FSL-1.1-ALv2 (source-available; each release becomes Apache-2.0 two years after it ships), except the receipt and seal format, spec and verifier, which are Apache-2.0, and the test vectors, which are CC0-1.0. In copy, never call the engine "open source"; say "source-available" or "free to self-host". The engine is `tfd` (the `atm` command until the rename lands); keep `packages/atm/...` paths and `justbry/atm` links as they are.
 
 ## Agent files
 
@@ -81,9 +86,6 @@ in its `sources`; "Not stated" means its public pages don't say. Trifold's price
 
 ## Placeholders to replace before launch
 
-- **Domain.** `SITE_ORIGIN` in `src/lib/config.ts` is `https://gettrifold.com`, which is not registered yet. Canonical
-  links, Open Graph URLs, `sitemap.xml` and `robots.txt` all read it.
-- **Contact address.** `CONTACT_EMAIL` (`hello@gettrifold.com`) in the same file.
 - **People block** on the homepage and the founder section of `/about`: marked placeholders.
 - **Legal** (`src/content/legal.md`): draft stubs, `noindex`.
 
@@ -103,15 +105,19 @@ When it is unset, submitting opens the visitor's email app with the fields fille
 
 ## Deploy to Cloudflare Pages
 
-Direct upload:
+CI deploys it (`.github/workflows/trifold-site.yml`): every pull request gets a preview at
+`<branch>.tfd-ledger.pages.dev`, and every push to `dev` goes to production at https://trifold.app (also served at
+`www.trifold.app` and `tfd-ledger.pages.dev`; `SITE_ORIGIN` in `src/lib/config.ts` sets the canonical). Setup, secrets and rollback are in
+`docs/ci-and-deploy.md`.
+
+By hand, from this directory:
 
 ```sh
 bun run build
-bunx wrangler pages deploy build --project-name trifold-site
+bunx wrangler pages deploy build --project-name tfd-ledger --branch main --commit-dirty=true
 ```
 
-Or Git integration: build command `bun run build`, output directory `build`, root directory `apps/trifold-site`
-(add `PUBLIC_FORM_ENDPOINT` as an environment variable if used). `wrangler.toml` names the project and its output.
+`wrangler.toml` names the project and its output. Set `PUBLIC_FORM_ENDPOINT` at build time if the form has an endpoint.
 
 `static/_headers` sets the security headers and long-lived caching for `/_app/immutable/*`. `build/404.html` is served
 for unknown paths.

@@ -11,6 +11,9 @@ import {
 import type { Change } from "./portal-format.ts";
 import type { SchoolTab } from "./route.ts";
 
+/** The note a demo school shows on a tab it has no data for (`shell.tsx`). */
+export { DemoTabNote } from "./demo-note.tsx";
+
 /** Everything a pane may be given; each takes the props it names. */
 export type PaneProps = BooksPaneProps & {
 	/** Plans: the school's draft kept by the shell, and where a changed one goes. */
@@ -74,6 +77,18 @@ const paneLoaders: Record<PaneName, () => Promise<ComponentType<PaneProps>>> = {
 	reports: () => import("./reports.tsx").then((module) => module.Reports),
 };
 
+const panesLoading = new Map<PaneName, Promise<ComponentType<PaneProps>>>();
+/** Loads the pane `name` names, once: the HTTP build starts the route's pane while the schools and the disclosure are
+ * read (`browser.ts`), and `Pane` takes the same load. */
+export function loadPane(name: PaneName): Promise<ComponentType<PaneProps>> {
+	let loading = panesLoading.get(name);
+	if (!loading) {
+		loading = paneLoaders[name]();
+		panesLoading.set(name, loading);
+	}
+	return loading;
+}
+
 /** The pane `name` names, once its module has loaded. */
 export function Pane({
 	name,
@@ -85,7 +100,7 @@ export function Pane({
 	const Shown = panes[name];
 	useEffect(() => {
 		if (!Shown)
-			paneLoaders[name]().then((loaded) =>
+			loadPane(name).then((loaded) =>
 				setPanes((before) => ({ ...before, [name]: loaded })),
 			);
 	}, [name, Shown]);

@@ -1,0 +1,203 @@
+---
+pagetitle: "Trifold brief · Investors"
+brief-audience: "Investors"
+brief-oneliner: "Books anyone can check, sold as a hosted service; Trifold's countersignature is the paid line a fork can't copy (next)."
+brief-length: "19 slides, about 16 minutes"
+include-in-header:
+  text: "<style>:root { --path: #1e2a44; --path-text: #1e2a44; }</style>"
+---
+
+{{< include ../_partials/_title.qmd >}}
+
+{{< include ../_partials/_problem.qmd >}}
+
+{{< include ../_partials/_how.qmd >}}
+
+{{< include ../_partials/_receipts.qmd >}}
+
+## Beachhead in Idaho and Utah; a market of about $307M a year across six countries {#market}
+
+<span class="kicker">Market · estimates unless marked</span>
+
+<figure class="rings" aria-label="Three market rings, not to scale">
+<div class="ring ring--outer"><b>~0.9M</b> small businesses on Stripe <em>estimate</em></div>
+<div class="ring ring--tam"><b>TAM ~426,000</b> organizations big enough to pay · ~$307M a year; schools, co-ops, churches ~$156M <em>estimate</em></div>
+<div class="ring ring--sam"><b>SAM ~77,000</b> on their own Stripe · ~$55M a year <em>estimate</em></div>
+<div class="ring ring--som"><b>SOM ~1,200</b> paying · ~$0.86M ARR, year 3 <em>estimate</em></div>
+</figure>
+
+<p class="fine">Launch order: US, ESA states first, starting with Idaho and Utah microschools → Canada without Quebec → UK → Australia and New Zealand → Ireland.</p>
+
+::: {.notes}
+Source: `docs/business/market-research.md` §6 (researched 2026-11-07; summarized in `docs/business/business-plan.md` §8, "Market size (estimates)", in docs PR #38): §6.1 the three rings (outer ring about 0.9M small businesses on Stripe in six countries, from BuiltWith counts of live Stripe sites: ~695,000–710,000 US and ~82,000–86,000 UK sourced, the rest estimated at the UK rate; websites aren't businesses); §6.7 TAM, SAM, SOM (TAM = paid-eligible organizations × $720 a year at the realized $60 a month: 426,000 total, 217,000 in the focus verticals, ~$307M / ~$156M; SAM = those billing through a Stripe account they control: 77,000, ~$55M; SOM = a 3-year share: ~1,200 customers, ~$0.86M ARR, ~$0.81M net of affiliates; sensitivity $45 to $76.50 a month gives TAM $230–391M and SOM ~$0.65–1.1M); §6.9 launch order (US nationally, ESA states first: AZ, FL, TX, UT, ID, then AR, IA, TN, AL, WV; Canada without Quebec; UK; Australia then New Zealand; Ireland with an EU plan). All four rings are estimates. The rings overlap rather than nest (focus organizations without Stripe are in the TAM, not the outer ring); the bars are not to scale. The SOM fits the plan's 1,000–1,300 paying by year 3 (`docs/business/financial-model.md` §5).
+
+Owner decision, 2026-11-07: the market is the US and each English-speaking country; Idaho and Utah microschools are the first beachhead (`docs/business/business-plan.md` §1 still says "the working default"). Utah's program is not named while its appeal is pending.
+:::
+
+{{< include ../_partials/_programs.qmd >}}
+
+## No accounting product hands the payer a receipt anyone can check {#competition}
+
+<span class="kicker">Competition · list prices a month</span>
+
+<div class="cards cards--2">
+<div class="card"><h3>General accounting</h3><p>QuickBooks $38–340, user caps on every plan. Xero $27–97. Trifold replaces or feeds them.</p></div>
+<div class="card card--green"><h3>AI-native accounting</h3><p>Puzzle $30–360. Digits $65–250. Same buyers; no payer receipts.</p></div>
+<div class="card card--ink"><h3>Bookkeeping services</h3><p>Pilot from $99; human-led $349–849+. Trifold sells this through partners.</p></div>
+<div class="card card--quiet"><h3>Vertical software</h3><p>Jackrabbit $49–245. Pike13 $139–249. Partners: they run operations, Trifold keeps the books.</p></div>
+</div>
+
+::: {.notes}
+Sources: `docs/business/market-research.md` §1 (the four groups and where Trifold fits), §2 (QuickBooks $38 / $85 / $140 / $340 with user caps 1 / 3 / 5 / 25; Xero $27 / $59 / $97; Puzzle $30 / $72 / $120 / $360 on its own page, 2026-11-06; Digits $65 / $100 / ~$250; Pilot Bookkeeping Essentials $99 on Pilot's page, aggregators $199 and human-led $349–849+; Jackrabbit $49–245; Pike13 $139–249) and §3 point 5 ("Nobody offers provable books"). Where vendor pages and aggregators differ, the vendor page wins (market-research header). Recheck before quoting.
+
+Nearest competitor: Airtight (Australia and the Gulf) signs entries with Ed25519 inside its own system; Trifold gives the signed receipt to the person who paid, with a free checker and an open format; Airtight has no free tier (`docs/business/pricing-strategy.md` §9, reviewed from its own pages, claims unverified).
+:::
+
+{{< include ../_partials/_pricing.qmd >}}
+
+## List prices give $76.50 a month per organization; about $60 after discounts {#arpu}
+
+<span class="kicker">Revenue per paying organization · illustrative</span>
+
+<figure class="stack">
+<div class="stack-bar" role="img" aria-label="Assumed list-price mix: Starter 40 percent at $29, Pro 35 percent at $79, Audited 20 percent at $149, bookkeeper bundle 5 percent counted at $149.">
+<div class="seg-a" style="width: 40%">Starter 40%<small>$29 → $11.60</small></div>
+<div class="seg-b" style="width: 35%">Pro 35%<small>$79 → $27.65</small></div>
+<div class="seg-c" style="width: 20%">Audited 20%<small>$149 → $29.80</small></div>
+<div class="seg-d" style="width: 5%">5%</div>
+</div>
+<figcaption>The last 5% is the bookkeeper bundle, counting only Trifold's $149 share ($7.45).</figcaption>
+</figure>
+
+<div class="cards cards--2">
+<div class="card card--ink"><span class="big">$76.50</span><p>List-price mix: the upside case</p></div>
+<div class="card card--green"><span class="big">≈ $60</span><p>Realized base case. By year: ≈ $40 (Starter and the compliance pack only), ≈ $55, ≈ $65</p></div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> $76.50 × 0.80 (about 40% non-profits at half price) × 0.975 (annual billing).</p>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §8 as updated in docs PR #38 (2026-11-07): list-price mix 40% Starter, 35% Pro, 20% Audited, 5% bundle counting only Trifold's ~$149 share = $11.60 + $27.65 + $29.80 + $7.45 = $76.50 (the upside case; credit packs left out); realized base case $76.50 × 0.80 × 0.975 ≈ $59.70 (about 40% non-profits or co-ops at about half price; about 15% annual with two months free); by year ~$40 (year 1: Starter with the compliance pack only, Pro waits for its features), ~$55 (Pro arrives, Audited late), ~$65 (the full mix plus packs). Unit economics: `docs/business/financial-model.md` §7 (#38).
+
+Every number is an assumption: no price tests have run (`docs/business/market-research.md` §5; experiment A in business-plan §11).
+:::
+
+## If 1,000 organizations pay by year 3, the run-rate is about $0.8–0.9M {#arr}
+
+<span class="kicker">Annual run-rate at year end · illustrative</span>
+
+<figure class="bars">
+<div class="bar-row"><span class="label">Year 1 · 50</span><div class="track"><span class="fill fill--list" style="--w: 3.75%"></span><span class="fill" style="--w: 1.96%"></span><span class="value" style="--at: 3.75%">$24K · list $46K</span></div></div>
+<div class="bar-row"><span class="label">Year 2 · 300</span><div class="track"><span class="fill fill--list" style="--w: 22.5%"></span><span class="fill" style="--w: 16.2%"></span><span class="value" style="--at: 22.5%">$198K · list $275K</span></div></div>
+<div class="bar-row"><span class="label">Year 3 · 1,000</span><div class="track"><span class="fill fill--list" style="--w: 75%"></span><span class="fill" style="--w: 63.7%"></span><span class="value" style="--at: 75%">$780K · list $918K</span></div></div>
+<figcaption><span class="legend"><span><i></i>Base case</span><span><i class="list"></i>List-price upside</span></span>Paying organizations × that year's revenue each × 12. Base revenue in the year: ≈ $14K, $122K, $525K.</figcaption>
+</figure>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Counts and prices are assumptions, not forecasts. Platform and Witness API revenue left out.</p>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §8 as updated in docs PR #38: paying organizations 50 / 300 / 1,000 at year end (free and self-hosted 300 / 2,000 / 8,000); base run-rate ARR (paying × that year's ARPU × 12) ~$24K / ~$198K / ~$780K; base revenue in the year ~$14K / ~$122K / ~$525K; upside (list price, full mix from day one) run-rate ~$46K / ~$275K / ~$918K, revenue in the year ~$28K / ~$170K / ~$618K; Platform and Witness API small in year 2, 10–20% on top in year 3. Growth (same section; `docs/business/financial-model.md` §5): 0.75% a month free-to-paid, 3% a month paid churn, plus about 4, 15 and 35 direct paid sign-ups a month in years 1–3; the free pool alone gives only about 10–20, 80–160 and 370–720 paying by the year-ends.
+
+The SOM in `docs/business/market-research.md` §6.7 (~1,200 paying, ~$0.86M ARR in year 3) sits between the base and the upside. Bars on one linear scale ($918K = 75% of the track).
+:::
+
+## Month 36, by hand: still about $13–17K a month short; break-even needs ~1,300 paying {#month-36}
+
+<span class="kicker">One month in year 3 · illustrative</span>
+
+<figure class="bars bars--zero">
+<div class="bar-row"><span class="label">Net revenue</span><div class="track"><span class="fill" style="--from: 15%; --w: 49%"></span><span class="value" style="--at: 64%">$65K</span></div></div>
+<div class="bar-row"><span class="label">Cost of revenue</span><div class="track"><span class="fill fill--clay" style="--from: 50.1%; --w: 13.9%"></span><span class="value" style="--at: 64%">−$16.5–20.5K</span></div></div>
+<div class="bar-row"><span class="label">Gross profit</span><div class="track"><span class="fill fill--green" style="--from: 15%; --w: 35.1%"></span><span class="value" style="--at: 50.1%">$45–49K · 69–75%</span></div></div>
+<div class="bar-row"><span class="label">Operating costs</span><div class="track"><span class="fill fill--clay" style="--from: 3.6%; --w: 46.5%"></span><span class="value" style="--at: 50.1%">−$62K</span></div></div>
+<div class="bar-row"><span class="label">Operating income</span><div class="track"><span class="fill fill--clay" style="--from: 3.75%; --w: 11.25%"></span><span class="value" style="--at: 15%">−$13–17K a month</span></div></div>
+<figcaption>The line marks zero. Per paying organization, gross margin is 75–80% if support costs about $8 a month; about 70% at $12.</figcaption>
+</figure>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Hand arithmetic, not a model run. Includes founder pay.</p>
+
+::: {.notes}
+Source: `docs/business/financial-model.md` §5, "What month 36 should roughly show", as updated in docs PR #38: gross collected ≈ $77,200 (1,000 paying × ~$64.70 realized incl. compliance packs; credit packs ≈ $2,500; bookkeeper passthrough ≈ $10,000); net revenue ≈ $65,400 (less the passthrough and ≈ $1,800 firm wholesale discounts); COGS ≈ $16,500–20,500 (Stripe ≈ $2,600; support $8,000–12,000; AI ≤ $4,700; witness ≈ $500; hosting under $1,000); gross margin ≈ 69–75% company-wide; opex ≈ $62,000 (marketing $25,000, three hires $28,800, founder pay $6,000, affiliate commissions ≈ $1,400, software and legal $800); operating income ≈ −$13,000 to −$17,000 a month. "Trifold isn't yet profitable at month 36. Break-even needs about 1,250–1,350 paying schools at this cost base, or marketing held near $8,000 a month, or the list-price case." Per-school gross margin 75–80% with support near $8, about 70% at $12: financial-model §7.
+
+The deck's earlier "operating income positive by year 3" came from the pre-#38 model and is withdrawn. Bars on one linear scale: zero at 15% of the track, $1K = 0.75%.
+:::
+
+## The strongest moat, Trifold's countersignature, ships next; the license is the weakest {#moat}
+
+<span class="kicker">Defensibility, strongest first</span>
+
+<div class="cards">
+<div class="card"><h3>1 · The witness</h3><p>Trifold's countersignature and public log. A fork can't copy it. <span class="tag tag--next">next</span></p></div>
+<div class="card card--green"><h3>2 · The open standard</h3><p>The receipt format and checker (Apache-2.0) and test data (CC0).</p></div>
+<div class="card card--ink"><h3>3 · The trademark</h3><p>Forks must rename. Unregistered; clearance search first.</p></div>
+</div>
+<div class="cards cards--2">
+<div class="card card--quiet"><h3>4 · Rifo on the books</h3><p>The assistant and workflows on top of the ledger. <span class="tag tag--next">next</span></p></div>
+<div class="card card--quiet"><h3>5 · The license</h3><p>FSL blocks a hosted clone for two years per release; then Apache-2.0.</p></div>
+</div>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §9 ("Moat, strongest first", in this order) and §5 ("The license is the weakest of the moats"). Status: the witness and Rifo are not built (business-plan §3; AGENTS.md "Claims"). Only the receipt and seal format, spec and verifier are Apache-2.0 and the vectors CC0; the KPI spec and event envelope are FSL (AGENTS.md "Licensing", open item 4). Trademark: `TRADEMARKS.md` (a draft; nothing registered, ™ only) and business-plan §10 (Samsung Galaxy Z TriFold; old TRIFOLD filings; search classes 9, 36, 42).
+
+Licensing detail (AGENTS.md; business-plan §5; pricing-strategy §8): tfd is FSL-1.1-ALv2 from 0.10.0 (releases up to 0.9.0 stay Apache-2.0); each release becomes Apache-2.0 two years after it ships (the owner kept two years on 2026-11-07); FSL over BSL, Elastic and SSPL because it is short, fixed and converts. Say "source-available" or "free to self-host" for tfd. The hosted service, Rifo and the witness are proprietary.
+:::
+
+## Organizations and accounting firms first; partners once 20 pay {#gtm}
+
+<span class="kicker">Go-to-market · three stages</span>
+
+<div class="timeline">
+<div class="stage stage--next"><span class="when">Stage A · months 0–6</span><h3>Founder-led, with firms</h3>
+<ul><li>Schools, co-ops and churches</li><li>~5 firms as co-design partners</li><li>Networks and co-ops</li><li>Organizations refer organizations</li></ul></div>
+<div class="stage stage--next"><span class="when">Stage B · months 6–12</span><h3>More firms</h3>
+<ul><li>The Practice firm tier</li><li>More firms bringing clients</li></ul></div>
+<div class="stage stage--later"><span class="when">Stage C · after ~20 paying</span><h3>Partners</h3>
+<ul><li>Affiliates: 20% for 24 months</li><li>Practice Pro, after ~100 paying</li><li>Vertical software</li><li>Witness API, once the witness ships</li></ul></div>
+</div>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> Cost to win a customer: referrals ~$130; firms ~$0 cash; affiliates $245–325; founder-led $300–500; paid ads $800–1,500, avoided.</p>
+
+::: {.notes}
+Cost to acquire a customer by channel: `docs/business/financial-model.md` §7 as updated in docs PR #38 (founder-led ~$300–500, LTV/CAC 3–5×; schools refer schools ~$130; affiliates ~$245–325 at the flat 20%, paid as earned; firms ~$0 cash, the cost is the Practice discount or wholesale margin; paid ads and content ~$800–1,500, avoid in years 1–2; LTV ~$1,500 at ~$45–48 contribution and 3% monthly churn).
+
+Owner decision of 2026-11-07: accounting firms are a key enabler. Stage A: founder-led outreach to schools, co-ops and churches, about 5 accounting firms as co-design partners (Listed tier plus a written agreement), networks and co-ops, and organization-refers-organization credit; Stage B: the Practice tier and more firms; Stage C after about 20 paying: affiliates (one flat 20% of subscription revenue for 24 months), Practice Pro after about 100 paying clients, vertical software, the Witness API. The docs may be updated to match on the stacked docs branch.
+
+It sequences what the docs list: `docs/business/business-plan.md` §7 (phases 0–3; growth loops; phase 1: ~10 CPA partners); `docs/business/go-to-market.md` §1 (channels), §2 (firm tiers: Listed at 1 client, Practice at 5, Practice Pro at 15), §3 (the 24-month cash limit, owner's decision), §3.2 (a month for a month, account credit, up to 12), §3.4 (networks and co-ops as one affiliate), §6 item 5 (which program ships first was open); `docs/business/pricing-strategy.md` §4c (free firm seats). The docs' affiliate tiers (25/30/35%) are replaced by the owner's flat 20%. The Witness API needs the witness (business-plan §3).
+:::
+
+{{< include ../_partials/_first10.qmd >}}
+
+## Three experiments in the next 90 days decide price, demand and cost {#experiments}
+
+<span class="kicker">What we test before scaling</span>
+
+<div class="cards">
+<div class="card"><h3>Price</h3><p>Test the plans with 10–15 schools that aren't the founder's own.</p></div>
+<div class="card card--green"><h3>Receipt demand</h3><p>Do families, CPAs and a program administrator want and use the receipt?</p></div>
+<div class="card card--ink"><h3>Cost and reliability</h3><p>Run 2 schools for 60 days; measure cost, support and errors.</p></div>
+</div>
+
+::: {.notes}
+Agreed in the 2026-11-07 deck review. They are experiments A, B and C in `docs/business/business-plan.md` §11 as updated in docs PR #38. They answer the gaps the docs name: `docs/business/market-research.md` §5 (no willingness-to-pay interviews; state program receipt rules need primary sources); `docs/business/business-plan.md` §8 ("What would change the outlook most": conversion, whether Rifo can close a month) and §11 item 5 (test prices with 5–10 design-partner schools); `docs/business/financial-model.md` §5 (AI cost per credit and hosting are assumptions to replace with measured cost).
+:::
+
+## Four risks, and how each is handled {#risks}
+
+<span class="kicker">Risks</span>
+
+<div class="cards cards--2">
+<div class="card card--clay"><h3>A big vendor hosts a clone</h3><p>FSL bars it for two years per release; the witness can't be cloned.</p></div>
+<div class="card card--clay"><h3>Over-claiming</h3><p>We claim only what has shipped: signed receipts and sealed books.</p></div>
+<div class="card card--clay"><h3>Tax preparation is regulated</h3><p>Trifold prepares books; licensed CPAs sign returns.</p></div>
+<div class="card card--clay"><h3>Student data</h3><p>No names in receipts; privacy law checked per school type.</p></div>
+</div>
+
+::: {.notes}
+Source: `docs/business/business-plan.md` §10 (the risk table; these four rows, shortened). Also there: what the witness promises (narrowly, "Trifold saw this exact record at time T"), key compromise, erasure that could break receipts (an owner decision before release, `packages/atm/ROADMAP.md` milestone 1), trademark conflict (Samsung Galaxy Z TriFold; clearance search), license backlash, deep competitor discounts. Pricing risks: `docs/business/pricing-strategy.md` §10 (the top tier, now Audited, needs Rifo to close reliably).
+:::
+
+{{< include ../_partials/_built-next.qmd >}}
+
+{{< include ../_partials/_team.qmd >}}
+
+{{< include ../_partials/_paths.qmd >}}

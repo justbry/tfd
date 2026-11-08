@@ -2,7 +2,9 @@
  * The ledger Worker on Miniflare over a seeded bucket, for another package's tests: `startLedgerWorker({ presets,
  * schools })` seeds each preset's events as a school, runs the views over them, starts the real Worker (the same code
  * Wrangler deploys, with a clock this harness controls) beside a test Ed25519 key pair and a JWKS endpoint, and hands
- * back the Worker's URL, a token minter and `stop()`. README.md, "Test harness".
+ * back the Worker's URL, a token minter and `stop()`. README.md, "Test harness". Each school with views gets its
+ * stored answers as the views job would write them at the harness's clock (`routes/stored.ts`), and the demo schools
+ * their index.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
@@ -11,10 +13,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Miniflare } from "miniflare";
 import type { AtmEvent } from "tfd";
-import type { R2BucketBinding } from "tfd/worker";
+import { R2BindingStore, type R2BucketBinding } from "tfd/worker";
 import { LEDGER_AUDIENCE } from "../auth/jwt.js";
+import { refreshDemoIndex } from "../data/demo-index.js";
+import { storeAnswers } from "../routes/stored.js";
 import { bundleTestWorker } from "./bundle.js";
-import { type SeededSchool, seedEvents, seedSchool } from "./seed.js";
+import { demoSchoolIdOf, seedDemoSchool } from "./demo-seed.js";
+import {
+	presetEvents,
+	type SeededSchool,
+	seedEvents,
+	seedSchool,
+} from "./seed.js";
 import {
 	signToken,
 	type TestJwk,
@@ -47,6 +57,11 @@ export type MintOptions = {
 	schools: SchoolGrantInput[];
 	/** Seconds the token lives from the harness clock; default 300 (the most the Worker accepts). Negative: already expired. */
 	expiresInSeconds?: number;
+	/**
+	 * The `su` claim: unix seconds of the PIN step-up the family service vouches for. Config writes need one within the
+	 * last 10 minutes of the harness clock; omit it to mint a token as today's family service does (no `su`).
+	 */
+	stepUpAt?: number;
 };
 
 export type StartOptions = {
@@ -61,6 +76,13 @@ export type StartOptions = {
 	 * `/v1/*` and `/healthz` to the Worker first). Default: a directory with a one-line `index.html`.
 	 */
 	assetsDirectory?: string;
+	/**
+	 * School presets to seed as demo schools (`demo-<preset>`, as `scripts/seed-demo.ts` seeds staging), each with its
+	 * views as of its last event. Default none.
+	 */
+	demoPresets?: readonly string[];
+	/** `LEDGER_DEMO_SCHOOLS=on` (as staging sets it); default: on when `demoPresets` names any. */
+	demoSchools?: boolean;
 };
 
 export type LedgerHarness = {
@@ -184,6 +206,9 @@ export const startLedgerWorker = async (
 			LEDGER_ISS: TEST_ISSUER,
 			LEDGER_JWKS_URL: `${origin}/jwks.json`,
 			TEST_CLOCK_URL: `${origin}/clock`,
+			...((options.demoSchools ?? (options.demoPresets ?? []).length > 0)
+				? { LEDGER_DEMO_SCHOOLS: "on" }
+				: {}),
 		},
 	});
 	try {
@@ -195,6 +220,19 @@ export const startLedgerWorker = async (
 			const id = ids[index] as string;
 			seeded[id] = await seedSchool(bucket, preset, id);
 		}
+		for (const preset of options.demoPresets ?? []) {
+			const events = presetEvents(preset);
+			const asOf = events
+				.map((event) => event.event_time)
+				.sort()
+				.at(-1) as string;
+			await seedDemoSchool(new R2BindingStore(bucket), preset, {
+				now: new Date(asOf),
+				events,
+			});
+			const id = demoSchoolIdOf(preset);
+			seeded[id] = { id, preset, asOf, events };
+		}
 		const latest = Object.values(seeded)
 			.map((school) => Date.parse(school.asOf))
 			.reduce((a, b) => Math.max(a, b), Number.NEGATIVE_INFINITY);
@@ -204,6 +242,10 @@ export const startLedgerWorker = async (
 				: Number.isFinite(latest)
 					? latest + MS_PER_MINUTE
 					: Date.now();
+		const store = new R2BindingStore(bucket);
+		for (const id of Object.keys(seeded))
+			await storeAnswers(store, id, new Date(now));
+		if ((options.demoPresets ?? []).length > 0) await refreshDemoIndex(store);
 		const base = (await miniflare.ready).toString().replace(/\/$/, "");
 
 		return {
@@ -212,7 +254,7 @@ export const startLedgerWorker = async (
 			seeded,
 			signer,
 			bucket,
-			async mintToken({ sub, schools, expiresInSeconds }) {
+			async mintToken({ sub, schools, expiresInSeconds, stepUpAt }) {
 				const issuedAt = Math.floor(now / MS_PER_SECOND);
 				return signToken(signer, {
 					iss: TEST_ISSUER,
@@ -222,6 +264,7 @@ export const startLedgerWorker = async (
 					nbf: issuedAt,
 					exp: issuedAt + (expiresInSeconds ?? DEFAULT_LIFETIME_SECONDS),
 					schools,
+					...(stepUpAt === undefined ? {} : { su: stepUpAt }),
 				});
 			},
 			signRaw: (claims, header) => signToken(signer, claims, header),
@@ -244,6 +287,12 @@ export const startLedgerWorker = async (
 			},
 			async seedEvents(schoolId, events, seedOptions) {
 				const school = await seedEvents(bucket, schoolId, events, seedOptions);
+				if (seedOptions?.views !== false)
+					await storeAnswers(
+						new R2BindingStore(bucket),
+						schoolId,
+						new Date(now),
+					);
 				seeded[schoolId] = school;
 				return school;
 			},

@@ -14,7 +14,9 @@
 		"ts": "tsc --noEmit",
 		"test": "bun test tests",
 		"check:bundle": "bun scripts/check-bundle.ts",
-		"staging-e2e": "bun scripts/staging-e2e.ts"
+		"staging-e2e": "bun scripts/staging-e2e.ts",
+		"seed:r2": "bun scripts/seed-r2.ts",
+		"seed:demo": "bun scripts/seed-demo.ts"
 	},
 	"dependencies": {
 		"tfd": "workspace:*"

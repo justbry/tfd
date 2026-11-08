@@ -34,6 +34,7 @@ const noBadges = (school: School): School => ({
 	...school,
 	attentionCount: null,
 	tabBadges: null,
+	demo: false,
 });
 
 test("no presets: the Dashboard renders its document and no scenario control", async () => {

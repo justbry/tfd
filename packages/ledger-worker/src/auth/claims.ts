@@ -1,4 +1,4 @@
-/** What the Worker takes from a verified token: the schools it lists. `sub` (a profile id) is dropped here and never kept. */
+/** What the Worker takes from a verified token: the schools it lists, the step-up time and (for this request only) `sub`. */
 import { ApiError } from "../http.js";
 import type { Verified } from "./jwt.js";
 
@@ -12,7 +12,16 @@ export const audiences = [
 export type Audience = (typeof audiences)[number];
 
 export type SchoolGrant = { role: string; finance: boolean };
-export type Caller = { schools: ReadonlyMap<string, SchoolGrant> };
+export type Caller = {
+	schools: ReadonlyMap<string, SchoolGrant>;
+	/**
+	 * The profile id (`sub`), kept for this request only: a config write hashes it into an opaque writer id, and nothing
+	 * else reads it. Never stored, logged or returned as it is.
+	 */
+	subject: string | null;
+	/** `su`: unix seconds of the last PIN step-up, when the family service sends it (S9 plan D22); null when absent. */
+	stepUpAt: number | null;
+};
 
 const SCHOOL_ID = /^[0-9A-Za-z_-]+$/;
 
@@ -35,7 +44,13 @@ export const callerOf = (verified: Extract<Verified, { ok: true }>): Caller => {
 			throw new ApiError("token_invalid", "The token's schools are malformed.");
 		schools.set(id, { role, finance });
 	}
-	return { schools };
+	const { sub, su } = verified.claims;
+	return {
+		schools,
+		subject: typeof sub === "string" && sub !== "" ? sub : null,
+		// a `su` of another type is no step-up: the write is refused, the reads are not
+		stepUpAt: typeof su === "number" && Number.isFinite(su) ? su : null,
+	};
 };
 
 /** The finest audience this grant may be served (D7: an admin without the finance grant is `public`). */

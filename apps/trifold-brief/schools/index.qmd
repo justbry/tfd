@@ -1,0 +1,95 @@
+---
+pagetitle: "Trifold brief · Schools, co-ops and churches"
+brief-audience: "Schools, co-ops and churches"
+brief-oneliner: "Every tuition payment, gift or dues payment, a receipt your families, givers or members can check."
+brief-length: "11 slides, about 9 minutes"
+include-in-header:
+  text: "<style>:root { --path: #e8a33d; --path-text: #8a5a12; }</style>"
+---
+
+{{< include ../_partials/_title.qmd >}}
+
+## Every payment gives the payer a receipt they can check {#payers}
+
+<span class="kicker">What payers will get</span>
+
+<div class="cards">
+<div class="card"><h3>A school</h3><p>A parent pays tuition and keeps a receipt signed with the school's key.</p></div>
+<div class="card card--green"><h3>A church</h3><p>Recurring giving, with a receipt for each gift that the giver can check.</p></div>
+<div class="card card--ink"><h3>A co-op</h3><p>Member dues, each with a receipt the member can check.</p></div>
+</div>
+
+<p class="fine">Anyone holding one checks it free in a browser; if the books change, it stops matching. Not yet: proof Stripe moved the money, or itemised state-program receipts. First pilot next.</p>
+
+::: {.notes}
+Sources: `packages/atm/README.md`, "Receipts and seals (new in 0.10.0)" (a receipt holds the organization, the payer's timeline key, the event's id, type, time and date, amount, currency, Stripe id and a hash of the event; no name or email; and "Not built: an itemised receipt... a proof of payment with no items, tax or student"); `docs/business/business-plan.md` §3 (released 2026-11-07, not yet issued by any school; daily Stripe matching is milestone 3); `packages/atm/ROADMAP.md` milestone 1 ("a receipt does not prove Stripe moved the money"). Itemised receipts for state programs: the compliance pack, in Starter by the owner's decision of 2026-11-07, not built. Church and co-op examples: owner's focus of 2026-11-07; non-profit and co-op pricing in `docs/business/pricing-strategy.md` §4b (donation acknowledgments, member capital accounts). AGENTS.md "Claims": tfd signs receipts; don't say organizations or families use them until one issues real receipts.
+:::
+
+{{< include ../_partials/_programs.qmd >}}
+
+{{< include ../_partials/_how.qmd >}}
+
+{{< include ../_partials/_pricing.qmd >}}
+
+## Up to about 40 families is free; non-profits and co-ops pay about half {#cost}
+
+<span class="kicker">What it would cost · illustrative</span>
+
+<div class="cards">
+<div class="card"><span class="big">≈ 7</span><p>events a family makes in a month</p></div>
+<div class="card card--green"><span class="big">≈ 40</span><p>families fit the free hosted plan</p></div>
+<div class="card card--ink"><span class="big">Half</span><p>for non-profits, churches and co-ops: Starter $15, Pro $39, Audited $79</p></div>
+</div>
+
+<p class="fine">Running over never stops the books: limits are soft, and nothing is billed automatically. Full refund within 30 days; cancel in two clicks.</p>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> From one test family; draft prices.</p>
+
+::: {.notes}
+Sources: `docs/business/business-plan.md` §8 ("A family makes about 7 events a month"); owner decision of 2026-11-07 (Free hosted at about 300 events, about 40 families: 300 ÷ 7 ≈ 43); `docs/business/pricing-strategy.md` §3 (the estimate is one fixture family, `packages/atm/fixtures/vibes-year`; replace with real data), §4 (soft limits: after two months over, the owner is asked to move up; nothing billed automatically), §4a (30-day refund, two-click cancel, plan changes any time, onboarding included), §4b (verified 501(c) organizations and cooperatives pay about half: $15 / $39 / $79 / ~$249; Witnessed renamed Audited by the owner). Churches are 501(c) organizations, so the non-profit price applies once verified. Credits running out: §5 rule 1 (payments still book and receipts are still signed).
+:::
+
+## Run it yourself free, or let Trifold host it {#self-host-or-hosted}
+
+<span class="kicker">Your choice</span>
+
+<div class="cards cards--2">
+<div class="card card--green"><h3>Run it yourself, $0</h3>
+<ul>
+<li>The whole engine, for your own books</li>
+<li>Your own signed receipts and sealed months</li>
+<li>For organizations with a technical person</li>
+</ul></div>
+<div class="card"><h3>Hosted by Trifold <span class="tag tag--next">next</span></h3>
+<ul>
+<li>Free plan: no server to run</li>
+<li>Paid plans add automation, Rifo and, later, Trifold's countersignature</li>
+<li>Early access for the first design partners</li>
+</ul></div>
+</div>
+
+::: {.notes}
+Sources: `docs/business/pricing-strategy.md` §1 (anything a school can do on its own is free to self-host; anything that needs Trifold as the trusted third party is paid), §4 (Community: the whole engine and CLI, self-signed receipts and seals), §8 (FSL-1.1-ALv2: free to use, modify and self-host for your own books; each release becomes Apache-2.0 two years after it ships); `docs/business/business-plan.md` §3 (hosted service not built). A self-hosted copy's receipts are "verifiable with the open verifier", never "Witnessed by Trifold" (TRADEMARKS.md). CTA "early access": `docs/website/decisions.md`.
+:::
+
+## Your books are yours: export is never behind a paywall {#your-data}
+
+<span class="kicker">Data ownership</span>
+
+<ul class="ticks">
+<li>Export everything in standard formats your CPA's tools read, before and after you cancel</li>
+<li>Erasure and privacy tools are free too</li>
+<li>No names or emails inside receipts</li>
+<li>Checking a receipt is free for anyone, forever</li>
+<li>Leave a bookkeeping firm and your ledger comes with you</li>
+</ul>
+
+::: {.notes}
+Sources: `docs/business/pricing-strategy.md` §2 ("Never paywall": verification, data export, erasure and privacy tools, correctness and security fixes, the receipt and seal specs) and §4a ("Data on leaving: export everything, in open formats, before and after cancelling"); brand doc website outline (export to Parquet or hledger); `packages/atm/README.md` (no name or email in a receipt); `docs/business/business-plan.md` §10 (student data checked per school type; erasure without breaking receipts is an owner decision before release, `packages/atm/ROADMAP.md` milestone 1); `docs/business/go-to-market.md` §5 (a client can move with its ledger intact). The receipt format and checker are Apache-2.0 (AGENTS.md).
+:::
+
+{{< include ../_partials/_built-next.qmd >}}
+
+{{< include ../_partials/_first10.qmd >}}
+
+{{< include ../_partials/_paths.qmd >}}

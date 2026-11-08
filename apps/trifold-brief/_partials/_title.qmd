@@ -1,0 +1,23 @@
+## {#title .hero data-menu-title="Books that show their work"}
+
+<p class="wordmark"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M20 8 H80 V36 H20 Z" fill="#e8a33d"/><path d="M20 36 H80 V64 H20 Z" fill="#1e2a44"/><path d="M20 64 H80 V86 L72.5 93 L65 86 L57.5 93 L50 86 L42.5 93 L35 86 L27.5 93 L20 86 Z" fill="#2f7d5b"/><path d="M20 36 H80 M20 64 H80" stroke="#f6f1e7" stroke-width="2.5" stroke-dasharray="6 4"/></svg>Trifold</p>
+
+<h1 class="headline">Books that show their work.</h1>
+
+<svg class="hero-mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><path d="M20 8 H80 V36 H20 Z" fill="#e8a33d"/><path d="M20 36 H80 V64 H20 Z" fill="#1e2a44"/><path d="M20 64 H80 V86 L72.5 93 L65 86 L57.5 93 L50 86 L42.5 93 L35 86 L27.5 93 L20 86 Z" fill="#2f7d5b"/><path d="M20 36 H80 M20 64 H80" stroke="#f6f1e7" stroke-width="1.6" stroke-dasharray="4 3"/></svg>
+
+<p class="hero-lede">Trusted accounting automation for organizations that bill through Stripe, starting with schools, co-ops and churches, delivered with accounting firms. Every payment gives the payer a receipt they can check, and every closed month is sealed, so a later change shows. Automation today, AI next.</p>
+
+<p class="for"><strong>{{< meta brief-audience >}}</strong>{{< meta brief-oneliner >}}</p>
+
+<p class="meta">{{< meta brief-length >}} · Confidential draft of 7 November 2026</p>
+
+::: {.notes}
+Positioning: owner decision of 2026-11-07 (trusted accounting automation and AI for any business that bills through Stripe; focus on schools, co-ops and churches; delivered with accounting firms; "automation today, AI next"). The headline "Books that show their work." is the website's hero (`docs/website/decisions.md`, 2026-11-06); it replaces the brand doc's tagline, whose third side (Stripe's record, matched daily) isn't built (`docs/brand/trifold-brand-and-messaging.md`, "What three sides means"). The docs may be updated to this positioning on the stacked docs branch.
+
+Facts behind the lede: `docs/business/business-plan.md` §1 and §3 (tfd signs a receipt for every payment and refund and seals every closed month, released in tfd 0.10.0 on 2026-11-07; no school issues them yet; the hosted service and Rifo are not built). The engine is free to self-host under FSL-1.1-ALv2 (AGENTS.md, "Licensing").
+
+The mark is the brand kit's description, a receipt folded in thirds (brand doc, "Logo"); the final logo is not commissioned.
+
+Keys: arrows or space to move, Esc for all slides, M for the menu, S for these notes.
+:::

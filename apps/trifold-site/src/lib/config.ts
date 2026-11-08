@@ -1,8 +1,8 @@
 /**
- * Site-wide constants. SITE_ORIGIN is a placeholder until the domain is registered: change it here and the canonical
- * links, Open Graph URLs, sitemap.xml and robots.txt all follow.
+ * Site-wide constants. SITE_ORIGIN is the production domain: the canonical links, Open Graph URLs, sitemap.xml and
+ * robots.txt all read it. www.trifold.app and tfd-ledger.pages.dev serve the same build and point their canonical here.
  */
-export const SITE_ORIGIN = "https://tfd-ledger.pages.dev";
+export const SITE_ORIGIN = "https://trifold.app";
 export const SITE_NAME = "Trifold";
 export const DEFAULT_DESCRIPTION =
 	"Books that show their work. Every Stripe payment becomes a signed receipt your families can check, and every sealed month shows any later change.";
@@ -17,8 +17,8 @@ export const CLI_URL = "https://github.com/justbry/atm/tree/dev/packages/atm";
  * demo's CSP only lets its own origin frame it, so link to it (new tab); never iframe it.
  */
 export const DEMO_URL = "https://staging.b4uni.com/for/schools/dashboard";
-/** Placeholder contact address, used as the early-access fallback when no form endpoint is configured. */
-export const CONTACT_EMAIL = "hello@gettrifold.com";
+/** The contact address, also the early-access fallback when no form endpoint is configured. */
+export const CONTACT_EMAIL = "hello@trifold.app";
 
 /**
  * Where the early-access form posts. Set PUBLIC_FORM_ENDPOINT at build time; unset shows a mailto fallback. `env?.`

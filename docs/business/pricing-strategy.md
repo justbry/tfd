@@ -1,6 +1,6 @@
 # Trifold pricing strategy
 
-Status: draft, updated 2026-11-06 after reviewing Airtight's pricing (section 9). All prices are starting points to test with design partners, not decisions. Market data and sources are in `market-research.md`. The plan this serves is `business-plan.md`.
+Status: draft, updated 2026-11-06 after reviewing Airtight's pricing (section 9); checked against the other docs and the site's pricing data (`apps/trifold-site/src/lib/pricing/data.ts`) on 2026-11-07; owner's plan decisions applied 2026-11-07 (Free's size, Starter as the wedge plan, Witnessed renamed Audited). Other prices are starting points to test with design partners, not decisions. Market data and sources are in `market-research.md`. The plan this serves is `business-plan.md`; open decisions are in its §12.
 
 ## 1. The rule
 
@@ -8,7 +8,7 @@ Status: draft, updated 2026-11-06 after reviewing Airtight's pricing (section 9)
 
 A receipt the school signs itself is a strong two-party record. An independent witness adds a third party's signature on top. A self-hosted fork can't produce Trifold's witness signature, so the premium tier protects itself without a strict license.
 
-Paid tiers sell five things: automation and scheduling, teams and collaboration, AI, views across many schools, and Trifold as witness.
+Paid tiers sell five things: automation and scheduling, teams and collaboration, AI, views across many schools, and audit-ready books with Trifold as witness.
 
 ## 2. Never paywall
 
@@ -18,7 +18,7 @@ Keeping these free keeps trust, avoids a fork, and keeps the word "open" true:
 2. Data export. The school owns its books.
 3. Erasure and privacy tools.
 4. Correctness and security fixes.
-5. The standards: the receipt, seal and KPI specs.
+5. The standards: the receipt and seal specs (Apache-2.0). The KPI spec (`schema/kpis.v1.json`) is free to use but is FSL today, like the event envelope schema; calling it part of the open standard needs the owner to make it Apache-2.0 (`AGENTS.md`, "Open licensing items").
 
 ## 3. Pricing units
 
@@ -29,7 +29,7 @@ Keeping these free keeps trust, avoids a fork, and keeps the word "open" true:
 | Compute | no | barely | no | yes | Free, with a fair-use cap |
 | **Ledger events per month** | yes | yes | roughly, with an estimate at signup | yes | **The limit between tiers** |
 | **AI credits** | yes | yes (token cost) | yes, with caps | yes | **Metered** |
-| **Witnessed receipts and seals** | yes | ops and liability | yes, one per payment | yes | **Metered through credits** |
+| **Countersigned receipts and seals** | yes | ops and liability | yes, one per payment | yes | **Metered through credits** |
 | % of payment volume | yes | no | yes | yes | Avoid: it stacks on Stripe's fees |
 | Per seat | no | no | yes | yes | Unlimited seats |
 
@@ -40,32 +40,32 @@ Keeping these free keeps trust, avoids a fork, and keeps the word "open" true:
 | Tier | Price | Limits | For whom | What's in it |
 |---|---|---|---|---|
 | **Community** | $0, self-hosted | None | Developers, technical schools | The whole engine and `tfd` CLI (the `atm` command until the rename lands), including `simulate` and `reconcile`. Self-signed receipts and seals |
-| **Free** (cloud) | $0 | 1,000 events, 200 credits, 2 seats | First-time small schools | Hosted books, **signed receipts on every plan, even Free**, one Pricing Lab scenario a month |
-| **Starter** | $29/mo | 5,000 events, 1,000 credits, 5 seats | Businesses keeping QuickBooks or Xero | **Sync to QuickBooks or Xero**, signed receipts on top of the books they already have |
-| **Pro** | $79/mo | 25,000 events, 5,000 credits, unlimited seats, **up to 3 organizations** | Stripe-native businesses ready to replace QuickBooks; small school networks and fiscal sponsors | Pricing Lab, daily reconcile with alerts, scheduled close, **bank-statement import (CSV/OFX)**, multi-user ledger UI with roles and CPA seats, Rifo |
-| **Witnessed** | $149/mo | 25,000 events, 8,000 credits | Schools that need provable books (state programs, audits, investors) | Pro, plus Trifold's countersignature, the transparency log, the per-event chain, daily Stripe matching, the auditor portal |
-| **Witnessed + Bookkeeper** | ~$349/mo | As Witnessed | Owners who want the month closed for them | A partner bookkeeper does the close, on provable books |
-| **Compliance pack** | $15–30/mo per state program | | Schools in state education programs | Itemised receipts for that program, kept current as the rules change |
+| **Free** (cloud) | $0 | About 300 events (about 40 families), 200 credits, 2 seats | First-time small schools, co-ops and churches | Hosted books, **signed receipts, even on Free**, one Pricing Lab scenario a month. Past about 40 families, move to Starter |
+| **Starter** | $29/mo | 5,000 events, 1,000 credits, 5 seats | **The wedge plan**, recommended for small schools | Hosted books and signed receipts, sold with the compliance pack (Next); **sync to QuickBooks or Xero** (Next) for those who keep them |
+| **Pro** | $79/mo | 25,000 events, 5,000 credits, unlimited seats, **up to 3 organizations** | Stripe-native organizations ready to replace QuickBooks; small school networks and fiscal sponsors | Pricing Lab, daily reconcile with alerts, scheduled close, **bank-statement import (CSV/OFX)**, multi-user ledger UI with roles and CPA seats, Rifo. On sale once these exist |
+| **Audited** | $149/mo | 25,000 events, 8,000 credits | Organizations that need audit-ready books (state programs, audits, boards, investors) | Pro, plus Trifold's countersignature ("Witnessed by Trifold"), the auditor portal, the compliance pack, daily Stripe matching, the transparency log and the per-event chain. All Next |
+| **Audited + Bookkeeper** | ~$349/mo | As Audited | Owners who want the month closed for them | A partner bookkeeper does the close, on audited books |
+| **Compliance pack** | $15–30/mo per state program | | Schools in state education programs | Itemised, payer-identified receipts for that program (provider, expense, amount, date, who paid, per child), kept current as the rules change. Next; included in Audited |
 | **Platform / Enterprise** | Metered or custom | | School networks, franchises, vertical software | Rollups across schools, network revenue share, SSO/SAML, SLA, embedding rights |
-| **Witness API** | First 500 receipts a month free, then $0.03–0.05 each | | Self-hosters and platforms | The witness alone |
+| **Witness API** | First 500 receipts a month free, then $0.03–0.05 each | | Platforms and issuers, under the Platform agreement | The witness alone, for receipts other software issues. Not sold to a single school as a cheap substitute for Audited; whether the free 500 stay is open (`business-plan.md` §12) |
 
 **No per-seat fees. No per-transaction fees. No surprise bills.** This is the line on the pricing page; Airtight leads with the same promise ("Pricing you can actually read"), so our pricing has to read at least as simply.
 
-Over the event limit: the event limit is a **soft limit** on Free, Starter, Pro and Witnessed. The books never stop and nothing is billed automatically; after two months over, the owner is asked to move up a tier. Platform pays about $1 per 10,000 events. (This replaces the earlier $2 per 10,000 overage: a metered overage contradicts "no surprise bills" and would cost more in trust than it earns.)
+Over the event limit: the event limit is a **soft limit** on Free, Starter, Pro and Audited. The books never stop and nothing is billed automatically; after two months over, the owner is asked to move up a tier. Platform pays about $1 per 10,000 events. (This replaces the earlier $2 per 10,000 overage: a metered overage contradicts "no surprise bills" and would cost more in trust than it earns.)
 
 **What the pricing page shows.** Cards show the plan, its features and "about N families". Events and credits appear only in the comparison matrix and the FAQ. Developers and platforms see the metered view.
 
-Annual billing: two months free (Starter $290/yr, Pro $790/yr, Witnessed $1,490/yr).
+Annual billing: two months free (Starter $290/yr, Pro $790/yr, Audited $1,490/yr).
 
 **Included credits and margin.** Included credits are a cost if they're used: 8,000 credits is $80 at face value on a $149 plan. Price credits so AI token cost stays under about a third of their face value, and watch actual use per tier.
 
 ### Why these prices (summary of `market-research.md`)
 
-- **Starter at $29** fills the gap between $0 and $79. Most businesses keep QuickBooks ($38) or Xero ($27) at first and need a cheap tier that adds to their books instead of replacing them.
-- **Pro at $79** sits just under QuickBooks Essentials ($85, 3 users) and near Digits ($65) and Puzzle Core ($60), with unlimited seats. It has to replace QuickBooks; stacked on top, the total is $117–164.
-- **Witnessed at $149**, down from a first draft of $199. At $199 it was priced like Pilot's service ($199) without a human behind it, and $50–100 above Digits Pro and Puzzle Complete.
+- **Starter at $29** is the wedge (owner's decision, 2026-11-07). It fills the gap between $0 and $79, and with the compliance pack it answers the beachhead's pain: receipts state programs ask for. Owners who keep QuickBooks ($38) or Xero ($27) get the sync on top.
+- **Pro at $79** sits just under QuickBooks Essentials ($85, 3 users) and near Digits Essentials ($65) and Puzzle Core ($72 on Puzzle's own page; aggregators show $60), with unlimited seats. It has to replace QuickBooks; stacked on top, the total is $117–164. So it waits until Rifo, Pricing Lab, daily reconcile and sync exist (owner's decision, 2026-11-07).
+- **Audited at $149**, down from a first draft of $199. At $199 it was priced like Pilot's entry service ($199 on aggregators; Pilot's own page shows Bookkeeping Essentials at $99) without a human behind it, and $79–99 above Puzzle Complete ($120) and Digits Core ($100). It was called Witnessed; the owner renamed it on 2026-11-07 because a timestamp signature alone is commodity cryptography, so the price has to buy the audit-ready outcome (`business-plan.md` §6).
 - **The bookkeeper bundle at ~$349** undercuts human bookkeeping ($349–849+) and the books are provable. Most of it passes through to the partner, so count only Trifold's share as revenue.
-- **Against Airtight** (section 9): their AUD $49 / $99 / $199 plans are roughly US$32 / $65 / $130. Pro at $79 and Witnessed at $149 sit a little above, which the free tier, non-profit pricing, Stripe-native books and payer-held receipts justify. Don't cut prices to match.
+- **Against Airtight** (section 9): their AUD $49 / $99 / $199 plans are roughly US$32 / $65 / $130. Pro at $79 and Audited at $149 sit a little above, which the free tier, non-profit pricing, Stripe-native books and payer-held receipts justify. Don't cut prices to match.
 
 ## 4a. Billing policies
 
@@ -80,44 +80,39 @@ Published on the pricing page and in the FAQ. Airtight publishes the same set, a
 | Data on leaving | Export everything, in open formats, before and after cancelling (export is never paywalled, section 2) |
 | Annual billing | Two months free (about 17% off) |
 
-## 4b. Non-profits and co-ops
+## 4b. Non-profits, co-ops and churches
 
-Verified 501(c) organizations (IRS determination letter or EIN check) and cooperatives (articles or bylaws) pay about half:
+Verified 501(c) organizations (IRS determination letter or EIN check), churches and cooperatives (articles or bylaws) pay about half:
 
 | Tier | Standard | Non-profit / co-op |
 |---|---|---|
 | Starter | $29 | $15 |
 | Pro | $79 | $39 |
-| Witnessed | $149 | $79 |
-| Witnessed + Bookkeeper | ~$349 | ~$249 |
+| Audited | $149 | $79 |
+| Audited + Bookkeeper | ~$349 | ~$249 |
 
-- Non-profits with gross receipts of $50,000 or less get Witnessed free on the Free plan (up to about 200 witnessed receipts a month), once the witness ships.
+- Non-profits with gross receipts of $50,000 or less get the witness free on the Free plan, once it ships: up to about 66 countersigned receipts a month (Free's 200 credits at 3 credits each).
 - Donation acknowledgments use no credits; board, member and auditor seats are unlimited.
 - Add-on packs ($15–25/mo): the non-profit pack (donation acknowledgments, restricted funds, grant reports, a Form 990 package) and the co-op pack (member capital accounts, patronage allocation, 1099-PATR export).
-- The annual discount stacks with the non-profit price (to decide; the draft pricing page stacks them).
+- Whether the annual discount stacks with the non-profit price is open; the recommendation is that it doesn't (`business-plan.md` §12). The draft pricing page and the site's FAQ stack them today.
 - Airtight has no non-profit pricing; this is a clear difference.
 
 ## 4c. Accounting firms
 
-Published rule, not case-by-case discounts (Airtight sets firm discounts by hand):
-- The firm's own seats are free and unlimited on every client's books.
-- Clients a firm brings get 20% off their first year (to test).
-- A partner directory, with a stated policy that Trifold pays no referral fees to tax preparers, matching the disclosure Airtight publishes.
+The firm's own seats are free and unlimited on every client's books, on every plan. Everything else for firms (client discounts, the directory, the no-referral-fee rule, the firm tiers and referrals) is in `go-to-market.md`.
 
-The full firm program (Listed, Practice, Practice Pro) and the referral program are in `go-to-market.md`. Idaho and Utah allow CPAs commissions outside attest and compilation clients, with written disclosure, so the no-referral-fee rule is a choice stricter than the law (`go-to-market.md` §4).
+### Firms hosting tfd for their clients: the tradeoffs (open, decide before the Practice tier)
 
-### Firms hosting tfd for their clients: the tradeoffs (open, decide before the partner program)
-
-The FSL already allows a firm to work on a client's **own** install ("professional services that you provide to a licensee"). The open question is one firm running **one tfd for many clients**: that is probably a Competing Use, because it substitutes for Starter, Pro and the Witnessed + Bookkeeper bundle.
+The FSL already allows a firm to work on a client's **own** install ("professional services that you provide to a licensee"). The open question is one firm running **one tfd for many clients**: that is probably a Competing Use, because it substitutes for Starter, Pro and the Audited + Bookkeeper bundle.
 
 | Option | For | Against |
 |---|---|---|
-| **A. No grant** (FSL as written) | Strongest protection; no new legal text; firms are steered to hosted Trifold, where their seats are already free | Firms that want their own servers (data control, one tool across all clients) may pick a competitor; the CPA channel is the third growth loop |
-| **B. Public grant: "a firm may host tfd for its own clients"** | Easiest for firms; more schools issue receipts with the verify link (growth loop 1); goodwill | A 200-client firm becomes a small Trifold at $0, cannibalising Pro and the $349 bundle. "Own clients" and "bookkeeping service" are hard to draw (hosted books *is* the service). A published grant can't be taken back for the releases it covers. Two years later each release is Apache-2.0 anyway, so the grant only matters for the newest releases, which are the ones that compete |
+| **A. No grant** (FSL as written) | Strongest protection; no new legal text; firms are steered to hosted Trifold, where their seats are already free | Firms that want their own servers (data control, one tool across all clients) may pick a competitor; firms are a key enabler |
+| **B. Public grant: "a firm may host tfd for its own clients"** | Easiest for firms; more schools issue receipts with the verify link; goodwill | A 200-client firm becomes a small Trifold at $0, cannibalising Pro and the $349 bundle. "Own clients" and "bookkeeping service" are hard to draw (hosted books *is* the service). A published grant can't be taken back for the releases it covers. Two years later each release is Apache-2.0 anyway, so the grant only matters for the newest releases, which are the ones that compete |
 | **C. Public grant with a cap**, e.g. up to 10 clients free, then a partner agreement | Small firms are free; large ones pay; one rule, no case-by-case deals | A cap needs counting and trust; a firm can split into entities; still new legal text to maintain |
 | **D. No public grant; a written partner agreement on request** (a commercial license, priced per client or as a revenue share) | Keeps FSL's text clean; terms fit each firm; turns the largest firms into revenue | Case-by-case, which this section otherwise avoids; slower for firms; needs a lawyer per template |
 
-**Suggestion:** A now, with D available on request, published as the firm program in `go-to-market.md` §2 (tiers, wholesale prices, white label that stops at the proof). Referrals and affiliate tiers are in `go-to-market.md` §3. B gives the most away exactly where Trifold earns: hosted books with a bookkeeper. Revisit C once the partner program has data on firm sizes. Whatever is chosen, it lives in a separate written permission, never in an edited FSL (a changed FSL is no longer FSL).
+**Suggestion:** A now, with D available on request (offered to the Stage A co-design firms), published as the firm program in `go-to-market.md` §2. B gives the most away exactly where Trifold earns: hosted books with a bookkeeper. Revisit C once the program has data on firm sizes. Whatever is chosen, it lives in a separate written permission, never in an edited FSL (a changed FSL is no longer FSL).
 
 ## 5. Credits
 
@@ -128,44 +123,44 @@ The FSL already allows a firm to work on a client's **own** install ("profession
 | Rifo question or explanation | 2–10 | Passes on the token cost with margin |
 | Rifo monthly close (categorize, reconcile, write the summary) | 500–1,500 | Replaces hours of bookkeeper time; still far below a service |
 | Pricing Lab forecast or scenario run | 25 | Replays a year of events and forecasts |
-| Witnessed receipt | 3 | The viral object: kept cheap on purpose |
-| Witnessed month seal | 25 | |
+| Countersigned receipt ("Witnessed by Trifold") | 3 | The viral object: kept cheap on purpose |
+| Countersigned month seal | 25 | |
 | Self-signed receipt, seal, `verify`, CLI `simulate` | **0, always** | Free to self-host; format and verifier are Apache-2.0 |
 
 ### Rules that make credits safe for small businesses
 
-1. **Running out never stops the books.** Payments still book, journals still build, receipts are still self-signed. Only Rifo and new witness signatures pause. Receipts made while out of credits are witnessed once credits return, and the transparency log shows the later time honestly.
+1. **Running out never stops the books.** Payments still book, journals still build, receipts are still self-signed. Only Rifo and new witness signatures pause. Receipts made while out of credits are countersigned once credits return, and the transparency log shows the later time honestly.
 2. **A hard cap by default**, with alerts at 80% and 100%. Overage is opt-in, so there are no surprise bills.
-3. **Estimates at signup:** "A school with about 50 families makes about 350 events a month, and Free covers it."
+3. **Estimates at signup:** "A school with about 40 families makes about 280 events a month, and Free covers it. Past that, Starter."
 4. **School owners see a flat plan.** Events and credits stay in the background, with defaults that rarely run out. Developers and platforms see pure usage.
 
 ## 6. Features by tier
 
-Free is the Community column, hosted, within Free's limits. Starter is Free plus the QuickBooks and Xero sync and higher limits.
+Free is the Community column, hosted, within Free's limits. Starter is Free plus higher limits, the compliance pack and the QuickBooks and Xero sync.
 
-| Feature (what exists in tfd today) | Community | Pro | Witnessed | Platform |
+| Feature (what exists in tfd today) | Community | Pro | Audited | Platform |
 |---|---|---|---|---|
 | Billing engine: credits, plans, bookings, codes, membership status, deduction order | ✅ all | | | |
 | Event log, `ship`, stored inputs, `inputs ship` | ✅ | Managed storage, backups, retention | | Data residency |
 | `journal` (hledger), `report` | ✅ | Scheduled monthly close, CPA package | | Consolidation across schools |
-| `reconcile` (Stripe matching) | ✅ on demand | Daily automatic run plus alerts | Matches enter the witnessed record | |
+| `reconcile` (Stripe matching) | ✅ on demand | Daily automatic run plus alerts | Matches enter the countersigned record | |
 | `simulate`, both modes | ✅ | **Pricing Lab** (section 7) | | Network-wide pricing tests |
-| `scenarios`, KPI spec, parity, parquet export | ✅ (the KPI spec is part of the open standard) | KPI dashboards; anonymous benchmarks against peer schools | | Network rollup |
+| `scenarios`, KPI spec, parity, parquet export | ✅ (the KPI spec is FSL today, not yet part of the open standard; section 2) | KPI dashboards; anonymous benchmarks against peer schools | | Network rollup |
 | `share` (revenue-share statement) | ✅ | | | Network revenue-share billing |
-| Receipts, seals, `verify` | ✅ self-signed | | Trifold countersignature, transparency log, per-event chain, auditor portal | White-label verify page |
+| Receipts, seals, `verify` | ✅ self-signed | | Trifold countersignature, transparency log, per-event chain, auditor portal | Co-branded verify page (link and badge kept) |
 | Ledger UI | Single-user, read-only viewer | Multiple users, roles, CPA seats, approvals | Auditor role | SSO, audit log |
 | Rifo agent | Small monthly quota | ✅, with approval modes: **Off**, **Ask first** (default) and **Auto within limits**. Rifo drafts, you approve, the engine does the math | | Custom agents and API |
-| Bank-statement import (CSV/OFX) | CLI import | ✅ hosted, with matching rules | | |
+| Bank-statement import (CSV/OFX) | Not built in tfd yet (planned as a CLI import) | ✅ hosted, with matching rules (planned) | | |
 | Organizations per account | 1 | Up to 3 | | Unlimited, with consolidation |
 | Erasure and privacy tools | ✅ never paywalled | | | |
-| State program receipts | | Compliance packs | | |
+| State program receipts | | Compliance packs (add-on, also on Starter) | Included | |
 | QuickBooks and Xero | CSV and hledger export | Managed sync (also in Starter) | | |
 
 **SSO:** charging extra for single sign-on is widely criticized as an "SSO tax." Basic Google sign-in goes in Pro; SAML stays in Platform.
 
 ## 7. Pricing Lab: what `simulate` becomes in Pro
 
-The `simulate` engine and CLI stay free. They were already published under Apache-2.0, they're a strong developer hook (exit code 1 lets CI block a pricing change), and they run on the core billing engine. Pro sells what the CLI can't do:
+The `simulate` engine and CLI stay free. They were already published under Apache-2.0 (releases 0.6.0 to 0.9.0; from 0.10.0 they are FSL, still free to self-host), they're a strong developer hook (exit code 1 lets CI block a pricing change), and they run on the core billing engine. Pro sells what the CLI can't do:
 
 | Free `simulate` | Paid Pricing Lab |
 |---|---|
@@ -178,22 +173,9 @@ The `simulate` engine and CLI stay free. They were already published under Apach
 
 ## 8. Licensing that supports the pricing
 
-Decided by the owner on 2026-11-06. `justbry/atm` is a public fork of Autumn under Apache-2.0. Every version published so far stays Apache-2.0 for good; a change applies only to future versions. Autumn-derived code keeps its Apache license and notices. All tfd code so far has one author, so changing the license now is easy. The full table and reasoning are in `business-plan.md` section 5.
+The licenses are decided; the table and rules are in `../../AGENTS.md`. In short: the engine is FSL-1.1-ALv2, so a hosted clone is blocked and each release becomes Apache-2.0 after two years; the format, verifier and vectors are Apache-2.0 or CC0, so checking can never be restricted; the hosted service, Rifo, the witness and the website are proprietary. Releases up to 0.9.0 stay Apache-2.0; 0.10.0 (2026-11-07) is the first FSL release.
 
-| Part | License |
-|---|---|
-| tfd engine and CLI (`packages/atm`, except the parts below) | **FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 future license). Free to use, modify and self-host for your own books, for non-commercial education and research, and for professional services to a licensee. Not allowed: offering it to others as a commercial product or service that competes with Trifold. Each release becomes Apache-2.0 two years after it ships |
-| Receipt and seal format, spec and verifier (schemas, `docs/receipts.md`, receipt, seal, sign and canonicalisation code, the website's in-browser verifier) | **Apache-2.0** |
-| Test vectors (golden receipt files) | **CC0-1.0** (public domain) |
-| Autumn code this repo forks (`balance-engine`, `shared`, and so on) | **Apache-2.0** (upstream license, unchanged) |
-| Hosted Trifold service, Rifo, the witness | Proprietary (a service; the code is never distributed) |
-| Names | Trademark policy: "Trifold" and "Witnessed by Trifold" are reserved; a fork may say it is based on tfd but may not use the Trifold names |
-
-**Open items:** whether the event envelope schema should also be Apache-2.0; whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (tradeoffs in section 4c). Contributor terms: a CLA, decided 2026-11-07 (`CONTRIBUTING.md`).
-
-**Claim rule.** An FSL engine can't be called "open source." Say "source-available," "Fair Source" or "free to self-host." "Open format," "open spec," "open standard" and "open verifier" are fine, because those parts are Apache-2.0.
-
-**Why FSL and not Apache everywhere.** Apache everywhere would give the most adoption and the least protection. The hosted engine is what a cheap competitor would copy, so the engine carries FSL. Checking stays unrestricted because the format, verifier and vectors are Apache-2.0 or CC0. Each release turns Apache-2.0 after two years, which backs the promise that the code stays available if Trifold disappears.
+This is the one place the license comparison lives:
 
 | License | Internal use | Competitor can host? | OSI open source? | Opens up later? | Track record |
 |---|---|---|---|---|---|
@@ -231,14 +213,11 @@ Sources: https://airtight.one/pricing/ and https://airtight.one/
 ## 10. Risks
 
 - **Stack fatigue.** Pro only wins if it replaces QuickBooks. Starter's sync is the bridge while Pro proves it can replace them.
-- **Witnessed needs Rifo to close reliably.** Until it does, the bookkeeper bundle carries the premium value.
-- **The "triple-entry" claim.** Never use it for Trifold. Say "signed receipts and sealed books" until the per-event chain and daily Stripe matching ship (milestones 2 and 3).
+- **Audited needs Rifo to close reliably.** Until it does, the bookkeeper bundle carries the premium value.
+- **The premium is commodity cryptography.** `business-plan.md` §10.
+- **Over-claiming.** The claim rules in `AGENTS.md`.
 - **Credit confusion.** Mitigated by flat plans, hard caps and generous defaults (section 5).
 
 ## 11. Open decisions
 
-1. ~~Engine license~~ Decided 2026-11-06: FSL-1.1-ALv2 for the engine, Apache-2.0 for the format and verifier, CC0-1.0 for vectors (section 8). Still open: the licensor legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need an extra grant (decide before the accountant partner program; tradeoffs in section 4c); whether the event envelope schema should also be Apache-2.0.
-2. Is "Trifold as witness" the paid line, or are Stripe matching or Rifo also paid-only?
-3. Final prices, after testing with the design-partner schools.
-4. Whether the annual and non-profit discounts stack.
-5. The accounting-firm client discount (20% for the first year is a placeholder).
+In `business-plan.md` §12.

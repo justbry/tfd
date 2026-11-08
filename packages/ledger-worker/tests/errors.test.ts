@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { buildViews, type R2BucketBinding } from "tfd/worker";
 import { base64urlEncode } from "../src/auth/jwt.js";
+import { answersPointerKey } from "../src/data/answers.js";
 import {
 	type LedgerHarness,
 	startLedgerWorker,
@@ -366,6 +367,34 @@ describe("403 and 404: who and what", () => {
 		expect(reply.body.asOf).toBeNull();
 		expect(reply.body.lagMinutes).toBeNull();
 	});
+
+	test("disclosure before a first views run: the B4 Uni defaults, never no_data, with null asOf and lagMinutes", async () => {
+		for (const grant of [
+			{ id: "fresh-school", role: "owner", finance: true },
+			{ id: "fresh-school", role: "admin", finance: false },
+		] as const) {
+			const reply = await call(
+				harness,
+				await mint([grant]),
+				"/v1/schools/fresh-school/disclosure",
+			);
+			expect(reply.status).toBe(200);
+			expect(reply.body.asOf).toBeNull();
+			expect(reply.body.lagMinutes).toBeNull();
+			const data = reply.body.data as Record<string, unknown>;
+			expect(data.school).toBe("fresh-school");
+			expect(data.source).toBe("defaults");
+			expect(data.override).toBeNull();
+			expect(Object.keys(data.views as object).sort()).toEqual([
+				"finance",
+				"governance",
+				"member",
+				"owner",
+				"public",
+			]);
+			expect(Object.keys(data.viewAs as object).length).toBeGreaterThan(0);
+		}
+	});
 });
 
 describe("400: the query", () => {
@@ -450,12 +479,28 @@ describe("409: the views changed under the read", () => {
 			);
 			expectError(reply, 409, "view_mismatch", { retryAfterSeconds: 5 });
 			expect(reply.headers.get("retry-after")).toBe("5");
-			expectError(
-				await call(harness, token, KPI("owner")),
-				409,
-				"view_mismatch",
-				{ retryAfterSeconds: 5 },
-			);
+			// the KPI document stored with the generation does not read the object: it answers
+			expect((await call(harness, token, KPI("owner"))).status).toBe(200);
+			// without its stored answers it is worked out from the views, and meets the changed object
+			const pointerKey = answersPointerKey("monthly-members");
+			const pointer = await harness.bucket.get(pointerKey);
+			if (!pointer) throw new Error("no stored answers");
+			const pointerText = new TextDecoder().decode(await pointer.arrayBuffer());
+			await harness.bucket.delete(pointerKey);
+			try {
+				expectError(
+					await call(harness, token, KPI("owner")),
+					409,
+					"view_mismatch",
+					{ retryAfterSeconds: 5 },
+				);
+			} finally {
+				await harness.bucket.put(
+					pointerKey,
+					new TextEncoder().encode(pointerText),
+					{},
+				);
+			}
 			// an endpoint that reads other objects is not affected
 			expect((await call(harness, token, LEDGER)).status).toBe(200);
 		} finally {

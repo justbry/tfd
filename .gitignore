@@ -48,6 +48,7 @@ apps/balance-worker/.data/
 !packages/billing/tests
 !packages/fx/tests
 !packages/errors/tests
+!packages/verify/tests
 !vite/tests
 .secrets
 
@@ -166,10 +167,7 @@ TAKEHOME.md
 # ai-sync: generated files (source of truth is ai/)
 .pi-subagents/
 .cursor/*
-!.cursor/environment.json
-# Keep the cloud SessionStart hook; other local Claude files stay ignored.
 .claude/*
-!.claude/settings.json
 .codex/
 .agents/
 .mcp.json

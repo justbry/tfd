@@ -19,7 +19,7 @@ import { DownloadButton } from "./download-button.tsx";
 import { Icon, type IconName } from "./icon.tsx";
 import { LoadFailed } from "./load-failed.tsx";
 import { LockPanel } from "./lock-panel.tsx";
-import { formatMoney, signedCount } from "./money.ts";
+import { csvCurrency, formatMoney, signedCount } from "./money.ts";
 import { monthAndDay, parsePeriod, weekdayName } from "./period.ts";
 import { PinLock } from "./pin-lock.tsx";
 import { withQuery } from "./route.ts";
@@ -267,7 +267,13 @@ export function Ledger({
 			/>
 		);
 	if (status.failed)
-		return <LoadFailed what="the ledger" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the ledger"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
 	const { page, promoCode } = loaded;
@@ -348,7 +354,7 @@ export function Ledger({
 					title="Download the rows in this view as CSV"
 					label="Download CSV"
 					name={csvFileNames.ledger(page.from, page.to)}
-					columns={ledgerColumns(currency)}
+					columns={ledgerColumns(csvCurrency(currency))}
 					rows={entries}
 				/>
 			</div>

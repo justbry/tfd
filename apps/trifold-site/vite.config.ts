@@ -6,8 +6,11 @@ import { defineConfig } from "vite";
 import { COMPETITORS, compareHref } from "./src/lib/compare/competitors.ts";
 import { galleryCards } from "./src/lib/verticals.ts";
 import { THEME_SCRIPT_HASH } from "./theme-script.ts";
+import { thirdPartyNotices } from "./third-party-notices.ts";
 
-const AGENT_FILE = /(\.md|^\/llms(-full)?\.txt|^\/samples\/[\w-]+\.json)$/;
+// Files in build/ that are neither pages nor static/: the agent files, and licenses.txt (third-party-notices.ts).
+const POST_BUILD_FILE =
+	/(\.md|^\/llms(-full)?\.txt|^\/licenses\.txt|^\/samples\/[\w-]+\.json)$/;
 
 export default defineConfig({
 	envPrefix: ["VITE_", "PUBLIC_"],
@@ -25,6 +28,16 @@ export default defineConfig({
 	},
 	plugins: [
 		tailwindcss(),
+		thirdPartyNotices({
+			// src/app.css and src/lib/styles/fonts.css pull these into the CSS and font files.
+			stylesheetPackages: [
+				"tailwindcss",
+				"tw-animate-css",
+				"@fontsource-variable/fraunces",
+				"@fontsource-variable/inter",
+				"@fontsource-variable/jetbrains-mono",
+			],
+		}),
 		sveltekit({
 			extensions: [".svelte", ".md", ".svx"],
 			preprocess: [mdsvex({ extensions: [".md", ".svx"] })],
@@ -45,9 +58,10 @@ export default defineConfig({
 			},
 			prerender: {
 				// The agent files (*.md mirrors, llms.txt, llms-full.txt, /samples/*.json) are written after the build by
-				// scripts/agent-files.ts, so links to them can't resolve while prerendering. Every other 404 still fails.
+				// scripts/agent-files.ts, and licenses.txt is a client build asset, so links to them can't resolve while
+				// prerendering. Every other 404 still fails.
 				handleHttpError: ({ path, message }) => {
-					if (AGENT_FILE.test(path)) return;
+					if (POST_BUILD_FILE.test(path)) return;
 					throw new Error(message);
 				},
 				handleMissingId: "fail",

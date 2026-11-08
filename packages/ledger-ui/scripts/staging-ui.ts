@@ -786,6 +786,7 @@ const httpApp = async (
 			mountHttpApp(root, {
 				apiBase: run.context.targets.api,
 				workerBase: `${run.context.targets.worker}/v1`,
+				webBase: "https://staging.b4uni.com",
 			});
 		} finally {
 			Date.now = systemNow;
@@ -962,18 +963,23 @@ export const stage5 = async (
 			() => run.reader.schools(),
 			(answer) => {
 				const own = answer.find((entry) => entry.id === school.id);
+				const leftOut = adapters.reader.schoolsLeftOut();
+				// A school with no menu and no Stripe account has a null currency (S8-contract section 11).
+				const currencyProblem =
+					own && own.currency !== null && typeof own.currency !== "string"
+						? "currency is not a string or null"
+						: null;
 				return answered(
 					own
-						? missingField(own, {
+						? (missingField(own, {
 								name: "string",
 								timeZone: "string",
-								currency: "string",
 								creditUnit: "object",
 								stale: "boolean",
 								lagMinutes: "number",
-							})
-						: `${school.id} is not in the list`,
-					`School[] of ${answer.length}: ${school.id} in ${own?.timeZone}, ${own?.currency}, lag ${own?.lagMinutes} min, stale ${own?.stale}`,
+							}) ?? currencyProblem)
+						: `${school.id} is not in the list${leftOut.length ? ` (left out: ${leftOut.join(", ")})` : ""}`,
+					`School[] of ${answer.length}: ${school.id} in ${own?.timeZone}, ${own?.currency}, lag ${own?.lagMinutes} min, stale ${own?.stale}; ${answer.filter((entry) => entry.currency === null).length} with no currency${leftOut.length ? `; left out: ${leftOut.join(", ")}` : ""}`,
 				);
 			},
 		);

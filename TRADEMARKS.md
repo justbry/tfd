@@ -41,6 +41,10 @@ This phrase is a promise about one specific record: Trifold saw that exact recor
 
 A self-hosted tfd issues self-signed receipts. You may say they are "verifiable with the open verifier", but not that Trifold witnessed them.
 
+## "Trifold Certified Implementer"
+
+Only a partner Trifold has certified may call itself a "Trifold Certified Implementer", and only while the certification lasts. Trifold may revoke it, and the partner then stops using it. It names the partner, not the partner's software or a hosted service, and it doesn't make the partner Trifold's agent. The program is proposed, not running (`docs/business/go-to-market.md` 3.6).
+
 ## Reporting misuse, asking permission
 
 Open an issue on the repository until Trifold publishes a contact address.

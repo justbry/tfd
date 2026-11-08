@@ -147,9 +147,10 @@ export function bookingsPageOf(answer: unknown): BookingsWirePage {
 	};
 }
 
-/** One booking, or null for one the list does not hold (cancelled or any state but requested and confirmed). The route
- * does not join brief D's `attendanceFor` today: a row without `attendance` is a mismatch, since null would claim
- * that no outcome was recorded. `seriesLabel` and `billing` are left out (no source). */
+/** One booking, or null for one the list does not hold (cancelled or any state but requested and confirmed). A row
+ * without `attendance` is a mismatch, since null would claim that no outcome was recorded. `cutoffMinutes` is null
+ * where the answer has none (a demo school's: no event names a cutoff). `seriesLabel` and `billing` are left out (no
+ * source). */
 export function bookingOf(
 	row: WireRecord,
 	timeZone: string,
@@ -208,7 +209,11 @@ export function bookingOf(
 		attendee,
 		guest: booleanOf(route, row.guest, `${path}.guest`),
 		state: state as BookingState,
-		cutoffMinutes: numberOf(route, row.cutoffMinutes, `${path}.cutoffMinutes`),
+		cutoffMinutes: nullableNumberOf(
+			route,
+			row.cutoffMinutes,
+			`${path}.cutoffMinutes`,
+		),
 		seriesId: nullableStringOf(route, row.seriesId, `${path}.seriesId`),
 		attendance,
 	};
@@ -585,12 +590,13 @@ export const capabilityActions: readonly CapabilityAction[] = [
 ];
 
 /**
- * buzz-school's reasons and the contract's. The contract has `owner_only`, `not_built` and
+ * buzz-school's reasons and the contract's. The contract has `owner_only`, `not_built`, `demo` and
  * `stripe_permission_missing` only (a contract change is proposed in the S8e report):
  * - `pin_required`: allowed: the Writer opens the PIN itself before it retries (`pinSource`).
  * - `step_up_required`: allowed: the write then rejects as `step_up` (the mailed link the UI must ask for).
  * - `school_billing_unavailable`, `bookings_unavailable`, `stripe_not_connected`: `not_built` ("Not available yet"),
  *   the nearest the contract has to "not available here now".
+ * - `demo_read_only`: `demo` (the Worker's answer for a demo school, S8-contract section 11: every write refused).
  */
 const capabilityOf = (
 	route: string,
@@ -608,10 +614,12 @@ const capabilityOf = (
 		"school_billing_unavailable",
 		"bookings_unavailable",
 		"stripe_not_connected",
+		"demo_read_only",
 	] as const);
 	if (reason === "pin_required" || reason === "step_up_required")
 		return { allowed: true };
 	if (reason === "owner_only") return { allowed: false, reason: "owner_only" };
+	if (reason === "demo_read_only") return { allowed: false, reason: "demo" };
 	return { allowed: false, reason: "not_built" };
 };
 

@@ -64,12 +64,6 @@ const lateShapes = {
 	heart: (
 		<path d="M12 20s-8-5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 9c0 6-8 11-8 11z" />
 	),
-	info: (
-		<>
-			<circle cx="12" cy="12" r="9" />
-			<path d="M12 11v5M12 8h.01" />
-		</>
-	),
 	key: (
 		<>
 			<circle cx="8" cy="15" r="4" />

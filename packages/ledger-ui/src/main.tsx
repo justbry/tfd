@@ -14,6 +14,7 @@ if (root) {
 			apiBase: import.meta.env.VITE_API_BASE ?? "https://api.b4uni.com",
 			// The Worker serves the UI and /v1 from one origin (S8-contract section 11).
 			workerBase: import.meta.env.VITE_LEDGER_WORKER_BASE ?? "/v1",
+			webBase: import.meta.env.VITE_WEB_BASE ?? "https://b4uni.com",
 		});
 	else
 		mountApp(root, {

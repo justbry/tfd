@@ -1,21 +1,27 @@
 # Trifold: brand kit and messaging
 
-Status: draft, 2026-11-05; names and licensing updated 2026-11-06. Names, domains and trademarks were checked on that date and must be checked again before anything is bought or filed.
+Status: draft, 2026-11-05; names and licensing updated 2026-11-06; build status and licensing checked against the code on 2026-11-07; positioning, taglines, profiles and the glossary updated after the business review on 2026-11-07. Names, domains and trademarks were checked on 2026-11-05 and must be checked again before anything is bought or filed. The website's own plan (hero, CTAs, pages) is in `../website/`, and where it differs from the outline below, `../website/decisions.md` wins.
 
 ## What Trifold is
 
-**For customers:** Trifold runs your memberships, bookings and books, and an AI agent keeps them closed and tax-ready.
+**Books that show their work.** Every payment gives the payer a receipt they can check, and every closed month is sealed, so a later change shows.
 
-**For technical readers:** Trifold is an agentic financial data mart. Every payment, credit and booking lands in one ledger that can be replayed and checked, and an AI agent reads it, reconciles it and reports on it.
+This is the positioning line everywhere (`../website/decisions.md`). The rest of this section is the positioning to aim for, not a description of what ships today. Today tfd builds the books from Stripe events and signs receipts and seals months (tfd 0.10.0); the hosted service, Rifo and tax-ready packages are not built.
 
-**What "three sides" means:** every dollar is recorded three ways. The business's books, the customer's signed receipt and the payment processor's record all agree, and anyone can check that they do. We explain this in plain words and never call it a blockchain.
+**In one line** (owner's decision, 2026-11-07): Trifold is trusted financial accounting automation and AI for any business that bills through Stripe. We focus on schools, co-ops and churches. Where it matters, say "automation today, AI next": Rifo isn't built.
+
+**For customers:** Trifold runs your books from your Stripe payments. Rifo, the agent we're building, will keep them closed and tax-ready.
+
+**For technical readers:** Trifold is an agentic financial data mart. Every payment, credit and booking lands in one ledger that can be replayed and checked. Rifo, the agent we're building, will read it, reconcile it and report on it.
+
+**What "three sides" means** (a later story, for after milestone 3): every dollar is recorded three ways. The business's books, the customer's signed receipt and the payment processor's record all agree, and anyone can check that they do. We explain this in plain words and never call it a blockchain. Today the books and the signed receipt can be checked; matching every event to Stripe's record each day is milestone 3 and not built, so don't present the third side as checked yet.
 
 ## Name architecture
 
 | Layer | Name | Where it appears |
 |---|---|---|
 | Company, customer brand and managed service | **Trifold** | Website, app, emails, receipts, contracts; the legal name |
-| Engine and command-line tool | **tfd** | The engine Trifold provides and runs as a managed service: "Trifold provides tfd, the engine behind it" on developer, accountant and trust pages; self-hosters run it directly. Docs, terminal, npm package `@trifold/cli`. The code rename is phased: the CLI answers to `tfd` and to `atm` (the `atm` command until the rename lands); the package and directory rename comes once open PRs land |
+| Engine and command-line tool | **tfd** | The engine Trifold provides and runs as a managed service: "Trifold provides tfd, the engine behind it" on developer, accountant and trust pages; self-hosters run it directly. Docs, terminal. The package is named `tfd` and is not on npm yet; the npm name (`tfd` or `@trifold/cli`) is open (`../business/website-open-questions.md` 2.7). The code rename is phased: the CLI answers to `tfd` and to `atm` (the `atm` command until the rename lands); the package and directory rename comes once open PRs land |
 | AI agent | **Rifo** (`@rifo`) | In the app, chat and `tfd ask`; it always cites the ledger behind each answer |
 
 ### The agent: Rifo
@@ -40,8 +46,10 @@ Why Trifold leads: it is warm, a real word, and speech-to-text hears it correctl
 |---|---|---|
 | Official | **TriFolD** | `tfd --help`, docs |
 | Brand promise | **Trusted Financial Data** | Trust page, accountant pitch, the three-records story |
-| Marketing line | **tfd: Taxes, Finally Done.** | Homepage, ads, the tax-season campaign |
+| Marketing line | **tfd: Taxes, Finally Done.** | Only the owner tax-season campaign, after a lawyer's review; never on school or family pages |
 | Easter egg | **Totally Freaking Done** | `tfd --why`, the month-close success message, stickers. Not on formal pages |
+
+Illustration only: `tfd close` and `tfd --why` are not built.
 
 ```text
 $ tfd close --month 2026-10
@@ -51,12 +59,12 @@ $ tfd close --month 2026-10
 
 ## Taglines
 
-- Main: **Three sides of every dollar.**
-- Tax season: **Taxes, Finally Done.** The first time it appears on a page, always pair it with a qualifier, such as "Tax-ready books, CPA-signed" (see Claim rules).
+- Main: **Books that show their work.**
+- Later, after milestone 3 (daily Stripe matching): **Three sides of every dollar.** Retired as a headline until then, because the third side isn't checked yet.
+- Tax season: **Taxes, Finally Done.** Needs a lawyer's review first. Not for school or family pages, where families may read it as "Trifold does my tax credit" (`../business/website-open-questions.md` 3.4). On first use, always pair it with a qualifier such as "Tax-ready books, CPA-signed" (see Claim rules).
 - Supporting lines:
-  - Books that close themselves.
   - Every dollar, folded into one truth.
-  - Your books closed all year. Your CPA signs in an afternoon.
+  - After Rifo ships: Books that close themselves. Your books closed all year; your CPA signs in an afternoon.
 
 ## Brand kit
 
@@ -108,8 +116,8 @@ Rifo speaks in the same voice and always shows its source, for example: "From 14
 ## Website outline
 
 1. **Home**
-   - Hero: *Memberships, bookings and books that close themselves.* Subhead: *Sell plans, packs and paid sessions. Trifold records every dollar three ways, and an AI agent keeps your books tax-ready.* Buttons: "Start free" and "See a live ledger".
-   - Logo strip: B4 Uni schools, Vibes of Light.
+   - Hero: *Memberships, bookings and books that close themselves.* Subhead: *Sell plans, packs and paid sessions. Trifold records every dollar three ways, and an AI agent keeps your books tax-ready.* Buttons: "Start free" and "See a live ledger". Superseded on 2026-11-06 (`../website/decisions.md`): the hero is "Books that show their work." and the CTA is "Get early access", because the hosted product isn't live.
+   - Logo strip: B4 Uni schools, Vibes of Light. These are the owner's own or related businesses, so show them as design partners with the connection disclosed (`../business/website-open-questions.md` 4.4).
    - The three folds: **Sell** (plans, add-ons, packs, bookings) · **Record** (ledger, signed receipts) · **Close** (the agent reconciles, reports and builds the tax package).
    - Agent demo: "How did October go?", with an answer that cites the ledger.
    - One section per audience (below), a CPA partner block, a pricing preview and an FAQ.
@@ -123,14 +131,16 @@ Rifo speaks in the same voice and always shows its source, for example: "From 14
 
 ## Ideal customer profiles
 
-### 1. Studio owner
+Focus verticals (owner's decision, 2026-11-07): **schools** (microschools, small private and hybrid schools), **co-ops** (homeschool and education co-ops, member co-ops) and **churches** (recurring giving). Studios and other businesses on Stripe are the broader market. Profiles 2, 3 and 4 are the focus.
+
+### 1. Studio owner (broader market)
 
 Yoga, light therapy, sauna or Pilates; 50 to 500 members.
 
 - **Message:** Sell packs and memberships your way. Know who has visits left. Never do the books again.
 - **Cares about:** members running out of visits, failed payments, time at month-end, simple pricing changes (1, 2 or 4 sessions a month), looking professional.
 - **Doesn't care about:** ledgers, APIs, how the data is stored.
-- **Proof:** the Vibes of Light case study, "N visits left" alerts, no spreadsheets at year-end.
+- **Proof:** "N visits left" alerts, no spreadsheets at year-end. No case study exists yet; Vibes of Light is a related business, so any story from it discloses the connection (`../business/website-open-questions.md` 4.4).
 - **Objection and answer:** "I already use Mindbody." Keep booking where you like and let Trifold close the books, or switch fully for less.
 - **Channels:** studio-owner communities, Instagram, referrals from bookkeepers.
 
@@ -141,14 +151,16 @@ B4 Uni schools; 10 to 150 families.
 - **Message:** Tuition, sessions and receipts families can use at tax time, handled.
 - **Cares about:** itemised receipts per child for tax credits and education savings accounts, families with several children, fair refunds, few admin hours.
 - **Doesn't care about:** usage-pricing jargon, dashboards for their own sake.
-- **Proof:** a sample signed receipt with the child's name, hours and the school's EIN; built into B4 Uni.
-- **Objection and answer:** "Will it satisfy our state?" Receipts are designed against the state's requirements, and your CPA confirms them.
+- **Proof:** a sample signed receipt. Today it shows the school, date and amount, with a signature; the itemised, payer-identified receipt (child, hours, who paid) is the compliance pack, not built (Next). B4 Uni runs tfd but doesn't issue receipts yet.
+- **Objection and answer:** "Will it satisfy our state?" The compliance pack is being designed against each program's published rules, with a CPA's review. We never say a program accepts it.
 - **Channels:** inside B4 Uni, homeschool and micro-school networks, state education-choice groups.
 
-### 3. Nonprofit school treasurer or board
+### 3. Church, co-op or non-profit school treasurer or board
+
+Churches with recurring giving on Stripe, homeschool and member co-ops, non-profit schools.
 
 - **Message:** Open books, at the right level of detail for each person.
-- **Cares about:** transparency, separating restricted funds, donor privacy, board reports, the audit trail, Form 990.
+- **Cares about:** transparency, giving statements and donation acknowledgments, separating restricted funds, donor privacy, board reports, the audit trail, Form 990.
 - **Doesn't care about:** booking features, the agent's personality.
 - **Proof:** detail levels by viewer (public, members, board, finance), a replayable ledger, an audit log of who read what.
 - **Objection and answer:** "Is our donor data safe?" Names are visible only to the owner and the finance admin, and every read is logged.
@@ -163,7 +175,8 @@ Serves 10 to 100 small businesses.
 - **Doesn't care about:** the booking interface, member alerts.
 - **Proof:** a year-end package, every number traced to an event, a read-only partner seat, `tfd verify`.
 - **Objection and answer:** "Will AI replace me?" No. The agent prepares and you sign, so you can serve more clients per hour.
-- **Channels:** accounting communities, a partner programme with a revenue share, CPE webinars.
+- **Why it matters:** accounting firms are a key enabler (owner's decision, 2026-11-07): about 5 firms are co-design partners from the start.
+- **Channels:** accounting communities, the firm programme (free seats, client discounts and firm tiers; Trifold pays accountants no cash referral fees, `../business/go-to-market.md`), CPE webinars.
 
 ### 5. Developer building a membership or credits product
 
@@ -182,11 +195,15 @@ The idea comes from Ian Grigg's 2005 work on triple-entry bookkeeping: every tra
 
 | Record | Whose | In Trifold |
 |---|---|---|
-| 1. The books | The business's | Double-entry postings in a hash-chained ledger |
+| 1. The books | The business's | Double-entry postings; months sealed and chained (a chain over every event is milestone 2) |
 | 2. The receipt | The customer's | A signed receipt the customer keeps and can verify |
-| 3. The witness | The processor's | Stripe's record of the charge, matched every day |
+| 3. The processor's record | Stripe's | Stripe's record of the charge, matched every day (milestone 3, not built) |
+
+"Witness" means only Trifold's countersignature ("Witnessed by Trifold", `../../TRADEMARKS.md`), never Stripe's record.
 
 ### How each side is kept honest
+
+This is the finished design. Today the receipt and seal checks work; the per-event hash chain, daily Stripe matching and a published daily fingerprint are not built.
 
 | Attempt | What catches it |
 |---|---|
@@ -207,21 +224,23 @@ What exists today, in `packages/atm`:
 - Batches are written once, with their hash in the key (`src/ledger/ship.ts`).
 - Stripe signatures are checked on ingest (`src/handler/stripe-signature.ts`).
 - Journals can be read by hledger.
+- Signed receipts and sealed months (milestone 1, released in tfd 0.10.0 on 2026-11-07): an Ed25519 receipt per payment and refund, a signed seal per closed month chained to the one before, `tfd keys new`, `tfd receipt`, `tfd verify receipt`, `tfd seal`, `tfd verify seals`. No school issues them yet.
+- `tfd-verify` (`packages/verify`, Apache-2.0, not yet published): the same receipt and seal checks for browsers. The website preview's verifier uses it.
 
-To build:
+To build (status as of 2026-11-07):
 1. Link every ledger event to its Stripe source (event id, charge, invoice, sha256 of the raw body).
 2. Chain events by hash per business (`prev_hash`, `hash`), and record the latest event's hash in each batch and month close.
-3. Sign batches and month closes with Ed25519 keys, and publish the public keys at `/.well-known/trifold-keys.json`.
-4. Signed customer receipts (`receiptOf`), with a verify page and `tfd verify receipt`. This also needs the open receipt decisions in `packages/atm/ROADMAP.md`.
+3. Sign batches and month closes with Ed25519 keys, and publish the public keys at `/.well-known/trifold-keys.json`. Month seals are signed (milestone 1) and `tfd keys new` writes `keys.json`; batches aren't signed, and no school serves the keys yet.
+4. Signed customer receipts (`receiptOf`), with a verify page and `tfd verify receipt`. Built (milestone 1); the verify page is in the site preview only. The open receipt decisions in `packages/atm/ROADMAP.md` (erasure, key id, refunds, disputes, when to seal) still come before a school issues them.
 5. Match every event daily against Stripe's balance transactions and payouts.
 6. Optional: publish each day's summary hash to a public transparency log.
-7. An open `tfd verify` (Apache-2.0) that checks the chain, signatures, balances, replay, the Stripe matches and receipts.
+7. An open `tfd verify` (Apache-2.0) that checks the chain, signatures, balances, replay, the Stripe matches and receipts. Partly built: receipts and seals (`tfd verify`, `tfd-verify`); the chain and the Stripe matches need steps 2 and 5.
 
 Where the code goes: tfd stays pure. `receiptOf`, the canonical receipt bytes and `verifyReceipt` live in tfd. Signing with a stored key and delivering receipts belong to the caller.
 
 ## Claim rules
 
-What we may say depends on what has shipped. The license wording rules are in the table below the ladder.
+The claim rules are in `../../AGENTS.md` ("Claims"); this section adds the brand's ladder and the tax wording.
 
 | After | We may say |
 |---|---|
@@ -230,21 +249,15 @@ What we may say depends on what has shipped. The license wording rules are in th
 | Steps 4 and 5 | "Three records that agree: your books, your customer's receipt and Stripe's record, signed and matched" |
 | Steps 6 and 7 | "Independently verifiable: check our math yourself with `tfd verify`" |
 
+**Open: this ladder and the business plan disagree** (`../business/website-open-questions.md` 4.1). Option A is the ladder above. Option B is the rule in `../../AGENTS.md` ("Claims"): "signed receipts and sealed books" until milestones 2 and 3 ship, and never "triple-entry" for Trifold. Until the owner picks one, copy follows the stricter reading of both. Both agree on "double-entry, append-only, replayable books" today, on "signed receipts and sealed books" for milestone 1, and on never saying "triple-entry".
+
 ### License wording
 
-| Say | Never say |
-|---|---|
-| "Source-available", "Fair Source", "free to self-host" for the engine | "Open source" for tfd. FSL is not OSI-approved |
-| "Open format", "open spec", "open standard", "open verifier" | "Open source" for the whole product |
-| "The verifier and receipt format are Apache-2.0" | "Anyone can run a hosted service on tfd" |
-| "Every tfd release becomes Apache-2.0 two years after it ships" | "Not even Trifold can quietly change your books" |
-| "Even if Trifold disappears, the code becomes Apache-2.0" | "Triple-entry" for Trifold, or any speed numbers |
-
-Open formats and an open verifier are fine to say because those parts are Apache-2.0 (the vectors are CC0). Keep the claim to the parts that carry that license.
+The license wording rules are in `../../AGENTS.md` ("Rules for words"). Never say "Not even Trifold can quietly change your books", "triple-entry" for Trifold, or any speed numbers.
 
 We never claim that Trifold files taxes. Filing needs an authorised e-file provider and a human who signs, and who is liable when an AI makes a filing error is unsettled. "Taxes, Finally Done" always comes with "tax-ready" or "CPA-signed" on first use, because the FTC treats an implied claim like an explicit one.
 
-Also not to claim yet: usage-based pricing (not built), itemised receipts (not built), and tax amounts on invoices (not built).
+Also not to claim yet: usage-based pricing (not built), itemised receipts and the compliance pack (not built), and tax amounts on invoices (not built).
 
 ## Names, domains and trademarks
 
@@ -254,7 +267,7 @@ As checked on 2026-11-05:
 |---|---|
 | gettrifold.com | Free |
 | trifold.com, .ai, .io | Registered by others |
-| npm `trifold`, `tfd` | Not checked as packages; publish under `@trifold/cli` |
+| npm `trifold`, `tfd` | `trifold` is taken; `tfd` was unpublished in 2024 and may be claimable; `@trifold/cli` is the fallback. Open (`../business/website-open-questions.md` 2.7) |
 | `tfd` command | No clash found on PATH or Homebrew |
 | Samsung Galaxy Z TriFold | Dominates search for "trifold". An SEO problem; have a lawyer check Samsung's filings |
 | Old TRIFOLD filings | A dead class 9 application (serial 77941454) and a "tri fold" class 42 filing of unknown status (77000614). Check in USPTO TSDR |
@@ -264,18 +277,26 @@ Next steps:
 2. Claim the npm scope `@trifold`, the GitHub organisation and the main social handles.
 3. Get a trademark clearance search for TRIFOLD in classes 9, 36 and 42.
 
-## Licensing summary
+## Plain-English glossary
 
-Decided by the owner on 2026-11-06.
+Say the plain words to owners, families and boards. The technical word is fine for developers.
 
-| Part | License |
+| Technical word | Plain English |
 |---|---|
-| tfd engine and CLI (`packages/atm`, except the parts below) | **FSL-1.1-ALv2**. Source-available: free to use, modify and self-host for your own books, for non-commercial education and research, and for professional services to a licensee (for example an accountant working on a client's own install). Not allowed: offering it to others as a commercial product or service that competes with Trifold. Each release becomes Apache-2.0 two years after it ships |
-| Receipt and seal format, spec and verifier (schemas, `docs/receipts.md`, receipt, seal, sign and canonicalisation code, the website's in-browser verifier) | **Apache-2.0** |
-| Test vectors (golden receipt files) | **CC0-1.0** (public domain) |
-| Autumn code this repo forks (`balance-engine`, `shared`, and so on) | **Apache-2.0** (upstream license, unchanged) |
-| Hosted Trifold service, Rifo, the witness | Proprietary |
+| Event | A payment, refund or booking |
+| Ledger, journal | The books |
+| Credits | An AI usage allowance (also used for witness signatures), included in every plan |
+| Signed receipt | A receipt with a digital signature, so any change to it shows |
+| Seal | A signed fingerprint of the closed month |
+| Verify | Check that a receipt or seal is unchanged, with the free verifier |
+| Witness, countersignature | Trifold's own signature on a record: proof Trifold saw that exact record at that time ("Witnessed by Trifold"; Next) |
+| Reconcile, matching | Checking the books against Stripe |
+| Compliance pack | Itemised receipts, with who paid, for one state program (Next) |
+| Self-host | Run tfd on your own computer or server, free |
+| Source-available | The code is public to read and run, with limits on reselling it (never "open source") |
+| Organization | One set of books, such as one school |
+| Hash, chain | Avoid. Say "fingerprint", and "linked, so a gap shows" |
 
-**Why.** "Anyone can check, forever" needs checking (verifier, format, vectors) to be unrestrictable. The engine is protected from a hosted clone, but each release becomes fully open after two years, so even if Trifold disappears, the code becomes Apache-2.0.
+## Licensing
 
-**Open items:** the licensor's legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (decide before the accountant partner program); contributor terms are decided (a CLA, 2026-11-07, `CONTRIBUTING.md`); whether the event envelope schema should also be Apache-2.0 so other ledgers can adopt the full standard.
+Decided; the table, the reasons and the wording rules are in `../../AGENTS.md`. In short: the engine is source-available (FSL-1.1-ALv2, each release becomes Apache-2.0 two years after it ships); the receipt and seal format, the verifier (`tfd-verify`) and the test vectors are Apache-2.0 or CC0; the website, hosted service, Rifo and the witness are proprietary. Open items are in `../business/business-plan.md` §12.
