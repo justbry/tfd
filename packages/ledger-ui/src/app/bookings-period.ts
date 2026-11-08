@@ -7,24 +7,48 @@ import { type Route, withQuery } from "./route.ts";
 export type BookingsPeriod = { range: "day" | "week"; offset: number };
 
 const daysPerWeek = 7;
+const msPerWeek = daysPerWeek * 86_400_000;
 
-export function readBookingsPeriod(query: URLSearchParams): BookingsPeriod {
-	const offset = Number(query.get("offset") ?? 0);
-	return {
-		range: query.get("range") === "day" ? "day" : "week",
-		offset: Number.isInteger(offset) ? offset : 0,
-	};
+/** The week the Bookings tab opens on, in weeks from this one: a demo school whose latest booking lies before this
+ * week opens on that booking's week (`School.bookingsOpenOn`), so its tab is not empty; any other school on this
+ * week. */
+export function bookingsOpenOffset(
+	school: { bookingsOpenOn?: string } | undefined,
+	today: string,
+): number {
+	const opensOn = school?.bookingsOpenOn;
+	if (!opensOn) return 0;
+	const weeks = Math.round(
+		(Date.parse(weekStart(opensOn)) - Date.parse(weekStart(today))) / msPerWeek,
+	);
+	return Math.min(0, weeks);
 }
 
-/** The route for a period: the defaults (week, offset 0) are left out of the hash; every other parameter stays. */
+/** The period of a route; a week with no `offset` is `opensOffset` weeks from this one (`bookingsOpenOffset`). */
+export function readBookingsPeriod(
+	query: URLSearchParams,
+	opensOffset = 0,
+): BookingsPeriod {
+	const range = query.get("range") === "day" ? "day" : "week";
+	const asked = query.get("offset");
+	const offset = Number(asked ?? 0);
+	if (asked === null)
+		return { range, offset: range === "week" ? opensOffset : 0 };
+	return { range, offset: Number.isInteger(offset) ? offset : 0 };
+}
+
+/** The route for a period: the defaults (week, the opening offset; a day, offset 0) are left out of the hash; every
+ * other parameter stays. */
 export function bookingsPeriodRoute(
 	route: Route,
 	{ range, offset }: BookingsPeriod,
+	opensOffset = 0,
 ): Route {
+	const opening = range === "week" ? opensOffset : 0;
 	return withQuery(
 		withQuery(route, "range", range === "day" ? "day" : null),
 		"offset",
-		offset === 0 ? null : String(offset),
+		offset === opening ? null : String(offset),
 	);
 }
 

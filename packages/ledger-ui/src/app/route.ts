@@ -23,7 +23,8 @@ export type Route = {
 
 export type Theme = "light" | "dark" | "system";
 
-/** The tab a school opens on: Plans, or the Dashboard for a demo school, which has no plans (S8-contract section 11). */
+/** The tab a school opens on: Plans, or the Dashboard for a demo school, whose plans are a scenario's, not its own to
+ * edit (S8-contract section 11). */
 export const defaultTabOf = (
 	school: { demo: boolean } | undefined,
 ): SchoolTab => (school?.demo ? "dashboard" : "plans");

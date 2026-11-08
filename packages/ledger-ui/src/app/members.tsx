@@ -479,7 +479,9 @@ function Roster({
 	const go = (name: string, value: string | null): void =>
 		navigate(withQuery(route, name, value));
 	const memberOf = (person: Person): Member | null =>
-		loaded.members.find(({ profileId }) => profileId === person.id) ?? null;
+		loaded.members.find(
+			({ profileId, familyId }) => (profileId ?? familyId) === person.id,
+		) ?? null;
 	const renewalOf = (member: Member | null): string =>
 		member ? formatPeriodEnd(member.currentPeriodEnd, school.timeZone) : "";
 	const writeContextOf = (person: Person): WriteContext => ({
@@ -710,7 +712,7 @@ function Roster({
 		const needsDialog =
 			action === "release" &&
 			inside &&
-			summary.bookingRules.lateCancel === "spend";
+			summary.bookingRules?.lateCancel === "spend";
 		if (action === "remind") remindHost(booking);
 		else if (action === "noshow")
 			startModal(person.id, { kind: "noshow", bookingId: booking.id });

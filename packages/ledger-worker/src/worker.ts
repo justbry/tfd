@@ -9,7 +9,8 @@
  * Demo schools (`demo.ts`, `LEDGER_DEMO_SCHOOLS=on`): `GET /v1/schools` and a demo school's paths need no token. A
  * token that is sent is checked all the same (an invalid or expired one is a 401); a valid one that does not list the
  * demo school reads it too. Every caller holds a demo school as its owner with the finance grant; a config verify or
- * put on one is refused (403 `demo_read_only`).
+ * put on one is refused (403 `demo_read_only`). `demo-api/<route>` serves a demo school's answers to the buzz-school
+ * reads (`routes/demo-api.ts`) to anyone, and is 404 for every other school.
  */
 import { R2BindingStore } from "tfd/worker";
 import {
@@ -40,6 +41,7 @@ import {
 	readConfigRoute,
 	verifyConfigRoute,
 } from "./routes/config.js";
+import { demoApiRoute } from "./routes/demo-api.js";
 import { fundraisingRoute } from "./routes/fundraising.js";
 import {
 	incomeStatementRoute,
@@ -59,6 +61,8 @@ import { demoSchoolsRoute, schoolsRoute } from "./routes/schools.js";
 import { runViewsJob, type ViewsJobResult } from "./views-job.js";
 
 const SCHOOL_PATH = /^\/v1\/schools\/([^/]+)\/(.+)$/;
+/** `demo-api/<route>`: a demo school's answers to the buzz-school reads (`routes/demo-api.ts`). */
+const DEMO_API_PATH = /^\/v1\/schools\/([^/]+)\/demo-api\/(.+)$/;
 const MEMBER_MONEY = /^members\/([^/]+)\/money$/;
 /** `config/<name>` and `config/<name>/verify`: the school's config objects (S9 plan section 4). */
 const CONFIG_PATH = /^config\/([^/]+?)(\/verify)?$/;
@@ -290,6 +294,22 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		now: number,
 	): Promise<Response> => {
 		const caller = await authenticate(request, env, now);
+		const demoApi = DEMO_API_PATH.exec(url.pathname);
+		if (demoApi !== null) {
+			// a demo school's buzz-school answers: no token needed, and nothing for any other school
+			const school = decode(demoApi[1] as string);
+			if (!isDemoSchool(school, env))
+				throw new ApiError("not_found", "No such endpoint.");
+			if (request.method !== "GET")
+				throw new ApiError("method_not_allowed", "Only GET is served.");
+			return demoApiRoute(
+				new R2BindingStore(env.LEDGER_BUCKET),
+				school,
+				demoApi[2] as string,
+				url.searchParams,
+				now,
+			);
+		}
 		const demoOn = demoSchoolsOn(env);
 		if (caller === null) {
 			// no token: only the demo schools' list and paths, and only where they are on

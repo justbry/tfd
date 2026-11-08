@@ -15,7 +15,8 @@ import {
  * The demo schools (S8-contract section 11 "Demo schools") through the real path: the harness seeds two of atm's school
  * presets as `demo-<preset>` with `LEDGER_DEMO_SCHOOLS=on`, the Worker serves them to anyone, and the HTTP adapters
  * show them after the person's own schools, or alone under the large alert when no one is signed in. Their reads
- * never ask buzz-school, and their writes are refused before any request.
+ * never ask buzz-school: its routes' answers come from the Worker's `demo-api` (worked out from the preset's events),
+ * and their writes are refused before any request.
  */
 
 const real = "tiny-school";
@@ -145,30 +146,121 @@ describe.skipIf(skip)("demo schools on the real Worker", () => {
 		}
 	});
 
+	/** Opens `tab` of the app's school, as a click on the tab would. */
+	const openTab = async (
+		app: Awaited<ReturnType<typeof mounted>>,
+		hash: string,
+	): Promise<void> => {
+		app.root.removeAttribute("data-route");
+		window.location.hash = hash;
+		window.dispatchEvent(new HashChangeEvent("hashchange"));
+		await app.shown(hash.split("?")[0] as string);
+	};
+	/** Waits until `selector` matches something in the app. */
+	const present = async (
+		root: HTMLElement,
+		selector: string,
+	): Promise<void> => {
+		for (
+			let attempt = 0;
+			attempt < renderAttempts && !root.querySelector(selector);
+			attempt += 1
+		)
+			await macrotask();
+	};
+
 	test("signed out, the first view is a demo school's Dashboard, and no tab of it is an empty pane", async () => {
 		const app = await mounted([], "#/", { signedOut: true });
 		try {
 			await app.shown(`#/${demos[0]}/dashboard`);
-			for (const tab of ["plans", "members", "bookings", "promos"]) {
-				app.root.removeAttribute("data-route");
-				window.location.hash = `#/${demos[0]}/${tab}`;
-				window.dispatchEvent(new HashChangeEvent("hashchange"));
-				await app.shown(`#/${demos[0]}/${tab}`);
+			await openTab(app, `#/${demos[0]}/promos`);
+			expect(
+				app.root.querySelector("[data-test=demo-tab-note]")?.textContent,
+			).toBe(
+				"Not available for demo schools: the demo scenarios hold no promo or gift events.",
+			);
+			for (const tab of ["plans", "members", "bookings", "ledger", "reports"]) {
+				await openTab(app, `#/${demos[0]}/${tab}`);
+				const pane = app.root.querySelector("[data-test=pane]");
 				expect({
 					tab,
 					note: app.root.querySelector("[data-test=demo-tab-note]") !== null,
-				}).toEqual({ tab, note: true });
+					empty: (pane?.textContent ?? "").trim() === "",
+				}).toEqual({ tab, note: false, empty: false });
 			}
-			for (const tab of ["ledger", "reports"]) {
-				app.root.removeAttribute("data-route");
-				window.location.hash = `#/${demos[0]}/${tab}`;
-				window.dispatchEvent(new HashChangeEvent("hashchange"));
-				await app.shown(`#/${demos[0]}/${tab}`);
-				const pane = app.root.querySelector("[data-test=pane]");
-				expect({ tab, empty: (pane?.textContent ?? "").trim() === "" }).toEqual(
-					{ tab, empty: false },
-				);
-			}
+		} finally {
+			app.close();
+		}
+	});
+
+	test("signed out, a demo school's Plans, Members and Bookings show the scenario's data from the Worker, not buzz-school", async () => {
+		const school = "demo-monthly-members";
+		const app = await mounted([], `#/${school}/plans`, { signedOut: true });
+		try {
+			await app.shown(`#/${school}/plans`);
+			await present(app.root, "[data-test=plan-row]");
+			expect(
+				[
+					...app.root.querySelectorAll(
+						"[data-test=plan-row] [data-test=plan-name]",
+					),
+				].map((name) => name.textContent),
+			).toEqual([
+				"Audit",
+				"Scholar",
+				"Seminar",
+				"Fellow",
+				"Library pass",
+				"Annual lab",
+				"Starter kit",
+				"Tutor hour",
+			]);
+			const active = app.root.querySelector(
+				"[data-test=plan-stat][data-stat=active] [data-test=plan-stat-value]",
+			);
+			expect(digit.test(active?.textContent ?? "")).toBe(true);
+			expect(app.root.querySelector("[data-test=not-available]")).toBeNull();
+
+			await openTab(app, `#/${school}/members`);
+			await present(app.root, "[data-test=member-row]");
+			const rows = [
+				...app.root.querySelectorAll<HTMLElement>("[data-test=member-row]"),
+			];
+			expect(rows.length).toBeGreaterThan(0);
+			expect(app.root.textContent ?? "").toContain("Family fam_0");
+			expect(app.root.querySelector("[data-test=demo-tab-note]")).toBeNull();
+
+			// The member drawer: its plan and balance from members-list, its payments from the ledger.
+			const id = rows[0]?.dataset.id as string;
+			await openTab(app, `#/${school}/members?member=${id}`);
+			await present(
+				app.root,
+				"[data-test=member-drawer] [data-test=payment-row]",
+			);
+			const drawer = app.root.querySelector("[data-test=member-drawer]");
+			expect(
+				drawer?.querySelector("[data-test=drawer-name]")?.textContent,
+			).toContain(`Family ${id}`);
+			expect(
+				drawer?.querySelectorAll("[data-test=payment-row]").length,
+			).toBeGreaterThan(0);
+
+			await openTab(app, `#/${school}/bookings`);
+			await present(app.root, "[data-test=booking-row]");
+			expect(
+				app.root.querySelectorAll("[data-test=booking-row]").length,
+			).toBeGreaterThan(0);
+			expect(app.root.querySelector("[data-test=demo-tab-note]")).toBeNull();
+			expect(
+				app.buzzSchool.apiCalls.filter(
+					(path) => path !== "/school-admin/ledger-token",
+				),
+			).toEqual([]);
+			expect(
+				app.buzzSchool.workerCalls.some((path) =>
+					path.startsWith(`/v1/schools/${school}/demo-api/`),
+				),
+			).toBe(true);
 		} finally {
 			app.close();
 		}
@@ -232,6 +324,7 @@ describe.skipIf(skip)("demo schools on the real Worker", () => {
 		const capabilities = await adapters.reader.capabilities({
 			schoolId: school,
 		});
+		expect(capabilities.stripeConnected).toBe(true);
 		expect(
 			Object.values(capabilities.actions).every(
 				(capability) =>
@@ -240,21 +333,49 @@ describe.skipIf(skip)("demo schools on the real Worker", () => {
 					capability.reason === "demo",
 			),
 		).toBe(true);
-		for (const read of [
-			() => adapters.reader.members({ schoolId: school }),
-			() =>
-				adapters.reader.bookings({
-					school,
-					from: "2026-03-01",
-					to: "2026-03-31",
-				}),
-			() => adapters.reader.menuVersions(school),
-			() => adapters.reader.menuVersion(school, 1),
-			() => adapters.reader.financeGrants({ schoolId: school }),
-			() => adapters.reader.invoiceItems({ schoolId: school }),
-			() => adapters.reader.switchTiers({ schoolId: school }),
-		])
-			await expect(read()).rejects.toMatchObject({ kind: "not_available" });
+		const members = await adapters.reader.members({ schoolId: school });
+		expect(members.members.length).toBeGreaterThan(0);
+		expect(members.members.every(({ key }) => key.startsWith("family:"))).toBe(
+			true,
+		);
+		const bookings = await adapters.reader.bookings({
+			school,
+			from: "2026-03-01",
+			to: "2026-03-31",
+		});
+		expect(bookings.bookings.length).toBeGreaterThan(0);
+		expect(
+			bookings.bookings.every(
+				({ startsAt }) => startsAt >= "2026-03-01" && startsAt < "2026-04-01",
+			),
+		).toBe(true);
+		const versions = await adapters.reader.menuVersions(school);
+		expect(versions.versions.map(({ version }) => version)).toEqual([1]);
+		expect((await adapters.reader.menuVersion(school, 1))?.version).toBe(1);
+		expect(await adapters.reader.menuVersion(school, 9)).toBeUndefined();
+		expect(await adapters.reader.financeGrants({ schoolId: school })).toEqual(
+			[],
+		);
+		expect(
+			(await adapters.reader.invoiceItems({ schoolId: school })).length,
+		).toBeGreaterThan(0);
+		expect(
+			(await adapters.reader.switchTiers({ schoolId: school })).length,
+		).toBeGreaterThan(0);
+		const summary = await adapters.reader.planSummary(school);
+		expect(summary.activeMembers).toBe(
+			members.members.filter(({ status }) => status === "active").length,
+		);
+		const people = await adapters.reader.people({ schoolId: school });
+		expect(people).toHaveLength(members.members.length);
+		const detail = await adapters.reader.memberDetail({
+			schoolId: school,
+			personId: people[0]?.id as string,
+		});
+		expect(detail.payments.length).toBeGreaterThan(0);
+		await expect(
+			adapters.reader.promos({ schoolId: school } as never),
+		).rejects.toMatchObject({ kind: "not_available" });
 		const disclosure = await adapters.reader.disclosure(school);
 		expect(disclosure.viewer.role).toBe("owner");
 		expect(adapters.buzzSchool.apiCalls.length).toBe(before);

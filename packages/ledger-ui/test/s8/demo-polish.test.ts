@@ -8,17 +8,18 @@ import { DemoBanner } from "../../src/http/demo-banner.tsx";
 import { cleanUp, clock, count, open, settle, text } from "../s5/helpers.ts";
 
 /**
- * Staging review, 2026-11-07. The demo alert is pinned top right (`http/demo-banner.tsx`), so the demo note's links to
- * the books tabs sit on their own line under its text, at the left, never at the note's right end under the alert. A
- * demo school is read-only, so Reports has no "Edit in school settings"; a real school's admin still has it.
- * happy-dom has no layout: the note's tests assert the structure that puts the links at the left.
+ * Staging review, 2026-11-07. The demo alert is pinned top right (`http/demo-banner.tsx`), so nothing of the demo note
+ * sits at its right end under the alert. Since the demo schools' buzz-school reads come from the Worker's `demo-api`
+ * answers, only Promos shows the note. A demo school is read-only, so Reports has no "Edit in school settings"; a real
+ * school's admin still has it.
  */
 let unmount: (() => void) | null = null;
-afterEach(() => {
+const closeApp = (): void => {
 	unmount?.();
 	unmount = null;
 	cleanUp();
-});
+};
+afterEach(closeApp);
 
 const base = createFixtureReader({ clock });
 /** The fixtures with Vibes of Light (`vol`, the first school) as a demo school. */
@@ -49,53 +50,23 @@ const openUnderAlert = async (hash: string): Promise<void> => {
 	await settle();
 };
 
-const links = (): HTMLAnchorElement[] => [
-	...document.querySelectorAll<HTMLAnchorElement>("[data-test=demo-tab-link]"),
-];
-
-test("with the demo alert open, the note's links sit on their own line under its text, at the left", async () => {
-	for (const tab of ["plans", "members", "bookings", "promos"]) {
+test("with the demo alert open, Promos shows the demo note, and Plans, Members and Bookings their panes", async () => {
+	await openUnderAlert("#/vol/promos");
+	expect(count("[data-test=demo-banner]")).toBe(1);
+	const note = document.querySelector<HTMLElement>("[data-test=demo-tab-note]");
+	expect(note?.textContent).toBe(
+		"Not available for demo schools: the demo scenarios hold no promo or gift events.",
+	);
+	// No spacer pushes anything to the note's right end, where the alert is.
+	expect(note?.querySelectorAll(".sp").length).toBe(0);
+	closeApp();
+	for (const tab of ["plans", "members", "bookings"]) {
 		await openUnderAlert(`#/vol/${tab}`);
-		expect(count("[data-test=demo-banner]")).toBe(1);
-		const note = document.querySelector<HTMLElement>(
-			"[data-test=demo-tab-note]",
-		);
-		const row = document.querySelector<HTMLElement>(
-			"[data-test=demo-tab-links]",
-		);
-		expect({ tab, row: row?.textContent }).toEqual({
+		expect({ tab, notes: count("[data-test=demo-tab-note]") }).toEqual({
 			tab,
-			row: "DashboardLedgerReports",
+			notes: 0,
 		});
-		// No spacer pushes anything to the note's right end, where the alert is.
-		expect(note?.querySelectorAll(".sp").length).toBe(0);
-		// The row is a block under the text, not an item of the note's own flex row beside it.
-		expect(row?.parentElement?.parentElement).toBe(note);
-		expect(row?.previousElementSibling?.textContent).toStartWith(
-			"Demo schools show the books only",
-		);
-		expect(row?.style.display).toBe("flex");
-		expect(row?.style.justifyContent).toBe("");
-		expect(row?.style.marginLeft).toBe("");
-		expect(links().every((link) => link.parentElement === row)).toBe(true);
-		unmount?.();
-		unmount = null;
-		cleanUp();
-	}
-});
-
-test("with the demo alert open, each of the note's links opens its tab", async () => {
-	for (const [index, tab] of ["dashboard", "ledger", "reports"].entries()) {
-		await openUnderAlert("#/vol/plans");
-		const link = links()[index];
-		expect(link?.getAttribute("href")).toBe(`#/vol/${tab}`);
-		link?.click();
-		await settle();
-		expect(window.location.hash).toBe(`#/vol/${tab}`);
-		expect(count("[data-test=demo-tab-note]")).toBe(0);
-		unmount?.();
-		unmount = null;
-		cleanUp();
+		closeApp();
 	}
 });
 

@@ -91,15 +91,9 @@ const noPendingBookings: ReadonlySet<string> = new Set();
 const noMembershipChanges: Record<string, Change> = {};
 const noRosterChanges: RosterChange[] = [];
 const loadPanes = () => import("./panes.tsx");
-/** The panes whose data a demo school does not have: no B4 Uni school stands behind it (S8-contract section 11 "Demo
- * schools"). The member portal is the Members tab's. They show `DemoTabNote` instead. */
-const demoNoteTabs: ReadonlySet<PaneName> = new Set([
-	"plans",
-	"members",
-	"portal",
-	"bookings",
-	"promos",
-]);
+/** The panes whose data a demo school does not have (S8-contract section 11 "Demo schools"): the scenarios hold no
+ * promo or gift events. They show `DemoTabNote` instead. */
+const demoNoteTabs: ReadonlySet<PaneName> = new Set(["promos"]);
 const loadMenus = () => import("./menus.tsx");
 const loadSettings = () => import("./settings.tsx");
 
@@ -457,9 +451,7 @@ export function Shell({
 						onRetry={disclosureRead.retry}
 					/>
 				)}
-				{ready && school && panes && demoNote && (
-					<panes.DemoTabNote school={school} />
-				)}
+				{ready && school && panes && demoNote && <panes.DemoTabNote />}
 				<ViewingContext.Provider value={viewing}>
 					{ready && school && panes && paneName && !demoNote && (
 						<panes.Pane

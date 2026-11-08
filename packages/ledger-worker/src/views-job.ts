@@ -5,12 +5,14 @@
  *
  * A demo school (`demo-<preset>`, `demo.ts`) ships nothing, so its views need no run every five minutes: each run
  * rebuilds at most one, the one whose views are oldest, and only once they are an hour old. Fifteen demo logs of a
- * year's days each would otherwise cost every run thousands of reads.
+ * year's days each would otherwise cost every run thousands of reads. The run also writes the demo school's route answers
+ * again (`demo/demo-api-store.ts`), as of the same instant as its views.
  */
 import { readViewsFromStore, runViews } from "tfd/worker";
 import { jobStatusKey, readJobProblem } from "./data/job-status.js";
 import { putText, type Store } from "./data/store-io.js";
 import { asOfFor } from "./data/watermark.js";
+import { refreshDemoApi } from "./demo/demo-api-store.js";
 import { DEMO_SCHOOL } from "./demo.js";
 
 const SCHOOLS_PREFIX = "schools/";
@@ -68,16 +70,15 @@ const runOne = async (
 	asOf: Date,
 ): Promise<ViewsJobResult> => {
 	try {
-		const run = await runViews(
-			store,
-			school,
-			await asOfFor(store, school, asOf),
-		);
+		const at = await asOfFor(store, school, asOf);
+		const run = await runViews(store, school, at);
 		if (!run.ok) {
 			await recordOutcome(store, school, { kind: run.error.kind }, asOf);
 			console.error(`views job failed for school ${school}`);
 			return { school, ok: false, reason: run.error.kind };
 		}
+		// A demo school's route answers follow its views, as of the same instant.
+		if (DEMO_SCHOOL.test(school)) await refreshDemoApi(store, school, at);
 		await recordOutcome(store, school, null, asOf);
 		return { school, ok: true };
 	} catch {

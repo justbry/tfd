@@ -5,6 +5,7 @@ import type { Clock, School } from "../data/types.ts";
 import {
 	bookingsDays,
 	bookingsLabel,
+	bookingsOpenOffset,
 	bookingsPeriodRoute,
 	readBookingsPeriod,
 } from "./bookings-period.ts";
@@ -74,7 +75,8 @@ export function TopBar({
 	const schoolName = school?.name ?? "All schools";
 
 	const onBookings = school !== undefined && route.tab === "bookings";
-	const bookingsPeriod = readBookingsPeriod(route.query);
+	const opensOffset = bookingsOpenOffset(school, today);
+	const bookingsPeriod = readBookingsPeriod(route.query, opensOffset);
 	const days = bookingsDays(bookingsPeriod, today);
 	const bookingsName = bookingsLabel(bookingsPeriod, days.from);
 	const moneyName = periodName(period);
@@ -176,7 +178,7 @@ export function TopBar({
 								timeZone={school.timeZone}
 								onChoose={(chosen, shut) => {
 									if (shut) close();
-									navigate(bookingsPeriodRoute(route, chosen));
+									navigate(bookingsPeriodRoute(route, chosen, opensOffset));
 								}}
 							/>
 						);

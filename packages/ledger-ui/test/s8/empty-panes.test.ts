@@ -4,8 +4,8 @@ import { createFixtureReader } from "../../src/fixtures/reader.ts";
 import { cleanUp, clock, count, open, text } from "../s5/helpers.ts";
 
 /**
- * Never an empty pane (orchestrator report on staging, 2026-11-08). A demo school opens on its Dashboard, and each tab
- * it has no data for (Plans, Members, Bookings, Promos) says so, with links to the books tabs. Any pane whose read
+ * Never an empty pane (orchestrator report on staging, 2026-11-08). A demo school opens on its Dashboard, and the tab
+ * it has no data for (Promos: the scenarios hold no promo events) says so. Any pane whose read
  * rejects says why: "Not available yet" for `not_available` (no Try again: nothing provides it), else "Could not load"
  * with Try again, for real schools too.
  */
@@ -27,7 +27,7 @@ const withDemo = (demoId: string, changes: Partial<Reader> = {}): Reader => ({
 		),
 });
 const noteText =
-	"Demo schools show the books only: Dashboard, Ledger and Reports. Plans, Members, Bookings and Promos need a real school.";
+	"Not available for demo schools: the demo scenarios hold no promo or gift events.";
 
 test("a demo school opens on its Dashboard; a real school still opens on Plans", async () => {
 	await open("#/vol", { reader: withDemo("vol") });
@@ -42,26 +42,20 @@ test("a demo school opens on its Dashboard; a real school still opens on Plans",
 	expect(window.location.hash).toBe("#/vol/dashboard");
 });
 
-test("each tab a demo school has no data for shows the demo note with links to the books tabs", async () => {
-	for (const tab of ["plans", "members", "bookings", "promos"]) {
-		await open(`#/vol/${tab}`, { reader: withDemo("vol") });
-		expect({ tab, note: text("[data-test=demo-tab-note]") }).toEqual({
-			tab,
-			note: `${noteText}DashboardLedgerReports`,
-		});
-		expect(
-			[
-				...document.querySelectorAll<HTMLAnchorElement>(
-					"[data-test=demo-tab-link]",
-				),
-			].map((link) => link.getAttribute("href")),
-		).toEqual(["#/vol/dashboard", "#/vol/ledger", "#/vol/reports"]);
-		cleanUp();
-	}
+test("a demo school's Promos shows the demo note", async () => {
+	await open("#/vol/promos", { reader: withDemo("vol") });
+	expect(text("[data-test=demo-tab-note]")).toBe(noteText);
 });
 
-test("a demo school's books tabs show their data, not the note", async () => {
-	for (const tab of ["dashboard", "ledger", "reports"]) {
+test("a demo school's other tabs show their data, not the note", async () => {
+	for (const tab of [
+		"dashboard",
+		"ledger",
+		"reports",
+		"plans",
+		"members",
+		"bookings",
+	]) {
 		await open(`#/vol/${tab}`, { reader: withDemo("vol") });
 		expect({ tab, notes: count("[data-test=demo-tab-note]") }).toEqual({
 			tab,
