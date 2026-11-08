@@ -149,3 +149,25 @@ describe("the Toasts service", () => {
 		expect(seen).toEqual([0, 1]);
 	});
 });
+
+describe("toast owners", () => {
+	test("identical messages merge only within one owner", () => {
+		const first = {
+			tone: "error",
+			title: "No connection",
+			owner: "read-a",
+		} as const;
+		const second = { ...first, owner: "read-b" };
+		const state = fill([
+			first,
+			second,
+			first,
+			{ tone: "error", title: "No connection" },
+		]);
+		expect(state.visible.map((toast) => [toast.owner, toast.count])).toEqual([
+			["read-a", 2],
+			["read-b", 1],
+			[undefined, 1],
+		]);
+	});
+});
