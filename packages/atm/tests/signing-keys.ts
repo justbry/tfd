@@ -51,3 +51,80 @@ export const testKeyFingerprint = (): string =>
 			}),
 		)
 		.digest("hex");
+
+const fingerprintOf = (publicKeyPem: string): string =>
+	createHash("sha256")
+		.update(
+			createPublicKey(publicKeyPem).export({ format: "der", type: "spki" }),
+		)
+		.digest("hex");
+
+/** When the October keys were revoked: after it, they fail everything they ever signed. */
+export const REVOKED_AT = "2026-11-05T00:00:00Z";
+
+/**
+ * Keys with a purpose and a window (the second keys-file form), as Trifold rotates them monthly: October's receipt and
+ * seal keys, revoked, and November's, current. Each is made from its phrase, like the test key; the receipt v2 vectors
+ * (tests/golden/receipt-v2/keys.json) pin their fingerprints and windows.
+ */
+const WINDOWED = [
+	{
+		keyId: "trifold-test-2026-10",
+		phrase: "tfd test receipt key 2026-10",
+		purpose: "receipt",
+		not_before: "2026-10-01T00:00:00Z",
+		not_after: "2026-11-01T00:00:00Z",
+		revoked_at: REVOKED_AT,
+	},
+	{
+		keyId: "trifold-test-2026-11",
+		phrase: "tfd test receipt key 2026-11",
+		purpose: "receipt",
+		not_before: "2026-11-01T00:00:00Z",
+		not_after: null,
+	},
+	{
+		keyId: "trifold-test-seal-2026-10",
+		phrase: "tfd test seal key 2026-10",
+		purpose: "seal",
+		not_before: "2026-10-01T00:00:00Z",
+		not_after: "2026-11-01T00:00:00Z",
+		revoked_at: REVOKED_AT,
+	},
+	{
+		keyId: "trifold-test-seal-2026-11",
+		phrase: "tfd test seal key 2026-11",
+		purpose: "seal",
+		not_before: "2026-11-01T00:00:00Z",
+		not_after: null,
+	},
+] as const;
+
+type WindowedId = (typeof WINDOWED)[number]["keyId"];
+
+const windowed = WINDOWED.map(({ keyId, phrase, ...use }) => ({
+	keyId,
+	use,
+	...signerFrom(keyId, phrase),
+}));
+
+/** The windowed keys' signers, by key id. */
+export const windowedSigners = Object.fromEntries(
+	windowed.map(({ keyId, signer }) => [keyId, signer]),
+) as Record<WindowedId, AtmSigner>;
+
+/** The keys file of the windowed keys: `{ key_id: { pem, purpose, not_before, not_after, revoked_at? } }`. */
+export const windowedKeys: AtmPublicKeys = Object.fromEntries(
+	windowed.map(({ keyId, use, publicKeyPem }) => [
+		keyId,
+		{ pem: publicKeyPem, ...use },
+	]),
+);
+
+/** What the vectors pin of each windowed key: its fingerprint and window, never the PEM. */
+export const windowedKeysPinned = Object.fromEntries(
+	windowed.map(({ keyId, use, publicKeyPem }) => [
+		keyId,
+		{ spki_sha256: fingerprintOf(publicKeyPem), ...use },
+	]),
+);

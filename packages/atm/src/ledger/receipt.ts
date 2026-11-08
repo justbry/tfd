@@ -7,9 +7,10 @@ import type {
 	AtmSigner,
 	LedgerVerdict,
 	ReceiptVerdict,
+	TfdReceiptV2,
 } from "../types.js";
-import { receiptSchema } from "./schemas.js";
-import { shapeCheck, signBytes, verifyBytes } from "./sign.js";
+import { receiptSchema, receiptV2Schema } from "./schemas.js";
+import { keyUse, shapeCheck, signBytes, verifyBytes } from "./sign.js";
 import { canonicalize, sha256Hex } from "./util.js";
 
 /**
@@ -76,9 +77,29 @@ export const receiptOf = (event: AtmEvent): AtmReceipt | null => {
 	};
 };
 
-/** The receipt signed with Ed25519 over `canonicalize(receipt)`. Throws naming the key type when the key is not Ed25519. */
+/** RFC 3339 UTC, as `schema/receipt.v2.json` takes `issued_at`. */
+const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+
+/**
+ * Receipt v2 of an event: `receiptOf`'s fields with `v: 2` and `issuedAt`, the time it is signed (the caller's clock).
+ * `null` for an event type without receipts. Throws as `receiptOf` does, and when `issuedAt` is not an RFC 3339 UTC
+ * instant. Pure: the books make it again from the event and the receipt's own `issued_at`.
+ */
+export const receiptOfV2 = (
+	event: AtmEvent,
+	issuedAt: string,
+): TfdReceiptV2 | null => {
+	if (!(UTC_INSTANT.test(issuedAt) && !Number.isNaN(Date.parse(issuedAt))))
+		throw new Error(
+			`issuedAt must be an RFC 3339 UTC instant, got ${issuedAt}`,
+		);
+	const v1 = receiptOf(event);
+	return v1 ? { ...v1, v: 2, issued_at: issuedAt } : null;
+};
+
+/** The receipt (v1 or v2) signed with Ed25519 over `canonicalize(receipt)`. Throws naming the key type when the key is not Ed25519. */
 export const signReceipt = (
-	receipt: AtmReceipt,
+	receipt: AtmReceipt | TfdReceiptV2,
 	signer: AtmSigner,
 ): AtmSignedReceipt => ({
 	receipt,
@@ -86,27 +107,42 @@ export const signReceipt = (
 	sig: signBytes(canonicalize(receipt), signer),
 });
 
-const isSignedReceipt = shapeCheck(receiptSchema);
+const isSignedV1 = shapeCheck(receiptSchema);
+const isSignedV2 = shapeCheck(receiptV2Schema);
+
+/** The receipt's `v`, read without trusting its shape. */
+const versionOf = (signed: unknown): unknown =>
+	typeof signed === "object" && signed !== null
+		? (signed as { receipt?: { v?: unknown } }).receipt?.v
+		: undefined;
+
+const isSignedReceipt = (signed: unknown): signed is AtmSignedReceipt =>
+	versionOf(signed) === 2 ? isSignedV2(signed) : isSignedV1(signed);
 
 /**
- * A signed receipt from anyone (a family's file is untrusted): its shape against `schema/receipt.v1.json`, then its key
- * id, then its signature. Never throws.
+ * A signed receipt from anyone (a family's file is untrusted): its shape against `schema/receipt.v1.json` or
+ * `schema/receipt.v2.json` (by its `v`), then its key id, then its signature, then whether the key vouches for it: a
+ * revoked key never does, a key of another purpose never does, and a v2 receipt's `issued_at` must be in the key's
+ * window (`keyUse`). Never throws.
  */
 export const verifyReceipt = (
 	signed: unknown,
 	keys: AtmPublicKeys,
 ): ReceiptVerdict => {
 	if (!isSignedReceipt(signed)) return { ok: false, reason: "malformed" };
-	const { receipt, key_id, sig } = signed as AtmSignedReceipt;
+	const { receipt, key_id, sig } = signed;
 	const verdict = verifyBytes(canonicalize(receipt), key_id, sig, keys);
-	return verdict === "ok" ? { ok: true } : { ok: false, reason: verdict };
+	if (verdict !== "ok") return { ok: false, reason: verdict };
+	const at = receipt.v === 2 ? receipt.issued_at : null;
+	const use = keyUse(keys, key_id, "receipt", at);
+	return use === "ok" ? { ok: true } : { ok: false, reason: use };
 };
 
 /**
  * A signed receipt against the school's events: the event it names, made into a receipt again and compared byte for
  * byte. `missing_event` when no event has its id, `not_receipted` when the event's type no longer gets a receipt,
- * `event_changed` for any other difference (also an event that no longer makes a receipt at all). The signature is
- * `verifyReceipt`'s job.
+ * `event_changed` for any other difference (also an event that no longer makes a receipt at all). A v2 receipt is made
+ * again with its own `issued_at`. The signature is `verifyReceipt`'s job.
  */
 export const checkReceiptAgainstEvents = (
 	signed: AtmSignedReceipt,
@@ -114,14 +150,18 @@ export const checkReceiptAgainstEvents = (
 ): LedgerVerdict => {
 	const event = events.find((e) => e.id === signed.receipt.event_id);
 	if (!event) return { ok: false, reason: "missing_event" };
-	let again: AtmReceipt | null;
+	const { receipt } = signed;
+	let again: AtmReceipt | TfdReceiptV2 | null;
 	try {
-		again = receiptOf(event);
+		again =
+			receipt.v === 2
+				? receiptOfV2(event, receipt.issued_at)
+				: receiptOf(event);
 	} catch {
 		return { ok: false, reason: "event_changed" };
 	}
 	if (!again) return { ok: false, reason: "not_receipted" };
-	return canonicalize(again) === canonicalize(signed.receipt)
+	return canonicalize(again) === canonicalize(receipt)
 		? { ok: true }
 		: { ok: false, reason: "event_changed" };
 };

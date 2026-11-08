@@ -172,7 +172,7 @@ describe("verifyReceipt", () => {
 	});
 
 	test("changing amount, event_time, stripe_id or event_hash breaks the signature", () => {
-		const changes: ((receipt: AtmReceipt) => void)[] = [
+		const changes: ((receipt: AtmSignedReceipt["receipt"]) => void)[] = [
 			(receipt) => {
 				receipt.amount += 1;
 			},

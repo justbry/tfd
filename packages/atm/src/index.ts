@@ -44,6 +44,7 @@ import {
 import {
 	checkReceiptAgainstEvents as checkReceiptAgainstEventsImpl,
 	receiptOf as receiptOfImpl,
+	receiptOfV2 as receiptOfV2Impl,
 	signReceipt as signReceiptImpl,
 	verifyReceipt as verifyReceiptImpl,
 } from "./ledger/receipt.js";
@@ -238,6 +239,7 @@ import type {
 	SubscriptionFact,
 	SubscriptionItem,
 	SubscriptionStatus,
+	TfdReceiptV2,
 	VerifySignatureInput,
 	WebhookDeps,
 	WebhookRequest,
@@ -1222,19 +1224,33 @@ export const appendToOutbox = (
 export const receiptOf = (event: AtmEvent): AtmReceipt | null =>
 	receiptOfImpl(event);
 
+/**
+ * Receipt v2 of an event: `receiptOf`'s fields with `v: 2` and `issued_at` (`issuedAt`, the caller's clock, RFC 3339
+ * UTC), signed with the rest so a verifier can check it against the key's window. Throws as `receiptOf` does, or on a bad
+ * `issuedAt`. Pure.
+ */
+export const receiptOfV2 = (
+	event: AtmEvent,
+	issuedAt: string,
+): TfdReceiptV2 | null => receiptOfV2Impl(event, issuedAt);
+
 /** Signs a receipt with an Ed25519 private key (PKCS#8 PEM): `sig` over `canonicalize(receipt)`, base64url. Throws for any other key type. */
 export const signReceipt = (
-	receipt: AtmReceipt,
+	receipt: AtmReceipt | TfdReceiptV2,
 	signer: AtmSigner,
 ): AtmSignedReceipt => signReceiptImpl(receipt, signer);
 
-/** Checks an untrusted signed receipt: its shape (`schema/receipt.v1.json`), its key id in `keys`, its signature. Never throws. */
+/**
+ * Checks an untrusted signed receipt: its shape (`schema/receipt.v1.json` or `receipt.v2.json`), its key id in `keys`, its
+ * signature, then the key's purpose, window (v2's `issued_at`) and revocation (`key_revoked` whatever `issued_at` says).
+ * Never throws.
+ */
 export const verifyReceipt = (
 	signed: unknown,
 	keys: AtmPublicKeys,
 ): ReceiptVerdict => verifyReceiptImpl(signed, keys);
 
-/** Makes the receipt again from the books' event and compares the bytes: `missing_event`, `not_receipted` or `event_changed` when they differ. */
+/** Makes the receipt again from the books' event (v2 with its own `issued_at`) and compares the bytes: `missing_event`, `not_receipted` or `event_changed` when they differ. */
 export const checkReceiptAgainstEvents = (
 	signed: AtmSignedReceipt,
 	events: readonly AtmEvent[],
@@ -1253,7 +1269,8 @@ export const signSeal = (seal: AtmSeal, signer: AtmSigner): AtmSignedSeal =>
 
 /**
  * A school's seal chain (in the order made) against its events: a verdict per seal (`ok`, `malformed`, `bad_signature`,
- * `unknown_key`, `broken_link`, `events_changed`) and the month events their month's latest seal does not name (late
+ * `unknown_key`, `key_revoked`, `key_wrong_purpose`, `outside_key_window`, `broken_link`, `events_changed`, or
+ * `superseded`: a revoked key's seal with a later `ok` seal of its month) and the month events their month's latest seal does not name (late
  * deliveries, or insertions). Never throws on a bad seal.
  */
 export const verifySeals = (

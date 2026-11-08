@@ -1047,10 +1047,14 @@ const keysFrom = async (path: string): Promise<AtmPublicKeys> => {
 		typeof keys !== "object" ||
 		keys === null ||
 		Array.isArray(keys) ||
-		!Object.values(keys).every((pem) => typeof pem === "string")
+		!Object.values(keys).every(
+			(entry) =>
+				typeof entry === "string" ||
+				(typeof entry === "object" && entry !== null && !Array.isArray(entry)),
+		)
 	)
 		throw new InputError(
-			`--keys ${path} is not a keys.json ({ key_id: public PEM }), as ${commandName} keys new writes`,
+			`--keys ${path} is not a keys.json ({ key_id: public PEM } as ${commandName} keys new writes, or { key_id: { pem, purpose, not_before, not_after, revoked_at? } })`,
 		);
 	return keys as AtmPublicKeys;
 };
