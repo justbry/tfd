@@ -1,0 +1,33 @@
+## Receipts and sealed months are released; hosting, Rifo and the witness are next {#built-and-next}
+
+<span class="kicker">Status, 7 November 2026</span>
+
+<div class="timeline">
+<div class="stage stage--built"><span class="when">Released</span><h3>Built</h3>
+<ul>
+<li>Books built from Stripe payments</li>
+<li>Signed receipts for payments and refunds</li>
+<li>Sealed months, each chained to the last</li>
+<li>Price what-ifs on past payments</li>
+<li>A free in-browser receipt checker</li>
+</ul></div>
+<div class="stage stage--next"><span class="when">Not built yet</span><h3>Next</h3>
+<ul>
+<li>First pilot issuing real receipts</li>
+<li>Hosted plans; scheduled monthly close</li>
+<li>Itemised receipts for state programs</li>
+<li>Rifo, the AI assistant</li>
+<li>Countersignature, auditor portal, daily Stripe matching</li>
+</ul></div>
+<div class="stage stage--later"><span class="when">Planned</span><h3>Later</h3>
+<ul>
+<li>Public log and Witness API</li>
+<li>Tax packages for your CPA</li>
+</ul></div>
+</div>
+
+::: {.notes}
+Sources: `docs/business/business-plan.md` §3, status as audited 2026-11-07: books from events, signed receipts and sealed months released in tfd 0.10.0, not yet issued by any school; `tfd simulate` released since 0.6.0 (the paid Pricing Lab is not built); `tfd-verify` built, not published; hosted service, Rifo, the witness, the per-event chain (milestone 2) and daily Stripe matching (milestone 3) not built; tax packages Later. Scheduled monthly close is a hosted Pro feature (`docs/business/pricing-strategy.md` §6). Itemised receipts (the compliance pack) are not built (`packages/atm/README.md`); the owner put them in Starter on 2026-11-07, so they are Next here. The auditor portal and countersignature are the Audited plan (owner's rename of Witnessed, 2026-11-07). Phases: business-plan §7.
+
+AGENTS.md "Claims": Rifo, the witness, daily payout matching and tax packages are Next or Later, never shipped; say "signed receipts and sealed books" for what milestone 1 built.
+:::

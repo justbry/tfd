@@ -1,0 +1,69 @@
+---
+pagetitle: "Trifold brief · Pick your path"
+format:
+  html:
+    minimal: true
+    embed-resources: true
+    css: [_fonts.css, picker.css]
+    include-in-header:
+      text: |
+        <meta name="robots" content="noindex">
+---
+
+```{=html}
+<header class="top">
+  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+    <path d="M20 8 H80 V36 H20 Z" fill="#e8a33d" />
+    <path d="M20 36 H80 V64 H20 Z" fill="#1e2a44" />
+    <path d="M20 64 H80 V86 L72.5 93 L65 86 L57.5 93 L50 86 L42.5 93 L35 86 L27.5 93 L20 86 Z" fill="#2f7d5b" />
+    <path d="M20 36 H80 M20 64 H80" stroke="#f6f1e7" stroke-width="2.5" stroke-dasharray="6 4" />
+  </svg>
+  <p class="wordmark">Trifold</p>
+</header>
+<main>
+  <h1>Books that show their work.</h1>
+  <p class="lede">Trusted accounting automation for organizations that bill through Stripe, starting with schools, co-ops and churches, delivered with accounting firms. Each path is a short deck; switch paths from any slide.</p>
+
+  <h2 id="paths-heading">Pick your path</h2>
+  <a class="card overview" href="/overview/">
+    <span class="who">The 5-minute overview</span>
+    <span class="covers">What Trifold does, what it costs, who it's for, and what's built versus next.</span>
+    <span class="time">8 slides · about 5 minutes</span>
+  </a>
+  <ul class="picker" aria-labelledby="paths-heading">
+    <li>
+      <a class="card investors" href="/investors/">
+        <span class="who">Investors</span>
+        <span class="covers">Books anyone can check, sold as a hosted service; Trifold's countersignature is the paid line a fork can't copy (next).</span>
+        <span class="time">19 slides · about 16 minutes</span>
+      </a>
+    </li>
+    <li>
+      <a class="card firms" href="/firms/">
+        <span class="who">Accounting firms and bookkeepers</span>
+        <span class="covers">Clients whose books arrive sealed and traced to the payment, so you review and sign instead of rebuilding.</span>
+        <span class="time">12 slides · about 10 minutes</span>
+      </a>
+    </li>
+    <li>
+      <a class="card schools" href="/schools/">
+        <span class="who">Schools, co-ops and churches</span>
+        <span class="covers">Every tuition payment, gift or dues payment, a receipt your families, givers or members can check.</span>
+        <span class="time">11 slides · about 9 minutes</span>
+      </a>
+    </li>
+    <li>
+      <a class="card partners" href="/partners/">
+        <span class="who">Partners: networks, co-ops, affiliates, software</span>
+        <span class="covers">Receipts your customers can check, with or without either of us; a bounded 24-month commission.</span>
+        <span class="time">10 slides · about 8 minutes</span>
+      </a>
+    </li>
+  </ul>
+
+  <p class="howto">In a deck: arrow keys or space to move, Esc to see all slides, M for the slide menu. Each deck has a "Print or save as PDF" link.</p>
+</main>
+<footer>
+  <p>Confidential draft · not legal, tax or investment advice. Every price, rate and projection is an assumption to test, not a decision or a forecast. Draft of 7 November 2026.</p>
+</footer>
+```

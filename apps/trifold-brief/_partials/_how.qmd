@@ -1,0 +1,17 @@
+## Every number traces back to a payment {#how-it-works}
+
+<span class="kicker">How it works</span>
+
+<div class="strip">
+<div class="fold-a"><span class="step">1</span><h3>A payment arrives</h3><p>Stripe reports it; Trifold checks it really came from Stripe, and records a repeat only once.</p></div>
+<div class="fold-b"><span class="step">2</span><h3>The books balance</h3><p>Every payment, refund or booking posts balanced entries. Nothing is ever edited; the books rebuild from the payments.</p></div>
+<div class="fold-c"><span class="step">3</span><h3>Receipt and seal</h3><p>The payer gets a receipt signed with the school's key. Each closed month gets a signed fingerprint.</p></div>
+</div>
+
+<p class="pills" aria-label="Three checks: books, built; receipt, built; Stripe's record, checked on request today, daily matching next"><span>Books ✓</span><span>Receipt ✓</span><span class="soon">Stripe ◌ daily matching next</span></p>
+
+::: {.notes}
+Sources: `docs/business/business-plan.md` §3 (books from events, signed receipts, sealed months: released in tfd 0.10.0). What exists: `docs/brand/trifold-brand-and-messaging.md`, "What exists and what is to build" (postings balance to zero per currency, `src/ledger/validate.ts`; a duplicate is recorded once via `idem`; balances replay from events, `src/ledger/replay.ts`; Stripe signatures checked on ingest, `src/handler/stripe-signature.ts`). The receipt is Ed25519-signed and the seal is a signed, chained hash of the month's events (`packages/atm/README.md`, "Receipts and seals"). Step wording follows `apps/trifold-site/src/content/how-it-works.md`.
+
+The three checks are the brand doc's motif ("Interface motifs": Books ✓ Receipt ✓ Stripe ✓). The third is not built: Stripe reconciliation runs on request today (`tfd reconcile`); daily matching is milestone 3 (business-plan §3). Don't say the three records "agree" yet (brand doc, "Claim rules").
+:::

@@ -1,0 +1,15 @@
+## Why receipts sell: programs that require them {#programs}
+
+<span class="kicker">Demand · sourced</span>
+
+<div class="cards">
+<div class="card"><h3>US school accounts</h3><p>Florida's ESA: 280,611 students. Arizona's: over 100,000. Texas: $1B in 2026–27. Odyssey asks for an itemized receipt, proof of payment and the payment method.</p></div>
+<div class="card card--green"><h3>US churches</h3><p>The IRS requires a written acknowledgment for every gift of $250 or more.</p></div>
+<div class="card card--ink"><h3>UK</h3><p>VAT on private school fees since January 2025. Gift Aid paid £1.71bn.</p></div>
+</div>
+
+::: {.notes}
+Source: `docs/business/market-research.md` §6.4, "Programs that make receipts worth paying for" (section 6, researched 2026-11-07). Florida FES-EO 280,611 students; Arizona's ESA more than 100,000 by January 2026 (96,802 earlier); Texas $1B with 90,000–100,000 expected in 2026–27 (sourced: EdChoice 2026; news reports). Odyssey, which runs several state programs, asks for an itemized receipt, proof of payment and the payment method. IRS: a written acknowledgment for any gift of $250 or more (IRS Pub. 1771). UK: VAT at 20% on private school fees since January 2025; Gift Aid £1.71bn to about 67,000 charities (HMRC).
+
+Trifold's receipts don't yet meet these programs' rules: itemized receipts for state programs (the compliance pack, in Starter) and the $250 acknowledgment wording are Next. No program has accepted Trifold receipts. Utah's program is not named while its appeal is pending.
+:::
