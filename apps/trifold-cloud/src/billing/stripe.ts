@@ -36,7 +36,8 @@ export const stripeApi = async (input: {
 	params?: Record<string, string> | readonly (readonly [string, string])[];
 	idempotencyKey?: string;
 }): Promise<Record<string, unknown>> => {
-	const { key } = input;
+	// Called detached: the Workers runtime's `fetch` throws "Illegal invocation" when called as a method of `input`.
+	const { key, fetcher } = input;
 	if (!key || !TEST_KEY.test(key))
 		throw new StripeError(
 			"STRIPE_SECRET_KEY is missing or not a test-mode key",
@@ -47,7 +48,7 @@ export const stripeApi = async (input: {
 	);
 	const get = input.method === "GET";
 	const query = get && form.size > 0 ? `?${form}` : "";
-	const response = await input.fetcher(`${STRIPE_API}${input.path}${query}`, {
+	const response = await fetcher(`${STRIPE_API}${input.path}${query}`, {
 		method: input.method,
 		headers: {
 			Authorization: `Bearer ${key}`,

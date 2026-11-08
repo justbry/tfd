@@ -84,6 +84,18 @@ describe("the Stripe fee of an invoice.paid", () => {
 		expect(stripe.calls).toEqual([]);
 	});
 
+	test("fetch is called detached, as the Workers runtime requires (a method call throws Illegal invocation)", async () => {
+		const stripe = fakeStripeApi(feeRoutes(114));
+		const strict = function (this: unknown, ...args: Parameters<typeof fetch>) {
+			if (this !== undefined && this !== globalThis)
+				throw new TypeError("Illegal invocation");
+			return stripe.fetcher(...args);
+		} as typeof fetch;
+		expect(await invoicePaidFee(paid(), { key: KEY, fetcher: strict })).toEqual(
+			{ ok: true, fee: 114 },
+		);
+	});
+
 	test("other events need no fee", async () => {
 		const stripe = fakeStripeApi();
 		expect(

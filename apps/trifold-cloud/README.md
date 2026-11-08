@@ -69,8 +69,10 @@ Secrets (Worker secrets on `trifold-cloud-staging`, put from files under `~/.con
 | `STRIPE_BILLING_WEBHOOK_SECRET` | `stripe-test-billing-webhook.secret` | endpoint `we_1UZSkmDsfMqSNUOEcATOUMeH` (test mode, API `2025-10-29.clover`) |
 | `STRIPE_SECRET_KEY` | `stripe-test-checkout.key` | a restricted TEST key (`rk_test_…`). Without it checkout and the portal answer 503, and every `invoice.paid` answers 503 (its fee can't be read) until it is set |
 
-The restricted key, made in the Stripe dashboard (test mode of the Krono.Works (Mercury) account, Developers → API
-keys → Create restricted key), needs only:
+The restricted key must belong to the account the plans are published to (`stripeAccount` in
+`src/published-plans.json`, `acct_1MmSzYDsfMqSNUOE`, Krono.Works (Mercury), test mode): a key from another account or
+sandbox finds none of its prices, sessions or invoices. Make it there (Developers → API keys → Create restricted key)
+with only:
 
 | Resource | Access | For |
 |---|---|---|
