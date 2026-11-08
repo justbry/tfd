@@ -197,6 +197,15 @@ This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orc
 
 **Test harness (a deliverable of S8c).** `packages/ledger-worker/src/testing/harness.ts` exports `startLedgerWorker({ presets, schools })`, which seeds an R2 bucket on Miniflare with the events, `runViews` output and `catalog.published` for the named presets (the 15 mart presets), starts the Worker with a test JWKS, and returns `{ url, mintToken({ sub, schools: [{ id, role, finance }], expiresInSeconds? }), stop() }`. The UI's C1 to C5 gates run S8e against it.
 
+### Demo schools (staging, owner decision 2026-11-08)
+
+On staging (`LEDGER_DEMO_SCHOOLS=on`, set only in the staging env of `wrangler.jsonc`; production never gets it) the fifteen golden school scenarios (atm's mart presets) are demo schools that anyone may read, signed in or not:
+
+- **Which.** A school id is a demo school when it matches `^demo-[a-z0-9-]+$` and the flag is on. Real school ids are UUIDs, so the prefix cannot meet one. With the flag off a demo id is any unknown school (404 `not_found` with a token, 401 without).
+- **Data.** `bun run --cwd packages/ledger-worker seed:demo` writes each preset's events to `schools/demo-<preset>/events/` as the shipper's batch files, and its display facts (name, time zone, currency, credit unit, from the preset's latest `catalog.published`) to `schools/demo-<preset>/demo.json`; a rerun replaces the demo prefixes and touches nothing else. The views job rebuilds one demo school per run, the one whose views are oldest, once they are an hour old.
+- **Access.** `GET /v1/schools` and every read of a demo school need no token. A token that is sent is checked as always: an invalid or expired one is a 401 even on a demo school. A valid token that does not list the demo school reads it too. Every caller holds a demo school as `{ role: "owner", finance: true }` (the data is fictional). A config verify or put on a demo school is `403 demo_read_only`; a config read answers as for any school.
+- **`GET /v1/schools`.** With a token: the token's schools as below, then the demo schools in the bucket. Without one: the demo schools only. Each demo row adds `demo: true`, `name` (e.g. "Demo · Monthly members"), `timeZone`, `currency` (upper case), `creditUnit`, and is never `stale` (nothing ships to it). A school path with no token that is not a demo school is still `401 token_missing`.
+
 ### Conventions for every endpoint
 
 - **Request.** `GET`, `Authorization: Bearer <ledger token>`. Dates are `YYYY-MM-DD` in the school's time zone. `:school` is the id in the token's `schools[]`.
@@ -216,6 +225,7 @@ This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orc
 | 429 | `rate_limited` | `retryAfterSeconds` is set. |
 | 501 | `not_available` | D12 and the rows below. `message` says why in one sentence. |
 | 503 | `views_unavailable` | The log cannot be replayed (`SummaryProblem.kind`) or R2 failed. |
+| 403 | `demo_read_only` | A config verify or put on a demo school (above). |
 | 403 | `owner_only`, `step_up_required` | A config verify or put by someone who is not the school's owner; a config put whose token has no `su` claim within the last 10 minutes (D22; until buzz-school sends `su`, every put). |
 | 412 | `stale_etag` | A config put whose `If-Match` is not the object's current sha256, or `If-None-Match: *` for an object that exists. |
 | 422 | `invalid_config` | A config put whose value fails its validator (`error.problems[]`: `{path, message, hint}`), or whose `verifiedHash` is not the hash of the canonical value (problem path `verifiedHash`). |
@@ -224,7 +234,7 @@ This is what the UI's `HttpReader` (S8e, `packages/ledger-ui/src/data/`, the orc
 
 | Path and query | Gate | `data` | `Reader` method it backs | Notes |
 | --- | --- | --- | --- | --- |
-| `GET /v1/schools` | any token | `{ schools: [{ id, asOf: string \| null, lagMinutes: number \| null, stale: boolean }] }` for the token's schools | `School.stale`, `School.lagMinutes` (the adapter merges them into `schools()`) | `stale` is `lagMinutes > 15`. A school with no manifest has `null`s and `stale: true`. Name, time zone, currency and credit unit are not here (`GET .../ledger/school` on the family service). |
+| `GET /v1/schools` | any token; none for the demo schools | `{ schools: [{ id, asOf: string \| null, lagMinutes: number \| null, stale: boolean }] }` for the token's schools, then the demo rows (above) | `School.stale`, `School.lagMinutes` (the adapter merges them into `schools()`) | `stale` is `lagMinutes > 15`. A school with no manifest has `null`s and `stale: true`. Name, time zone, currency and credit unit are not here (`GET .../ledger/school` on the family service). |
 | `GET /v1/schools/:school/kpi?audience=&pin=open\|locked` | audience gate | `KpiDocument` | `kpiDocument`; `audienceReport` for public, member and governance | `source` is `{kind:"events"}` and `dataSource` `"events"`. `pin=locked` is always allowed; `pin=open` is honoured as is (the token was minted with the PIN open). A school with no usable `catalog.published` has plans in alphabetical order. No `preset` parameter. |
 | `GET /v1/schools/:school/disclosure` | any token | `{ school, year, size, file, override: null, source: "defaults", views, viewAs }` where `views: Record<Audience, AudienceView>` is `audienceViews({ file, override, size, year, clock })` and `viewAs: Record<ViewAs, { name, summary, locks }>` is `viewAsRows({ file, override, views, adminAudience })`, both from `atm/worker` (S8c2, S8e part 3). `adminAudience` is the books audience the Admin row shows this caller: `member` for an owner or a finance admin (a preview), the caller's own (`public`, D7) for an admin without the grant | `disclosure` (the adapter adds `viewer` with `audiencesOf` from the token's claim, and each row's `held`, `audience` and `admin`; `viewer.name` is `null`, since no route gives the signed-in person's name) | `file` is the B4 Uni file shipped with the Worker. `override` is `null` until buzz-school stores one (build list group 8): the UI says "B4 Uni defaults". |
 | `GET /v1/schools/:school/audience-report?audience=public\|member\|governance&from=&to=` | audience gate | `AudienceReport` | `audienceReport` | Derived from the same KPI document; same errors. |

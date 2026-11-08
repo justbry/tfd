@@ -393,17 +393,24 @@ export function Shell({
 					onExit={() => navigate(withQuery(route, "as", null))}
 				/>
 			)}
-			{school?.stale && (
+			{school?.stale && school.lagMinutes !== null && (
 				<div
 					class="banner"
 					data-test="stale-banner"
 					inert={settingsOpen || portalShown}
 				>
-					<CoreIcon name="alert" />{" "}
-					{school.lagMinutes === null
-						? "No ledger data has shipped yet"
-						: `Data is ${school.lagMinutes} min behind`}
-					: the shipper may be stuck. Recent events can be missing.
+					<CoreIcon name="alert" /> Data is {school.lagMinutes} min behind: the
+					shipper may be stuck. Recent events can be missing.
+				</div>
+			)}
+			{school && school.lagMinutes === null && (
+				<div
+					class="banner"
+					style="color:var(--muted-foreground);border-bottom-color:var(--border)"
+					data-test="no-data-banner"
+					inert={settingsOpen || portalShown}
+				>
+					No ledger data for this school yet.
 				</div>
 			)}
 			<section

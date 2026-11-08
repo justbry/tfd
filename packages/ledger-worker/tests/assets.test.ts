@@ -97,3 +97,21 @@ test("wrangler.jsonc has no production environment and binds no production resou
 	expect(config).not.toMatch(/"production"/);
 	expect(config).not.toMatch(/"pattern":\s*"ledger\.b4uni\.com"/);
 });
+
+// Owner decision 2026-11-08: the demo schools are open on staging only. Production (the top level, no env) never gets it.
+test("only the staging environment turns the demo schools on", () => {
+	const config = readFileSync(
+		join(import.meta.dir, "../wrangler.jsonc"),
+		"utf8",
+	);
+	const parsed = JSON.parse(config.replace(/^\s*\/\/.*$/gm, "")) as {
+		vars?: Record<string, string>;
+		env: Record<string, { vars?: Record<string, string> }>;
+	};
+	expect(parsed.env.staging?.vars?.LEDGER_DEMO_SCHOOLS).toBe("on");
+	expect(parsed.vars?.LEDGER_DEMO_SCHOOLS).toBeUndefined();
+	expect(config.match(/LEDGER_DEMO_SCHOOLS/g)).toHaveLength(1);
+	for (const [name, environment] of Object.entries(parsed.env))
+		if (name !== "staging")
+			expect(environment.vars?.LEDGER_DEMO_SCHOOLS).toBeUndefined();
+});

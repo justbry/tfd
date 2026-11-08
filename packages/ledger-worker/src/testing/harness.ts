@@ -11,10 +11,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Miniflare } from "miniflare";
 import type { AtmEvent } from "tfd";
-import type { R2BucketBinding } from "tfd/worker";
+import { R2BindingStore, type R2BucketBinding } from "tfd/worker";
 import { LEDGER_AUDIENCE } from "../auth/jwt.js";
 import { bundleTestWorker } from "./bundle.js";
-import { type SeededSchool, seedEvents, seedSchool } from "./seed.js";
+import { demoSchoolIdOf, seedDemoSchool } from "./demo-seed.js";
+import {
+	presetEvents,
+	type SeededSchool,
+	seedEvents,
+	seedSchool,
+} from "./seed.js";
 import {
 	signToken,
 	type TestJwk,
@@ -66,6 +72,13 @@ export type StartOptions = {
 	 * `/v1/*` and `/healthz` to the Worker first). Default: a directory with a one-line `index.html`.
 	 */
 	assetsDirectory?: string;
+	/**
+	 * School presets to seed as demo schools (`demo-<preset>`, as `scripts/seed-demo.ts` seeds staging), each with its
+	 * views as of its last event. Default none.
+	 */
+	demoPresets?: readonly string[];
+	/** `LEDGER_DEMO_SCHOOLS=on` (as staging sets it); default: on when `demoPresets` names any. */
+	demoSchools?: boolean;
 };
 
 export type LedgerHarness = {
@@ -189,6 +202,9 @@ export const startLedgerWorker = async (
 			LEDGER_ISS: TEST_ISSUER,
 			LEDGER_JWKS_URL: `${origin}/jwks.json`,
 			TEST_CLOCK_URL: `${origin}/clock`,
+			...((options.demoSchools ?? (options.demoPresets ?? []).length > 0)
+				? { LEDGER_DEMO_SCHOOLS: "on" }
+				: {}),
 		},
 	});
 	try {
@@ -199,6 +215,19 @@ export const startLedgerWorker = async (
 		for (const [index, preset] of options.presets.entries()) {
 			const id = ids[index] as string;
 			seeded[id] = await seedSchool(bucket, preset, id);
+		}
+		for (const preset of options.demoPresets ?? []) {
+			const events = presetEvents(preset);
+			const asOf = events
+				.map((event) => event.event_time)
+				.sort()
+				.at(-1) as string;
+			await seedDemoSchool(new R2BindingStore(bucket), preset, {
+				now: new Date(asOf),
+				events,
+			});
+			const id = demoSchoolIdOf(preset);
+			seeded[id] = { id, preset, asOf, events };
 		}
 		const latest = Object.values(seeded)
 			.map((school) => Date.parse(school.asOf))

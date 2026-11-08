@@ -19,7 +19,7 @@ The Worker is built on `atm/worker` (`readViewsFromStore`, `readEventsFromStore`
 
 ## Order of checks
 
-Token (401) → route → the school is in the token's `schools[]` (404 `not_found`, the same body as an unknown school) → the
+Token (401; none needed for `GET /v1/schools` and the demo schools, below) → route → the school is in the token's `schools[]` (404 `not_found`, the same body as an unknown school) → the
 endpoint's gate (403 `finance_required`, 403 `audience_not_allowed`) → the query (400) → the data (404 `no_data`, 409
 `view_mismatch`, 501, 503). Every `/v1` answer is `Cache-Control: private, no-store`.
 
@@ -38,6 +38,7 @@ logged as `views job failed for school <id>` and nothing else (a job message can
 | `ASSETS` | assets binding | `../ledger-ui/dist`, single-page-application fallback, `/v1/*` and `/healthz` run the Worker first |
 | cron | trigger | `*/5 * * * *` |
 | route | custom domain | `ledger-staging.b4uni.com` |
+| `LEDGER_DEMO_SCHOOLS` | var | `on`: the demo schools below (staging only; `tests/assets.test.ts` fails if it appears anywhere else) |
 
 **Production has no binding.** There is no `production` environment, bucket or route in `wrangler.jsonc` until the owner answers
 the E2/E11 questions (contract D13: may events keyed `family:<id>` reach a production bucket). `tests/assets.test.ts` fails if
@@ -93,6 +94,26 @@ views come from the shipper and the views job (the harness seeds its own).
 `tests/seed-config.test.ts` fails when a reader that `reader.ts` leaves unavailable has neither a row in `readerConfig`
 (`seed-config.ts`) nor a place on the list of readers that stay unavailable. The Worker's `disclosure` route does not read
 `config/disclosure.json` yet (its `override` is `null`).
+
+## Demo schools (staging)
+
+Owner decision 2026-11-08 (contract section 11, "Demo schools"): with `LEDGER_DEMO_SCHOOLS=on`, a school id matching
+`^demo-[a-z0-9-]+$` is a demo school (`src/demo.ts`). `GET /v1/schools` and a demo school's reads need no token; every
+caller holds it as owner with the finance grant; an invalid or expired token is still a 401; a config verify or put on one
+is `403 demo_read_only`. `GET /v1/schools` lists the token's schools, then the demo schools in the bucket (`demo: true`,
+with `name`, `timeZone`, `currency` and `creditUnit` from `schools/demo-<preset>/demo.json`).
+
+The data is atm's fifteen school presets (the mart presets), through the real path: events, the views job, the endpoints.
+
+    set -a; . ~/.config/b4uni/r2-stg-ledger-s3.env; set +a
+    bun run --cwd packages/ledger-worker seed:demo [--preset <name>]... [--no-views]
+
+writes each preset's events to `schools/demo-<preset>/events/date=<day>/batch-*.jsonl` (the shipper's `planOutbox`), deletes
+any other object under that `events/`, writes `demo.json`, and runs the views as of now. A rerun replaces the demo prefixes
+and touches no other one. It refuses a bucket whose name holds `prod`, and any bucket but `b4uni-stg-ledger`. No watermark is
+written: nothing ships to a demo school, so `asOf` is the run's time. The views job rebuilds one demo school per run (the one
+whose views are oldest, once they are an hour old), so fifteen logs of a year of daily batches do not cost every run thousands of
+reads. The harness seeds them with `startLedgerWorker({ presets, demoPresets })`.
 
 ## The views job and `asOf`
 

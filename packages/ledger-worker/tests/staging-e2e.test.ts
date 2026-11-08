@@ -59,6 +59,7 @@ beforeAll(async () => {
 	await writeFile(join(assets, "assets", "app.css"), "body{margin:0}\n");
 	harness = await startLedgerWorker({
 		presets: ["tiny-school"],
+		demoPresets: ["free-only"],
 		assetsDirectory: assets,
 	});
 	api = Bun.serve({
@@ -122,6 +123,7 @@ test("stage 1 passes every check against the local Worker", async () => {
 	expect(context.report.results.map((result) => result.check)).toEqual([
 		"healthz",
 		"no-token",
+		"no-token-real-school",
 		"forged-signature",
 		"forged-expired",
 		"alg-none",
