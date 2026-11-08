@@ -765,6 +765,7 @@ function Rules({
 	/** Null where no source has the rules (D11). */
 	rules: SchoolRules | null;
 	unit: CreditUnit;
+	/** An admin of a real school; a demo school is read-only, so it has no way to an edit. */
 	canEdit: boolean;
 	onEdit: () => void;
 }): JSX.Element {
@@ -903,7 +904,13 @@ export function Reports({
 			/>
 		);
 	if (status.failed)
-		return <LoadFailed what="the report" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the report"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
 	const { rules, donors, document } = loaded;
@@ -979,7 +986,7 @@ export function Reports({
 				<Rules
 					rules={rules.rules}
 					unit={rules.unit ?? school.creditUnit}
-					canEdit={admin}
+					canEdit={admin && !school.demo}
 					onEdit={() => onToast("Opening school settings in buzz-school…")}
 				/>
 			</div>

@@ -4,7 +4,7 @@
 	import * as Dialog from "$lib/components/ui/dialog/index.ts";
 	import { Input } from "$lib/components/ui/input/index.ts";
 	import PaneIcon from "../PaneIcon.svelte";
-	import { control, field, fieldLabel, footer, modal, muted } from "../plans/styles.ts";
+	import { control, field, fieldLabel, footer, muted } from "../plans/styles.ts";
 
 	/** The created promo (mockup `ACT.code`'s second step): its full code, shown only now; copying it; and the two things no
 	 * route provides yet (a checkout link, mailing the code), off with their reasons. */
@@ -27,8 +27,6 @@
 <Dialog.Root open onOpenChange={(open) => !open && onDone()}>
 	<Dialog.Content
 		showCloseButton={false}
-		class={[modal, "top-10 translate-y-0"]}
-		overlayClass="bg-black/50 supports-backdrop-filter:backdrop-blur-none"
 		data-test="dialog"
 		onOpenAutoFocus={(event) => {
 			event.preventDefault();

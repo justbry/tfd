@@ -155,7 +155,7 @@ export async function releaseHold(
 		waiveCutoff: fields.waive,
 	});
 	const late =
-		fields.inside && context.rules.lateCancel === "spend" && !fields.waive;
+		fields.inside && context.rules?.lateCancel === "spend" && !fields.waive;
 	return {
 		changes: [
 			ledger(
@@ -187,7 +187,7 @@ export async function recordOutcome(
 		state,
 	});
 	const held = booking.creditsHeld;
-	const spends = state === "attended" || context.rules.noShow === "spend";
+	const spends = state === "attended" || context.rules?.noShow === "spend";
 	const event =
 		held === 0
 			? pendingEvent(context.now, {

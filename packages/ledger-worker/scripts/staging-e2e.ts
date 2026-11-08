@@ -61,6 +61,9 @@ const PAYMENT_PATTERN = /^(pi|ch|py)_[A-Za-z0-9_]{6,80}$/;
 const PIN_PATTERN = /^\d{4,12}$/;
 const SCRIPT_TAG_PATTERN = /<script\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
 const LINK_TAG_PATTERN = /<link\b[^>]*?\bhref\s*=\s*["']([^"']+)["']/gi;
+/** Text only the HTTP build carries: the signed-out demo alert (`ledger-ui/src/http/demo-banner.tsx`). Since that build
+ * shows the fixture schools as a demo to a signed-out visitor, fixture names alone no longer mean the fixture build. */
+const HTTP_BUILD_MARKER = "I have signed in";
 const FIXTURE_SCHOOL_PATTERN =
 	/\bid:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*timeZone:/g;
 const PROD_API_PATTERN = /(?<![\w-])api\.b4uni\.com/;
@@ -773,6 +776,11 @@ const expectStatus = (
 
 // ---- stage 1: no credential
 
+/** A demo school's id (`src/demo.ts`). */
+const DEMO_SCHOOL_PATTERN = /^demo-[a-z0-9-]+$/;
+/** A school id of the real shape (a UUID) that no school has: without a token, the Worker refuses before it looks. */
+const PLACEHOLDER_SCHOOL = "00000000-0000-4000-8000-000000000000";
+
 /** The fixture schools' names, read from the UI's own fixture file. */
 export const fixtureSchoolNames = async (
 	path: string = FIXTURE_READER,
@@ -831,10 +839,36 @@ export const stage1 = async (context: Context): Promise<void> => {
 		};
 	});
 
+	// Owner decision 2026-11-08: staging opens the demo schools to everyone, so no token lists those and nothing else.
 	await check(context, stage, "no-token", async () => {
 		const reply = await send(`${worker}/v1/schools`);
+		const rows = asArray(asRecord(asRecord(reply.json).data).schools).map(
+			asRecord,
+		);
+		const others = rows.filter(
+			(row) =>
+				row.demo !== true ||
+				typeof row.id !== "string" ||
+				!DEMO_SCHOOL_PATTERN.test(row.id),
+		);
+		const ok = reply.status === 200 && rows.length > 0 && others.length === 0;
+		return {
+			status: ok ? "PASS" : "FAIL",
+			why: ok
+				? `GET /v1/schools without a token lists only the ${rows.length} demo schools`
+				: `GET /v1/schools without a token answered ${describe(reply)}, ${rows.length} rows, ${others.length} not demo schools`,
+		};
+	});
+
+	await check(context, stage, "no-token-real-school", async () => {
+		const reply = await send(
+			`${worker}/v1/schools/${PLACEHOLDER_SCHOOL}/kpi?audience=public&pin=locked`,
+		);
 		const result = expectStatus(reply, 401, "token_missing");
-		return { ...result, why: `GET /v1/schools without a token ${result.why}` };
+		return {
+			...result,
+			why: `a real school's kpi without a token ${result.why}`,
+		};
 	});
 
 	const { reply: jwksReply, keys } = await fetchJwks(api).catch(() => ({
@@ -972,11 +1006,16 @@ export const stage1 = async (context: Context): Promise<void> => {
 		};
 	});
 
-	await check(context, stage, "bundle-no-fixtures", async () => {
+	await check(context, stage, "bundle-http-build", async () => {
 		if (bundles.length === 0)
 			return {
 				status: "BLOCKED",
 				why: "needs a JS bundle from the assets check",
+			};
+		if (bundles.some((bundle) => bundle.text.includes(HTTP_BUILD_MARKER)))
+			return {
+				status: "PASS",
+				why: "bundle is the HTTP build (it carries the signed-out demo alert)",
 			};
 		let names: string[];
 		try {
@@ -995,15 +1034,13 @@ export const stage1 = async (context: Context): Promise<void> => {
 		const hits = new Set<string>();
 		for (const bundle of bundles)
 			for (const name of findFixtureNames(bundle.text, names)) hits.add(name);
-		return hits.size === 0
-			? {
-					status: "PASS",
-					why: `none of the ${names.length} fixture school names (${names.join(", ")}) is in the bundle`,
-				}
-			: {
-					status: "FAIL",
-					why: `fixture school name(s) in the deployed bundle: ${[...hits].join(", ")}`,
-				};
+		return {
+			status: "FAIL",
+			why:
+				hits.size === 0
+					? "bundle is not the HTTP build: no signed-out demo alert"
+					: `fixture build deployed: fixture school name(s) ${[...hits].join(", ")} and no signed-out demo alert`,
+		};
 	});
 
 	await check(context, stage, "spa-fallback", async () => {

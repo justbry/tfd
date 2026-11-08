@@ -9,7 +9,6 @@
 		field,
 		fieldLabel,
 		footer,
-		modal,
 		muted,
 		preview as previewBox,
 		selectControl,
@@ -51,7 +50,7 @@
 </script>
 
 <Dialog.Root open onOpenChange={(open) => !open && onCancel()}>
-	<Dialog.Content showCloseButton={false} class={[modal, "top-10 translate-y-0"]} overlayClass="bg-black/50 supports-backdrop-filter:backdrop-blur-none" data-test="dialog">
+	<Dialog.Content showCloseButton={false} data-test="dialog">
 		<Dialog.Title>
 			{#snippet child({ props })}
 				<h3 {...props} class="m-0 text-[14px] font-semibold" data-test="dialog-title">Create promo · {schoolName}</h3>

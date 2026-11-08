@@ -114,7 +114,8 @@ export type AttentionReason = {
 	bookingId: string | null;
 };
 
-/** One row of the Members table. Plan holders join their membership by `Member.profileId === Person.id`; a role
+/** One row of the Members table. Plan holders join their membership by `Member.profileId === Person.id` (the family
+ * id when `profileId` is null: the membership is the family's own); a role
  * holder with no plan has no membership and shows "No plan" / "no plan", never 0. Rows sort by attention score
  * (highest first), then role (owner, admin, member), then name. */
 export type Person = {
@@ -152,11 +153,12 @@ export type MembersSummary = {
 	currency: string;
 	/** Unredeemed gift codes that expire within 30 days, masked as the Promos tab masks them. */
 	expiringGifts: Array<{ maskedCode: string; expiresOn: string }>;
-	/** The school's booking rules the release preview quotes (Settings "Rules in force"). */
+	/** The school's booking rules the release preview quotes (Settings "Rules in force"); null where no source states
+	 * them (D11), and the preview then quotes none. */
 	bookingRules: {
 		lateCancel: "spend" | "release";
 		noShow: "spend" | "release";
-	};
+	} | null;
 };
 
 // ---- Brief A item 4: GET .../ledger/capabilities
@@ -177,12 +179,12 @@ export type CapabilityAction =
 
 /** Why an action is not allowed: `owner_only` (shown "Owner role needed" in the menu, "Refunds need the owner role
  * in this school" on the drawer button), `stripe_permission_missing` with the permission (shown "The Stripe key lacks
- * <permission>. Fix it in Settings."), `not_built`. */
+ * <permission>. Fix it in Settings."), `not_built`, `demo` (a demo school, read-only: "Demo school: read-only"). */
 export type Capability =
 	| { allowed: true }
 	| {
 			allowed: false;
-			reason: "owner_only" | "not_built";
+			reason: "owner_only" | "not_built" | "demo";
 	  }
 	| {
 			allowed: false;

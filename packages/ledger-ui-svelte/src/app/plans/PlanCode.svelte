@@ -4,7 +4,7 @@
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import Icon from "../Icon.svelte";
 	import PaneIcon from "../PaneIcon.svelte";
-	import type { PaneIconName } from "../late-icons.ts";
+	import type { PaneIconName } from "../pane-icons.ts";
 	import { mockBadge, badgeTones } from "../styles.ts";
 	import { exitPreviewTitle } from "./notify.ts";
 	import type { PlanChange, PlansSession } from "./plans-menu.ts";

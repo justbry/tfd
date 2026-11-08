@@ -22,6 +22,9 @@ export function fixtureLayer(options: {
 	/** The config client; by default an in-memory store that follows the Worker's rules, the person holding each
 	 * fixture school's role (an owner has the finance grant, an admin does not). */
 	config?: ConfigApi;
+	/** A state of the default config store for the fixture build's reviews (`#/…?config=stale|step-up`): "stale" has
+	 * someone else write the copy before it is verified (a 412), "step-up" has no fresh `su` (a 403). */
+	configScenario?: "stale" | "step-up";
 }): Layer.Layer<AppServices> {
 	const reader = createFixtureReader({ clock: options.calendar });
 	return appLayer({
@@ -30,6 +33,8 @@ export function fixtureLayer(options: {
 		config:
 			options.config ??
 			createFixtureConfig({
+				stepUp: options.configScenario !== "step-up",
+				concurrentWriter: options.configScenario === "stale",
 				grant: async (school) => {
 					const found = (await reader.schools()).find(
 						({ id }) => id === school,

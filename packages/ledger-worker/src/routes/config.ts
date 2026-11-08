@@ -25,7 +25,8 @@ import { ApiError, lagMinutesOf, okResponse } from "../http.js";
 export const STEP_UP_WINDOW_SECONDS = 600;
 const MS_PER_SECOND = 1000;
 const STEP_UP_LEEWAY_SECONDS = 5;
-const MAX_BODY_BYTES = 262_144;
+/** The largest config request body read. */
+export const MAX_BODY_BYTES = 262_144;
 const OPAQUE_WRITER_LENGTH = 16;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 const QUOTED_HASH = /^"?([0-9a-f]{64})"?$/;

@@ -6,7 +6,7 @@ name: Deploy ledger worker
 #      deploying it puts the fixture school names on staging.
 #   2. check the bundle (a wrangler dry run)
 #   3. deploy
-#   4. staging-e2e stage 1, the checks that need no credential (the bundle's API host, no fixtures, health)
+#   4. staging-e2e stage 1, the checks that need no credential (health, token refusals, the bundle is the HTTP build)
 #
 # The job runs in the GitHub environment `staging`: give it a required reviewer to approve each deploy. Secrets and
 # setup are in docs/ci-and-deploy.md.

@@ -22,10 +22,11 @@ import {
 	notComputedCell,
 	withheldKinds,
 } from "./kpi-cell.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import { monthName, type Period, parsePeriod } from "./period.ts";
 import { PinLock } from "./pin-lock.tsx";
 import { withQuery } from "./route.ts";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { useViewing } from "./viewing.ts";
 
 /** The mockup's four fixture scenarios (its `Fixture scenario` segmented control) come first in the Reader's list. The
@@ -1379,8 +1380,13 @@ export function Dashboard({
 		row.held ? [row.audience] : [],
 	);
 	const heldKey = heldAudiences.join(",");
+	const readStatus = useReadFailure(key);
+	const { failFor, attempt } = readStatus;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		let current = true;
+		const failed = failFor(key);
 		const load = async (): Promise<void> => {
 			const { presets } = await reader.dashboardOptions();
 			const preset = presets.find(({ id }) => id === presetAsked) ?? presets[0];
@@ -1409,20 +1415,39 @@ export function Dashboard({
 				[...others].map((other) => read(other, false).catch(() => undefined)),
 			);
 		};
-		load().catch(keepLoading);
+		load().catch((error: unknown) => {
+			if (current) failed(error);
+		});
 		return () => {
 			current = false;
 		};
-	}, [reader, key, school.id, presetAsked, audience, pinLocked, heldKey]);
+	}, [
+		reader,
+		key,
+		school.id,
+		presetAsked,
+		audience,
+		pinLocked,
+		heldKey,
+		failFor,
+		attempt,
+	]);
 	const onScreen = loaded?.key === key && loaded.document !== undefined;
 	useLayoutEffect(() => {
-		if (onScreen) onRendered();
+		if (onScreen || readStatus.failed) onRendered();
 	});
 	/** While the next document loads, the one before stays on screen (the route is reported only once it is in). */
 	const document =
 		documents.current.get(key) ??
 		(loaded?.school === school.id ? loaded.document : undefined);
-	if (!(loaded && document)) return null;
+	if (!(loaded && document))
+		return readStatus.failed ? (
+			<LoadFailed
+				what="the dashboard"
+				error={readStatus.error}
+				onRetry={readStatus.retry}
+			/>
+		) : null;
 
 	const go = (name: string, value: string | null): void =>
 		navigate(withQuery(route, name, value));

@@ -3,6 +3,12 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const WORKSPACE_MANIFEST = /^(?:(?:apps|packages)\/)?[^/]+\/package\.json$/;
+/** Trifold projects kept out of the workspace on purpose: each has its own bun.lock and installs on its own. */
+const STANDALONE = new Set([
+	"apps/trifold-site",
+	"packages/ledger-ui",
+	"packages/ledger-ui-svelte",
+]);
 
 const listed: string[] = (await Bun.file(join(root, "package.json")).json())
 	.workspaces.packages;
@@ -19,14 +25,14 @@ const errors = [
 		.filter((dir) => !existsSync(join(root, dir, "package.json")))
 		.map((dir) => `"${dir}" is in workspaces but has no package.json.`),
 	...tracked
-		.filter((dir) => !listed.includes(dir))
+		.filter((dir) => !(listed.includes(dir) || STANDALONE.has(dir)))
 		.map((dir) => `"${dir}" has a package.json but is not in workspaces.`),
 ];
 
 if (errors.length > 0) {
 	for (const error of errors) console.error(`::error::${error}`);
 	console.error(
-		"Every top-level, apps/*, and packages/* folder with a package.json must be listed in the root package.json workspaces.",
+		"Every top-level, apps/*, and packages/* folder with a package.json must be listed in the root package.json workspaces, or in STANDALONE here.",
 	);
 	process.exit(1);
 }

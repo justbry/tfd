@@ -6,8 +6,8 @@
  * served (`bun run dev`, or `vite preview` after a build):
  *   bun scripts/shots.ts [--out shots] [--side app|mock|both] [--app http://localhost:5191] [--nonce K7QX]
  *     [--only dash-]
- * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`, Plans' with `plans-`, Promos'
- * with `promos-`).
+ * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`, Bookings' with `bk-`,
+ * Members' with `mem-`).
  * Needs playwright-core in /tmp/ledger-shots and the cached Chromium headless shell, as shoot.mjs does.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -80,10 +80,13 @@ const dashboardTab = "document.querySelector('.tab[data-p=dash]').click()";
 const glowDraft =
 	"SC.vol.pl.draft.tiers.find(t=>t.id==='glow').month=70;render()";
 const promosTab = "document.querySelector('.tab[data-p=cod]').click()";
+const bookingsTab = "document.querySelector('.tab[data-p=bk]').click()";
+const membersTab = "document.querySelector('.tab[data-p=mem]').click()";
 const themes = ["light", "dark"] as const;
 
 /** The shell's entries: the S0 golden file's three shots, then the stale banner, All schools, a toast and the
- * settings; then the Dashboard's (S9.1): each viewer state and grain, the PIN prompt and View as. */
+ * settings; then the Dashboard's (S9.1): each viewer state and grain, the PIN prompt and View as; then Bookings' (S9.2)
+ * and Members' (S9.2): the lists, a dialog, the drawer, the menu and a modal. */
 const entries: Array<{
 	id: string;
 	route: string;
@@ -176,13 +179,79 @@ const entries: Array<{
 		clicks: ["[data-test=view-as]"],
 		mockupSteps: `setSchool('b4u');${dashboardTab};document.querySelector('#kview').click()`,
 	},
-	// S9.3: the Plans tab (Edit, Preview, Code, the editor and the review) and Promos.
 	{
-		id: "plans-edit",
-		route: "#/vol/plans",
+		id: "bk-week",
+		route: "#/vol/bookings",
 		clicks: [],
-		mockupSteps: glowDraft,
+		mockupSteps: bookingsTab,
 	},
+	{
+		id: "bk-today-overdue",
+		route: "#/vol/bookings?range=day",
+		clicks: [],
+		mockupSteps: `${bookingsTab};bPer={k:"day",off:0};bookings()`,
+	},
+	{
+		id: "bk-filter-outcome",
+		route: "#/vol/bookings?filter=outcome",
+		clicks: [],
+		mockupSteps: `${bookingsTab};bF="out";bookings()`,
+	},
+	{
+		id: "bk-noshow-dialog",
+		route: "#/vol/bookings",
+		clicks: ["[data-test=booking-action][data-action=noshow]"],
+		mockupSteps: `${bookingsTab};document.querySelector('[data-act=noshow]').click()`,
+	},
+	{
+		id: "bk-period-open",
+		route: "#/vol/bookings",
+		clicks: ["[data-test=period-button]"],
+		mockupSteps: `${bookingsTab};document.querySelector('#pb').click()`,
+	},
+	{
+		id: "bk-lock-member",
+		route: "#/vol/bookings?as=member",
+		clicks: [],
+		mockupSteps: `${bookingsTab};setVa('member')`,
+	},
+	{
+		id: "mem-list",
+		route: "#/vol/members",
+		clicks: [],
+		mockupSteps: membersTab,
+	},
+	{
+		id: "mem-drawer",
+		route: "#/vol/members?member=m_012",
+		clicks: [],
+		mockupSteps: `${membersTab};open('m_012')`,
+	},
+	{
+		id: "mem-menu-open",
+		route: "#/vol/members",
+		clicks: [
+			"[data-test=member-row][data-id=m_012] [data-test=member-menu-button]",
+		],
+		mockupSteps: `${membersTab};document.querySelector('[data-kmenu=m_012]').click()`,
+	},
+	{
+		id: "mem-adjust-modal",
+		route: "#/vol/members",
+		clicks: [
+			"[data-test=member-row][data-id=m_012] [data-test=member-menu-button]",
+			"[data-test=member-menu-item][data-action=adjust]",
+		],
+		mockupSteps: `${membersTab};openAct('adjust','m_012')`,
+	},
+	{
+		id: "mem-lock-public",
+		route: "#/vol/members?as=public",
+		clicks: [],
+		mockupSteps: `${membersTab};setVa('public')`,
+	},
+	// S9.3: the Plans tab (Edit, Preview, Code, the editor and the review) and Promos.
+	{ id: "plans-edit", route: "#/vol/plans", clicks: [], mockupSteps: glowDraft },
 	{
 		id: "plans-preview",
 		route: "#/vol/plans?mode=preview",
@@ -207,12 +276,7 @@ const entries: Array<{
 		clicks: ["[data-test=plan-review]"],
 		mockupSteps: `${glowDraft};document.querySelector('#prev').click()`,
 	},
-	{
-		id: "promos-list",
-		route: "#/vol/promos",
-		clicks: [],
-		mockupSteps: promosTab,
-	},
+	{ id: "promos-list", route: "#/vol/promos", clicks: [], mockupSteps: promosTab },
 	{
 		id: "promos-create",
 		route: "#/vol/promos",

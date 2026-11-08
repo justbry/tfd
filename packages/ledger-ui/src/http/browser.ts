@@ -3,9 +3,8 @@ import { mountApp } from "../app/mount.tsx";
 import type { DownloadFile } from "../data/ledger.ts";
 import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
-import type { Writer } from "../data/writer.ts";
 import { createHttpAdapters } from "./adapters.ts";
-import { DemoBanner, type DemoReason } from "./demo-banner.tsx";
+import { DemoBanner } from "./demo-banner.tsx";
 import { memoryStorage, type StorageLike } from "./pending.ts";
 import { localWallTime } from "./school-routes.ts";
 import { timerScheduler } from "./transport.ts";
@@ -58,6 +57,10 @@ function pendingStorage(): StorageLike {
  * wall time of the first school's time zone (the browser's when there is no school). The schools read for that zone
  * is the one the app then shows. No PIN dialog is wired for the writes that do not collect one: once a books pane's
  * PIN lock has opened the session (`unlockBooks`) they go through; before, such a write rejects `pin_required`.
+ *
+ * Signed out (the ledger token answers 401) or administering no school, the visitor sees the Worker's demo schools
+ * (S8-contract section 11 "Demo schools") under a large alert, rather than an empty page; where the Worker serves none
+ * (production), the app's own sign-in prompt or empty list.
  */
 export function mountHttpApp(
 	root: HTMLElement,
@@ -65,8 +68,6 @@ export function mountHttpApp(
 		apiBase: string;
 		workerBase: string;
 		webBase: string;
-		/** The demo schools (the fixtures) a visitor sees when they are signed out or administer no school. */
-		demo?: () => { reader: Reader; writer: Writer; clock: Clock };
 	},
 ): void {
 	const mountedAt = Date.now() / millisecondsPerSecond;
@@ -96,33 +97,14 @@ export function mountHttpApp(
 		},
 	};
 	const signInUrl = `${options.webBase}/signin`;
-	const demo = options.demo;
-	/** Signed out (the ledger token answers 401) or no school (404, an empty list): the demo schools under a large
-	 * alert rather than an empty page. Null when the HTTP app mounts instead. */
-	const showDemo = (reason: DemoReason): null | undefined => {
-		if (!demo) return undefined;
-		mountApp(root, {
-			...demo(),
-			banner: h(DemoBanner, {
-				reason,
-				signInUrl,
-				reload: () => window.location.reload(),
-			}),
-		});
-		return null;
-	};
 	firstSchools
 		.then(
-			(schools) =>
-				schools.length === 0 ? showDemo("no_school") : schools[0]?.timeZone,
-			(error: unknown) => {
-				// Any other failure mounts the app, which offers Try again.
-				const reason = demoReasonOf(error);
-				return reason === null ? undefined : showDemo(reason);
-			},
+			(schools) => schools[0]?.timeZone,
+			// A failure mounts the app all the same: it offers Sign in or Try again.
+			() => undefined,
 		)
 		.then((timeZone) => {
-			if (timeZone === null) return;
+			const session = reader.session();
 			mountApp(root, {
 				reader: sharedReader,
 				writer,
@@ -132,16 +114,15 @@ export function mountHttpApp(
 				),
 				// The ledger token is minted from B4 Uni's session cookie: a signed-out visitor signs in on the web app.
 				signInUrl,
+				...(session !== "signed_in" && timeZone !== undefined
+					? {
+							banner: h(DemoBanner, {
+								reason: session,
+								signInUrl,
+								reload: () => window.location.reload(),
+							}),
+						}
+					: {}),
 			});
 		});
-}
-
-/** Which demo a failed first schools read calls for: signed out, or none (another failure). No school is an empty
- * list, not a failure (`ledger-token.ts`). */
-function demoReasonOf(error: unknown): DemoReason | null {
-	const kind =
-		typeof error === "object" && error !== null && "kind" in error
-			? (error as { kind: unknown }).kind
-			: null;
-	return kind === "unauthenticated" ? "signed_out" : null;
 }

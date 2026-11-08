@@ -1,5 +1,5 @@
 <script lang="ts">
-	import "./late-icons.ts"; // the icons this pane draws that the first page load does not carry
+	import "./all-schools.css";
 	import { type Period, periodLabel } from "$contract/app/period.ts";
 	import type { School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
@@ -87,7 +87,7 @@
 	 * keep to one line. */
 	const header =
 		"h-auto border-b border-border px-2 py-1.5 text-left align-bottom text-[10.5px] font-medium whitespace-normal text-muted-foreground";
-	const cell = "border-b border-border px-2 py-[7px] align-middle whitespace-normal";
+	const cell = "p-0 border-b border-border px-2 py-[7px] align-middle whitespace-normal";
 	const hiddenFigure =
 		"inline-flex items-center gap-[3px] text-[10.5px] font-medium text-muted-foreground";
 </script>

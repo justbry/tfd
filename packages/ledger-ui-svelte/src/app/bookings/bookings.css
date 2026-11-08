@@ -1,0 +1,12 @@
+/* The Bookings pane's utilities, loaded with its chunk so that the first page load does not carry them (app.css
+   leaves this folder, panes/ and the dialog out of its sources). Theme and utilities only: the base styles and the
+   tokens are app.css's. `source(none)` keeps Tailwind from scanning the whole project for this file. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../../tailwind-shared.css";
+@source "./";
+@source "../panes";
+@source "../PaneIcon.svelte";
+@source "../../lib/components/ui/dialog";
+@source "../../lib/components/ui/table";
+@source "../LoadFailed.svelte";

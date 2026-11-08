@@ -373,6 +373,7 @@ describe("the fetch WorkerSource over section 11", () => {
 				lagMinutes: 3,
 				attentionCount: null,
 				tabBadges: null,
+				demo: false,
 			},
 		]);
 	});

@@ -65,13 +65,13 @@ const allowedPackages = [
 	/^tailwindcss\/(theme|utilities)\.css$/,
 	/^tw-animate-css$/,
 ];
-/** What the app may take from the Preact package: its contract and adapters, and the two pure route and period
+/** What the app may take from the Preact package: its contract and adapters, and the pure route, period and booking wording
  * modules. Not its UI, not the HTTP entry that mounts Preact. */
 const allowedContract = [
 	/^data\/[a-z-]+\.ts$/,
 	/^http\/(?!browser\.ts$)[a-z-]+\.ts$/,
 	/^fixtures\/[a-z-]+\.ts$/,
-	/^app\/(route|period)\.ts$/,
+	/^app\/(route|period|booking-text)\.ts$/,
 ];
 /** The ledger Worker's config modules the ConfigClient takes read-only (`$worker-config`): its types, validators,
  * canonical JSON and diff, which carry no Worker runtime. */

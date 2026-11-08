@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { cn } from "$lib/utils.ts";
-	import { type IconName, shapesNamed } from "./icons.ts";
+	import { type IconName, iconShapes } from "./icons.ts";
 
 	/** Decorative: the button or text beside it carries the name. */
 	let { name, class: className = "" }: { name: IconName; class?: string } =
@@ -8,7 +8,7 @@
 </script>
 
 <svg class={cn("icon", className)} viewBox="0 0 24 24" aria-hidden="true">
-	{#each shapesNamed(name) as shape, index (index)}
+	{#each iconShapes[name] as shape, index (index)}
 		{#if shape.tag === "path"}
 			<path d={shape.d} />
 		{:else if shape.tag === "circle"}

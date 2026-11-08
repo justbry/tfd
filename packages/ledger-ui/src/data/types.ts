@@ -17,12 +17,18 @@ export type School = {
 	/** The month the Dashboard opens on (the mockup opens its fixture school on Jun); without it, the clock's month.
 	 * Either snaps to a period the viewed audience may pick. */
 	dashboardOpensOn?: string;
+	/** A demo school's latest booking day (`YYYY-MM-DD`): its Bookings tab opens on that week when it lies before the
+	 * current one (S8-contract section 11 "Demo schools"). */
+	bookingsOpenOn?: string;
 	/** The ledger shipper is behind; `lagMinutes` says by how much. */
 	stale: boolean;
 	/** Null when the school has no ledger views yet (nothing has shipped): it is listed all the same. */
 	lagMinutes: number | null;
 	/** Members that need attention; null when no source counts them (the HTTP build): no badge, never 0. */
 	attentionCount: number | null;
+	/** A demo school (staging's golden scenarios, S8-contract section 11 "Demo schools"): fictional, read-only, listed
+	 * after the person's own schools under "Demo". */
+	demo: boolean;
 	/** Null when no source has them (the HTTP build): the tabs show no badge. */
 	tabBadges: {
 		/** The plans have unpublished changes. */

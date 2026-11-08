@@ -4,7 +4,7 @@
 	import Icon from "../Icon.svelte";
 	import PaneIcon from "../PaneIcon.svelte";
 	import type { PlanChange } from "./plans-menu.ts";
-	import { control, field, fieldLabel, footer, heading, lock, modal, muted, preview } from "./styles.ts";
+	import { control, field, fieldLabel, footer, heading, lock, muted, preview } from "./styles.ts";
 
 	const minimumPinLength = 4;
 	const maximumPinLength = 6;
@@ -51,8 +51,6 @@
 		showCloseButton={false}
 		escapeKeydownBehavior={behaviour}
 		interactOutsideBehavior={behaviour}
-		class={[modal, "top-10 translate-y-0"]}
-		overlayClass="bg-black/50 supports-backdrop-filter:backdrop-blur-none"
 		data-test="plan-publish-dialog"
 		onOpenAutoFocus={(event) => {
 			event.preventDefault();

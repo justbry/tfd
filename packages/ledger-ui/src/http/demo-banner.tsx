@@ -6,14 +6,14 @@ export type DemoReason = "signed_out" | "no_school";
 
 const reasonText: Record<DemoReason, string> = {
 	signed_out:
-		"You are not signed in, so these are sample schools. Sign in to B4 Uni to see your own school's books.",
+		"You are not signed in, so these are demo scenarios: fictional schools, read-only. Sign in to B4 Uni to see your own school's books.",
 	no_school:
-		"This account is not an owner or admin of any school, so these are sample schools.",
+		"This account is not an owner or admin of any school, so these are demo scenarios: fictional schools, read-only.",
 };
 
 /**
- * The large alert pinned to the top right while the HTTP build shows the demo schools (the fixture data, fictional
- * schools and people). It says the figures are samples and that nothing is saved, and links to B4 Uni's sign-in page;
+ * The large alert pinned to the top right while the HTTP build shows only the demo schools (the ledger Worker's demo
+ * scenarios: fictional schools and people). It says they are demo scenarios and read-only, and links to B4 Uni's sign-in page;
  * B4 Uni cannot send a visitor back to the ledger after signing in, so "I have signed in" reloads the page. It folds to a
  * small pill so it never hides the controls under it for good.
  */
@@ -67,7 +67,7 @@ export function DemoBanner({
 				style="margin:0 0 12px;font-size:13px;color:var(--muted-foreground)"
 				data-test="demo-banner-not-saved"
 			>
-				Changes here are not saved.
+				Demo schools are read-only: nothing here can be changed.
 			</p>
 			<div style="display:flex;gap:8px;flex-wrap:wrap">
 				{reason === "signed_out" && (

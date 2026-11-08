@@ -29,7 +29,8 @@ const counted = (count: number, noun: string): string =>
 	`${count} ${noun}${count === 1 ? "" : "s"}`;
 
 /** A tab's badge from the school's counts (mockup `#plbadge`, `#bkbadge`, `#pbadge`), as the Preact shell's
- * `tabBadge`; none when the school has no counts (`tabBadges` null), never 0. The Plans draft badge follows `plansDraftNow` once the Plans tab has worked it out. */
+ * `tabBadge`; none when the school has no counts (`tabBadges` null), never 0. The Plans draft badge follows `plansDraftNow` once
+ * the Plans tab has worked it out. */
 export function tabBadge(
 	tab: SchoolTab,
 	{ tabBadges }: School,
@@ -93,7 +94,20 @@ export const schoolLabel = (school: School): string =>
 export const staleText = (school: School): string =>
 	`Data is ${school.lagMinutes} min behind: the shipper may be stuck. Recent events can be missing.`;
 
+/** The props a pane loaded on demand takes (the generics of `LazyPane`). */
+export type PaneProps = Record<string, unknown>;
+
+/** The panes that read the school's disclosure (View as, the audience's limits) before they show anything. */
+export const readsDisclosure = (
+	tab: string,
+): tab is "dashboard" | "bookings" | "members" | "plans" | "promos" =>
+	tab === "dashboard" ||
+	tab === "bookings" ||
+	tab === "members" ||
+	tab === "plans" ||
+	tab === "promos";
+
 /** The tabs whose pane reports its own render (it is loaded on demand, or it loads data, so the route is on screen only
  * once the pane, its data or its message is): the others are on screen as soon as the shell is. */
 export const reportsItsOwnRender = (tab: string): boolean =>
-	tab === allSchools || /^(dashboard|plans|promos)$/.test(tab);
+	readsDisclosure(tab) || tab === allSchools;

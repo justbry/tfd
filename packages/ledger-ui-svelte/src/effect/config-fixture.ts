@@ -25,6 +25,10 @@ export type FixtureConfigOptions = {
 	grant: (school: string) => FixtureGrant | null | Promise<FixtureGrant | null>;
 	/** Whether the token carries a fresh `su` claim (D22). Writes need it. Default: true. */
 	stepUp?: boolean;
+	/** Someone else writes the object the first time it is verified (before the verdict is made), so that the verdict
+	 * is over a newer ETag than the copy was read at: the state of a 412 for the fixture build (gate K) and the
+	 * screenshots. */
+	concurrentWriter?: boolean;
 	asOf?: string | null;
 };
 
@@ -82,6 +86,9 @@ export function createFixtureConfig(
 	const calls: Array<{ method: string; args: unknown[] }> = [];
 	let stepUp = options.stepUp ?? true;
 	let refreshes = 0;
+	let raced = false;
+	const isRecord = (value: unknown): value is Record<string, unknown> =>
+		typeof value === "object" && value !== null;
 	const asOf = options.asOf ?? null;
 	const keyOf = (school: string, name: string): string => `${school}/${name}`;
 
@@ -162,6 +169,17 @@ export function createFixtureConfig(
 			requireOwner(grant);
 			requireFinance(known, grant);
 			const problems = definitions[known].validate(value, school);
+			if (options.concurrentWriter && !raced) {
+				raced = true;
+				const current: unknown = value;
+				const rival = isRecord(current)
+					? {
+							...current,
+							purchaseLinkShared: current.purchaseLinkShared !== true,
+						}
+					: value;
+				await write(keyOf(school, known), rival);
+			}
 			const stored = store.get(keyOf(school, known));
 			const ok = problems.length === 0;
 			return {

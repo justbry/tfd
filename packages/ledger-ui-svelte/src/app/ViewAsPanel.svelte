@@ -1,5 +1,4 @@
 <script lang="ts">
-	import "./late-icons.ts"; // the icons this pane draws that the first page load does not carry
 	import { onMount } from "svelte";
 	import type { ViewAs } from "$contract/data/disclosure.ts";
 	import Icon from "./Icon.svelte";

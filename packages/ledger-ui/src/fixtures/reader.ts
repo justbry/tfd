@@ -29,6 +29,7 @@ const schools: FixtureSchool[] = [
 		stale: false,
 		lagMinutes: 2,
 		attentionCount: 4,
+		demo: false,
 		tabBadges: { plansDraft: true, bookingsOverdue: 2, promosExpiring: 1 },
 	},
 	{
@@ -42,6 +43,7 @@ const schools: FixtureSchool[] = [
 		stale: false,
 		lagMinutes: 3,
 		attentionCount: 2,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 1, promosExpiring: 0 },
 	},
 	{
@@ -54,6 +56,7 @@ const schools: FixtureSchool[] = [
 		stale: true,
 		lagMinutes: 26,
 		attentionCount: 1,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 0, promosExpiring: 0 },
 	},
 	{
@@ -66,6 +69,7 @@ const schools: FixtureSchool[] = [
 		stale: false,
 		lagMinutes: 1,
 		attentionCount: 0,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 0, promosExpiring: 0 },
 	},
 	{
@@ -78,6 +82,7 @@ const schools: FixtureSchool[] = [
 		stale: false,
 		lagMinutes: 2,
 		attentionCount: 0,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 0, promosExpiring: 0 },
 	},
 ];

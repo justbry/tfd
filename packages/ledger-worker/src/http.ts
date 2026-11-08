@@ -20,6 +20,7 @@ export type ErrorCode =
 	| "method_not_allowed"
 	| "owner_only"
 	| "step_up_required"
+	| "demo_read_only"
 	| "stale_etag"
 	| "invalid_config";
 
@@ -40,6 +41,7 @@ const STATUS: Record<ErrorCode, number> = {
 	method_not_allowed: 405,
 	owner_only: 403,
 	step_up_required: 403,
+	demo_read_only: 403,
 	stale_etag: 412,
 	invalid_config: 422,
 };

@@ -54,11 +54,13 @@ beforeAll(async () => {
 	);
 	await writeFile(
 		join(assets, "assets", "app.js"),
-		'const api="https://api-staging.b4uni.com";const copy="The school uses the B4 Uni file.";export{api,copy};\n',
+		// The HTTP build since #52: its signed-out demo alert, and a fixture school that the demo shows.
+		'const api="https://api-staging.b4uni.com";const copy="The school uses the B4 Uni file.";const demo={name:"Maple Pilates",action:"I have signed in"};export{api,copy,demo};\n',
 	);
 	await writeFile(join(assets, "assets", "app.css"), "body{margin:0}\n");
 	harness = await startLedgerWorker({
 		presets: ["tiny-school"],
+		demoPresets: ["free-only"],
 		assetsDirectory: assets,
 	});
 	api = Bun.serve({
@@ -122,6 +124,7 @@ test("stage 1 passes every check against the local Worker", async () => {
 	expect(context.report.results.map((result) => result.check)).toEqual([
 		"healthz",
 		"no-token",
+		"no-token-real-school",
 		"forged-signature",
 		"forged-expired",
 		"alg-none",
@@ -131,7 +134,7 @@ test("stage 1 passes every check against the local Worker", async () => {
 		"index-html",
 		"assets",
 		"bundle-api-host",
-		"bundle-no-fixtures",
+		"bundle-http-build",
 		"spa-fallback",
 		"jwks",
 	]);
@@ -148,7 +151,7 @@ test("the refusals of stage 1 are not vacuous: a real token passes the same rout
 	expect(response.status).toBe(200);
 });
 
-test("stage 1 FAILs a bundle that is missing the staging api host", async () => {
+test("stage 1 FAILs a fixture bundle that is missing the staging api host", async () => {
 	const other = await mkdtemp(join(tmpdir(), "s8f-assets-bad-"));
 	await mkdir(join(other, "assets"));
 	await writeFile(
@@ -174,8 +177,8 @@ test("stage 1 FAILs a bundle that is missing the staging api host", async () => 
 			context.report.results.map((result) => [result.check, result]),
 		);
 		expect(byCheck["bundle-api-host"]?.status).toBe("FAIL");
-		expect(byCheck["bundle-no-fixtures"]?.status).toBe("FAIL");
-		expect(byCheck["bundle-no-fixtures"]?.why).toContain("Maple Pilates");
+		expect(byCheck["bundle-http-build"]?.status).toBe("FAIL");
+		expect(byCheck["bundle-http-build"]?.why).toContain("Maple Pilates");
 	} finally {
 		await bad.stop();
 		await rm(other, { recursive: true, force: true });

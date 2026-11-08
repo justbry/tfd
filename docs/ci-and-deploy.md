@@ -11,8 +11,18 @@ What runs where, and the one-time Cloudflare setup the deploy workflows need.
 | Ledger Worker + UI (`packages/ledger-worker`, `packages/ledger-ui`) | `deploy-ledger-worker.yml` | **Run workflow** only, after approval | staging: `ledger-staging.b4uni.com` |
 | `tfd` package | `release-atm.yml` (Release tfd) | a `tfd-v<version>` tag | a release on `justbry/atm` with `tfd-<version>.tgz` |
 
-The checks (`atm-tests.yml` and the rest) only test. Autumn's own deploy workflows (its ECR image, its deploy server, its
-Slack) are removed; `UPSTREAM.md` lists them.
+The other workflows only check:
+
+| Workflow | Checks |
+|---|---|
+| `atm-tests.yml` | `packages/atm`: tests, golden end-to-end, typecheck, lint, build |
+| `balance-unit-tests.yml` | `balance-engine`, which tfd builds on, and its neighbours: unit tests and typechecks |
+| `server-typecheck.yml` | no edits to generated paths, the workspace list, the Autumn server's typecheck |
+| `knip.yml` | unused files, exports and dependencies |
+
+Every job runs on `vars.CI_RUNNER` if set (a JSON runner label list, for a self-hosted box), else `ubuntu-latest`.
+Autumn's own deploy, product-test and publish workflows are removed: they needed its secrets or its paid runners, so
+they only failed or sat queued. `UPSTREAM.md` lists them.
 
 The site workflow always runs its checks. It deploys only when both Cloudflare secrets are set, and skips with a warning
 otherwise, so a missing secret never fails a run. A pull request from a fork gets no secrets, so it is checked but not

@@ -3,7 +3,7 @@
 	import type { PlanSummary } from "$contract/data/plans.ts";
 	import { formatMoney } from "../money.ts";
 	import PaneIcon from "../PaneIcon.svelte";
-	import type { PaneIconName } from "../late-icons.ts";
+	import type { PaneIconName } from "../pane-icons.ts";
 	import type { PlansView } from "./plans-menu.ts";
 	import Withheld from "./Withheld.svelte";
 	import { financeOnlyText } from "./tables-model.ts";
