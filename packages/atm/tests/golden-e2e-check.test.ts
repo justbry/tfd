@@ -11,8 +11,8 @@
  *   S5  hashes of the database and the folder around every read-only command (inside S1 to S4)
  *   S6  the same under TZ=America/Denver and TZ=Asia/Tokyo
  *
- * The default run is a sample that takes about two minutes. `ATM_GOLDEN_E2E=full` runs every bundle, all kill points and both
- * time zones over everything. `ATM_GOLDEN_E2E_SHARD=1/6` runs one sixth of either run (of its bundles, then of the tests after
+ * The default run is a sample that takes about two minutes. `TFD_GOLDEN_E2E=full` runs every bundle, all kill points and both
+ * time zones over everything. `TFD_GOLDEN_E2E_SHARD=1/6` runs one sixth of either run (of its bundles, then of the tests after
  * them), to run six processes at once. S7, the scale probe, is `scripts/golden-e2e-scale.ts`. A finding is something the
  * design says should not happen: the ones known today are listed below and pinned, so a test fails when one appears or goes
  * away.
@@ -22,6 +22,7 @@ import { appendFileSync, existsSync, readdirSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { readEnvironmentVariable } from "../src/environment.js";
 import {
 	defaultBundlesDirectory,
 	loadScenarioBundle,
@@ -38,20 +39,21 @@ import { checkWhatIfs } from "./golden-e2e-whatif.js";
 import { checkLogFixture } from "./golden-e2e-years.js";
 import { hasHledger } from "./helpers.js";
 
-const FULL = process.env.ATM_GOLDEN_E2E === "full";
-const SHARD = /^(\d+)\/(\d+)$/.exec(process.env.ATM_GOLDEN_E2E_SHARD ?? "");
+const FULL = readEnvironmentVariable(process.env, "TFD_GOLDEN_E2E") === "full";
+const SHARD_SPEC = readEnvironmentVariable(process.env, "TFD_GOLDEN_E2E_SHARD");
+const SHARD = /^(\d+)\/(\d+)$/.exec(SHARD_SPEC ?? "");
 if (
-	process.env.ATM_GOLDEN_E2E_SHARD &&
+	SHARD_SPEC &&
 	!(SHARD && Number(SHARD[1]) >= 1 && Number(SHARD[1]) <= Number(SHARD[2]))
 )
 	throw new Error(
-		`ATM_GOLDEN_E2E_SHARD must be i/n with 1 <= i <= n, not ${process.env.ATM_GOLDEN_E2E_SHARD}`,
+		`TFD_GOLDEN_E2E_SHARD must be i/n with 1 <= i <= n, not ${SHARD_SPEC}`,
 	);
 const QUICK_BUNDLES = ["create", "second-school", "refused-invoice"];
 const TIME_ZONES = ["America/Denver", "Asia/Tokyo"] as const;
 const MINUTES = 60_000;
-/** A time zone for every process of the run (`ATM_GOLDEN_E2E_TZ=Asia/Tokyo`), the handler's included. */
-const ZONE = process.env.ATM_GOLDEN_E2E_TZ;
+/** A time zone for every process of the run (`TFD_GOLDEN_E2E_TZ=Asia/Tokyo`), the handler's included. */
+const ZONE = readEnvironmentVariable(process.env, "TFD_GOLDEN_E2E_TZ");
 const TEST_TIMEOUT = FULL ? 20 * MINUTES : 4 * MINUTES;
 
 /** The raw bytes finding of S3: the erased facts stay in the `-wal` until it is checkpointed. */
@@ -70,8 +72,11 @@ const findingsOf = (rec: Outcomes): string[] =>
 		.filter((outcome) => outcome.status === "FINDING")
 		.map((outcome) => outcome.check);
 
-/** With ATM_GOLDEN_E2E_REPORT=<file>, one JSON line per scenario run (for the results table of the doc). */
-const REPORT_FILE = process.env.ATM_GOLDEN_E2E_REPORT;
+/** With TFD_GOLDEN_E2E_REPORT=<file>, one JSON line per scenario run (for the results table of the doc). */
+const REPORT_FILE = readEnvironmentVariable(
+	process.env,
+	"TFD_GOLDEN_E2E_REPORT",
+);
 const note = (line: Record<string, unknown>) => {
 	if (REPORT_FILE)
 		appendFileSync(
@@ -176,7 +181,7 @@ else {
 				`${id}`,
 				async () => {
 					expectPinned(id, await runBundle(id, {}));
-					// with ATM_GOLDEN_E2E_TZ set, runBundle puts the handler and every process in that zone
+					// with TFD_GOLDEN_E2E_TZ set, runBundle puts the handler and every process in that zone
 				},
 				TEST_TIMEOUT,
 			);

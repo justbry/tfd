@@ -28,6 +28,7 @@ const ENTRIES = [
 	"src/ledger/ledger-rows.ts",
 	"src/ledger/catalog.ts",
 	"src/ledger/run-views.ts",
+	"src/ledger/ledger-token.ts",
 ];
 
 const FORBIDDEN = [

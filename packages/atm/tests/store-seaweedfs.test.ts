@@ -1,6 +1,6 @@
 /**
  * The Store contract against R2Store talking to a local SeaweedFS (`weed mini`), the CI stand-in for R2. Needs the
- * `weed` binary: env ATM_WEED, or `weed` on PATH; otherwise the suite is skipped. See docs/spikes/seaweedfs.md.
+ * `weed` binary: env TFD_WEED (or the old ATM_WEED), or `weed` on PATH; otherwise the suite is skipped. See docs/spikes/seaweedfs.md.
  *
  * `weed mini` also starts WebDAV, Iceberg and an admin UI without a password, so everything binds to 127.0.0.1 and the
  * process is killed when the suite ends. The S3 port is a free one picked at start; the other ports are weed's

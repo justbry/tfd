@@ -4,7 +4,7 @@
  * still validate every command at runtime. tests/types.test.ts fails if the engine's types stop fitting them.
  */
 
-export type AtmCommandType =
+export type TfdCommandType =
 	| "check"
 	| "finalize"
 	| "confirmExpiredLock"
@@ -15,9 +15,9 @@ export type AtmCommandType =
 	| "deleteBalance";
 
 /** The Stripe mode a subject belongs to; it is part of the subject key (`<school>|<env>|<customer>`). */
-export type AtmEnv = "live" | "test";
+export type TfdEnv = "live" | "test";
 
-export type AtmIdentity = {
+export type TfdIdentity = {
 	orgId: string;
 	env: string;
 	customerId: string;
@@ -25,8 +25,8 @@ export type AtmIdentity = {
 };
 
 /** Autumn's WorkerFullSubject: the customer (or entity) with its products, entitlements, pools, windows and open locks. */
-export type AtmSubject = {
-	identity: AtmIdentity;
+export type TfdSubject = {
+	identity: TfdIdentity;
 	revision: number;
 	customer: Record<string, unknown>;
 	entity: Record<string, unknown> | null;
@@ -38,18 +38,18 @@ export type AtmSubject = {
 };
 
 /** Fields every engine command carries; each type adds its own (see the engine's parsers). */
-export type AtmCommand = {
+export type TfdCommand = {
 	schemaVersion: 1;
-	type: AtmCommandType;
+	type: TfdCommandType;
 	requestId: string;
-	identity: AtmIdentity;
+	identity: TfdIdentity;
 	occurredAt: number;
 	/** Required on commands that change balances; duplicates are dropped on it. */
 	commandId?: string;
 	[field: string]: unknown;
 };
 
-export type AtmCheckResult = {
+export type TfdCheckResult = {
 	allowed: boolean;
 	reason: string | null;
 	limitType: string | null;
@@ -58,38 +58,38 @@ export type AtmCheckResult = {
 	isFlag: boolean;
 };
 
-export type AtmRowChange = {
+export type TfdRowChange = {
 	table: string;
 	op: string;
 	[field: string]: unknown;
 };
 
 /** What a command that changes balances returns: row changes guarded by the subject's revision. */
-export type AtmMutation = {
+export type TfdMutation = {
 	schemaVersion: 1;
 	type: "mutation";
 	id: string;
-	identity: AtmIdentity;
+	identity: TfdIdentity;
 	revision: { before: number; after: number };
-	changes: AtmRowChange[];
+	changes: TfdRowChange[];
 	[field: string]: unknown;
 };
 
-export type AtmResultFor<T extends AtmCommandType> = T extends "check"
-	? AtmCheckResult
+export type TfdResultFor<T extends TfdCommandType> = T extends "check"
+	? TfdCheckResult
 	: T extends "reset" | "updateBalance"
-		? AtmMutation | null
+		? TfdMutation | null
 		: T extends "recalculateBalance"
 			? Record<string, unknown>
-			: AtmMutation;
+			: TfdMutation;
 
-export type AtmResult = AtmResultFor<AtmCommandType>;
+export type TfdResult = TfdResultFor<TfdCommandType>;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Ledger: events, postings, replay and journals (the B4 Uni school ledger spec, "Event envelope").
 // ---------------------------------------------------------------------------------------------------------------
 
-export type AtmEventType =
+export type TfdEventType =
 	| "payment.succeeded"
 	| "payment.refunded"
 	| "payment.disputed"
@@ -135,20 +135,20 @@ export type AtmEventType =
 	| "mrr.changed";
 
 /** One line of a transaction. `amount` is a decimal string (two places for USD, none for credits), never a float. */
-export type AtmPosting = {
+export type TfdPosting = {
 	account: string;
 	amount: string;
 	commodity: string;
 };
 
 /** The envelope every event in `schools/<id>/events/` has. A new optional field is not a new version; `v` is. */
-export type AtmEvent = {
+export type TfdEvent = {
 	v: 1;
 	/** A ULID; the hledger transaction code. */
 	id: string;
 	school: string;
 	source: string;
-	event_type: AtmEventType;
+	event_type: TfdEventType;
 	/** UTC instant, ISO 8601 with `Z`. */
 	event_time: string;
 	ingest_time: string;
@@ -162,7 +162,7 @@ export type AtmEvent = {
 	idem: string;
 	cause?: string;
 	text: string;
-	postings: AtmPosting[];
+	postings: TfdPosting[];
 	/** Lossless. */
 	payload: Record<string, unknown>;
 	/** `payload` with personal fields removed; absent when there are none. */
@@ -170,7 +170,7 @@ export type AtmEvent = {
 };
 
 /** What `mutationToEvents` needs besides the mutation. Everything here is persisted in the events (labels, payload), so a replay can rebuild it. */
-export type AtmEventContext = {
+export type TfdEventContext = {
 	school: string;
 	/** IANA zone of the school when the event is written. */
 	tz: string;
@@ -195,7 +195,7 @@ export type AtmEventContext = {
 	/** Extra labels (`booking`, `service`, ...). */
 	labels?: Record<string, string>;
 	/** The state the mutation was computed against; resolves lapsed rollover rows and the balance a delete removes. */
-	before?: AtmSubjectState | null;
+	before?: TfdSubjectState | null;
 	/** Extra payload fields kept beside the engine record. */
 	payload?: Record<string, unknown>;
 	/** Prefix of `idem` (default `engine`). */
@@ -213,7 +213,7 @@ export type AtmEventContext = {
 	 * the low and depleted events judge the feature's total once. Default: the mutation's changes to the rows of the
 	 * feature the command draws (its `internalFeatureId`).
 	 */
-	featureChanges?: AtmMutation["changes"];
+	featureChanges?: TfdMutation["changes"];
 	/**
 	 * Positions in `mutation.changes` of the changes these events are made from, when the caller cuts one mutation into
 	 * one call per feature and plan. The payload still records the whole mutation (a replay runs the whole command), and
@@ -224,8 +224,8 @@ export type AtmEventContext = {
 };
 
 /** Inputs of the events that are not engine mutations (payments, payouts, plan changes, ...). */
-export type AtmLedgerEventInput = {
-	type: AtmEventType;
+export type TfdLedgerEventInput = {
+	type: TfdEventType;
 	school: string;
 	tz: string;
 	/** UTC instant (ISO) or epoch ms. */
@@ -264,12 +264,12 @@ export type AtmLedgerEventInput = {
 /** How a subscription's MRR moved: started (from nothing or from 0), rose, fell while it runs, or ended. */
 export type MrrMovement = "new" | "expansion" | "contraction" | "churned";
 
-export type AtmCatalogRow = { table: string; row: Record<string, unknown> };
+export type TfdCatalogRow = { table: string; row: Record<string, unknown> };
 
 /** The engine's `SubjectState`: one subject's rows, revisioned by its mutation log. */
-export type AtmSubjectState = {
+export type TfdSubjectState = {
 	schemaVersion: 1;
-	identity: AtmIdentity;
+	identity: TfdIdentity;
 	revision: number;
 	customer: Record<string, unknown>;
 	customerProducts: Record<string, unknown>[];
@@ -285,26 +285,26 @@ export type AtmSubjectState = {
 	[field: string]: unknown;
 };
 
-export type AtmHold = { holder: string; feature: string; units: number };
+export type TfdHold = { holder: string; feature: string; units: number };
 
 /** Where a replay starts: the states and the units each open lock holds, as of `lastEventId`. */
-export type AtmSnapshot = {
-	states: Record<string, AtmSubjectState>;
-	holds: Record<string, AtmHold>;
+export type TfdSnapshot = {
+	states: Record<string, TfdSubjectState>;
+	holds: Record<string, TfdHold>;
 	lastEventId: string | null;
 };
 
-export type AtmBalance = {
+export type TfdBalance = {
 	holder: string;
 	feature: string;
 	avail: number;
 	held: number;
 };
 
-export type AtmReplayResult = {
-	snapshot: AtmSnapshot;
+export type TfdReplayResult = {
+	snapshot: TfdSnapshot;
 	/** The balances at `asOf`, sorted by holder then feature. */
-	balances: AtmBalance[];
+	balances: TfdBalance[];
 	asOf: string | null;
 	applied: number;
 	lastEventId: string | null;
@@ -317,7 +317,7 @@ export type AtmReplayResult = {
 };
 
 /** One row change of an engine mutation, shortened for a diff: the table, the op, the row's id, and the rest of the change as canonical JSON. */
-export type AtmSimulateChange = {
+export type TfdSimulateChange = {
 	table: string;
 	op: string;
 	id: string | null;
@@ -325,7 +325,7 @@ export type AtmSimulateChange = {
 };
 
 /** A command the candidate decides differently from the log: the changes only one side makes. */
-export type AtmSimulateDecision = {
+export type TfdSimulateDecision = {
 	key: string;
 	commandId: string;
 	/** The engine command's type (`track`, `reset`, ...). */
@@ -335,15 +335,15 @@ export type AtmSimulateDecision = {
 	/** The recorded events of this command. */
 	eventIds: string[];
 	/** Changes the log has and the candidate does not make. */
-	removed: AtmSimulateChange[];
+	removed: TfdSimulateChange[];
 	/** Changes the candidate makes and the log does not have. */
-	added: AtmSimulateChange[];
+	added: TfdSimulateChange[];
 	/** The engine's answer to the command (`result`) is not the recorded one. */
 	resultChanged: boolean;
 };
 
 /** A command the candidate's engine refused (it threw, decided nothing, or answered `rejected`); the replay went on from the state before it. */
-export type AtmSimulateRefusal = {
+export type TfdSimulateRefusal = {
 	key: string;
 	commandId: string;
 	command: string;
@@ -351,10 +351,10 @@ export type AtmSimulateRefusal = {
 	eventIds: string[];
 	reason: string;
 	/** The changes the log made that the candidate does not. */
-	lost: AtmSimulateChange[];
+	lost: TfdSimulateChange[];
 };
 
-export type AtmSimulateBalanceChange = {
+export type TfdSimulateBalanceChange = {
 	holder: string;
 	feature: string;
 	current: { avail: number; held: number };
@@ -362,7 +362,7 @@ export type AtmSimulateBalanceChange = {
 };
 
 /** A posting total (summed over the events of `month`, by the school's calendar) that is not the same on both sides. */
-export type AtmSimulatePostingChange = {
+export type TfdSimulatePostingChange = {
 	month: string;
 	account: string;
 	commodity: string;
@@ -370,10 +370,10 @@ export type AtmSimulatePostingChange = {
 	candidate: string;
 };
 
-export type AtmSimulateInput = {
-	events: readonly AtmEvent[];
+export type TfdSimulateInput = {
+	events: readonly TfdEvent[];
 	/** The catalog rows the log was written under. Give these or `menu`. */
-	catalog?: readonly AtmCatalogRow[];
+	catalog?: readonly TfdCatalogRow[];
 	/** The menu the log was written under, instead of `catalog` (its rows come from `menuCatalogRows`). */
 	menu?: Menu;
 	/** The school id the menus' rows are made for; default the first event's. */
@@ -383,7 +383,7 @@ export type AtmSimulateInput = {
 	 * (`deductionOrder`) of every command that carries an `org`. Nothing given is the identity: no difference.
 	 */
 	candidate: {
-		catalog?: readonly AtmCatalogRow[];
+		catalog?: readonly TfdCatalogRow[];
 		menu?: Menu;
 		policy?: BillingPolicy;
 	};
@@ -393,20 +393,20 @@ export type AtmSimulateInput = {
 	month?: string;
 };
 
-export type AtmSimulation = {
+export type TfdSimulation = {
 	/** The candidate's events (every one the log has, as decided by the candidate); build its journal from these. Left out of the CLI's `--json`. */
-	events: AtmEvent[];
-	balances: { current: AtmBalance[]; candidate: AtmBalance[] };
+	events: TfdEvent[];
+	balances: { current: TfdBalance[]; candidate: TfdBalance[] };
 	/** The holder and feature pairs whose balance differs, sorted. */
-	balanceChanges: AtmSimulateBalanceChange[];
+	balanceChanges: TfdSimulateBalanceChange[];
 	/** Posting totals by month, account and commodity that differ, sorted. */
-	postingChanges: AtmSimulatePostingChange[];
+	postingChanges: TfdSimulatePostingChange[];
 	/** Transactions (events with postings) per month on each side, as `buildJournal` counts them. */
 	transactions: { month: string; current: number; candidate: number }[];
 	/** Commands the candidate decides differently. */
-	changed: AtmSimulateDecision[];
+	changed: TfdSimulateDecision[];
 	/** Commands the candidate's engine refuses. */
-	refused: AtmSimulateRefusal[];
+	refused: TfdSimulateRefusal[];
 	/** Events no engine command made (payments, refunds, payouts, disputes, the cron's expiries), carried over as they are: a replay cannot change what Stripe charged. */
 	unaffected: { events: number; byType: Record<string, number> };
 	/** The sum of the balance, posting, changed and refused entries; 0 means the candidate changes nothing the log can show. */
@@ -416,19 +416,19 @@ export type AtmSimulation = {
 	summary: string;
 };
 
-export type AtmValidationError = { path: string; message: string };
+export type TfdValidationError = { path: string; message: string };
 
-export type AtmValidation =
+export type TfdValidation =
 	| { ok: true; errors: [] }
-	| { ok: false; errors: AtmValidationError[] };
+	| { ok: false; errors: TfdValidationError[] };
 
 /** The text of every file `buildJournal` makes, keyed by path under the school's prefix. */
-export type AtmJournalFiles = Record<string, string>;
+export type TfdJournalFiles = Record<string, string>;
 
-export type AtmJournalBuild = {
+export type TfdJournalBuild = {
 	/** `ledger/b4u/YYYY-MM.journal`. */
 	month: string;
-	files: AtmJournalFiles;
+	files: TfdJournalFiles;
 	/** Transactions written (events with postings). */
 	transactions: number;
 	/** sha256 of the month's input event lines, in order. */
@@ -483,7 +483,7 @@ export type ShareStatement = {
  * The facts of one paid or refunded payment, made from its event alone (`receiptOf`), so the school's books can make it
  * again byte for byte. Its canonical form (`canonicalize`, "canonical v1") is what is signed: a change to it is receipt v2.
  */
-export type AtmReceipt = {
+export type TfdReceipt = {
 	v: 1;
 	school: string;
 	/** The family's timeline, e.g. `family:fam_8k2`. No name or email: a receipt may be shown to anyone. */
@@ -505,8 +505,8 @@ export type AtmReceipt = {
 	event_hash: string;
 };
 
-export type AtmSignedReceipt = {
-	receipt: AtmReceipt;
+export type TfdSignedReceipt = {
+	receipt: TfdReceipt;
 	/** Which public key verifies `sig`, e.g. `trifold-2026-11`. */
 	key_id: string;
 	/** Ed25519 over `canonicalize(receipt)`, base64url without padding. */
@@ -514,10 +514,10 @@ export type AtmSignedReceipt = {
 };
 
 /** The key a receipt or a seal is signed with: an Ed25519 private key as PKCS#8 PEM, and the id its public key is published under. */
-export type AtmSigner = { keyId: string; privateKeyPem: string };
+export type TfdSigner = { keyId: string; privateKeyPem: string };
 
 /** Published public keys: key id to an Ed25519 SPKI PEM. Old keys stay, so old receipts keep verifying. */
-export type AtmPublicKeys = Record<string, string>;
+export type TfdPublicKeys = Record<string, string>;
 
 export type ReceiptVerdict =
 	| { ok: true }
@@ -529,7 +529,7 @@ export type LedgerVerdict =
 	| { ok: false; reason: "missing_event" | "event_changed" | "not_receipted" };
 
 /** One month's events, named by id, as they stood in the folder when sealed, chained to the school's seal before it. */
-export type AtmSeal = {
+export type TfdSeal = {
 	v: 1;
 	school: string;
 	/** `YYYY-MM`, by the events' school-local `date`. */
@@ -548,16 +548,16 @@ export type AtmSeal = {
 	prev_seal_hash: string | null;
 };
 
-export type AtmSignedSeal = { seal: AtmSeal; key_id: string; sig: string };
+export type TfdSignedSeal = { seal: TfdSeal; key_id: string; sig: string };
 
 export type SealOfInput = {
 	school: string;
 	month: string;
 	/** All the school's events, one per `idem` (as `readEvents` returns them); `sealOf` picks the month's. */
-	events: readonly AtmEvent[];
+	events: readonly TfdEvent[];
 	sealedAt: string;
 	/** The school's last signed seal, or null for its first. */
-	previous: AtmSignedSeal | null;
+	previous: TfdSignedSeal | null;
 };
 
 /** What `verifySeals` found, one verdict per seal in chain order. `ok` is false when any seal is not `ok`; late events alone leave it true. */
@@ -579,7 +579,7 @@ export type SealReport = {
 };
 
 /** A grant or rollover row past its expiry that still holds a balance: the engine drops it by the clock, the cron books `credit.expired`. */
-export type AtmLapsedRow = {
+export type TfdLapsedRow = {
 	table: "customerEntitlements" | "rollovers";
 	id: string;
 	balance: number;
@@ -1268,7 +1268,7 @@ export type InvoiceGrantInput = {
 	 * Stripe's mode for this subject, part of its subject key. Default `"live"`; a school with both a test and a live
 	 * endpoint passes it so the two do not share a subject. Anything else throws.
 	 */
-	env?: AtmEnv;
+	env?: TfdEnv;
 } & GrantVersions;
 
 /**
@@ -1279,13 +1279,13 @@ export type GrantRemovalInput = {
 	menu?: Menu;
 	policy: BillingPolicy;
 	state: GrantsState;
-	subject: AtmSubject | null;
+	subject: TfdSubject | null;
 	now: number;
 	/**
 	 * Stripe's mode for this subject, part of its subject key. Default `"live"`; a school with both a test and a live
 	 * endpoint passes it so the two do not share a subject. Anything else throws.
 	 */
-	env?: AtmEnv;
+	env?: TfdEnv;
 } & GrantVersions;
 
 export type SubscriptionEndInput = {
@@ -1301,13 +1301,13 @@ export type SubscriptionEndInput = {
 	menu: Menu;
 	policy: BillingPolicy;
 	state: GrantsState;
-	subject: AtmSubject | null;
+	subject: TfdSubject | null;
 	now: number;
 	/**
 	 * Stripe's mode for this subject, part of its subject key. Default `"live"`; a school with both a test and a live
 	 * endpoint passes it so the two do not share a subject. Anything else throws.
 	 */
-	env?: AtmEnv;
+	env?: TfdEnv;
 } & GrantVersions;
 
 // ---- Stripe menu and checkout ----
@@ -1625,10 +1625,10 @@ export type BookingContext = {
 	rows: readonly BillingRow[];
 	revision: number;
 	/** The engine catalog rows from `menuCatalogRows` for this menu. */
-	catalog: readonly AtmCatalogRow[];
+	catalog: readonly TfdCatalogRow[];
 	/** The time of the call (ms), not the clock. */
 	now: number;
-	env?: AtmEnv;
+	env?: TfdEnv;
 };
 
 /**
@@ -1663,7 +1663,7 @@ export type BookingResult =
 	| {
 			ok: true;
 			rowChanges: RowChanges | null;
-			events: AtmEvent[];
+			events: TfdEvent[];
 			booking: BookingRecord;
 			/** `cancel` only: whether the cutoff had passed (the late-cancel rule applied). */
 			late?: boolean;
@@ -1841,7 +1841,7 @@ export type RedeemSessionGiftCodeResult =
 	| {
 			ok: true;
 			rowChanges: RowChanges | null;
-			events: AtmEvent[];
+			events: TfdEvent[];
 			code: SessionGiftCode;
 			redeemed: RedeemedCode;
 	  }
@@ -2026,7 +2026,7 @@ export type StripeEventInput = {
 	/** The revision the store holds for the subject (0 for none). */
 	revision: number;
 	/** The engine catalog rows from `menuCatalogRows` for this menu. */
-	catalog: readonly AtmCatalogRow[];
+	catalog: readonly TfdCatalogRow[];
 	/** The time of the event being handled (ms), not the clock. */
 	now: number;
 	/**
@@ -2064,7 +2064,7 @@ export type StripeEventInput = {
 	 * A school with both a test and a live endpoint passes it so the two do not share a subject; build `catalog` with
 	 * the same `env` (`menuCatalogRows`). Anything else throws.
 	 */
-	env?: AtmEnv;
+	env?: TfdEnv;
 };
 
 /** Why an event was set aside: nothing was decided and nothing is to be written. Keep the event and retry after the cause is fixed. */
@@ -2090,7 +2090,7 @@ export type StripeEventRefusal = {
 	 * fixed makes the same event and the outbox keeps the one it has. Absent for every other refusal, and ignored by a
 	 * caller that does not know it: the refusal is then what it was.
 	 */
-	payment?: AtmEvent[];
+	payment?: TfdEvent[];
 };
 
 export type StripeEventResult = {
@@ -2102,7 +2102,7 @@ export type StripeEventResult = {
 	 * (`payout.paid`), and of a dispute that moved money: `payment.disputed` when it opens (the withdrawal and Stripe's
 	 * dispute fee) and `dispute.closed` when it closes.
 	 */
-	events: AtmEvent[];
+	events: TfdEvent[];
 	/**
 	 * What a one-time booking payment's event decided, for the caller to act on (0.8.0): confirm the booking on `paid`, cancel
 	 * it on `refunded`, free its slot on `expired`. Set only for a payment-mode Checkout Session made by `bookingCheckoutParams`
@@ -2173,7 +2173,7 @@ export type InputOutcome = "applied" | "refused";
 export type StoredInput = {
 	/** The order the inputs were applied in (an `AUTOINCREMENT`): the order of replay. */
 	appliedOrder: number;
-	env: AtmEnv;
+	env: TfdEnv;
 	/** Stripe's `evt_...`. */
 	eventId: string;
 	schoolId: string;
@@ -2218,7 +2218,7 @@ export type StoredInput = {
 
 /** The menu, policy and Stripe price ids that were in force when inputs were handled (`atm_input_contexts`). */
 export type StoredContext = {
-	env: AtmEnv;
+	env: TfdEnv;
 	schoolId: string;
 	contextHash: string;
 	menuVersion: string;
@@ -2231,7 +2231,7 @@ export type StoredContext = {
 
 /** A holder's rows and revision as they were just before its first stored input (`atm_input_seeds`). */
 export type StoredSeed = {
-	env: AtmEnv;
+	env: TfdEnv;
 	subjectKey: string;
 	revision: number;
 	takenAt: number;
@@ -2241,7 +2241,7 @@ export type StoredSeed = {
 
 /** What `recordInput` takes. It runs in the caller's transaction. */
 export type RecordInputArgs = {
-	env: AtmEnv;
+	env: TfdEnv;
 	schoolId: string;
 	event: {
 		/** Stripe's `evt_...`. */
@@ -2292,7 +2292,7 @@ export type InputsStatus =
 			firstStoredAt: number;
 			lastStoredAt: number;
 			schools: string[];
-			envs: AtmEnv[];
+			envs: TfdEnv[];
 			atmVersions: string[];
 	  };
 
@@ -2312,7 +2312,7 @@ export type InputsRead = {
 
 /** What the replay reads; the handler's SQLite (`sqliteInputsSource`) and a shipped copy both implement it. */
 export interface InputsSource {
-	read(filter: { env: AtmEnv; school: string }): Promise<InputsRead>;
+	read(filter: { env: TfdEnv; school: string }): Promise<InputsRead>;
 }
 
 // ---- Simulating from stored inputs ----
@@ -2322,11 +2322,11 @@ export interface InputsSource {
  * candidate. No candidate menu and no candidate policy is the identity.
  */
 export type InputsSimulateInput = {
-	/** The log (as `AtmSimulateInput.events`). */
-	events: readonly AtmEvent[];
+	/** The log (as `TfdSimulateInput.events`). */
+	events: readonly TfdEvent[];
 	/** From any `InputsSource.read`; the replay does not know where it came from. */
 	inputs: InputsRead;
-	env: AtmEnv;
+	env: TfdEnv;
 	school: string;
 	/** The candidate; neither given is the identity. A `policy` is the whole candidate policy (resolve it over the defaults with `resolvePolicy`). */
 	candidate: {
@@ -2439,9 +2439,9 @@ export type ReplayContext = {
 
 /** What `replayInputs` is given: the log, the stored inputs and which menu and policy to decide each with. */
 export type ReplayInputsOptions = {
-	events: readonly AtmEvent[];
+	events: readonly TfdEvent[];
 	inputs: InputsRead;
-	env: AtmEnv;
+	env: TfdEnv;
 	school: string;
 	/** Which menu and policy to decide with, per input: the recorded context or a replacement. */
 	contextFor: (
@@ -2460,7 +2460,7 @@ export type ReplayHalt = { token: string; reason: NotReplayable["reason"] };
 export type ReplayedInput = {
 	appliedOrder: number;
 	subjectKey: string;
-	events: AtmEvent[];
+	events: TfdEvent[];
 	refused: StripeEventRefusal | null;
 	rowsDigest: string;
 	booking: DecisionSummary["booking"];
@@ -2471,14 +2471,14 @@ export type ReplayedInput = {
 /** What `replayInputs` leaves: the events, what each input decided, the rows, and the history it could not replay. */
 export type ReplayInputsResult = {
 	/** Decision events and carried events, deduped by idem (first wins), in id order. */
-	events: AtmEvent[];
+	events: TfdEvent[];
 	/** By Stripe event id, for every input that ran. */
 	byInput: Map<string, ReplayedInput>;
 	/** The rows and revision of every holder that ran, as the replay leaves them. */
 	rows: Map<string, { rows: BillingRow[]; revision: number }>;
 	notReplayable: NotReplayable[];
 	/** Commands the engine refused (a candidate only). */
-	refused: AtmSimulateRefusal[];
+	refused: TfdSimulateRefusal[];
 	/** Where a holder stopped being replayed, by subject key. */
 	halts: Map<string, ReplayHalt>;
 	/** The baseline's mismatches with the log (empty for a candidate). */
@@ -2488,17 +2488,17 @@ export type ReplayInputsResult = {
 	/** Holders that ran at least one input, by subject key. */
 	holders: Set<string>;
 	/** The log events a replayed input or command replaced. */
-	replaced: Set<AtmEvent>;
+	replaced: Set<TfdEvent>;
 	carriedCommands: number;
 	/** The open holds the carried commands left, by lock id. */
-	holds: Record<string, AtmHold>;
+	holds: Record<string, TfdHold>;
 	/** Applied inputs whose payment line was booked by an earlier refused attempt and is carried as the log has it. */
 	carriedPayments: string[];
 };
 
 /** The result of `simulateFromInputs`. */
 export type InputsSimulation = Pick<
-	AtmSimulation,
+	TfdSimulation,
 	| "balances"
 	| "balanceChanges"
 	| "postingChanges"
@@ -2507,7 +2507,7 @@ export type InputsSimulation = Pick<
 	| "unaffected"
 > & {
 	/** The candidate's events (left out of the CLI's `--json`), for building its journal. */
-	events: AtmEvent[];
+	events: TfdEvent[];
 	/** Whether the replay with the recorded context reproduces the log, and where it does not. */
 	baseline: {
 		identical: boolean;
@@ -2531,8 +2531,8 @@ export type InputsSimulation = Pick<
 		items: NotReplayable[];
 	};
 	replayed: { holders: number; inputs: number; carriedCommands: number };
-	/** Commands the candidate's engine refused (as `AtmSimulation.refused`). */
-	refused: AtmSimulateRefusal[];
+	/** Commands the candidate's engine refused (as `TfdSimulation.refused`). */
+	refused: TfdSimulateRefusal[];
 	/** Policy settings the candidate changes that stored inputs cannot simulate (booking calls decide them). */
 	notSimulated: string[];
 	/** The delivery changes that are not `same`, the balance and posting changes, and the refused commands. */
@@ -2571,7 +2571,7 @@ export type ShipInputsInput = {
 	/** Where the objects go. Any `Store`: `FolderStore`, `R2Store`. */
 	store: Store;
 	school: string;
-	env: AtmEnv;
+	env: TfdEnv;
 	/** Stamps `shipped_at`, `done_at` (milliseconds). */
 	nowMs: () => number;
 };
@@ -2639,7 +2639,7 @@ export type BillingRow = { table: RowTable; id: string; data: RowData };
 export type RowKey = { table: RowTable; id: string };
 
 export type SubjectRows = {
-	identity: AtmIdentity;
+	identity: TfdIdentity;
 	revision: number;
 	rows: readonly BillingRow[];
 };
@@ -2824,7 +2824,7 @@ export interface Store {
 }
 
 /** What every error a Store throws has in common. Its `name` says which: AlreadyExists, Stale, NotFound, Transient, ShaMismatch, Conflict, Unsupported. */
-export type AtmStoreError = Error & { readonly key: string | null };
+export type TfdStoreError = Error & { readonly key: string | null };
 
 // ---- Stores and the reference webhook handler ----
 
@@ -2911,7 +2911,7 @@ export type WebhookContext = {
 	policy: BillingPolicy;
 	policyVersion: number | string;
 	/** The engine catalog rows from `menuCatalogRows` for this menu. */
-	catalog: readonly AtmCatalogRow[];
+	catalog: readonly TfdCatalogRow[];
 	/** Stripe price ids by lookup key, from publishing the menu. */
 	priceIds?: Readonly<Record<string, string>>;
 };
@@ -2939,7 +2939,7 @@ export type WebhookDeps = {
 	 * context's catalog with the same `env`. Anything else throws. A test-mode endpoint must pass `"test"`: an event whose
 	 * boolean `livemode` disagrees with `env` is refused with 422 `livemode_mismatch`, before any claim, and writes nothing.
 	 */
-	env?: AtmEnv;
+	env?: TfdEnv;
 	/**
 	 * The school's menu, policy and catalog; null when this service does not serve the school. Called once per attempt,
 	 * inside the transaction, so a throw here leaves nothing written.
@@ -3125,11 +3125,11 @@ export type OutboxStatus = {
 };
 
 /**
- * How the events of one command the family service ran are booked: `AtmEventContext` without what `recordEngineCommand`
+ * How the events of one command the family service ran are booked: `TfdEventContext` without what `recordEngineCommand`
  * sets from the mutation and the state (`school`, `before`) or keeps for itself (`payload`, `idemPrefix`, `slice`).
  */
-export type AtmCommandContext = Omit<
-	AtmEventContext,
+export type TfdCommandContext = Omit<
+	TfdEventContext,
 	"school" | "before" | "payload" | "idemPrefix" | "slice"
 >;
 
@@ -3137,11 +3137,11 @@ export type RecordEngineCommandInput = {
 	/** The database the handler writes. The caller's own transaction must be open: this opens none. */
 	db: SqlDatabase;
 	/** What `runEngineCommand` returned; null when the engine decided nothing. */
-	mutation: AtmMutation | null;
+	mutation: TfdMutation | null;
 	/** The subject as it was when the command ran (the state the engine ran on). Needed for the alerts, a delete and a lapsed rollover. */
-	before: AtmSubjectState | null;
+	before: TfdSubjectState | null;
 	/** The feature, service, reason and the rest the postings need; the school is the mutation's `identity.orgId`. */
-	context: AtmCommandContext;
+	context: TfdCommandContext;
 	/**
 	 * The caller's claim that it records every engine command it runs for this subject, written as `payload.complete`.
 	 * `replayEvents` reads it only for a command named `<ULID>:<step>` (the handler's names); a caller whose command ids
@@ -3154,7 +3154,7 @@ export type RecordLapseInput = {
 	/** The database the handler writes. The caller's own transaction must be open: this opens none. */
 	db: SqlDatabase;
 	/** The subject as the cron read it; its identity names the school, the key and the holder, and its revision orders the events. */
-	state: AtmSubjectState;
+	state: TfdSubjectState;
 	featureOf: (internalFeatureId: string) => string | undefined;
 	feature: string;
 	atMs: number;
@@ -3166,7 +3166,7 @@ export type RecordLapseInput = {
 
 /** What a `record*` call made, and how many of those events were new to the outbox (a retry inserts none). */
 export type RecordedEvents = {
-	events: AtmEvent[];
+	events: TfdEvent[];
 	inserted: number;
 };
 
@@ -3186,13 +3186,13 @@ export interface ReplayErrorConstructor {
  */
 export interface ReplayGapErrorType extends ReplayErrorType {
 	readonly gap: { subject: string; after: number; before: number };
-	readonly prefix: AtmReplayResult;
+	readonly prefix: TfdReplayResult;
 }
 export interface ReplayGapErrorConstructor {
 	new (
 		eventId: string,
 		gap: { subject: string; after: number; before: number },
-		prefix: AtmReplayResult,
+		prefix: TfdReplayResult,
 	): ReplayGapErrorType;
 	readonly prototype: ReplayGapErrorType;
 }
@@ -3289,7 +3289,7 @@ export type ReconcilePeriod = { month: string } | { from: string; to: string };
 
 export type ReconcileInput = {
 	/** The school's events, of any date: an event outside the period is still matched by id, so a payment the log dated a day off is `period_differs`, not two missing records. */
-	events: readonly AtmEvent[];
+	events: readonly TfdEvent[];
 	stripe: ReconcileStripe;
 	period: ReconcilePeriod;
 	/** The school's IANA zone, for dating Stripe's objects. Defaults to the zone of the latest event; required when there are none. */
@@ -3336,7 +3336,7 @@ export type ReconcileDifference = {
 	/** Stripe's id (`in_`, `re_`, `dp_`, `po_`, `pi_` for a booking's payment); null for the totals. */
 	id: string | null;
 	/** The log event type compared against, null for the totals. */
-	eventType: AtmEventType | null;
+	eventType: TfdEventType | null;
 	/** The log events involved (more than one for `duplicate_in_log`). */
 	eventIds: string[];
 	stripe: ReconcileSide | null;
@@ -3382,13 +3382,13 @@ export type ReconcileResult = {
 
 /** What `journalMonth` made: the month's build, the paths it wrote (under the school's prefix), and whether it wrote none. */
 export type JournalRun = {
-	build: AtmJournalBuild;
+	build: TfdJournalBuild;
 	written: string[];
 	unchanged: boolean;
 };
 
 /** One event file `readEvents` read: its key under the school's prefix, the sha256 of its text and its line count. */
-export type AtmEventFile = { key: string; sha256: string; lines: number };
+export type TfdEventFile = { key: string; sha256: string; lines: number };
 
 export type ReportName = "income-statement" | "balance-sheet" | "credits";
 export type ReportChoice = ReportName | "all";
@@ -3626,3 +3626,96 @@ export type CatalogPublishedInput = {
 	source?: string;
 	ingestTime?: string | number;
 };
+
+// ---- The old names, for the rename window ------------------------------------------------------------------------
+
+/*
+ * Every type above was named `Atm*` before the rename to tfd (`plans/tfd-rename.md`, step 3). The old names stay as
+ * aliases of the new ones for the rename window, so a caller can move one import at a time; they are types only and
+ * cost nothing at run time. They go away in a later release (`UPGRADING.md`).
+ */
+
+/** @deprecated Use {@link TfdBalance}. */
+export type AtmBalance = TfdBalance;
+/** @deprecated Use {@link TfdCatalogRow}. */
+export type AtmCatalogRow = TfdCatalogRow;
+/** @deprecated Use {@link TfdCheckResult}. */
+export type AtmCheckResult = TfdCheckResult;
+/** @deprecated Use {@link TfdCommand}. */
+export type AtmCommand = TfdCommand;
+/** @deprecated Use {@link TfdCommandContext}. */
+export type AtmCommandContext = TfdCommandContext;
+/** @deprecated Use {@link TfdCommandType}. */
+export type AtmCommandType = TfdCommandType;
+/** @deprecated Use {@link TfdEnv}. */
+export type AtmEnv = TfdEnv;
+/** @deprecated Use {@link TfdEvent}. */
+export type AtmEvent = TfdEvent;
+/** @deprecated Use {@link TfdEventContext}. */
+export type AtmEventContext = TfdEventContext;
+/** @deprecated Use {@link TfdEventFile}. */
+export type AtmEventFile = TfdEventFile;
+/** @deprecated Use {@link TfdEventType}. */
+export type AtmEventType = TfdEventType;
+/** @deprecated Use {@link TfdHold}. */
+export type AtmHold = TfdHold;
+/** @deprecated Use {@link TfdIdentity}. */
+export type AtmIdentity = TfdIdentity;
+/** @deprecated Use {@link TfdJournalBuild}. */
+export type AtmJournalBuild = TfdJournalBuild;
+/** @deprecated Use {@link TfdJournalFiles}. */
+export type AtmJournalFiles = TfdJournalFiles;
+/** @deprecated Use {@link TfdLapsedRow}. */
+export type AtmLapsedRow = TfdLapsedRow;
+/** @deprecated Use {@link TfdLedgerEventInput}. */
+export type AtmLedgerEventInput = TfdLedgerEventInput;
+/** @deprecated Use {@link TfdMutation}. */
+export type AtmMutation = TfdMutation;
+/** @deprecated Use {@link TfdPosting}. */
+export type AtmPosting = TfdPosting;
+/** @deprecated Use {@link TfdPublicKeys}. */
+export type AtmPublicKeys = TfdPublicKeys;
+/** @deprecated Use {@link TfdReceipt}. */
+export type AtmReceipt = TfdReceipt;
+/** @deprecated Use {@link TfdReplayResult}. */
+export type AtmReplayResult = TfdReplayResult;
+/** @deprecated Use {@link TfdResult}. */
+export type AtmResult = TfdResult;
+/** @deprecated Use {@link TfdResultFor}. */
+export type AtmResultFor<T extends TfdCommandType> = TfdResultFor<T>;
+/** @deprecated Use {@link TfdRowChange}. */
+export type AtmRowChange = TfdRowChange;
+/** @deprecated Use {@link TfdSeal}. */
+export type AtmSeal = TfdSeal;
+/** @deprecated Use {@link TfdSignedReceipt}. */
+export type AtmSignedReceipt = TfdSignedReceipt;
+/** @deprecated Use {@link TfdSignedSeal}. */
+export type AtmSignedSeal = TfdSignedSeal;
+/** @deprecated Use {@link TfdSigner}. */
+export type AtmSigner = TfdSigner;
+/** @deprecated Use {@link TfdSimulateBalanceChange}. */
+export type AtmSimulateBalanceChange = TfdSimulateBalanceChange;
+/** @deprecated Use {@link TfdSimulateChange}. */
+export type AtmSimulateChange = TfdSimulateChange;
+/** @deprecated Use {@link TfdSimulateDecision}. */
+export type AtmSimulateDecision = TfdSimulateDecision;
+/** @deprecated Use {@link TfdSimulateInput}. */
+export type AtmSimulateInput = TfdSimulateInput;
+/** @deprecated Use {@link TfdSimulatePostingChange}. */
+export type AtmSimulatePostingChange = TfdSimulatePostingChange;
+/** @deprecated Use {@link TfdSimulateRefusal}. */
+export type AtmSimulateRefusal = TfdSimulateRefusal;
+/** @deprecated Use {@link TfdSimulation}. */
+export type AtmSimulation = TfdSimulation;
+/** @deprecated Use {@link TfdSnapshot}. */
+export type AtmSnapshot = TfdSnapshot;
+/** @deprecated Use {@link TfdStoreError}. */
+export type AtmStoreError = TfdStoreError;
+/** @deprecated Use {@link TfdSubject}. */
+export type AtmSubject = TfdSubject;
+/** @deprecated Use {@link TfdSubjectState}. */
+export type AtmSubjectState = TfdSubjectState;
+/** @deprecated Use {@link TfdValidation}. */
+export type AtmValidation = TfdValidation;
+/** @deprecated Use {@link TfdValidationError}. */
+export type AtmValidationError = TfdValidationError;

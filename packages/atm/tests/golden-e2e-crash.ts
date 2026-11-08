@@ -72,9 +72,9 @@ const killedAt = (
 		stderr: "pipe",
 		env: {
 			...process.env,
-			ATM_KILL_OP: spec.op,
-			ATM_KILL_AT: String(spec.at),
-			ATM_KILL_PHASE: spec.phase,
+			TFD_KILL_OP: spec.op,
+			TFD_KILL_AT: String(spec.at),
+			TFD_KILL_PHASE: spec.phase,
 		},
 	});
 	return {
