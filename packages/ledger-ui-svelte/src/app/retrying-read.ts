@@ -28,8 +28,8 @@ let readsMade = 0;
 
 /** A read a screen shows (S9-plan section 5): tried under the read retry rule; a failure is toasted with Retry (the
  * same read again) and Reload, and handed to the screen to show in place. One failure is one toast, owned by this
- * read: a run started while that toast is on screen shows its progress there (else in a retry toast of its own), a
- * later success takes it down, a failure the same way merges into it (its count up), a different failure replaces it.
+ * read: a run shows its progress there while it is on screen (else in a retry toast of its own), a later success
+ * takes it down, a failure the same way merges into it (its count up), a different failure replaces it.
  * Another read's toasts are never touched, even with the same words. */
 export function retryingRead<A>(
 	context: AppContext,
@@ -47,11 +47,10 @@ export function retryingRead<A>(
 	let cancelled = false;
 	/** This read's failure toast, while it is in the queue. */
 	let failureToast: string | null = null;
-	const where = (id: string): "visible" | "waiting" | "gone" => {
+	/** Whether a toast is still in the queue, on screen or waiting. */
+	const queued = (id: string): boolean => {
 		const { visible, waiting } = context.toasts.state;
-		if (visible.some((toast) => toast.id === id)) return "visible";
-		if (waiting.some((toast) => toast.id === id)) return "waiting";
-		return "gone";
+		return [...visible, ...waiting].some((toast) => toast.id === id);
 	};
 	const markBusy = (id: string, busy: boolean): void => {
 		context.runtime.runFork(
@@ -67,12 +66,8 @@ export function retryingRead<A>(
 	const run = async (): Promise<void> => {
 		if (running || cancelled) return;
 		// A toast dismissed by hand is no longer this read's to settle.
-		if (failureToast !== null && where(failureToast) === "gone")
-			failureToast = null;
-		const progressIn =
-			failureToast !== null && where(failureToast) === "visible"
-				? failureToast
-				: undefined;
+		if (failureToast !== null && !queued(failureToast)) failureToast = null;
+		const progressIn = failureToast ?? undefined;
 		const controller = new AbortController();
 		running = controller;
 		on.busy?.(true);

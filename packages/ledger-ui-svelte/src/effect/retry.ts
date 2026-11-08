@@ -29,16 +29,18 @@ export type RetryOptions = {
 	baseMilliseconds?: number;
 	/** Whose retry toast it is (`ToastInput.owner`): another read's identical retry never merges into it. */
 	owner?: string;
-	/** The id of a failure toast on screen for this failure (its Retry started this run): the progress shows in it
-	 * (`ToastInput.progress`) instead of in a second toast, and is cleared if the run fails, so that the failure
-	 * merges back into it. On success or interruption the caller takes that toast down. */
+	/** The id of this failure's toast (its Retry started this run): at each step, while that toast is on screen, the
+	 * progress shows in it (`ToastInput.progress`) instead of in a second toast; while it waits behind others, or once
+	 * it is dismissed, the run shows its own retry toast. Its progress is cleared when the run ends without a value
+	 * (a failure, which then merges back into it, or an interruption). On success the caller takes it down. */
 	progressIn?: string;
 };
 
 /** Runs `effect`, trying again while `mayRetry` allows and fewer than three tries have run. While it retries, one
- * toast says so ("Retrying (2 of 3)", then "(3 of 3)"): its own, which leaves when the effect ends either way,
- * interrupted included; or the failure toast `progressIn`. The caller reports a final failure. The toast work is not
- * interruptible, so an interruption never strands a retry toast whose id was not yet kept. */
+ * toast on screen says so ("Retrying (2 of 3)", then "(3 of 3)"): the failure toast `progressIn` when it is on screen
+ * at that step, else the run's own retry toast, made when first needed and taken down when the effect ends either
+ * way, interrupted included. The caller reports a final failure. The toast work is not interruptible, so an
+ * interruption never strands a retry toast whose id was not yet kept. */
 export const withRetry = <A, R>(
 	effect: Effect.Effect<A, UiError, R>,
 	attempted: Attempted,
@@ -48,8 +50,21 @@ export const withRetry = <A, R>(
 		const toasts = yield* Toasts;
 		let tries = 1;
 		let toastId: string | null = null;
-		let progressShown = false;
 		const { progressIn, owner } = options;
+		/** Whether a toast is on screen now (`subscribe` hands the current state at once). */
+		const onScreen = (id: string): boolean => {
+			let shown = false;
+			toasts.subscribe((state) => {
+				shown = state.visible.some((toast) => toast.id === id);
+			})();
+			return shown;
+		};
+		const ownToastLeaves = Effect.suspend(() => {
+			if (toastId === null) return Effect.void;
+			const leaving = toastId;
+			toastId = null;
+			return toasts.dismiss(leaving);
+		});
 		const tryAgain = (error: UiError): Effect.Effect<boolean> =>
 			Effect.uninterruptible(
 				Effect.gen(function* () {
@@ -57,9 +72,9 @@ export const withRetry = <A, R>(
 						return false;
 					tries += 1;
 					const progress = retryingText(tries);
-					if (progressIn !== undefined) {
-						progressShown = true;
+					if (progressIn !== undefined && onScreen(progressIn)) {
 						yield* toasts.update(progressIn, { progress });
+						yield* ownToastLeaves;
 					} else if (toastId === null)
 						toastId = yield* toasts.show({
 							tone: "info",
@@ -72,13 +87,10 @@ export const withRetry = <A, R>(
 					return true;
 				}),
 			);
-		const ownToastLeaves = Effect.suspend(() =>
-			toastId === null ? Effect.void : toasts.dismiss(toastId),
-		);
 		const progressCleared = Effect.suspend(() =>
-			progressIn !== undefined && progressShown
-				? toasts.update(progressIn, { progress: "" })
-				: Effect.void,
+			progressIn === undefined
+				? Effect.void
+				: toasts.update(progressIn, { progress: "" }),
 		);
 		return yield* effect.pipe(
 			Effect.retry({
@@ -87,7 +99,7 @@ export const withRetry = <A, R>(
 				),
 				while: tryAgain,
 			}),
-			Effect.tapError(() => progressCleared),
+			Effect.onError(() => progressCleared),
 			Effect.ensuring(ownToastLeaves),
 		);
 	});
