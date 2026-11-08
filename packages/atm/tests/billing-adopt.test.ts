@@ -5,7 +5,6 @@
  * import grants (units, expiry, rollover) is compared with what that rule grants for the same invoice.
  */
 import { describe, expect, test } from "bun:test";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { grantsStateFromCallerRows } from "../src/billing/adopt.js";
 import { menuCatalogRows } from "../src/billing/grants.js";
@@ -15,6 +14,7 @@ import {
 	applyRowChanges,
 	type BillingRow,
 	grantsFromRows,
+	rowsFromState,
 	stateFromRows,
 } from "../src/billing/rows.js";
 import {
@@ -24,15 +24,30 @@ import {
 	tierPriceKey,
 } from "../src/billing/stripe-menu.js";
 import { deterministicUlid } from "../src/ledger/ids.js";
-import { balancesOf } from "../src/ledger/replay.js";
+import {
+	balancesOf,
+	HANDLER_COMMAND,
+	replayEvents,
+} from "../src/ledger/replay.js";
 import { toCatalog } from "../src/ledger/run.js";
+import { membersOf } from "../src/ledger/summary.js";
+import { isoInstant } from "../src/ledger/util.js";
+import { validateEvent } from "../src/ledger/validate.js";
 import type {
+	AtmEvent,
 	CallerCreditLotRow,
 	CallerMembershipRow,
 	GrantsState,
 	Menu,
 	StripeEventResult,
 } from "../src/types.js";
+import {
+	type CallerInvoice,
+	callerAdjust,
+	callerAvail,
+	callerGrant,
+	callerRaise,
+} from "./caller-lots.js";
 import {
 	chargeRefunded,
 	invoicePaid,
@@ -54,151 +69,6 @@ const baseMenu = JSON.parse(
 ) as Menu;
 /** The school's calendar is UTC unless a test says otherwise, so month arithmetic agrees between the caller and atm. */
 const utcMenu: Menu = { ...baseMenu, timeZone: "UTC" };
-
-// ---- The caller's own rule, ported from family-service src/school-billing/grant.ts and time.ts -----------------------
-
-const offsetMs = (ms: number, timeZone: string): number => {
-	const parts = new Intl.DateTimeFormat("en-US", {
-		timeZone,
-		hourCycle: "h23",
-		year: "numeric",
-		month: "numeric",
-		day: "numeric",
-		hour: "numeric",
-		minute: "numeric",
-		second: "numeric",
-	}).formatToParts(new Date(ms));
-	const number = (type: string) =>
-		Number(parts.find((p) => p.type === type)?.value);
-	const local = Date.UTC(
-		number("year"),
-		number("month") - 1,
-		number("day"),
-		number("hour"),
-		number("minute"),
-		number("second"),
-	);
-	return local - Math.floor(ms / 1000) * 1000;
-};
-
-const addMonthsInZone = (ms: number, months: number, timeZone: string) => {
-	const offset = offsetMs(ms, timeZone);
-	const wall = new Date(ms + offset);
-	const year = wall.getUTCFullYear();
-	const month = wall.getUTCMonth() + months;
-	const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-	const local = Date.UTC(
-		year,
-		month,
-		Math.min(wall.getUTCDate(), daysInMonth),
-		wall.getUTCHours(),
-		wall.getUTCMinutes(),
-		wall.getUTCSeconds(),
-		wall.getUTCMilliseconds(),
-	);
-	return local - offsetMs(local - offset, timeZone);
-};
-
-const YEAR_MS = 365 * 86_400_000;
-const GRANTING_REASONS = ["subscription_create", "subscription_cycle"];
-
-type CallerInvoice = {
-	id: string;
-	reason: "subscription_create" | "subscription_cycle";
-	periodStart: number;
-	periodEnd: number;
-	/** The event's time (ms): the lot's `created_at`. */
-	atMs: number;
-};
-
-/** What `grantForInvoice` writes for one paid invoice: one lot per tier grant and per add-on grant, balance = the amount. */
-const callerGrant = ({
-	membership,
-	menu,
-	invoice,
-	existing,
-}: {
-	membership: CallerMembershipRow;
-	menu: Menu;
-	invoice: CallerInvoice;
-	existing: readonly CallerCreditLotRow[];
-}): CallerCreditLotRow[] => {
-	if (!GRANTING_REASONS.includes(invoice.reason)) return [];
-	const tierGrants = menu.tiers.find((t) => t.id === membership.tier_id)
-		?.grants as Menu["tiers"][number]["grants"];
-	const items = tierGrants.map((grant) => ({
-		source: "tier",
-		grant,
-		every: grant.every as "month" | "year" | "once",
-	}));
-	for (const id of membership.addon_ids.split(",").filter(Boolean)) {
-		const addon = menu.addons.find((a) => a.id === id);
-		if (!addon) continue;
-		if (
-			addon.price.every === "once" &&
-			invoice.reason !== "subscription_create"
-		)
-			continue;
-		for (const grant of addon.grants)
-			items.push({ source: `addon:${id}`, grant, every: addon.price.every });
-	}
-	const out: CallerCreditLotRow[] = [];
-	for (const item of items) {
-		const { grant } = item;
-		const per = grant.amount * membership.quantity;
-		let amount: number;
-		if (item.source !== "tier")
-			amount =
-				grant.amount *
-				(item.every === "month" && membership.interval === "year" ? 12 : 1);
-		else if (grant.every === membership.interval) amount = per;
-		else if (grant.every === "month" && membership.interval === "year")
-			amount = per * 12;
-		else if (invoice.reason === "subscription_create") amount = per;
-		else
-			amount = existing.some(
-				(l) =>
-					l.feature_id === grant.featureId &&
-					l.created_at > invoice.atMs - YEAR_MS,
-			)
-				? 0
-				: per;
-		if (amount <= 0) continue;
-		const months = grant.rollover?.months;
-		const expiresAt =
-			item.every === "once"
-				? months === undefined
-					? null
-					: addMonthsInZone(invoice.atMs, months, menu.timeZone)
-				: months === undefined
-					? invoice.periodEnd
-					: addMonthsInZone(invoice.periodEnd, months, menu.timeZone);
-		const id = `lot_${createHash("sha256")
-			.update(
-				`${membership.id}|${grant.featureId}|${invoice.id}|${item.source}`,
-			)
-			.digest("hex")
-			.slice(0, 24)}`;
-		out.push({
-			id,
-			membership_id: membership.id,
-			school_id: membership.school_id,
-			feature_id: grant.featureId,
-			invoice_id: invoice.id,
-			source: item.source,
-			every: item.every,
-			allowance: amount,
-			removed_at: null,
-			balance: amount,
-			adjustment: 0,
-			additional_balance: 0,
-			next_reset_at: null,
-			expires_at: expiresAt,
-			created_at: invoice.atMs,
-		});
-	}
-	return out;
-};
 
 // ---- Fixtures -----------------------------------------------------------------------------------------------------
 
@@ -406,20 +276,6 @@ const atmStore = (
 			rows.filter((r) => r.table === table),
 	};
 };
-
-/** What the caller would hold available at `asOfMs`: every lot not past its expiry. */
-const callerAvail = (
-	lots: readonly CallerCreditLotRow[],
-	asOfMs: number,
-	feature = "visit",
-) =>
-	lots
-		.filter(
-			(l) =>
-				l.feature_id === feature &&
-				(l.expires_at === null || l.expires_at > asOfMs),
-		)
-		.reduce((sum, l) => sum + l.balance, 0);
 
 const only = <T>(items: readonly T[]): T => {
 	expect(items).toHaveLength(1);
@@ -649,8 +505,15 @@ describe("what the rows determine, and what moving does not make the same", () =
 		const engineOnly = (rows: readonly BillingRow[]) =>
 			rows.filter((r) => r.table !== "atm_grants");
 		expect(engineOnly(imported.rows)).toEqual(engineOnly(native.rows));
-		// The grants state differs only in what the lots cannot say (the billing anchor) and the membership record.
-		const { anchor, membership: record, ...importedRest } = imported.state;
+		// The grants state differs only in what the lots cannot say (the billing anchor), the membership record and the menu
+		// version the import pins the member to (the caller's `menu_version`).
+		const {
+			anchor,
+			membership: record,
+			menuVersion,
+			...importedRest
+		} = imported.state;
+		expect(menuVersion).toBe("3");
 		// ...and in the MRR atm booked for its own invoice: an adopted member's starts at the next invoice atm handles.
 		const {
 			anchor: nativeAnchor,
@@ -1053,26 +916,16 @@ describe("rows that cannot be placed are refused, naming the problem", () => {
 		);
 	});
 
-	test("a lot of another member, a source atm does not know, and a lot of an add-on the membership no longer has", () => {
+	test("a lot of another member, and a source atm does not know", () => {
 		expect(() =>
 			run({ lots: [{ ...january, membership_id: "mem_9" }] }),
 		).toThrow(/belongs to membership mem_9/);
 		expect(() => run({ lots: [{ ...january, source: "promo" }] })).toThrow(
 			/source atm does not know/,
 		);
-		expect(() =>
-			run({
-				lots: [
-					january,
-					{
-						...january,
-						id: "lot_glow",
-						source: "addon:glow",
-						invoice_id: "in_1",
-					},
-				],
-			}),
-		).toThrow(/which membership mem_1 no longer has/);
+		expect(() => run({ lots: [{ ...january, source: "adjust:" }] })).toThrow(
+			/source atm does not know/,
+		);
 	});
 
 	test("credit rows on different cycles: a renewal was granted to some and not others", () => {
@@ -1145,5 +998,632 @@ describe("the state it returns is a state atm accepts", () => {
 		const state: GrantsState = grantsFromRows(imported.rows);
 		expect(state).toEqual(imported.state);
 		expect(JSON.parse(JSON.stringify(imported.rows))).toEqual(imported.rows);
+	});
+});
+
+// ---- D12 T2: what the caller does that atm's rules place on their own rows ----------------------------------------
+
+/** A raise from `from` to `to` units of the member's tier, as Stripe bills it at once (`subscription_update`). */
+const raiseEvent = ({
+	menu,
+	membership,
+	invoiceId,
+	atMs,
+	from,
+	to,
+	cycleEnd,
+}: {
+	menu: Menu;
+	membership: CallerMembershipRow;
+	invoiceId: string;
+	atMs: number;
+	from: number;
+	to: number;
+	cycleEnd: number;
+}) => {
+	const key = tierKey(menu, membership.tier_id, membership.interval);
+	const line = (quantity: number, sign: number) => ({
+		lookupKey: key,
+		amount: sign * 1000 * quantity,
+		interval: membership.interval,
+		quantity,
+		proration: true,
+		periodStart: atMs,
+		periodEnd: cycleEnd,
+	});
+	return invoicePaid({
+		eventId: `evt_${invoiceId}`,
+		invoiceId,
+		at: atMs,
+		subscriptionId: membership.stripe_subscription_id,
+		reason: "subscription_update",
+		periodStart: atMs,
+		periodEnd: atMs,
+		lines: [line(from, -1), line(to, 1)],
+		metadata: { b4u_school: SCHOOL, family_id: FAMILY },
+	});
+};
+
+const visitRows = (rows: readonly BillingRow[]) =>
+	rows.filter(
+		(r) =>
+			r.table === "customerEntitlements" &&
+			r.data.internal_feature_id === "feat_visit",
+	);
+
+describe("D12 T2: a quantity raise mid-cycle is folded into the cycle's row", () => {
+	// Sparkle 1 grants 1 visit a unit. The member bought 2, and raised to 3 halfway through January: the caller's prorated
+	// raise is ceil(1 x 1 x 1/2) = 1 visit, which is a whole number of units by chance.
+	const menu = utcMenu;
+	const membership = membershipRow({
+		tier_id: "sparkle-1",
+		quantity: 3,
+		current_period_end: secondsOf(FEB),
+	});
+	const atTwo = { ...membership, quantity: 2 };
+	const january = only(
+		callerGrant({ membership: atTwo, menu, invoice: IN_1, existing: [] }),
+	);
+	const halfway = JAN + (FEB - JAN) / 2;
+	const raise = only(
+		callerRaise({
+			membership,
+			menu,
+			invoiceId: "in_raise",
+			atMs: halfway,
+			from: 2,
+			to: 3,
+			cycleStart: JAN,
+			cycleEnd: FEB,
+		}),
+	);
+	const lots = [january, raise];
+	const now = D("2026-01-25T00:00:00Z");
+	const imported = grantsStateFromCallerRows({ membership, lots, menu, now });
+
+	test("the raise lot is 1 visit, the cycle's lot 2, both to the same end: the case that used to import as quantity 1", () => {
+		expect(january.allowance).toBe(2);
+		expect(raise.allowance).toBe(1);
+		expect(raise.expires_at).toBe(january.expires_at);
+		// One whole unit of the menu's 1 a unit: read back from the newest lot, it says quantity 1.
+		expect(raise.allowance % 1).toBe(0);
+	});
+
+	test("the quantity is the membership's 3, on the state and on the tier's product", () => {
+		expect(imported.state.quantity).toBe(3);
+		const product = imported.rows.find(
+			(r) => r.table === "customerProducts" && r.id === "cp_tier",
+		);
+		expect(product?.data.quantity).toBe(3);
+	});
+
+	test("one row holds the cycle's lot and the raise, in one refill; both invoices are decided", () => {
+		const row = only(visitRows(imported.rows));
+		expect(row.data.balance).toBe(3);
+		expect(row.data.next_reset_at).toBe(FEB);
+		expect(imported.rows.filter((r) => r.table === "rollovers")).toEqual([]);
+		expect(imported.state.rows.ce_tier_visit_month).toBe(1);
+		expect(imported.state.invoices.in_raise?.granted).toEqual([
+			expect.objectContaining({ units: 1, epoch: 1 }),
+		]);
+		expect(imported.state.invoices.in_1?.granted).toEqual([
+			expect.objectContaining({ units: 2, epoch: 1 }),
+		]);
+	});
+
+	test("a later raise from 3 to 4 grants for one unit, not three; the renewal refills 4", () => {
+		const store = atmStore(menu, imported.rows);
+		const atRaise = D("2026-01-25T18:00:00Z");
+		const raised = store.handle(
+			raiseEvent({
+				menu,
+				membership,
+				invoiceId: "in_raise_2",
+				atMs: atRaise,
+				from: 3,
+				to: 4,
+				cycleEnd: FEB,
+			}),
+			atRaise,
+		);
+		expect(raised.refused).toBeUndefined();
+		const units = (store.grants.invoices.in_raise_2?.granted ?? []).reduce(
+			(sum, g) => sum + g.units,
+			0,
+		);
+		// 21 of January's 31 days left: ceil(1 x 1 x 21/31) = 1. Imported at quantity 1, it would be ceil(3 x 21/31) = 3.
+		expect(units).toBe(1);
+		expect(store.grants.quantity).toBe(4);
+		const four = { ...membership, quantity: 4 };
+		store.handle(
+			paidEvent({ menu, membership: four, invoice: IN_2 }),
+			IN_2.atMs,
+		);
+		expect(only(visitRows(store.rows)).data.balance).toBe(4);
+	});
+
+	test("the plan's example: 10 a unit, raised from 1 to 3 with half the cycle left, is a lot of 10 and imports as 3", () => {
+		const tens: Menu = {
+			...menu,
+			tiers: menu.tiers.map((t) =>
+				t.id === "sparkle-1"
+					? {
+							...t,
+							grants: t.grants.map((g) => ({
+								...g,
+								amount: 10,
+								rollover: { max: 10, months: 1 },
+							})),
+						}
+					: t,
+			),
+		};
+		const atOne = { ...membership, quantity: 1 };
+		const first = only(
+			callerGrant({
+				membership: atOne,
+				menu: tens,
+				invoice: IN_1,
+				existing: [],
+			}),
+		);
+		const up = only(
+			callerRaise({
+				membership,
+				menu: tens,
+				invoiceId: "in_raise",
+				atMs: halfway,
+				from: 1,
+				to: 3,
+				cycleStart: JAN,
+				cycleEnd: FEB,
+			}),
+		);
+		expect(up.allowance).toBe(10);
+		const result = grantsStateFromCallerRows({
+			membership,
+			lots: [first, up],
+			menu: tens,
+			now,
+		});
+		expect(result.state.quantity).toBe(3);
+		expect(only(visitRows(result.rows)).data.balance).toBe(20);
+	});
+
+	test("a raise in an earlier cycle is part of that cycle's refill: its leftover is a rollover", () => {
+		const february = only(
+			callerGrant({ membership, menu, invoice: IN_2, existing: lots }),
+		);
+		const leftJanuary = { ...january, balance: 1 };
+		const result = grantsStateFromCallerRows({
+			membership,
+			lots: [leftJanuary, raise, february],
+			menu,
+			now: D("2026-02-20T00:00:00Z"),
+		});
+		expect(result.state.rows.ce_tier_visit_month).toBe(2);
+		expect(result.state.invoices.in_raise?.granted[0]?.epoch).toBe(1);
+		expect(result.state.invoices.in_2?.granted[0]?.epoch).toBe(2);
+		const rollovers = result.rows.filter((r) => r.table === "rollovers");
+		expect(
+			rollovers.reduce((sum, r) => sum + (r.data.balance as number), 0),
+		).toBe(2);
+		expect(only(visitRows(result.rows)).data.balance).toBe(3);
+	});
+});
+
+describe("D12 T2: admin adjustments, partial refunds and dropped add-ons import", () => {
+	const membership = membershipRow({ current_period_end: secondsOf(FEB) });
+	const january = only(
+		callerGrant({ membership, menu: utcMenu, invoice: IN_1, existing: [] }),
+	);
+	const now = D("2026-01-25T00:00:00Z");
+
+	test("an adjustment is its own row: ce_adjust_, no refill, no expiry, external_id adjust:<kind>; no invoice record", () => {
+		const goodwill = callerAdjust({
+			membership,
+			key: "k1",
+			kind: "goodwill",
+			amount: 3,
+			atMs: JAN + HOUR_MS,
+		});
+		const imported = grantsStateFromCallerRows({
+			membership,
+			lots: [january, goodwill],
+			menu: utcMenu,
+			now,
+		});
+		const row = only(
+			imported.rows.filter(
+				(r) =>
+					r.table === "customerEntitlements" && r.id.startsWith("ce_adjust_"),
+			),
+		);
+		expect(row.data).toMatchObject({
+			balance: 3,
+			next_reset_at: null,
+			expires_at: null,
+			customer_product_id: null,
+			entitlement_id: "ent_gift_visit",
+			internal_feature_id: "feat_visit",
+			external_id: "adjust:goodwill",
+		});
+		expect(Object.keys(imported.state.invoices)).toEqual(["in_1"]);
+		expect(imported.state.rows[row.id]).toBe(1);
+		// It never lapses: a year on it still counts, beside the refilling row's 2 (which lapses only with a cancel).
+		const store = atmStore(utcMenu, imported.rows);
+		expect(store.avail(D("2027-06-01T00:00:00Z"))).toBe(2 + 3);
+		// The renewal leaves it alone.
+		store.handle(
+			paidEvent({ menu: utcMenu, membership, invoice: IN_2 }),
+			IN_2.atMs,
+		);
+		const after = store
+			.rowsOf("customerEntitlements")
+			.find((r) => r.id === row.id);
+		expect(after?.data.balance).toBe(3);
+	});
+
+	test("an adjustment lot with an expiry is refused: the row never lapses", () => {
+		expect(() =>
+			grantsStateFromCallerRows({
+				membership,
+				lots: [
+					january,
+					{
+						...callerAdjust({
+							membership,
+							key: "k1",
+							kind: "gift",
+							amount: 1,
+							atMs: JAN,
+						}),
+						expires_at: FEB,
+					},
+				],
+				menu: utcMenu,
+				now,
+			}),
+		).toThrow(/an adjustment row never lapses/);
+	});
+
+	test("a refund of one invoice in a row with several: accepted, that invoice taken back, the balance is the lots'", () => {
+		const leftJanuary = { ...january, balance: 0, removed_at: FEB - HOUR_MS };
+		const february = only(
+			callerGrant({
+				membership,
+				menu: utcMenu,
+				invoice: IN_2,
+				existing: [january],
+			}),
+		);
+		const imported = grantsStateFromCallerRows({
+			membership: membershipRow(),
+			lots: [leftJanuary, february],
+			menu: utcMenu,
+			now: D("2026-02-20T00:00:00Z"),
+		});
+		expect(imported.state.invoices.in_1?.removed).toBe(true);
+		expect(imported.state.invoices.in_2?.removed).toBe(false);
+		expect(
+			atmStore(utcMenu, imported.rows).avail(D("2026-02-20T00:00:00Z")),
+		).toBe(callerAvail([leftJanuary, february], D("2026-02-20T00:00:00Z")));
+	});
+
+	test("an invoice with some lots taken back and others not is recorded as taken back", () => {
+		const withGlow = membershipRow({
+			addon_ids: "glow",
+			current_period_end: secondsOf(FEB),
+		});
+		const lots = callerGrant({
+			membership: withGlow,
+			menu: utcMenu,
+			invoice: IN_1,
+			existing: [],
+		}).map((lot) =>
+			lot.source === "tier"
+				? { ...lot, balance: 0, removed_at: JAN + HOUR_MS }
+				: lot,
+		);
+		const imported = grantsStateFromCallerRows({
+			membership: withGlow,
+			lots,
+			menu: utcMenu,
+			now,
+		});
+		expect(imported.state.invoices.in_1?.removed).toBe(true);
+		expect(atmStore(utcMenu, imported.rows).avail(now)).toBe(
+			callerAvail(lots, now),
+		);
+	});
+
+	test("a dropped add-on's lots are a retired row that lapses where they do", () => {
+		const withGlow = membershipRow({
+			addon_ids: "glow",
+			current_period_end: secondsOf(FEB),
+		});
+		const lots = callerGrant({
+			membership: withGlow,
+			menu: utcMenu,
+			invoice: IN_1,
+			existing: [],
+		});
+		const glowLot = lots.find(
+			(l) => l.source === "addon:glow",
+		) as CallerCreditLotRow;
+		const imported = grantsStateFromCallerRows({
+			membership: membershipRow({ current_period_end: secondsOf(FEB) }),
+			lots,
+			menu: utcMenu,
+			now,
+		});
+		const row = imported.rows.find((r) => r.id === "ce_addon_glow_visit_month");
+		expect(row?.data).toMatchObject({
+			balance: 1,
+			next_reset_at: null,
+			expires_at: glowLot.expires_at,
+		});
+		expect(imported.state.retired).toEqual({ ce_addon_glow_visit_month: 1 });
+		expect(imported.state.rows.ce_addon_glow_visit_month).toBeUndefined();
+		expect(imported.state.addonIds).toEqual([]);
+		const store = atmStore(utcMenu, imported.rows);
+		for (const at of [now, (glowLot.expires_at as number) + 1])
+			expect(store.avail(at)).toBe(callerAvail(lots, at));
+		// The renewal refills the tier, not the dropped add-on.
+		store.handle(
+			paidEvent({
+				menu: utcMenu,
+				membership: membershipRow(),
+				invoice: IN_2,
+			}),
+			IN_2.atMs,
+		);
+		expect(store.grants.retired).toEqual({ ce_addon_glow_visit_month: 1 });
+		expect(
+			store.rowsOf("customerEntitlements").find((r) => r.id === row?.id)?.data
+				.balance,
+		).toBe(1);
+	});
+
+	test("the member's menu version is kept", () => {
+		const imported = grantsStateFromCallerRows({
+			membership: membershipRow({ menu_version: 7 }),
+			lots: [january],
+			menu: utcMenu,
+			now,
+		});
+		expect(imported.state.menuVersion).toBe("7");
+		expect(grantsFromRows(imported.rows).menuVersion).toBe("7");
+	});
+});
+
+// ---- D12 T3: opening events --------------------------------------------------------------------------------------
+
+describe("D12 T3: the import's opening events replay to the imported rows, and the handler's later events follow on", () => {
+	// The mid-cycle member, with a goodwill adjustment and a raise folded in: January's lot has 1 of 2 left, February's
+	// lot 2 of 2, a raise in February adds 1, and an admin gave 3 visits that never lapse. It is the 25th of February.
+	const membership = membershipRow({ quantity: 2 });
+	const atOne = { ...membership, quantity: 1 };
+	const januaryLot = {
+		...only(
+			callerGrant({
+				membership: atOne,
+				menu: utcMenu,
+				invoice: IN_1,
+				existing: [],
+			}),
+		),
+		balance: 1,
+	};
+	const februaryLot = only(
+		callerGrant({
+			membership: atOne,
+			menu: utcMenu,
+			invoice: IN_2,
+			existing: [januaryLot],
+		}),
+	);
+	const raised = callerRaise({
+		membership,
+		menu: utcMenu,
+		invoiceId: "in_raise",
+		atMs: D("2026-02-20T18:00:00Z"),
+		from: 1,
+		to: 2,
+		cycleStart: FEB,
+		cycleEnd: MAR,
+	});
+	const goodwill = callerAdjust({
+		membership,
+		key: "k1",
+		kind: "goodwill",
+		amount: 3,
+		atMs: D("2026-02-21T00:00:00Z"),
+	});
+	const lots = [januaryLot, februaryLot, ...raised, goodwill];
+	const now = D("2026-02-25T12:00:00Z");
+	const importId = deterministicUlid({
+		timeMs: now,
+		revision: 0,
+		seed: "import-1",
+	});
+	const imported = grantsStateFromCallerRows({
+		membership,
+		lots,
+		menu: utcMenu,
+		now,
+		importId,
+		policyVersion: 1,
+	});
+	const catalog = menuCatalogRows({ menu: utcMenu, school: SCHOOL });
+	const engineOnly = (rows: readonly BillingRow[]) =>
+		rows.filter((r) => r.table !== "atm_grants");
+	const replayedRows = (events: readonly AtmEvent[], asOf: number) => {
+		const replay = replayEvents({ events, catalog, asOf: isoInstant(asOf) });
+		const state = replay.snapshot.states[HOLDER];
+		return {
+			replay,
+			rows: state ? rowsFromState(state as never) : [],
+		};
+	};
+
+	test("the opening events are valid credit.granted events, caused by the import, at revision 0 to 1", () => {
+		expect(imported.revision).toBe(1);
+		expect(imported.events.length).toBeGreaterThan(0);
+		for (const event of imported.events) {
+			expect(validateEvent(event)).toMatchObject({ ok: true });
+			// The caller's own command, not a handler decision: a stored-inputs replay carries it.
+			const command = (event.payload as { command: { commandId: string } })
+				.command;
+			expect(command.commandId).toBe(`import:${importId}`);
+			expect(HANDLER_COMMAND.test(command.commandId)).toBe(false);
+			expect(event.event_type).toBe("credit.granted");
+			expect(event.cause).toBe(importId);
+			expect(event.key).toBe(HOLDER);
+			expect(event.labels).toMatchObject({
+				menu_version: "3",
+				policy_version: "1",
+				mapping: "import/caller-rows",
+			});
+		}
+		// One per plan the credits came from: the tier and the adjustment.
+		expect(imported.events.map((e) => e.labels.plan).sort()).toEqual([
+			"adjust",
+			"sparkle-2@v3",
+		]);
+		// The same import gives the same events.
+		expect(
+			grantsStateFromCallerRows({
+				membership,
+				lots,
+				menu: utcMenu,
+				now,
+				importId,
+				policyVersion: 1,
+			}).events,
+		).toEqual(imported.events);
+	});
+
+	test("a log of the opening events replays to exactly the imported rows and balances", () => {
+		const { replay, rows } = replayedRows(imported.events, now);
+		expect(rows).toEqual(engineOnly(imported.rows));
+		expect(replay.balances).toEqual([
+			{
+				holder: HOLDER,
+				feature: "visit",
+				avail: callerAvail(lots, now),
+				held: 0,
+			},
+		]);
+		const members = membersOf(imported.events, new Date(now), { catalog });
+		expect(members.ok).toBe(true);
+		if (members.ok)
+			expect(members.members[HOLDER]?.features.visit?.available).toBe(
+				callerAvail(lots, now),
+			);
+	});
+
+	test("opening events, then the handler's renewal and a refund, replay to the handler's rows", () => {
+		const store = atmStore(utcMenu, imported.rows, {
+			[paymentIntentOf("in_2")]: "in_2",
+		});
+		const later: AtmEvent[] = [];
+		const renewal = store.handle(
+			paidEvent({ menu: utcMenu, membership, invoice: IN_3 }),
+			IN_3.atMs,
+		);
+		later.push(...renewal.events);
+		const refundAt = IN_3.atMs + HOUR_MS;
+		const refunded = store.handle(
+			chargeRefunded({
+				eventId: "evt_refund_in_2",
+				chargeId: "ch_in_2",
+				invoiceId: "in_2",
+				amount: 26000,
+				chargeAmount: 26000,
+				at: refundAt,
+			}),
+			refundAt,
+		);
+		expect(refunded.refused).toBeUndefined();
+		later.push(...refunded.events);
+		const asOf = D("2026-03-20T00:00:00Z");
+		const log = [...imported.events, ...later];
+		const { replay, rows } = replayedRows(log, asOf);
+		expect(rows).toEqual(engineOnly(store.rows));
+		expect(replay.balances[0]?.avail).toBe(store.avail(asOf));
+		const members = membersOf(log, new Date(asOf), { catalog });
+		expect(members.ok).toBe(true);
+		if (members.ok)
+			expect(members.members[HOLDER]?.features.visit?.available).toBe(
+				store.avail(asOf),
+			);
+	});
+
+	test("a money-only log before the import, then the opening events and the handler's events, replays", () => {
+		// atm booked the member's money before the import (the caller granted the credits): the log holds payments and no
+		// subject. The money names no engine command, so the replay steps past it to the opening events.
+		const native = atmStore(utcMenu, []);
+		const before: AtmEvent[] = [];
+		for (const invoice of [IN_1, IN_2])
+			before.push(
+				...native.handle(
+					paidEvent({ menu: utcMenu, membership: atOne, invoice }),
+					invoice.atMs,
+				).events,
+			);
+		const money = before.filter(
+			(e) => (e.payload as { command?: unknown }).command === undefined,
+		);
+		expect(money.map((e) => e.event_type)).toContain("payment.succeeded");
+		expect(
+			replayedRows(money, now).replay.snapshot.states[HOLDER],
+		).toBeUndefined();
+
+		const store = atmStore(utcMenu, imported.rows);
+		const later = store.handle(
+			paidEvent({ menu: utcMenu, membership, invoice: IN_3 }),
+			IN_3.atMs,
+		).events;
+		const asOf = D("2026-03-20T00:00:00Z");
+		const log = [...money, ...imported.events, ...later];
+		const { replay, rows } = replayedRows(log, asOf);
+		expect(rows).toEqual(engineOnly(store.rows));
+		expect(replay.balances[0]?.avail).toBe(store.avail(asOf));
+		const members = membersOf(log, new Date(asOf), { catalog });
+		expect(members.ok).toBe(true);
+		if (members.ok)
+			expect(members.members[HOLDER]?.features.visit?.available).toBe(
+				store.avail(asOf),
+			);
+	});
+
+	test("a member whose lots have all lapsed opens with a plan.changed: the subject exists, with nothing in it", () => {
+		const lapsedNow = D("2026-06-01T00:00:00Z");
+		const canceled = membershipRow({
+			status: "canceled",
+			current_period_end: secondsOf(MAR),
+		});
+		const result = grantsStateFromCallerRows({
+			membership: canceled,
+			lots: [januaryLot, februaryLot],
+			menu: utcMenu,
+			now: lapsedNow,
+		});
+		expect(result.events.map((e) => e.event_type)).toEqual(["plan.changed"]);
+		const { replay, rows } = replayedRows(result.events, lapsedNow);
+		expect(rows).toEqual(engineOnly(result.rows));
+		expect(replay.balances[0]?.avail ?? 0).toBe(0);
+	});
+
+	test("a member with no lots has no subject yet: no opening events", () => {
+		const result = grantsStateFromCallerRows({
+			membership,
+			lots: [],
+			menu: utcMenu,
+			now,
+		});
+		expect(result.events).toEqual([]);
+		expect(result.revision).toBe(0);
 	});
 });

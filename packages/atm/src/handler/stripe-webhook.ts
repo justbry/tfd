@@ -155,7 +155,12 @@ import {
 	mappingFor,
 	normalize,
 } from "../billing/normalize.js";
-import { type BillingRow, StaleRevision, subjectKey } from "../billing/rows.js";
+import {
+	type BillingRow,
+	grantsFromRows,
+	StaleRevision,
+	subjectKey,
+} from "../billing/rows.js";
 import { appendToOutbox } from "../ledger/outbox.js";
 import type {
 	AtmEnv,
@@ -827,12 +832,16 @@ const applyOnce = ({
 	const { db } = deps;
 	assertClaimIsOurs(deps, event.id, claim);
 	const school = schoolOf(located.subjectKey);
-	const context = deps.context(school);
+	const { rows, revision } = loadSubject(db, located.subjectKey);
+	// Asked per holder: a member kept on the menu version they bought is decided with that version's menu.
+	const context = deps.context(school, {
+		subjectKey: located.subjectKey,
+		menuVersion: grantsFromRows(rows).menuVersion ?? null,
+	});
 	if (!context) {
 		releaseClaim(deps, event.id, claim);
 		return { kind: "unknown_school" };
 	}
-	const { rows, revision } = loadSubject(db, located.subjectKey);
 	const fee = feeOf(deps, event);
 	const inputId = inputCauseId({
 		school,
@@ -844,6 +853,7 @@ const applyOnce = ({
 		eventId: inputId,
 		menu: context.menu,
 		menuVersion: context.menuVersion,
+		...(context.pinMenuVersion ? { pinMenuVersion: true } : {}),
 		policy: context.policy,
 		policyVersion: context.policyVersion,
 		rows,
