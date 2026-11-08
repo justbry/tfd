@@ -22,7 +22,7 @@ A treasurer who has never heard of tfd can, on staging, with Stripe test mode:
 
 Each step is an automated end-to-end test (`apps/trifold-cloud/scripts/staging-e2e.ts`) that drives Stripe test mode
 (`stripe` API with the connected account header) against staging. It is the acceptance test of M6. Production stays off
-until the launch gate (section 10). "Within a minute" is a test timeout, never copy (no speed numbers).
+until the launch gate (section 10). The test's timeouts allow for the 5-minute view batching (section 3.4); none is copy (no speed numbers).
 
 ## 2. Hosts
 
@@ -98,8 +98,8 @@ engine, beside the existing one, chosen per org:
     invoice payment, it is on the invoice (`starting_balance`, `ending_balance`). So: if the lookup fails, or a
     default invoice payment is still `open`, the event retries. Once the invoice is paid, each paid `payment_intent`
     or `charge` books under its own idem. A paid invoice with `amount_paid > 0`, an empty paid list and no balance
-    change keeps retrying (Stripe's list can lag); the only terminal outcomes are booked payments or a credit-only
-    marker. **Customer balance applied to an invoice is not booked as income**:
+    change keeps retrying (Stripe's list can lag) under the 409 rule of section 3.3, so after 3 days it lands in
+    **Refusals**; it never books from the invoice alone. **Customer balance applied to an invoice is not booked as income**:
     it isn't money received in that invoice (it may be a goodwill credit, or an overpayment already booked), so the
     handler writes a `money.skipped` marker with `kind: "invoice"` and a new `reason: "customer_balance"` (today
     `reason` allows only `non_usd`, `schema/payload/money.skipped.v1.json:14-19`; additive, with an `UPGRADING.md`
@@ -110,7 +110,7 @@ engine, beside the existing one, chosen per org:
     any marker as non-USD checks `reason === "non_usd"`: `skippedLines` and the claim outcome and warning in
     `handler/stripe-webhook.ts:653-659, 929-934, 975` (a golden test: a credit-only invoice is answered `applied`, not
     `non_usd`); `reconcile.ts:647-650` and `scenario/generate.ts:751-754` gain a bucket; `finance.ts:217` and
-    `report.ts:129` already filter. The UI reads the markers through a new read path, and the UI shows it under the invoice. A credit-only invoice (`amount_paid` may be 0) books
+    `report.ts:129` already filter. The UI reads the markers through a new read path and shows each under its invoice. A credit-only invoice (`amount_paid` may be 0) books
     only that marker and never retries. **(owner: book credits as income instead; default no.)** An invoice paid by several payment intents
     books one line per payment intent, for that payment's amount.
   - **Fees wait for Stripe.** When the charge's `balance_transaction` isn't ready yet (some payment methods), the async
@@ -228,8 +228,6 @@ It is released as a tfd minor version with golden tests and a `UPGRADING.md` ent
   receipt equals `receiptOfV2(event, receipt.issued_at)`, so the books check in `plans/atm-signed-receipts.md` still holds; storing the signed
   copy means a key rotation never changes an issued receipt and old private keys never need to stay online (they are
   archived offline).
-- One platform key per environment and per purpose (receipts and seals; a separate key for directory documents), in
-  Secrets Store, key id `trifold-YYYY-MM` **(owner: id format)**. Staging and production key files are separate.
 - **Receipt v2.** Receipt v1 has no signing time (`receipt.ts:64-77`) and its schema and verifiers pin `v: 1`
   (`schema/receipt.v1.json:28-29`, `packages/verify/src/core.ts:20, 415, 441`). The cloud issues v2: v1 plus a signed
   `issued_at` **(owner: approve v2)**. M1 work: `schema/receipt.v2.json`, a v2 builder (`receiptOfV2(event,
@@ -237,7 +235,8 @@ It is released as a tfd minor version with golden tests and a `UPGRADING.md` ent
   (`checkReceiptAgainstEvents`, which compares canonical bytes, `receipt.ts:132-134`) comparing the v2 receipt with
   `receiptOfV2(event, receipt.issued_at)`, and golden v2 receipts with test vectors. v1 stays frozen and verifiable.
 - **Keys.** Two signing keys per environment, one for receipts and one for seals, plus a third for directory
-  documents. The keys file is `{key_id: {pem, purpose: "receipt"|"seal"|"directory", not_before, not_after,
+  documents, in Secrets Store, key id `trifold-YYYY-MM` **(owner: id format)**. Staging and production key files are
+  separate. The keys file is `{key_id: {pem, purpose: "receipt"|"seal"|"directory", not_before, not_after,
   revoked_at?}}`, a superset of today's `{key_id: PEM}`. The signer always uses the current key. The verifier fails a
   key used for the wrong purpose and a v2 receipt (or seal, by `sealed_at`) whose time is outside its key's window.
   **A revoked key fails everything it ever signed, whatever `issued_at` says**, because a thief can backdate
@@ -296,7 +295,7 @@ It is released as a tfd minor version with golden tests and a `UPGRADING.md` ent
   `read_write` and the copy changes to "Trifold only reads")**.
   The OAuth `state` is a random value bound to the session and the org, single use. With `read_only`, the UI can truly
   say Trifold can't move money.
-- **Trifold's own billing** (Starter, Pro, Witnessed): Stripe Checkout and the customer portal on the platform
+- **Trifold's own billing** (Starter, Pro, Audited): Stripe Checkout and the customer portal on the platform
   account, per account (the person or firm paying), covering the orgs that plan allows (pricing strategy: 1 on Free and
   Starter, 3 on Pro). Webhooks to `/webhooks/billing`, with a separate secret.
 - **Seats** are counted for the tier limit (Free has 2), never charged per seat. CPA and auditor seats don't count.
@@ -350,13 +349,13 @@ limits, export and delete. The B4 Uni build keeps its own data source.
 
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | Infra and safety | DNS for every host; D1 (Time Travel on), buckets per env, Secrets Store keys; `trifold-cloud` `/healthz` on `staging-ledger` and `staging-api`; CI deploys staging; error reporting and logs on; nightly copy of each books bucket to a locked backup bucket; www→apex; `hello@` routed |
+| M0 | Infra and safety | DNS for every host; D1 (Time Travel on), buckets per env, Secrets Store keys; `trifold-cloud` `/healthz` on `staging-ledger` and `staging-api`; CI deploys staging; error reporting and logs on; nightly copy of each books bucket to a locked backup bucket; www→apex; `hello@` and `dmarc@` routed |
 | M1 | Verifier | `checkReceiptInSeal` and key windows in `packages/verify`; `staging-verify` verifies the golden receipts (`packages/atm/tests/golden/receipt/`) and fails each tampered one; keys file with CORS; mobile Lighthouse ≥ 95 |
 | M2 | Accounts | Email sign-in, sessions, CSRF, Turnstile, orgs, memberships, invites, roles, step-up; D1 migrations; a test for every auth refusal and every cell of the role table |
 | M3 | Books intake | `tfd/cloud` export and workerd tests; merchant mapping released in tfd; OrgDO, adapter, migrations; Connect OAuth (test); webhook → inbox → handler → ship → views → seals; duplicates book once; refusals retry and surface; envs never mix; a real test-mode receipt verifies on `staging-verify` |
 | M4 | Product UI | `cloud` source, path routing, onboarding, receipts with Verify links, seals, refusals, roles. Steps 1–7 of section 1 pass in a browser test |
 | M5 | API | `/v1` reads including `GET /v1/orgs` and `/reports/income`, API keys (`tf_live_`/`tf_test_` prefixes, hashed, shown once, inherit the creator's role, revoked when the membership ends), `/public/v1`, OpenAPI document, docs at `trifold.app/docs/api`. Step 8 passes |
-| M6 | Plans and data rights | Trifold billing, limits from the rate card (`pricing-strategy.md`: Free 1,000 events, 200 credits, 2 seats; soft event cap with 80% and 100% warnings; orgs per plan), org-name verification, export zip (streamed to R2, then a signed download link), org deletion (DO storage wiped, R2 prefix deleted, D1 rows tombstoned; afterwards the public seal endpoint answers
+| M6 | Plans and data rights | Trifold billing, limits from the rate card (`pricing-strategy.md`: Free about 300 events, 200 credits, 2 seats; soft event cap with 80% and 100% warnings; orgs per plan), org-name verification, export zip (streamed to R2, then a signed download link), org deletion (DO storage wiped, R2 prefix deleted, D1 rows tombstoned; afterwards the public seal endpoint answers
   410 and the verifier says the issuer deleted these books; backups and D1 Time Travel keep data up to their
   retention window (30 days), stated in the privacy policy. Member erasure inside a live org follows the engine's
   `subject.erased` and S8 D4). **All of section 1 passes on staging in CI** |

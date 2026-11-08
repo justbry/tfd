@@ -15,7 +15,7 @@ Decided 2026-11-07. `trifold.app` is the only brand domain; each host has one jo
 | `verify.trifold.app` | Receipt verifier and witness keys. Printed on receipts, so it never moves and carries no app code | Planned |
 | `staging-ledger`, `staging-api`, `staging-verify` | Staging. Flat names: the free certificate covers one subdomain level only | Planned |
 | `send.trifold.app` | Transactional email sender (SPF, DKIM, DMARC) | Planned |
-| `hello@trifold.app` | Contact address, via Email Routing | Not routed yet |
+| `hello@trifold.app`, `dmarc@trifold.app` | Contact address and DMARC reports, via Email Routing | Not routed yet |
 
 `ledger.b4uni.com` and `ledger-staging.b4uni.com` stay B4 Uni's own install.
 
