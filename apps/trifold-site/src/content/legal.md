@@ -6,7 +6,7 @@
 
 <h2 id="privacy">Privacy</h2>
 
-*Draft placeholder.* This website sets no tracking cookies and loads no third-party scripts. The theme you choose is stored in your browser only. The verify page checks receipts inside your browser and sends nothing to us. If you submit the early-access form, we receive what you type in it and use it only to contact you about the pilot.
+*Draft placeholder.* This website sets no tracking cookies and loads no third-party scripts. The theme you choose is stored in your browser only. The verify page checks receipts inside your browser and sends nothing to us. If you submit the early-access form, we receive what you type in it and use it only to contact you about the pilot. It reaches us as an email, sent through Cloudflare; the website stores none of it.
 
 <h2 id="trademark">Trademark policy</h2>
 

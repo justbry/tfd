@@ -178,7 +178,7 @@ const head = (title: string, css: string): string =>
 export const pageHtml = (page: DemoPage): string =>
 	`${head(`${page.name} KPIs · demo, synthetic data`, readAsset("dashboard.css"))}<body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="5" height="5" fill="transparent"/><line x1="0" y1="0" x2="0" y2="5" stroke="var(--mu)" stroke-width="1.2" opacity=".55"/></pattern></defs></svg>
-<header><h1>${escapeHtml(page.name)} <span>KPIs · demo, synthetic data</span></h1><a class="back" href="index.html">All demos</a></header>
+<header><h1>${escapeHtml(page.name)} <span>KPIs · demo, synthetic data</span></h1><a class="back" href="./">All demos</a></header>
 <div class="bar"><label for="prof">Preset</label><select id="prof"></select><select id="year" aria-label="Year"></select><span class="vw"><span class="lbl">Viewer</span><span id="viewers"></span></span><button id="theme" type="button"></button></div>
 <div class="bar" id="tabs"></div>
 <p class="note" id="note"></p>
@@ -198,7 +198,7 @@ export const galleryHtml = (pages: readonly DemoPage[]): string => {
 			const live = school
 				? `<a class="live" href="${SCHOOL_LIVE_DEMO}" target="_blank" rel="noopener">Live demo</a>`
 				: "";
-			return `<li class="card${school ? " featured" : ""}"><a class="go" href="${page.kind}.html"><span class="kind">${escapeHtml(capitalized(page.label))}</span><b>${escapeHtml(page.name)}</b><span class="words">${escapeHtml(capitalized(page.words.holder.other))}, ${escapeHtml(page.words.plan.other)} and ${escapeHtml(page.words.credit.other)}</span><span class="presets">${escapeHtml(presets)}</span></a>${live}</li>`;
+			return `<li class="card${school ? " featured" : ""}"><a class="go" href="${page.kind}"><span class="kind">${escapeHtml(capitalized(page.label))}</span><b>${escapeHtml(page.name)}</b><span class="words">${escapeHtml(capitalized(page.words.holder.other))}, ${escapeHtml(page.words.plan.other)} and ${escapeHtml(page.words.credit.other)}</span><span class="presets">${escapeHtml(presets)}</span></a>${live}</li>`;
 		})
 		.join("\n");
 	return `${head("Trifold KPI demos · demo, synthetic data", readAsset("dashboard.css"))}<body class="gallery">

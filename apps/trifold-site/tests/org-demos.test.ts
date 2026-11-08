@@ -17,8 +17,12 @@ import { DASHBOARDS_GALLERY, VERTICALS } from "../src/lib/verticals";
 
 const KPIS_HASH = /"kpisHash":"([0-9a-f]{64})"/g;
 const SHORT_HASH = /^([0-9a-f]{8})…([0-9a-f]{4})$/;
+/** "/demo/orgs/school" → school.html, "/demo/orgs/" → index.html: the site links the clean URLs Pages serves. */
 const staticPage = (url: string) =>
-	readFileSync(join(ORG_DEMOS_TARGET, url.replace("/demo/orgs/", "")), "utf8");
+	readFileSync(
+		join(ORG_DEMOS_TARGET, `${url.replace("/demo/orgs/", "") || "index"}.html`),
+		"utf8",
+	);
 
 describe("source", () => {
 	test("static/demo/orgs/ holds exactly the generated pages, byte for byte (run `bun run org-demos:sync`)", async () => {
