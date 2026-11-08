@@ -75,7 +75,9 @@
 		{@render line("Paid", `${r.date} · ${SAMPLE_INVOICE.paidWith}`)}
 		{@render line("Stripe", r.stripe_id)}
 	</dl>
-	<p class="mt-2.5 text-[12.5px] text-muted-foreground">Itemised lines from the school's Stripe invoice.</p>
+	<p class="mt-2.5 text-[12.5px] text-muted-foreground">
+		These lines come from the school's Stripe invoice. A receipt itemised per child is the compliance pack, Next.
+	</p>
 
 	{#if !collapsed}
 		<div class="mt-[18px] rounded-md border border-border bg-sunk p-4">

@@ -7,9 +7,13 @@ export const SITE_NAME = "Trifold";
 export const DEFAULT_DESCRIPTION =
 	"Books that show their work. Every Stripe payment becomes a signed receipt your families can check, and every sealed month shows any later change.";
 
-export const GITHUB_URL = "https://github.com/justbry/atm";
-/** Where "Install the CLI" points: the engine's package in the repo. */
-export const CLI_URL = "https://github.com/justbry/atm/tree/dev/packages/atm";
+/**
+ * The source repository, justbry/tfd since 2026-11-07. The old copy, justbry/atm, still holds the release tarballs
+ * (`atm-v*`); the site links to no release download, so nothing here points there.
+ */
+export const GITHUB_URL = "https://github.com/justbry/tfd";
+/** Where "Install the CLI" points: the engine's package in the repo (its README installs it from source). */
+export const CLI_URL = `${GITHUB_URL}/tree/dev/packages/atm`;
 /**
  * The live demo: Honeycomb Hill Academy, a sample school's dashboard on synthetic data, computed by the engine. Every
  * demo link reads this constant (a test fails if another file in src/ spells the URL). Switch it to

@@ -9,12 +9,12 @@
 
 <Seo
 	title="How it works"
-	description="One payment, three records, a monthly seal. How Trifold turns Stripe payments into balanced books, signed receipts and sealed months, and what each check catches."
+	description="One payment, booked, signed and sealed. How Trifold turns Stripe payments into balanced books, signed receipts and sealed months, and what each check catches."
 />
 
 <PageHero
 	eyebrow="How it works"
-	title="One payment, three records, one seal."
+	title="One payment, booked, signed and sealed."
 	lede="Every Stripe payment becomes balanced books and a receipt the payer keeps. At month end, a seal fixes the month's fingerprint. Here is each step, and what each check catches."
 >
 	<ThreeChecks />

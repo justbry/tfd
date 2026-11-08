@@ -15,7 +15,7 @@
 		},
 		{
 			q: "Does the signed receipt carry my students' names?",
-			a: "No, by design. The signed record carries the payment, the date, the Stripe record and a hash of the event in your books. The child and the hours appear as itemised lines from your Stripe invoice, beside it, so a receipt can be shown to anyone without exposing more than it needs to.",
+			a: "No, by design. The signed record carries the payment, the date, the Stripe record and a hash of the event in your books, so it can be shown to anyone without exposing more than it needs to. Your Stripe invoice, with whatever lines you put on it, sits beside it. A receipt itemised per child, with who paid, is the compliance pack: Next, and not built yet.",
 		},
 		{
 			q: "What does sealed mean?",
@@ -31,11 +31,12 @@
 <ForPage
 	eyebrow="For schools · Idaho and Utah first"
 	seoTitle="For schools"
-	description="Signed, itemised tuition receipts your families can check, and sealed monthly books your CPA can trace. Built first for microschools in Idaho and Utah."
+	description="Signed tuition receipts your families can check, and sealed monthly books your CPA can trace. Itemised receipts for state programs are next. Built first for microschools in Idaho and Utah."
 	title="Every tuition payment, a receipt your families can check."
 	subhead="Trifold turns your Stripe payments into signed receipts and sealed monthly books. Built first for microschools in Idaho and Utah."
 	points={[
-		{ text: "Receipts with the child, the hours, the dates and your EIN as invoice lines, beside a signed record that shows any later change." },
+		{ text: "A signed receipt for every tuition payment, beside your Stripe invoice, that shows any later change." },
+		{ text: "Itemised receipts per child, with who paid, for state programs: the compliance pack.", note: "Next" },
 		{ text: "A month that closes from your Stripe events, not from a spreadsheet." },
 		{ text: "Books your CPA can trace to the payment behind every number." },
 	]}
@@ -52,8 +53,9 @@
 				<p class="label-mono">A sample receipt</p>
 				<h2 class="display-3 mt-3.5 mb-4">What a family gets.</h2>
 				<p class="text-muted-foreground [&_a]:underline">
-					Itemised lines from your Stripe invoice, and a signed record that links the payment to one exact entry in your
-					books. Check it on the <a href="/verify">verify page</a>.
+					The lines from your Stripe invoice, and a signed record that links the payment to one exact entry in your books.
+					Check it on the <a href="/verify">verify page</a>. A receipt itemised per child for a state program is the
+					compliance pack, which is Next.
 				</p>
 				<p class="mt-6 text-[15px]">
 					<a class="font-semibold text-foreground underline" href={DEMO_URL} rel="noopener" target="_blank"
