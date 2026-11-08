@@ -10,7 +10,7 @@ permissions:
 jobs:
   changes:
     name: Check changed files
-    runs-on: peak-ubuntu-24.04-4
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
     outputs:
       server: ${{ steps.filter.outputs.server }}
     steps:
@@ -30,7 +30,7 @@ jobs:
         if: github.base_ref == 'dev' && github.head_ref != 'main' && !(startsWith(github.head_ref, 'sync/') && github.event.pull_request.head.repo.full_name == github.repository) && github.event.pull_request.user.login != 'autumn-codegen[bot]'
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version-file: .bun-version
 
       - name: Block edits to generated paths
         if: github.base_ref == 'dev' && github.head_ref != 'main' && !(startsWith(github.head_ref, 'sync/') && github.event.pull_request.head.repo.full_name == github.repository) && github.event.pull_request.user.login != 'autumn-codegen[bot]'
@@ -59,7 +59,7 @@ jobs:
     name: Type Check
     needs: changes
     if: needs.changes.outputs.server == 'true'
-    runs-on: peak-ubuntu-24.04-4
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
 
     steps:
       - name: Checkout code
@@ -68,7 +68,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.2
+          bun-version-file: .bun-version
 
       - name: Check workspace list
         working-directory: .github/scripts
