@@ -76,12 +76,17 @@ describe("pruning superseded copies", () => {
 		expect(backup.objects.has(backupKey("a", second))).toBe(true);
 	});
 
-	test("a young copy is never considered", async () => {
-		const { source, put, copy, prune } = setup();
+	test("a young copy superseded the same day is deleted 30 days later, not 60", async () => {
+		const { source, backup, put, copy, prune } = setup();
 		const etag = put("a", "one", NOW);
 		copy("a", etag, NOW);
 		source.objects.delete("a");
 		expect(await prune(NOW)).toMatchObject({ deleted: 0, kept: 1 });
+		expect(await prune(new Date(NOW.getTime() + 10 * DAY))).toMatchObject({
+			deleted: 0,
+		});
+		expect(await prune(LATER)).toMatchObject({ deleted: 1 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(false);
 	});
 
 	test("a large backup is pruned across runs within the budget", async () => {

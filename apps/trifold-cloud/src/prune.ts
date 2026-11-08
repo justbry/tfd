@@ -92,11 +92,13 @@ export const pruneSuperseded = async ({
 		subrequests += 1;
 		for (const copy of page.objects) {
 			const match = VERSIONED.exec(copy.key);
-			// A copy younger than the retention can't have been superseded that long (and the lock keeps it anyway).
-			if (!match || copy.uploaded.getTime() > cutoff) {
+			if (!match) {
 				counts.kept += 1;
 				continue;
 			}
+			// A young copy is still checked, so its supersession is recorded from the day it happens; it just can't be
+			// deleted until it is past the retention too (the lock would refuse anyway).
+			const young = copy.uploaded.getTime() > cutoff;
 			const [, etag, sourceKey] = match as unknown as [string, string, string];
 			try {
 				subrequests += 1;
@@ -129,7 +131,7 @@ export const pruneSuperseded = async ({
 					counts.kept += 1;
 					continue;
 				}
-				if (new Date(firstSeen).getTime() > cutoff) {
+				if (young || new Date(firstSeen).getTime() > cutoff) {
 					counts.kept += 1;
 					continue;
 				}

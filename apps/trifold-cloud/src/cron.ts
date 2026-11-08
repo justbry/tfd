@@ -10,6 +10,9 @@ import { pruneSuperseded, readPruneState, writePruneState } from "./prune";
  * The hourly cron: back up first; once a backup pass is complete, give what is left of the budget to pruning
  * superseded copies. Throws when anything failed, so the invocation shows as an error in Workers observability.
  */
+/** The cron's own D1 reads and writes of backup and prune state, kept out of the passes' budgets. */
+const STATE_SUBREQUESTS = 4;
+
 export const runCron = async (
 	env: CloudEnv,
 	now: Date,
@@ -18,16 +21,16 @@ export const runCron = async (
 	const budget = Number(
 		env.BACKUP_SUBREQUEST_BUDGET ?? DEFAULT_SUBREQUEST_BUDGET,
 	);
-	if (!Number.isFinite(budget) || budget < MIN_SUBREQUEST_BUDGET) {
+	if (!Number.isFinite(budget) || budget < MIN_SUBREQUEST_BUDGET + STATE_SUBREQUESTS) {
 		throw new Error(
-			`BACKUP_SUBREQUEST_BUDGET must be a number of at least ${MIN_SUBREQUEST_BUDGET}`,
+			`BACKUP_SUBREQUEST_BUDGET must be a number of at least ${MIN_SUBREQUEST_BUDGET + STATE_SUBREQUESTS}`,
 		);
 	}
 	const backup = await runBackup(
 		{ db: env.DB, source: env.BOOKS, backup: env.BACKUPS },
 		now,
 		log,
-		budget,
+		budget - STATE_SUBREQUESTS,
 	);
 	let pruneFailed = 0;
 	if (backup.complete) {
@@ -37,7 +40,7 @@ export const runCron = async (
 			backup: env.BACKUPS,
 			state: await readPruneState(env.DB),
 			now,
-			budget: budget - backup.used,
+			budget: budget - backup.used - STATE_SUBREQUESTS,
 			log,
 		});
 		await writePruneState(env.DB, prune.state);
