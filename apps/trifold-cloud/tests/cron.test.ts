@@ -1,0 +1,48 @@
+import { describe, expect, test } from "bun:test";
+import { backupKey } from "../src/backup";
+import { runCron } from "../src/cron";
+import { fakeEnv, memoryBucket, memoryD1 } from "./fakes";
+
+const quiet = { log: () => {}, error: () => {} };
+const DAY = 86_400_000;
+
+describe("hourly cron", () => {
+	test("backs up, then prunes superseded copies once the pass is complete", async () => {
+		const now = new Date("2026-12-31T00:00:00Z");
+		let clock = new Date(now.getTime() - 40 * DAY);
+		const books = memoryBucket({}, () => clock);
+		const backups = memoryBucket({}, () => clock);
+		books.write("k", "1");
+		const oldEtag = books.objects.get("k")?.etag as string;
+		backups.write(backupKey("k", oldEtag), "1");
+		clock = new Date(now.getTime() - DAY);
+		books.write("k", "2");
+		const env = {
+			...fakeEnv(),
+			DB: memoryD1().db,
+			BOOKS: books.bucket,
+			BACKUPS: backups.bucket,
+		};
+		await runCron(env, now, quiet);
+		const currentEtag = books.objects.get("k")?.etag as string;
+		expect(backups.objects.has(backupKey("k", currentEtag))).toBe(true);
+		expect(backups.objects.has(backupKey("k", oldEtag))).toBe(false);
+	});
+
+	test("throws when a copy fails, so the invocation shows as an error", async () => {
+		const books = memoryBucket({ a: "1" });
+		const backups = memoryBucket();
+		backups.failingPuts.add(
+			backupKey("a", books.objects.get("a")?.etag as string),
+		);
+		const env = {
+			...fakeEnv(),
+			DB: memoryD1().db,
+			BOOKS: books.bucket,
+			BACKUPS: backups.bucket,
+		};
+		await expect(runCron(env, new Date(), quiet)).rejects.toThrow(
+			"1 backup and 0 prune failures",
+		);
+	});
+});

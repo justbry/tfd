@@ -218,3 +218,41 @@ describe("nightly backup", () => {
 		expect(backup.streamedPuts()).toBe(2);
 	});
 });
+
+describe("backup budgets", () => {
+	test("a budget too small to copy one object is refused", async () => {
+		const source = memoryBucket({ a: "1" });
+		await expect(
+			backupBucket({
+				source: source.bucket,
+				backup: memoryBucket().bucket,
+				state: { watermark: null },
+				now: NOW,
+				budget: 3,
+				log: quiet,
+			}),
+		).rejects.toThrow("at least 4");
+	});
+
+	test("a small budget still makes progress on a page of new objects", async () => {
+		const many = Object.fromEntries(
+			Array.from({ length: 50 }, (_, index) => [`k/${index}`, "x"]),
+		);
+		const source = memoryBucket(many);
+		const backup = memoryBucket();
+		const { db } = memoryD1();
+		let runs = 0;
+		let result: Awaited<ReturnType<typeof runBackup>>;
+		do {
+			result = await runBackup(
+				{ db, source: source.bucket, backup: backup.bucket },
+				NOW,
+				quiet,
+				31,
+			);
+			runs += 1;
+		} while (!result.complete && runs < 50);
+		expect(result.complete).toBe(true);
+		expect(backup.objects.size).toBe(50);
+	});
+});

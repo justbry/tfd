@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { resetHealthCache } from "../src/health";
 import worker from "../src/index";
 import { fakeEnv, signingPem } from "./fakes";
 
@@ -9,6 +10,7 @@ let pem = "";
 beforeAll(async () => {
 	pem = await signingPem();
 });
+beforeEach(() => resetHealthCache());
 
 const env = (overrides: Parameters<typeof fakeEnv>[0] = {}) =>
 	fakeEnv(overrides, pem);

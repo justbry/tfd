@@ -1,7 +1,12 @@
 import type { D1Database, R2Bucket } from "./env";
 
 /** Each fresh object costs up to three subrequests (head, get, put) after the page's list call. */
-const PAGE_SIZE = 200;
+const MAX_PAGE_SIZE = 200;
+/** The smallest budget that can copy one object: a list, then head, get and put. */
+export const MIN_SUBREQUEST_BUDGET = 4;
+/** A page that always fits a fresh run's budget, so a pass can't stall on a page of new objects. */
+export const pageSizeFor = (budget: number): number =>
+	Math.min(MAX_PAGE_SIZE, Math.floor((budget - 1) / 3));
 /** The default budget of one run; the cron runs hourly, so a pass that needs more resumes within the hour. */
 export const DEFAULT_SUBREQUEST_BUDGET = 900;
 const STATE_KEY = "backup_state";
@@ -28,6 +33,8 @@ export type BackupResult = {
 	skipped: number;
 	failed: number;
 	complete: boolean;
+	/** Subrequests this run used, so the cron can give the rest to the prune pass. */
+	used: number;
 	state: BackupState;
 };
 
@@ -52,7 +59,7 @@ export const writeBackupState = async (
 };
 
 /**
- * One run of the nightly backup. Lists the source from the saved cursor, copies objects uploaded at or after the
+ * One run of the hourly backup. Lists the source from the saved cursor, copies objects uploaded at or after the
  * watermark that the backup doesn't hold yet, and stops at the subrequest budget, saving the cursor. A failed object
  * is counted and logged, never fatal: the watermark only moves when a pass finishes with no failures, so the next pass
  * retries it.
@@ -72,6 +79,8 @@ export const backupBucket = async ({
 	budget?: number;
 	log?: Pick<Console, "error">;
 }): Promise<BackupResult> => {
+	if (budget < MIN_SUBREQUEST_BUDGET)
+		throw new Error(`backup budget must be at least ${MIN_SUBREQUEST_BUDGET}`);
 	const passStartedAt = state.passStartedAt ?? now.toISOString();
 	const since = state.watermark
 		? new Date(state.watermark).getTime()
@@ -85,10 +94,11 @@ export const backupBucket = async ({
 			return {
 				...counts,
 				complete: false,
+				used: subrequests,
 				state: { watermark: state.watermark, cursor, passStartedAt },
 			};
 		}
-		const page = await source.list({ limit: PAGE_SIZE, cursor });
+		const page = await source.list({ limit: pageSizeFor(budget), cursor });
 		subrequests += 1;
 		const fresh = page.objects.filter(
 			(object) => object.uploaded.getTime() >= since,
@@ -99,6 +109,7 @@ export const backupBucket = async ({
 			return {
 				...counts,
 				complete: false,
+				used: subrequests,
 				state: { watermark: state.watermark, cursor, passStartedAt },
 			};
 		}
@@ -140,7 +151,7 @@ export const backupBucket = async ({
 	}
 
 	const watermark = counts.failed === 0 ? passStartedAt : state.watermark;
-	return { ...counts, complete: true, state: { watermark } };
+	return { ...counts, complete: true, used: subrequests, state: { watermark } };
 };
 
 /** The cron entry: one run, state saved in D1, a summary logged, and any failure logged as an error. */

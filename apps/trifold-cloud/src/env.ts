@@ -24,6 +24,7 @@ export type R2Bucket = {
 		cursor?: string;
 	}>;
 	head(key: string): Promise<R2Object | null>;
+	delete(key: string): Promise<void>;
 	/** With `onlyIf`, R2 answers the object without a body when the precondition fails. */
 	get(
 		key: string,

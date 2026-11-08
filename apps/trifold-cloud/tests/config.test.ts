@@ -29,6 +29,7 @@ const VERIFY_TOP_LEVEL = [
 	"name",
 	"compatibility_date",
 	"workers_dev",
+	"observability",
 	"assets",
 	"env",
 ];

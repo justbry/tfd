@@ -34,11 +34,15 @@ export const memoryBucket = (
 	const bucket: R2Bucket = {
 		list: async ({ limit = 1000, cursor } = {}) => {
 			calls += 1;
-			const keys = [...objects.keys()].sort();
-			const start = cursor ? Number(cursor) : 0;
-			const truncated = start + limit < keys.length;
+			// Like R2, the cursor marks a position in key order (the last key returned), so deletes behind it don't shift
+			// the next page.
+			const keys = [...objects.keys()]
+				.sort()
+				.filter((key) => cursor === undefined || key > cursor);
+			const page = keys.slice(0, limit);
+			const truncated = keys.length > limit;
 			return {
-				objects: keys.slice(start, start + limit).map((key) => {
+				objects: page.map((key) => {
 					const stored = objects.get(key) as Stored;
 					return {
 						key,
@@ -48,7 +52,7 @@ export const memoryBucket = (
 					};
 				}),
 				truncated,
-				cursor: truncated ? String(start + limit) : undefined,
+				cursor: truncated ? page.at(-1) : undefined,
 			};
 		},
 		head: async (key) => {
@@ -81,6 +85,10 @@ export const memoryBucket = (
 				...meta,
 				body: new Response(stored.bytes).body as ReadableStream,
 			};
+		},
+		delete: async (key) => {
+			calls += 1;
+			objects.delete(key);
 		},
 		put: async (key, body, options) => {
 			calls += 1;

@@ -6,7 +6,7 @@ name: Trifold cloud
 #   - push to dev with repository variable TRIFOLD_CLOUD_DEPLOY=on, or Run workflow: the same, then deploy both to
 #     staging and check every staging host
 # Production is unbound (wrangler.jsonc) until the launch gate. The deploy job runs in the GitHub environment
-# `staging`; its CLOUDFLARE_API_TOKEN needs Workers Scripts, Workers Routes, D1 and R2 edit (docs/ci-and-deploy.md).
+# `staging`; its CLOUDFLARE_API_TOKEN needs Workers Scripts, Workers Routes, D1, R2 and Secrets Store edit.
 
 on:
   pull_request:
@@ -85,6 +85,13 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/trifold-verify
           command: deploy --env staging
+      - name: Check the backup bucket's lock is still in place
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.90.0"
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: r2 bucket lock list trifold-staging-backups
       - name: Check every staging host
         run: |
           set -euo pipefail
