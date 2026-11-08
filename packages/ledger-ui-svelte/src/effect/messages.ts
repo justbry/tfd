@@ -9,6 +9,7 @@ export const serverCodes = [
 	"finance_required",
 	"audience_not_allowed",
 	"stripe_permission_missing",
+	"refund_failed",
 ] as const;
 export type ServerCode = (typeof serverCodes)[number];
 
@@ -211,6 +212,11 @@ export const codeMessages: Record<ServerCode, MessageEntry> = {
 		title: "Stripe permission missing",
 		what: "The school's Stripe account has not given atm this permission.",
 		doThis: "Reconnect Stripe from the school's settings.",
+	},
+	refund_failed: {
+		title: "Stripe refused the refund",
+		what: "Stripe did not take the refund, so nothing was refunded.",
+		doThis: "Look at the payment in Stripe, then try the refund again.",
 	},
 };
 

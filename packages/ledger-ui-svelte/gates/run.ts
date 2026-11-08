@@ -5,11 +5,11 @@
  * I frozen install, F the contract's fixtures, Y types (svelte-check), B Biome on the package's files changed since
  * `--base`, S first-load size against gates/budget.json, T every test group (bun run test, hygiene included), K
  * computed styles in a real browser (scripts/check-styles.ts: the built app served by `vite preview` on port
- * `--style-port`, 5399 by default; happy-dom has no cascade, so only a browser can see a rule that a later stylesheet
+ * `--style-port`, 5399 by default, and the one-stylesheet reference build on the next port; happy-dom has no cascade, so only a browser can see a rule that a later stylesheet
  * overrides). K needs the Chromium headless shell and playwright-core in /tmp/ledger-shots that scripts/shots.ts uses:
  * without them it is red, unless `--skip-browser` says this machine has none. Stops at the first red gate.
  */
-import { spawn, spawnSync } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -40,8 +40,13 @@ const run = (
 	command: string,
 	args: string[],
 	cwd = packageRoot,
+	environment: Record<string, string> = {},
 ): void => {
-	const result = spawnSync(command, args, { cwd, encoding: "utf8" });
+	const result = spawnSync(command, args, {
+		cwd,
+		encoding: "utf8",
+		env: { ...process.env, ...environment },
+	});
 	const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
 	if (result.status !== 0) {
 		process.stdout.write(
@@ -155,39 +160,75 @@ if (process.argv.includes("--skip-browser"))
 		"K skipped: --skip-browser (no Chromium on this machine)\n",
 	);
 else {
-	const stylePort = argument("--style-port", "5399");
+	const stylePort = Number(argument("--style-port", "5399"));
 	run("K build", "bun", ["run", "build"]);
-	const preview = spawn(
+	// The reference: one stylesheet (LEDGER_SINGLE_SHEET=1), the cascade as Tailwind orders it, for the comparison.
+	run(
+		"K reference build",
 		"bunx",
-		["vite", "preview", "--port", stylePort, "--strictPort"],
+		["vite", "build", "--outDir", "tmp/dist-reference"],
+		packageRoot,
 		{
-			cwd: packageRoot,
-			stdio: "ignore",
+			LEDGER_SINGLE_SHEET: "1",
 		},
 	);
+	const serve = (port: number, directory: string): ChildProcess =>
+		spawn(
+			"bunx",
+			[
+				"vite",
+				"preview",
+				"--port",
+				String(port),
+				"--strictPort",
+				"--outDir",
+				directory,
+			],
+			{
+				cwd: packageRoot,
+				stdio: "ignore",
+			},
+		);
+	const previews = [
+		serve(stylePort, "dist"),
+		serve(stylePort + 1, "tmp/dist-reference"),
+	];
 	const origin = `http://localhost:${stylePort}`;
+	const referenceOrigin = `http://localhost:${stylePort + 1}`;
 	let served = false;
 	for (let attempt = 0; attempt < 50 && !served; attempt += 1) {
-		served = await fetch(origin).then(
-			(response) => response.ok,
-			() => false,
-		);
+		served = await Promise.all(
+			[origin, referenceOrigin].map((address) =>
+				fetch(address).then(
+					(response) => response.ok,
+					() => false,
+				),
+			),
+		).then((answers) => answers.every(Boolean));
 		if (!served) await new Promise((resolve) => setTimeout(resolve, 200));
 	}
 	if (!served) {
-		preview.kill();
-		process.stdout.write(`K red: vite preview did not answer on ${origin}\n`);
+		for (const preview of previews) preview.kill();
+		process.stdout.write(
+			`K red: vite preview did not answer on ${origin} and ${referenceOrigin}\n`,
+		);
 		process.exit(1);
 	}
 	const styles = spawnSync(
 		"bun",
-		["scripts/check-styles.ts", "--app", origin],
+		[
+			"scripts/check-styles.ts",
+			"--app",
+			origin,
+			"--reference",
+			referenceOrigin,
+		],
 		{
 			cwd: packageRoot,
 			encoding: "utf8",
 		},
 	);
-	preview.kill();
+	for (const preview of previews) preview.kill();
 	const output = `${styles.stdout ?? ""}${styles.stderr ?? ""}`.trim();
 	if (styles.status !== 0) {
 		process.stdout.write(`K red: bun scripts/check-styles.ts\n${output}\n`);

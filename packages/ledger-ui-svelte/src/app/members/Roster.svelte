@@ -99,8 +99,8 @@
 		capabilities: Capabilities;
 		/** Minor units, or why they could not be read (the stat then says so, never a 0). Null while reading. */
 		income: number | UiError | null;
-		invoiceItems: InvoiceItem[] | UiError;
-		switchTiers: SwitchTier[] | UiError;
+		invoiceItems: InvoiceItem[] | UiError | null;
+		switchTiers: SwitchTier[] | UiError | null;
 		onRetryIncome: () => void;
 		onRendered: (hash: string) => void;
 	} = $props();
@@ -125,9 +125,16 @@
 	let search = $state("");
 	type Menu = { personId: string; place: "row" | "drawer"; anchor: HTMLElement; focusFirst: boolean };
 	let menu = $state<Menu | null>(null);
-	let modal = $state<{ personId: string; action: Action } | null>(null);
-	let busy = $state<{ bookingId: string; action: BookingAction } | null>(null);
-	let returnFocus: HTMLElement | null = null;
+	let modal = $state<{ personId: string; action: Action; opener: HTMLElement | null } | null>(null);
+	/** The drawer's booking buttons whose call is on its way. */
+	let busy = $state<Array<{ bookingId: string; action: BookingAction }>>([]);
+	/** The pane is gone: a write that finishes then changes what is pending for its school, and says nothing. */
+	let gone = false;
+	onDestroy(() => {
+		gone = true;
+	});
+	/** Whether the person is still looking at the school a write was sent for. */
+	const present = (schoolId: string): boolean => !gone && school.id === schoolId;
 	let drawerOpener: string | null = null;
 	let topBarHeight = $state(0);
 
@@ -169,11 +176,6 @@
 	);
 	$effect(() => {
 		if (settled || !viewer.roster) onRendered(formatRoute(route));
-	});
-	$effect(() => {
-		if (modal !== null) return;
-		if (returnFocus?.isConnected) returnFocus.focus();
-		returnFocus = null;
 	});
 	$effect(() => {
 		if (drawerId !== null || drawerOpener === null) return;
@@ -257,23 +259,28 @@
 
 	// ---- Effects of writes
 
-	const apply = ({ changes: added, toast }: Applied): void => {
+	/** A write that has been answered: its pending effect goes to the school it was sent for, whatever the person looks
+	 * at now; its toast only if they still look at that school. */
+	const apply = ({ changes: added, toast }: Applied, schoolId: string): void => {
 		const kept = added.filter((change) => change.kind !== "booking" && change.kind !== "membership");
-		if (kept.length > 0) store.addRoster(school.id, kept);
+		if (kept.length > 0) store.addRoster(schoolId, kept);
 		for (const change of added) {
 			const sent = portalChangeOf(change);
 			if (!sent || change.kind === "booking" || change.kind === "role") continue;
-			store.mergeMembership(school.id, change.personId, sent);
+			store.mergeMembership(schoolId, change.personId, sent);
 		}
 		const bookingIds = added.flatMap((change) => (change.kind === "booking" ? [change.bookingId] : []));
-		if (bookingIds.length > 0) store.addBookings(school.id, bookingIds);
+		if (bookingIds.length > 0) store.addBookings(schoolId, bookingIds);
+		if (!present(schoolId)) return;
 		modal = null;
-		busy = null;
 		notifySuccess(app, toast);
 	};
-	/** A booking button of the drawer that needs no modal: the button waits while the call is on its way, a failure is
-	 * a toast with Retry. */
-	let quick: RetryingRead | null = null;
+	const unbusy = (bookingId: string): void => {
+		busy = busy.filter((entry) => entry.bookingId !== bookingId);
+	};
+	/** The drawer's booking buttons that need no modal, one write per booking at a time: never cancelled, since the
+	 * request may already be at the server. */
+	const quickWrites = new Set<string>();
 
 	// ---- Menu, drawer and actions
 
@@ -291,10 +298,9 @@
 		go("member", personId);
 	};
 	const startModal = (personId: string, action: Action): void => {
-		returnFocus =
-			menu?.anchor ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+		const opener = menu?.anchor ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
 		menu = null;
-		modal = { personId, action };
+		modal = { personId, action, opener };
 	};
 	const downloadPayments = (person: Person): void => {
 		const detail = detailOf(person);
@@ -316,8 +322,11 @@
 	};
 	/** The toast only after the server has accepted the receipt. */
 	const resendReceipt = (person: Person): void => {
-		retryingWrite(app, (writer) => writer.resendReceipt({ schoolId: school.id, personId: person.id }), {
-			value: () => notifySuccess(app, `Receipt resent to ${endSentence(person.name)}`),
+		const schoolId = school.id;
+		retryingWrite(app, (writer) => writer.resendReceipt({ schoolId, personId: person.id }), {
+			value: () => {
+				if (present(schoolId)) notifySuccess(app, `Receipt resent to ${endSentence(person.name)}`);
+			},
 		}).run();
 	};
 	const modalActions: Partial<Record<MenuAction, Action>> = {
@@ -344,15 +353,20 @@
 	};
 	/** Remind host: the toast only after the server has taken the reminder. */
 	const remindHost = (booking: MemberBooking): void => {
-		busy = { bookingId: booking.id, action: "remind" };
-		retryingWrite(app, (writer) => writer.remindHost({ school: school.id, bookingId: booking.id }), {
+		const schoolId = school.id;
+		if (quickWrites.has(booking.id)) return;
+		quickWrites.add(booking.id);
+		busy = [...busy, { bookingId: booking.id, action: "remind" }];
+		const finished = (): void => {
+			quickWrites.delete(booking.id);
+			unbusy(booking.id);
+		};
+		retryingWrite(app, (writer) => writer.remindHost({ school: schoolId, bookingId: booking.id }), {
 			value: () => {
-				busy = null;
-				notifySuccess(app, reminderToast(booking.hosts));
+				finished();
+				if (present(schoolId)) notifySuccess(app, reminderToast(booking.hosts));
 			},
-			failure: () => {
-				busy = null;
-			},
+			failure: finished,
 		}).run();
 	};
 	const bookingAction = (person: Person, action: BookingAction, booking: MemberBooking): void => {
@@ -363,27 +377,34 @@
 		else if (action === "refund") startModal(person.id, { kind: "refund", bookingId: booking.id });
 		else if (needsDialog) startModal(person.id, { kind: "release", bookingId: booking.id });
 		else {
+			if (quickWrites.has(booking.id)) return;
+			quickWrites.add(booking.id);
 			const base = writeBaseOf(person);
-			busy = { bookingId: booking.id, action };
-			quick?.cancel();
-			quick = retryingWrite(
+			busy = [...busy, { bookingId: booking.id, action }];
+			const finished = (): void => {
+				quickWrites.delete(booking.id);
+				unbusy(booking.id);
+			};
+			retryingWrite(
 				app,
 				(writer) =>
 					action === "confirm"
 						? recordOutcome({ ...base, writer }, booking, "attended")
 						: releaseHold({ ...base, writer }, booking, { waive: false, inside, quick: true }),
 				{
-					value: apply,
-					failure: () => {
-						busy = null;
+					value: (applied) => {
+						finished();
+						apply(applied, base.schoolId);
 					},
+					failure: finished,
 				},
-			);
-			quick.run();
+			).run();
 		}
 	};
-	onDestroy(() => quick?.cancel());
 
+	/** Where focus goes when a modal closes and its opener has gone: the person's row. */
+	const rowButtonOf = (personId: string): HTMLElement | null =>
+		document.querySelector<HTMLElement>(`[data-test=member-row][data-id="${personId}"] button[aria-haspopup=dialog]`);
 	const menuPerson = $derived(menu ? people.find(({ id }) => id === menu?.personId) : undefined);
 	const menuContext = $derived(menuPerson ? contextOf(menuPerson) : null);
 	const modalPerson = $derived(modal ? people.find(({ id }) => id === modal?.personId) : undefined);
@@ -401,6 +422,7 @@
 					switchTiers,
 					insideCutoff: (booking) => insideCutoffOf(modalPerson, booking),
 					onDone: apply,
+					returnTo: () => modal?.opener?.isConnected ? modal.opener : rowButtonOf(modalPerson.id),
 					onCancel: () => {
 						modal = null;
 					},
@@ -567,7 +589,7 @@
 				top={topBarHeight}
 				menuOpen={menu?.personId === drawerPerson.id && menu.place === "drawer"}
 				trapActive={menu === null && modal === null}
-				{busy}
+				busy={busy}
 				onMenu={toggleMenu(drawerPerson.id, "drawer")}
 				onClose={() => go("member", null)}
 				onAction={(chosen) => choose(drawerPerson, chosen)}
@@ -590,7 +612,8 @@
 			action={modal.action}
 			context={modalContext}
 			onPick={(booking) => {
-				if (modalPerson) modal = { personId: modalPerson.id, action: { kind: "release", bookingId: booking.id } };
+				if (modalPerson && modal)
+					modal = { personId: modalPerson.id, action: { kind: "release", bookingId: booking.id }, opener: modal.opener };
 			}}
 		/>
 	{/if}

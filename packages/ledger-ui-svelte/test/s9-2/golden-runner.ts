@@ -24,6 +24,9 @@ import { calendar } from "../helpers.ts";
  *   balance bar, `kfin` the Finance chip, `krole kr-<role>` a role chip); the Svelte markup carries the state itself
  *   (`.on` reads `[aria-pressed="true"]`, `.d` `[data-destructive]`, `.low` `[data-low]`, `.kfin` `[data-finance]`,
  *   `.krole` `[data-role]`, `.kr-<role>` `[data-role="<role>"]`); a class inside quotes is left as it is;
+ * - the ⋯ menu's items that are off carry `aria-disabled="true"` (they stay focusable, and their reason is read from
+ *   them) where the Preact menu has the `disabled` attribute: on a selector that names `member-menu-item`, `[disabled]`
+ *   reads `[aria-disabled="true"]`;
  * - a step waits for its target to exist (the shadcn-svelte popovers, dialogs and sheets render after the click), and
  *   after a step the runner waits until the rendered route has matched the hash and the page has stopped changing
  *   (a write goes through the Effect runtime before its effect shows);
@@ -89,6 +92,13 @@ const classMap: Record<string, string> = {
 const quoted = /"[^"]*"|'[^']*'/g;
 /** The Preact markup's state classes as the Svelte markup carries them; text inside quotes is left alone. */
 export const mapSelector = (selector: string): string => {
+	if (selector.includes("member-menu-item"))
+		return mapQuoted(
+			selector.replaceAll("[disabled]", '[aria-disabled="true"]'),
+		);
+	return mapQuoted(selector);
+};
+const mapQuoted = (selector: string): string => {
 	const parts: string[] = [];
 	let last = 0;
 	for (const match of selector.matchAll(quoted)) {

@@ -8,7 +8,7 @@ import { dedupeLazyCss } from "./build/dedupe-lazy-css.ts";
  * shadcn-svelte alias of components.json; `$contract` is the Preact package's `src`, imported read-only (D20: the
  * Reader/Writer contract, the fixtures, the HTTP adapters and the pure route and period modules). */
 export default defineConfig({
-	plugins: [tailwindcss(), svelte(), dedupeLazyCss()],
+	plugins: [dedupeLazyCss(), tailwindcss(), svelte()],
 	resolve: {
 		alias: {
 			$lib: fileURLToPath(new URL("./src/lib", import.meta.url)),

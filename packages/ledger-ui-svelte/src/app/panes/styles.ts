@@ -15,16 +15,17 @@ export const link =
 export const note =
 	"mb-2 flex items-center gap-2 rounded-xl border border-warning px-2.5 py-[7px] text-warning";
 export const headCell =
-	"h-auto border-b border-border px-2 py-1.5 text-[10.5px] font-medium text-muted-foreground";
-export const cell = "border-b border-border px-2 py-[7px] align-middle";
+	"h-auto p-0 border-b border-border px-2 py-1.5 text-[10.5px] font-medium text-muted-foreground";
+export const cell = "p-0 border-b border-border px-2 py-[7px] align-middle";
 export const dayRow =
-	"border-b border-border bg-card px-2 py-1.5 text-[10.5px] font-semibold text-muted-foreground";
+	"p-0 border-b border-border bg-card px-2 py-1.5 text-[10.5px] font-semibold text-muted-foreground";
 export const rowHover = "cursor-pointer hover:[&>td]:bg-secondary";
 /** `.btn.s` of the row actions and the drawer. */
-export const smallButtons = "flex flex-wrap justify-end gap-1";
+export const smallButtons =
+	"flex flex-wrap justify-end gap-1 [&_button]:whitespace-normal";
 /** The mockup's field (`select, input, textarea`): card fill, 1px border, 6px corners. */
 export const field =
-	"h-auto w-full rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground shadow-none focus-visible:ring-0 focus-visible:border-ring";
+	"h-auto w-full rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground shadow-none focus-visible:ring-0 focus-visible:border-ring md:text-[12px] dark:bg-card";
 /** `.fld`: a labelled field of a dialog. */
 export const fieldBox = "mt-2.5";
 export const fieldLabel = "mb-[3px] block text-[10.5px] text-muted-foreground";

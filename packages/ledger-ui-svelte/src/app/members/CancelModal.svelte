@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import { useApp } from "../context.ts";
 	import PaneIcon from "../PaneIcon.svelte";
@@ -16,7 +15,6 @@
 	let { context }: { context: ModalContext } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 	const noteLength = 3;
 	// svelte-ignore state_referenced_locally
 	const { write, member, changes } = context;
@@ -35,6 +33,7 @@
 {/snippet}
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={member ? `${member.tierName} ×${member.quantity}` : undefined}
 	cancelLabel="Keep membership"
 	confirm={{

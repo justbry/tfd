@@ -17,6 +17,8 @@
 	class="group/bar flex h-[7px] min-w-[90px] overflow-hidden rounded bg-secondary"
 	data-test="balance-bar"
 	data-low={bar.low ? "" : undefined}
+	role="img"
+	aria-label={`Balance: used ${projection.used}, held ${projection.held}, available ${projection.available}`}
 	title={`used ${projection.used} · held ${projection.held} · available ${projection.available}`}
 >
 	{#each segments as segment (segment.name)}

@@ -68,7 +68,11 @@
 	});
 
 	const choose = (chosen: BookingsPeriod, close: boolean): void => {
-		if (close) open = false;
+		if (close) {
+			open = false;
+			// The option that was picked is gone with the panel: focus goes back to the button.
+			wrapper?.querySelector<HTMLElement>("#pb")?.focus();
+		}
 		onNavigate(bookingsPeriodRoute(route, chosen));
 	};
 </script>

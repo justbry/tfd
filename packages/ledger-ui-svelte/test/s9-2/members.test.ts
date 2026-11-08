@@ -164,7 +164,7 @@ describe("what the HTTP layer does not build", () => {
 			const item = document.querySelector<HTMLButtonElement>(
 				`[data-test=member-menu-item][data-action=${action}]`,
 			);
-			expect(item?.disabled).toBe(true);
+			expect(item?.getAttribute("aria-disabled")).toBe("true");
 			expect(item?.title).toBe("Not available yet");
 		}
 	});
@@ -199,7 +199,11 @@ describe("what the HTTP layer does not build", () => {
 			const item = document.querySelector<HTMLButtonElement>(
 				`[data-test=member-menu-item][data-action=${action}]`,
 			);
-			expect({ action, disabled: item?.disabled, title: item?.title }).toEqual({
+			expect({
+				action,
+				disabled: item?.getAttribute("aria-disabled") === "true",
+				title: item?.title,
+			}).toEqual({
 				action,
 				disabled: true,
 				title: "Not available yet",
@@ -227,8 +231,8 @@ describe("what the HTTP layer does not build", () => {
 		expect(all("[data-test=history-item][data-pending]")).toHaveLength(0);
 		await click("[data-test=modal-cancel]");
 		expect(document.querySelector("[data-test=modal]")).toBeNull();
-		// Closing the modal takes the toast of its write down.
-		expect(toastTitles(pane)).not.toContain("Not available yet");
+		// The write was sent: closing the modal does not take its toast down.
+		expect(toastTitles(pane)).toContain("Not available yet");
 	});
 	test("the audit: the modal gives the message, not a verdict", async () => {
 		await open("#/vol/members?theme=light", {
@@ -345,7 +349,7 @@ describe("writes through the Effect layer", () => {
 			text('[data-test=member-row][data-id="m_012"] [data-test=pending-badge]'),
 		).toContain("→ 22");
 	}, 20_000);
-	test("a refused adjustment names why, offers no Retry, and Cancel takes its toast down", async () => {
+	test("a refused adjustment names why and offers no Retry; Cancel leaves its toast", async () => {
 		const writer = writerWith({
 			adjustCredits: (async () => {
 				throw new AdapterError("forbidden", "owner only", {
@@ -367,7 +371,8 @@ describe("writes through the Effect layer", () => {
 		await waitFor(() => toastTitles(pane).includes("Owners only"), "the toast");
 		expect(all("[data-test=toast-action]")).toHaveLength(0);
 		await click("[data-test=modal-cancel]");
-		await waitFor(() => toastTitles(pane).length === 0, "the toast to leave");
+		await settle();
+		expect(toastTitles(pane)).toContain("Owners only");
 	});
 	test("a drawer booking button waits while its call is on its way, and is ready again after a failure", async () => {
 		const writer = writerWith({

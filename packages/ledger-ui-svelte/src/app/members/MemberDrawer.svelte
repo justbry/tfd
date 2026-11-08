@@ -72,8 +72,8 @@
 		menuOpen: boolean;
 		/** The drawer takes Tab and Escape while nothing above it does. */
 		trapActive: boolean;
-		/** The booking button whose call is on its way. */
-		busy: { bookingId: string; action: BookingAction } | null;
+		/** The booking buttons whose call is on its way. */
+		busy: ReadonlyArray<{ bookingId: string; action: BookingAction }>;
 		onMenu: (button: HTMLElement, focusFirst: boolean) => void;
 		onClose: () => void;
 		onAction: (action: MenuAction) => void;
@@ -219,7 +219,14 @@
 				<h5 class={heading}><PaneIcon name="clock" /> Upcoming bookings</h5>
 				<div>
 					{#each detail.bookings as booking (booking.id)}
-						<DrawerBooking {booking} {context} {unit} {currency} {busy} onAction={onBookingAction} />
+						<DrawerBooking
+							{booking}
+							{context}
+							{unit}
+							{currency}
+							busy={busy.find((entry) => entry.bookingId === booking.id) ?? null}
+							onAction={onBookingAction}
+						/>
 					{/each}
 				</div>
 			{/if}

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import type { MemberBooking } from "$contract/data/members.ts";
 	import { Button } from "$lib/components/ui/button/index.ts";
 	import { useApp } from "../context.ts";
@@ -16,7 +15,6 @@
 	let { context, onPick }: { context: ModalContext; onPick: (booking: MemberBooking) => void } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 	let waiting = $state<string | null>(null);
 	// svelte-ignore state_referenced_locally
 	const { write } = context;
@@ -24,6 +22,7 @@
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={`${write.person.name} · ${write.person.id}. Pick the booking whose hold to release.`}
 	busy={submitter.busy}
 	onCancel={context.onCancel}

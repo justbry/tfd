@@ -163,8 +163,9 @@
 	const incomeValue = $derived<number | UiError | null>(
 		income && income.key === incomeKey ? ("value" in income ? income.value : income.failure) : null,
 	);
-	const listOf = <Value,>(slot: Slot<Value>, empty: Value): Value | UiError =>
-		slot && slot.key === school.id ? ("value" in slot ? slot.value : slot.failure) : empty;
+	/** A list the modals need: null while it is being read, the error when it could not be. */
+	const listOf = <Value,>(slot: Slot<Value>): Value | UiError | null =>
+		slot && slot.key === school.id ? ("value" in slot ? slot.value : slot.failure) : null;
 
 	$effect(() => {
 		if (!viewer.roster || failures.length > 0) onRendered(formatRoute(route));
@@ -189,8 +190,8 @@
 		summary={ready.summary}
 		capabilities={ready.capabilities}
 		income={incomeValue}
-		invoiceItems={listOf(invoiceItems, [])}
-		switchTiers={listOf(switchTiers, [])}
+		invoiceItems={listOf(invoiceItems)}
+		switchTiers={listOf(switchTiers)}
 		onRetryIncome={() => readers.income?.run()}
 		{onRendered}
 	/>

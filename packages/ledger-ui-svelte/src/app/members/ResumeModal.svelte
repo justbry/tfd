@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { useApp } from "../context.ts";
 	import PaneIcon from "../PaneIcon.svelte";
 	import { preview as previewClass } from "../panes/styles.ts";
@@ -12,12 +11,12 @@
 	let { context }: { context: ModalContext } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 	// svelte-ignore state_referenced_locally
 	const { write, member } = context;
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={member ? `${member.tierName} ×${member.quantity}` : undefined}
 	cancelLabel="Not now"
 	confirm={{

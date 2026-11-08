@@ -13,6 +13,7 @@
 		waiveLabel,
 		consequence,
 		busy = false,
+		returnTo,
 		onConfirm,
 		onCancel,
 	}: {
@@ -27,6 +28,8 @@
 		consequence?: (waive: boolean) => ConsequenceLine | null;
 		/** A write is on its way: the confirm button waits and Escape leaves the dialog open. */
 		busy?: boolean;
+		/** Where focus goes when the dialog closes. */
+		returnTo?: (() => HTMLElement | null) | undefined;
 		onConfirm: (waiveCutoff: boolean) => void;
 		onCancel: () => void;
 	} = $props();
@@ -35,7 +38,7 @@
 	const line = $derived(consequence?.(waive));
 </script>
 
-<AppDialog hooks="dialog" {busy} onClose={onCancel}>
+<AppDialog hooks="dialog" {busy} onClose={onCancel} {returnTo}>
 	{#snippet heading()}{title}{/snippet}
 	<div class={muted}>{detail}</div>
 	{#if waiveLabel}

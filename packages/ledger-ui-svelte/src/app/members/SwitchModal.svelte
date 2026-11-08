@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import { NativeSelect } from "$lib/components/ui/native-select/index.ts";
 	import { useApp } from "../context.ts";
@@ -19,33 +18,40 @@
 	let { context }: { context: ModalContext } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 	// svelte-ignore state_referenced_locally
 	const { write, member, currency } = context;
-	// svelte-ignore state_referenced_locally
-	const unreadable = Array.isArray(context.switchTiers) ? null : context.switchTiers;
-	// svelte-ignore state_referenced_locally
-	const others = (Array.isArray(context.switchTiers) ? context.switchTiers : []).filter(({ id }) => id !== member?.tierId);
-	let tierId = $state(others[0]?.id ?? "");
-	let quantity = $state(others[0]?.quantities?.[0] ?? 1);
+	/** The plans: null while they are being read (the modal says so, it does not offer an empty choice), the error when
+	 * they could not be. */
+	const loading = $derived(context.switchTiers === null);
+	const unreadable = $derived(
+		context.switchTiers === null || Array.isArray(context.switchTiers) ? null : context.switchTiers,
+	);
+	const others = $derived(
+		(Array.isArray(context.switchTiers) ? context.switchTiers : []).filter(({ id }) => id !== member?.tierId),
+	);
+	let pickedTier = $state("");
+	let pickedQuantity = $state<number | null>(null);
+	const tierId = $derived(pickedTier !== "" ? pickedTier : (others[0]?.id ?? ""));
 	const tier = $derived(others.find(({ id }) => id === tierId));
+	const quantity = $derived(pickedQuantity ?? tier?.quantities?.[0] ?? 1);
 	const money = (cents: number): string => formatMoney(cents, currency);
 	const chosenTier = (id: string): void => {
-		tierId = id;
-		quantity = others.find((candidate) => candidate.id === id)?.quantities?.[0] ?? 1;
+		pickedTier = id;
+		pickedQuantity = null;
 	};
 	const label = $derived(tier ? `${tier.name} ×${quantity}` : "");
 	const shown = $derived(tier?.quantities ? `${tier.name} ×${quantity}` : tier?.name);
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={member ? `${member.tierName} ×${member.quantity} now` : undefined}
 	confirm={unreadable
 		? undefined
 		: {
 				label: "Schedule switch",
 				tone: "primary",
-				disabled: !tier || member === null,
+				disabled: loading || !tier || member === null,
 				onConfirm: () => {
 					if (tier && member)
 						submitter.run((withWriter) =>
@@ -60,6 +66,8 @@
 	{#snippet preview()}
 		{#if unreadable}
 			<span class={errorText}>The plans could not be read.</span>
+		{:else if loading}
+			<span class={muted} data-test="modal-loading">Loading the plans…</span>
 		{:else if tier}
 			From {write.renewal}: <b>{shown}</b> at <b>{money(tier.monthlyCents * quantity)}</b> / month. It takes effect at the renewal and grants nothing until then.
 			<div class={muted}><PaneIcon name="alert" class="mr-1 inline" /> Stripe's member portal doesn't offer plan switches today, so members can't do this themselves.</div>
@@ -69,7 +77,7 @@
 	{/snippet}
 	{#if unreadable}
 		<LoadFailed error={unreadable} />
-	{:else}
+	{:else if !loading}
 		<Field field="tier">
 			{#snippet label()}New plan{/snippet}
 			{#snippet children(id)}
@@ -80,7 +88,7 @@
 			<Field field="quantity">
 				{#snippet label()}Amount{/snippet}
 				{#snippet children(id)}
-					<NativeSelect {id} data-test="modal-field" data-field="quantity" value={String(quantity)} options={(tier.quantities ?? []).map((size) => ({ value: size, label: String(size) }))} oninput={(event) => (quantity = Number(event.currentTarget.value))} />
+					<NativeSelect {id} data-test="modal-field" data-field="quantity" value={String(quantity)} options={(tier.quantities ?? []).map((size) => ({ value: size, label: String(size) }))} oninput={(event) => (pickedQuantity = Number(event.currentTarget.value))} />
 				{/snippet}
 			</Field>
 		{/if}

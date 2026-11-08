@@ -19,20 +19,22 @@ export type Action =
 	| { kind: "refund"; bookingId: string | null }
 	| { kind: "release" | "noshow"; bookingId: string };
 
-/** Everything a modal reads and the ways it ends. A list the modal needs that could not be read is the error
- * itself (`invoiceItems`, `switchTiers`): the modal says so, in the message table's words, rather than offer an empty
- * choice. The write context has no Writer: the modal's submit runs it through the Effect layer, which supplies it. */
+/** Everything a modal reads and the ways it ends. A list the modal needs that is still being read is null (the
+ * modal says so), and one that could not be read is the error itself (`invoiceItems`, `switchTiers`): the modal says
+ * so, in the message table's words, rather than offer an empty choice. The write context has no Writer: the modal's submit runs it through the Effect layer, which supplies it. */
 export type ModalContext = {
 	write: Omit<WriteContext, "writer">;
 	member: Member | null;
 	detail: MemberDetail;
 	changes: Change[];
 	currency: string;
-	invoiceItems: InvoiceItem[] | UiError;
-	switchTiers: SwitchTier[] | UiError;
+	invoiceItems: InvoiceItem[] | UiError | null;
+	switchTiers: SwitchTier[] | UiError | null;
 	/** Whether the booking is inside its cutoff (the server says so, in the person's attention). */
 	insideCutoff: (booking: MemberBooking) => boolean;
 	/** A finished write hands its effect to the tab (which closes the modal and shows the toast). */
-	onDone: (applied: Applied) => void;
+	onDone: (applied: Applied, schoolId: string) => void;
+	/** Where focus goes when the modal closes: its opener, or the person's row once the opener has gone. */
+	returnTo: () => HTMLElement | null;
 	onCancel: () => void;
 };

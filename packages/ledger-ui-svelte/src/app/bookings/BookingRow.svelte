@@ -57,8 +57,8 @@
 	const { billing } = $derived(booking);
 </script>
 
-<Table.Row class="[&>td]:hover:bg-secondary" data-test="booking-row" data-booking={booking.id}>
-	<Table.Cell class={[cell, mono]} data-test="booking-time">
+<Table.Row class="outline-none [&>td]:hover:bg-secondary" tabindex={-1} data-test="booking-row" data-booking={booking.id}>
+	<Table.Cell class={[cell, mono, "whitespace-normal"]} data-test="booking-time">
 		{withDate ? `${monthAndDay(dayOf(booking))} ` : ""}{booking.startsAt.slice(11)}
 	</Table.Cell>
 	<Table.Cell class={[cell, "whitespace-normal"]}>
@@ -93,7 +93,7 @@
 			{#if index > 0}{" "}{/if}<Badge class={[paneBadge, badge.tone && badgeTones[badge.tone]]}>{badge.text}</Badge>
 		{/each}
 	</Table.Cell>
-	<Table.Cell class={[cell, "text-right"]}>
+	<Table.Cell class={[cell, "text-right whitespace-normal"]}>
 		<div class={smallButtons}>
 			{#if actions === "pending"}
 				<Badge class={[paneBadge, badgeTones.warning]}><PaneIcon name="clock" class="mr-[3px] size-[11px]" />waiting to ship</Badge>

@@ -6,7 +6,7 @@
 	/** The open ⋯ menu (mockup `#kmm`, `.kmenu`): arrows, Home and End move between the items that are on, Escape
 	 * closes it and returns focus to its button, Tab or a click elsewhere closes it. Above 600px it sits under (or
 	 * over) its button; below, it is a sheet at the bottom. An item that is off is disabled with its reason as the
-	 * title, described to a screen reader by text (never `aria-disabled`); the Stripe item is a link. The menu is the
+	 * title; it stays focusable (`aria-disabled`, the click does nothing) and its reason is text it is described by; the Stripe item is a link. The menu is the
 	 * app's own markup (buttons and rules in a `role=menu`), not a shadcn-svelte dropdown: its golden file addresses
 	 * the items as buttons and links, in order. */
 	let {
@@ -24,7 +24,10 @@
 		onClose: (returnFocus: boolean) => void;
 	} = $props();
 
-	const enabledItems = "button:not([disabled]), a[href]";
+	/** Every item can take focus, one that is off included (its reason is read from it); the first to take it is the first
+	 * that is on. */
+	const allItems = "button, a[href]";
+	const enabledItems = 'button:not([aria-disabled="true"]), a[href]';
 	const compactWidth = 600;
 	const menuGap = 4;
 	const screenMargin = 8;
@@ -75,7 +78,7 @@
 			onClose(true);
 			return;
 		}
-		const enabled = [...event.currentTarget.querySelectorAll<HTMLElement>(enabledItems)];
+		const enabled = [...event.currentTarget.querySelectorAll<HTMLElement>(allItems)];
 		const current = enabled.indexOf(event.target as HTMLElement);
 		const targets: Record<string, number> = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: -1 };
 		const target = targets[event.key];
@@ -85,7 +88,7 @@
 	};
 
 	const itemClass =
-		"flex w-full items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 py-1.5 text-left text-[12px] text-foreground hover:bg-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent max-[600px]:px-2.5 max-[600px]:py-3 data-destructive:text-destructive [&_svg]:size-3.5 [&_svg]:flex-none";
+		"flex w-full items-center gap-1.5 rounded-sm border-0 bg-transparent px-2 py-1.5 text-left text-[12px] text-foreground hover:bg-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent max-[600px]:px-2.5 max-[600px]:py-3 data-destructive:text-destructive [&_svg]:size-3.5 [&_svg]:flex-none";
 </script>
 
 <!-- svelte-ignore a11y_interactive_supports_focus -->
@@ -124,14 +127,16 @@
 					data-test="member-menu-item"
 					data-action={entry.action}
 					data-destructive={entry.destructive ? "" : undefined}
-					disabled={entry.reason !== ""}
+					aria-disabled={entry.reason === "" ? undefined : "true"}
 					aria-describedby={entry.reason === "" ? undefined : `${menuId}-${entry.action}-reason`}
 					title={entry.reason === "" ? entry.hint : entry.reason}
-					onclick={() => onChoose(entry.action)}
+					onclick={() => {
+						if (entry.reason === "") onChoose(entry.action);
+					}}
 				><PaneIcon name={entry.icon} />{entry.label}</button>
 			{/if}
 			{#if entry.reason !== ""}
-				<span id={`${menuId}-${entry.action}-reason`} class="sr-only" aria-hidden="true">{entry.reason}</span>
+				<span id={`${menuId}-${entry.action}-reason`} class="sr-only">{entry.reason}</span>
 			{/if}
 		{/if}
 	{/each}

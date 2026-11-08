@@ -59,7 +59,7 @@
 	import BookingDialog from "./BookingDialog.svelte";
 	import BookingRow from "./BookingRow.svelte";
 	import BookingsPeriodControl from "./BookingsPeriodControl.svelte";
-	import { mount, onMount, unmount } from "svelte";
+	import { mount, onDestroy, onMount, unmount } from "svelte";
 
 	/** The Bookings pane (mockup `bookings()`): one day or week of the school's bookings in day groups, preceded by the
 	 * overdue group (confirmed bookings that started before the range and have no outcome, from a second read over the
@@ -282,64 +282,82 @@
 	let reminding = $state<ReadonlySet<string>>(new Set());
 	let dialog = $state<{ action: "noshow" | "release"; booking: Booking } | null>(null);
 
+	/** Where focus goes when a dialog closes: the booking's row, which is still there (it turns pending). */
+	const rowOf = (id: string | undefined): HTMLElement | null =>
+		id === undefined
+			? null
+			: document.querySelector<HTMLElement>(`[data-test=booking-row][data-booking="${id}"]`);
+	/** The pane is gone: a write that finishes then changes what is pending for its school, and says nothing. */
+	let gone = false;
+	onDestroy(() => {
+		gone = true;
+	});
+	/** Whether the person is still looking at the school a write was sent for. */
+	const present = (schoolId: string): boolean => !gone && school.id === schoolId;
+
 	/** Marks the bookings pending, runs one write each (in row order), and toasts when every Writer has answered; a
-	 * booking whose write failed is offered again (and is pending again while its toast's Retry is on its way). */
+	 * booking whose write failed is offered again (and is pending again while its toast's Retry is on its way). The
+	 * writes are for the school and the bookings of the click, whatever the app shows later; none is ever cancelled (a
+	 * request may already be at the server): their failure toast, with Retry, stays; their success toasts only if the
+	 * person still looks at that school, and the pending change is kept either way. `partial` words a batch that only
+	 * partly went through. */
 	const send = (
 		bookings: Booking[],
-		call: (writer: Writer["Service"], booking: Booking) => Promise<unknown>,
+		call: (writer: Writer["Service"], booking: Booking, schoolId: string) => Promise<unknown>,
 		done: string,
 		doneOne: (booking: Booking) => string,
+		partial?: (succeeded: number, total: number) => string,
 	): void => {
-		pending.addBookings(school.id, bookings.map(({ id }) => id));
+		const schoolId = school.id;
+		pending.addBookings(schoolId, bookings.map(({ id }) => id));
 		let outstanding = bookings.length;
-		let problems = 0;
+		let succeeded = 0;
 		let batchDone = false;
-		const settle = (failedOne: boolean): void => {
-			if (failedOne) problems += 1;
+		const settle = (ok: boolean): void => {
+			if (ok) succeeded += 1;
 			outstanding -= 1;
 			if (outstanding > 0) return;
 			batchDone = true;
-			if (problems === 0) notifySuccess(app, done);
+			if (!present(schoolId)) return;
+			if (succeeded === bookings.length) notifySuccess(app, done);
+			else if (succeeded > 0 && partial) notifySuccess(app, partial(succeeded, bookings.length));
 		};
 		for (const booking of bookings) {
-			const writing = retryingWrite(app, (writer) => call(writer, booking), {
+			retryingWrite(app, (writer) => call(writer, booking, schoolId), {
 				value: () => {
-					if (batchDone) {
-						notifySuccess(app, doneOne(booking));
-						return;
-					}
-					settle(false);
+					if (!batchDone) settle(true);
+					else if (present(schoolId)) notifySuccess(app, doneOne(booking));
 				},
 				failure: () => {
-					pending.removeBookings(school.id, [booking.id]);
-					if (!batchDone) settle(true);
+					pending.removeBookings(schoolId, [booking.id]);
+					if (!batchDone) settle(false);
 				},
 				busy: (next) => {
-					if (next) pending.addBookings(school.id, [booking.id]);
+					if (next) pending.addBookings(schoolId, [booking.id]);
 				},
-			});
-			writing.run();
+			}).run();
 		}
 	};
-	const record = (writer: Writer["Service"], booking: Booking, state: "attended" | "no_show") =>
-		writer.recordOutcome({ school: school.id, bookingId: booking.id, state });
-	const release = (writer: Writer["Service"], booking: Booking, waiveCutoff?: boolean) =>
+	const record = (writer: Writer["Service"], schoolId: string, booking: Booking, state: "attended" | "no_show") =>
+		writer.recordOutcome({ school: schoolId, bookingId: booking.id, state });
+	const release = (writer: Writer["Service"], schoolId: string, booking: Booking, waiveCutoff?: boolean) =>
 		writer.cancelBooking({
-			school: school.id,
+			school: schoolId,
 			bookingId: booking.id,
 			reason: adminReleaseReason,
 			...(waiveCutoff === undefined ? {} : { waiveCutoff }),
 		});
 	const confirm = (booking: Booking): void => {
 		const text = `Attendance confirmed for ${endSentence(attendeeName(booking))}`;
-		send([booking], (writer, each) => record(writer, each, "attended"), text, () => text);
+		send([booking], (writer, each, schoolId) => record(writer, schoolId, each, "attended"), text, () => text);
 	};
 	const confirmAll = (rows: Booking[]): void => {
 		send(
 			rows,
-			(writer, each) => record(writer, each, "attended"),
+			(writer, each, schoolId) => record(writer, schoolId, each, "attended"),
 			`Attendance confirmed for ${rows.length} bookings.`,
 			(each) => `Attendance confirmed for ${endSentence(attendeeName(each))}`,
+			(succeeded, total) => `Attendance confirmed for ${succeeded} of ${total} bookings.`,
 		);
 	};
 	const startRelease = (booking: Booking): void => {
@@ -349,7 +367,7 @@
 			return;
 		}
 		const text = `Hold released for ${endSentence(attendeeName(booking))}`;
-		send([booking], (writer, each) => release(writer, each), text, () => text);
+		send([booking], (writer, each, schoolId) => release(writer, schoolId, each), text, () => text);
 	};
 	const confirmDialog = (waiveCutoff: boolean): void => {
 		if (!dialog) return;
@@ -357,8 +375,8 @@
 		dialog = null;
 		send(
 			[booking],
-			(writer, each) =>
-				action === "noshow" ? record(writer, each, "no_show") : release(writer, each, waiveCutoff),
+			(writer, each, schoolId) =>
+				action === "noshow" ? record(writer, schoolId, each, "no_show") : release(writer, schoolId, each, waiveCutoff),
 			sentToast,
 			() => sentToast,
 		);
@@ -367,14 +385,15 @@
 	/** The toast only after the server has taken the reminder. */
 	const remind = (booking: Booking): void => {
 		const { id, hosts } = booking;
+		const schoolId = school.id;
 		reminding = new Set([...reminding, id]);
 		const clear = (): void => {
 			reminding = new Set([...reminding].filter((each) => each !== id));
 		};
-		retryingWrite(app, (writer) => writer.remindHost({ school: school.id, bookingId: id }), {
+		retryingWrite(app, (writer) => writer.remindHost({ school: schoolId, bookingId: id }), {
 			value: () => {
 				clear();
-				notifySuccess(app, reminderToast(hosts.map(({ name }) => name)));
+				if (present(schoolId)) notifySuccess(app, reminderToast(hosts.map(({ name }) => name)));
 			},
 			failure: clear,
 		}).run();
@@ -439,7 +458,7 @@
 		<Table.Root class="text-[12px]">
 			<Table.Header>
 				<Table.Row class="hover:bg-transparent">
-					<Table.Head class={[headCell, "w-[84px]"]}>When</Table.Head>
+					<Table.Head class={headCell}>When</Table.Head>
 					<Table.Head class={headCell}>Booking</Table.Head>
 					<Table.Head class={headCell}>Member</Table.Head>
 					<Table.Head class={headCell}>Billing</Table.Head>
@@ -452,19 +471,24 @@
 					{@const needing = group.rows.filter(canRecord)}
 					<Table.Row class="hover:bg-transparent" data-test="booking-day" data-day={group.key}>
 						<Table.Cell class={dayRow} colspan={6}>
-							<PaneIcon name={group.icon} class="mr-1 inline align-[-2px]" />{group.heading}
-							{#if needing.length > 1}
-								<Button
-									variant="tool"
-									size="tool-small"
-									class="float-right"
-									data-test="booking-bulk"
-									data-day={group.key}
-									disabled={preview}
-									title={preview ? exitPreviewTitle : undefined}
-									onclick={() => confirmAll(needing)}
-								><PaneIcon name="check" />Confirm all attended ({needing.length})</Button>
-							{/if}
+							<!-- Sticky and no wider than the screen: on a narrow one the table scrolls, and the heading and its
+							     bulk button stay where they can be seen. -->
+							<div class="sticky left-0 flex max-w-[calc(100vw-3.5rem)] flex-wrap items-center justify-between gap-1.5">
+								<span>
+									<PaneIcon name={group.icon} class="mr-1 inline align-[-2px]" />{group.heading}
+								</span>
+								{#if needing.length > 1}
+									<Button
+										variant="tool"
+										size="tool-small"
+										data-test="booking-bulk"
+										data-day={group.key}
+										disabled={preview}
+										title={preview ? exitPreviewTitle : undefined}
+										onclick={() => confirmAll(needing)}
+									><PaneIcon name="check" />Confirm all attended ({needing.length})</Button>
+								{/if}
+							</div>
 						</Table.Cell>
 					</Table.Row>
 					{#each group.rows as booking (booking.id)}
@@ -504,6 +528,7 @@
 		</p>
 	{/if}
 	{#if dialog}
+		{@const dialogBooking = dialog.booking.id}
 		<BookingDialog
 			title={`${dialog.action === "noshow" ? "Mark no-show" : "Release hold"} · ${school.name}`}
 			detail={dialogLine}
@@ -522,6 +547,7 @@
 			waiveLabel={dialog.action === "release"
 				? `Waive the late-cancel forfeit (return the ${school.creditUnit.other})`
 				: undefined}
+			returnTo={() => rowOf(dialogBooking)}
 			onConfirm={confirmDialog}
 			onCancel={() => (dialog = null)}
 		/>

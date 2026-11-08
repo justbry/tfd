@@ -85,6 +85,7 @@
 {/snippet}
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle="Replays the event log and compares it with the live balance and Stripe"
 	cancelLabel="Close"
 	confirm={audit ? { label: "Export report", tone: "plain", icon: "download", disabled: false, onConfirm: exportReport } : undefined}

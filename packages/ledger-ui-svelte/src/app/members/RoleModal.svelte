@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { useApp } from "../context.ts";
 	import PaneIcon from "../PaneIcon.svelte";
 	import { muted } from "../panes/styles.ts";
@@ -14,7 +13,6 @@
 	let { context, change }: { context: ModalContext; change: RoleChange } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 	// svelte-ignore state_referenced_locally
 	const { write } = context;
 	const { person } = write;
@@ -22,6 +20,7 @@
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	previewHook="modal-note"
 	confirm={{
 		label: "Confirm",

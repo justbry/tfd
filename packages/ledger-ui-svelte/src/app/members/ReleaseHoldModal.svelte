@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { consequenceLine } from "$contract/app/booking-text.ts";
 	import type { MemberBooking } from "$contract/data/members.ts";
 	import { useApp } from "../context.ts";
@@ -18,7 +17,6 @@
 	}: { context: ModalContext; booking: MemberBooking; action: "release" | "noshow" } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 	let waive = $state(false);
 	// svelte-ignore state_referenced_locally
 	const { write } = context;
@@ -40,6 +38,7 @@
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={`${booking.service} · ${booking.id} · ${write.person.name} · ${write.person.id}`}
 	confirm={{
 		label,

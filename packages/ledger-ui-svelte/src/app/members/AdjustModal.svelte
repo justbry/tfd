@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { Input } from "$lib/components/ui/input/index.ts";
 	import { NativeSelect } from "$lib/components/ui/native-select/index.ts";
 	import { useApp } from "../context.ts";
@@ -8,7 +7,7 @@
 	import ModalFrame from "./ModalFrame.svelte";
 	import type { ModalContext } from "./modal-context.ts";
 	import { Submitter } from "./modal-submit.svelte.ts";
-	import { capitalized } from "./members-model.ts";
+	import { capitalized, project } from "./members-model.ts";
 	import { adjustCredits } from "./members-writes.ts";
 	import NoteField from "./NoteField.svelte";
 
@@ -17,7 +16,6 @@
 	let { context }: { context: ModalContext } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 
 	const kinds = [
 		["goodwill", "Goodwill"],
@@ -30,7 +28,11 @@
 	let note = $state("");
 	// svelte-ignore state_referenced_locally
 	const { write, member } = context;
-	const available = member?.balances[0]?.available ?? 0;
+	/** What is available now, a pending change included (the balance the roster and the drawer show). */
+	const available = $derived.by(() => {
+		const balance = member?.balances[0];
+		return balance ? project(balance, write.person.id, context.changes).available : 0;
+	});
 	const amount = $derived(Number(delta));
 	const problem = $derived(
 		!Number.isInteger(amount) || amount === 0
@@ -45,6 +47,7 @@
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={`${person.name} · ${person.id}`}
 	confirm={{
 		label: "Apply",
@@ -90,7 +93,7 @@
 			<Input
 				{id}
 				type="number"
-				step="0.01"
+				step="1"
 				class={fieldClass}
 				data-test="modal-field"
 				data-field="delta"

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onDestroy } from "svelte";
 	import { Input } from "$lib/components/ui/input/index.ts";
 	import { NativeSelect } from "$lib/components/ui/native-select/index.ts";
 	import { useApp } from "../context.ts";
@@ -18,7 +17,6 @@
 	let { context, bookingId }: { context: ModalContext; bookingId: string | null } = $props();
 	const app = useApp();
 	const submitter = new Submitter(app, () => context);
-	onDestroy(() => submitter.cancel());
 
 	const noteLength = 3;
 	const majorUnits = (cents: number): string => (cents / 100).toFixed(2);
@@ -71,6 +69,7 @@
 </script>
 
 <ModalFrame
+	returnTo={context.returnTo}
 	subtitle={`${write.person.name} · ${write.person.id}`}
 	confirm={{
 		label: "Refund in Stripe",
