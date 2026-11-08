@@ -74,7 +74,6 @@
 	/** Neither the page nor the frame is a control to come back to, nor a place the stack must avoid. */
 	const isControl = (element: Element): element is HTMLElement =>
 		element instanceof HTMLElement && element !== document.body && element !== frame;
-	let sentinel: HTMLElement | undefined = $state();
 
 	const boxOf = (element: Element): Box => {
 		const { left, top: boxTop, right, bottom } = element.getBoundingClientRect();
@@ -111,25 +110,19 @@
 	});
 
 	/** Focus never falls to the page's body when a toast leaves, whatever takes it down (its own button, the read it
-	 * reported recovering, its timer): before the stack redraws, if focus is inside a toast that is leaving, it goes
-	 * back to the control that had it before the stack, else to the Dismiss of a toast that stays, else to the stack's
-	 * own sentinel (never the app's frame, which the stack would then take for a control to avoid). Each candidate is
-	 * kept only if it took focus: a control disabled meanwhile does not. */
-	const moveFocusOut = (staying: ReadonlySet<string>): void => {
-		const neighbour = [
-			...(region?.querySelectorAll<HTMLElement>("[data-toast-id]") ?? []),
-		].find((element) => staying.has(element.dataset.toastId ?? ""));
-		const candidates = [
-			focusBefore?.isConnected ? focusBefore : null,
-			neighbour?.querySelector<HTMLElement>("[data-test=toast-dismiss]") ?? null,
-			sentinel ?? null,
-		];
-		for (const candidate of candidates) {
-			if (!candidate) continue;
-			candidate.focus();
-			if (document.activeElement === candidate) return;
-		}
+	 * reported recovering, its timer). Before the stack redraws, if focus is inside a toast that is leaving, it goes
+	 * back to the control that had it before the stack; if that control cannot take it (gone, or disabled meanwhile),
+	 * then after the redraw it goes to the Dismiss of the toast that just came on screen from the queue, else of the
+	 * toast now in the leaving one's place, else to the stack itself (labelled, with a visible ring when reached from
+	 * the keyboard), never the app's frame, which the stack would then take for a control to avoid. */
+	const takes = (element: HTMLElement | null | undefined): boolean => {
+		if (!element) return false;
+		element.focus();
+		return document.activeElement === element;
 	};
+	/** A leaving toast had focus and the control from before could not take it back: where it stood, and which toasts
+	 * were on screen then. */
+	let focusToPlace: { index: number; before: readonly string[] } | null = null;
 	$effect.pre(() => {
 		const staying = new Set(visible.map((toast) => toast.id));
 		untrack(() => {
@@ -138,14 +131,49 @@
 				active instanceof HTMLElement && region?.contains(active)
 					? active.closest<HTMLElement>("[data-toast-id]")
 					: null;
-			if (holder && !staying.has(holder.dataset.toastId ?? "")) moveFocusOut(staying);
+			if (!holder || staying.has(holder.dataset.toastId ?? "")) return;
+			if (focusBefore?.isConnected && takes(focusBefore)) return;
+			const before = [
+				...(region?.querySelectorAll<HTMLElement>("[data-toast-id]") ?? []),
+			].map((element) => element.dataset.toastId ?? "");
+			focusToPlace = {
+				index: before.indexOf(holder.dataset.toastId ?? ""),
+				before,
+			};
+		});
+	});
+	$effect(() => {
+		const now = visible.map((toast) => toast.id);
+		untrack(() => {
+			if (!focusToPlace) return;
+			const { index, before } = focusToPlace;
+			focusToPlace = null;
+			const arrived = now.filter((id) => !before.includes(id));
+			const staying = now.filter((id) => before.includes(id));
+			const candidates = [
+				arrived.at(-1),
+				staying[index],
+				staying[index - 1],
+			].filter((id): id is string => id !== undefined);
+			for (const id of candidates) {
+				const dismiss = region?.querySelector<HTMLElement>(
+					`[data-toast-id="${id}"] [data-test=toast-dismiss]`,
+				);
+				if (takes(dismiss)) return;
+			}
+			takes(region);
 		});
 	});
 
 	onMount(() => {
 		const onFocusIn = (event: FocusEvent): void => {
 			const target = event.target;
-			if (!(target instanceof Element) || !isControl(target) || region?.contains(target)) return;
+			if (!(target instanceof Element) || region?.contains(target)) return;
+			// The frame or the page taking focus (a click on blank space) leaves nothing for the stack to avoid.
+			if (!isControl(target)) {
+				focused = null;
+				return;
+			}
 			focused = boxOf(target);
 			focusBefore = target;
 		};
@@ -171,10 +199,10 @@
 	aria-label="Notifications"
 	data-test="toasts"
 	data-edge={edge}
-	class="pointer-events-none fixed z-(--layer-toast) flex max-w-[calc(100vw-16px)] flex-col gap-2"
+	tabindex="-1"
+	class="pointer-events-none fixed z-(--layer-toast) flex max-w-[calc(100vw-16px)] flex-col gap-2 rounded-lg outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
 	style={positionStyle(edge, layout)}
 >
-	<span bind:this={sentinel} class="sr-only" tabindex="-1" data-test="toasts-sentinel">Notifications</span>
 	<div class="sr-only" role="alert" data-test="toasts-assertive">
 		{#each visible.filter((toast) => toast.tone === "error") as toast (`${toast.id}-${toast.count}`)}
 			<p>{announce(toast)}</p>
@@ -184,6 +212,9 @@
 		{#each visible.filter((toast) => toast.tone !== "error") as toast (`${toast.id}-${toast.count}-${toast.detail ?? ""}`)}
 			<p>{announce(toast)}</p>
 		{/each}
+	</div>
+	<!-- Progress has its own polite region, so that a step re-reads neither a sibling toast nor the failure. -->
+	<div class="sr-only" role="status" data-test="toasts-progress">
 		{#each withProgress as toast (`${toast.id}-progress-${toast.progress}`)}
 			<p>{toast.title.replace(trailingStop, "")}. {toast.progress}.</p>
 		{/each}
@@ -222,10 +253,9 @@
 				{#if toast.action}
 					<button
 						type="button"
-						class="mt-1 rounded-md border border-background/40 px-2 py-0.5 font-semibold hover:bg-background/10 focus-visible:outline-2 focus-visible:outline-background"
+						class="mt-1 rounded-md border border-background/40 px-2 py-0.5 font-semibold hover:bg-background/10 focus-visible:outline-2 focus-visible:outline-background aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-transparent"
 						data-test="toast-action"
 						aria-disabled={toast.busy ? "true" : undefined}
-						aria-busy={toast.busy ? "true" : undefined}
 						onclick={() => {
 							// While a run it started is on its way, the action stays focusable but does nothing.
 							if (toast.busy) return;

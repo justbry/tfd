@@ -69,7 +69,8 @@ export type PerformOptions = {
 
 /** The last word on a run that failed past its own handler: the report itself died (the log or the toasts broke),
  * or a defect arrived together with the interruption (Effect then skips the handler). Each step runs on its own, so
- * that a broken log still lets the toast show and a broken toast still lets the log keep it. */
+ * that a broken log still lets the toast show and a broken toast still lets the log keep it. An aborted run is only
+ * logged: the screen that aborted it no longer wants a toast for it. */
 async function reportBeyondHandler<A>(
 	runtime: AppContext["runtime"],
 	cause: Cause.Cause<unknown>,
@@ -85,6 +86,9 @@ async function reportBeyondHandler<A>(
 				log.write({ level: "error", message: error.reason, cause: squashed }),
 			),
 		);
+	// A run the screen aborted wants no toast: the log keeps the defect, and the caller takes nothing down.
+	if (options.signal?.aborted)
+		return { ok: false, interrupted: false, error, toastId: null };
 	const shown = await runtime.runPromiseExit(
 		reportFailure(error, options.handlers, options.owner),
 	);

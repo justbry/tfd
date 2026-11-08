@@ -6,7 +6,7 @@
 
 	/** A read that failed, in place of what it would have shown (never an empty table): the message table's text,
 	 * the same as the toast's, and Retry when the screen offers it. While a retry is on its way (`busy`) the message
-	 * stays and Retry says so. */
+	 * stays and Retry says so: aria-disabled rather than disabled, so that the focus on it stays. */
 	let {
 		error,
 		onRetry,
@@ -29,11 +29,13 @@
 			<Button
 				variant="tool"
 				size="tool-small"
-				class="mt-1 self-start"
+				class="mt-1 self-start aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
 				data-test="load-retry"
-				disabled={busy}
-				aria-busy={busy}
-				onclick={onRetry}
+				aria-disabled={busy ? "true" : undefined}
+				onclick={() => {
+					// While the retry is on its way the button keeps focus and says so, but does nothing.
+					if (!busy) onRetry?.();
+				}}
 			>
 				{busy ? "Retrying…" : "Retry"}
 			</Button>
