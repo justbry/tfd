@@ -37,7 +37,7 @@ logged as `views job failed for school <id>` and nothing else (a job message can
 | `LEDGER_BUCKET` | R2 binding | the staging bucket, `b4uni-stg-ledger` (exists) |
 | `LEDGER_ISS` | var | the family service's `API_BASE` (`https://api-staging.b4uni.com`) |
 | `LEDGER_JWKS_URL` | var | its `/.well-known/ledger-jwks.json` |
-| `ASSETS` | assets binding | `../ledger-ui/dist`, single-page-application fallback, `/v1/*` and `/healthz` run the Worker first |
+| `ASSETS` | assets binding | `../ledger-ui-svelte/dist`, single-page-application fallback, `/v1/*` and `/healthz` run the Worker first |
 | cron | trigger | `*/5 * * * *` |
 | route | custom domain | `ledger-staging.b4uni.com` |
 | `LEDGER_DEMO_SCHOOLS` | var | `on`: the demo schools below (staging only; `tests/assets.test.ts` fails if it appears anywhere else) |
@@ -49,7 +49,7 @@ a production environment or a production bucket name appears in the file. Adding
 `nodejs_compat` is on (`atm/worker` imports `node:crypto`). `atm/worker` is aliased to its source in the config, so the
 bundle does not need atm's `dist`. No secret is needed. `bun run check:bundle` runs `wrangler deploy --dry-run` for
 staging (through `bunx wrangler@4.90.0`: the repo's esbuild override breaks a local wrangler). Wrangler needs the
-assets directory to exist: the check uses `../ledger-ui/dist` if it is built, builds the UI first when its dependencies are
+assets directory to exist: the check uses `../ledger-ui-svelte/dist` if it is built, builds the UI first when its dependencies are
 installed, and otherwise checks against a placeholder page (`--assets`) and says so. A real deploy must build the UI first.
 
 **Assets.** A page that is not a file in the UI build gets `index.html`. `/v1/*` and `/healthz` run the Worker first, so an

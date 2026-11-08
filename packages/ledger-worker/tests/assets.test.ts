@@ -52,7 +52,7 @@ test("wrangler.jsonc binds the assets, Worker first, in staging", () => {
 		env: Record<string, { assets: Record<string, unknown> }>;
 	};
 	expect(parsed.env.staging?.assets).toEqual({
-		directory: "../ledger-ui/dist",
+		directory: "../ledger-ui-svelte/dist",
 		binding: "ASSETS",
 		not_found_handling: "single-page-application",
 		run_worker_first: ["/v1/*", "/healthz"],

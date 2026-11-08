@@ -1,6 +1,6 @@
 /**
  * `wrangler deploy --dry-run` for the staging environment: the bundle builds and the bindings resolve. The config serves the UI
- * from `../ledger-ui/dist`, which wrangler needs to exist, so the check builds the UI first when it can (its own
+ * from `../ledger-ui-svelte/dist`, which wrangler needs to exist, so the check builds the UI first when it can (its own
  * dependencies installed) and otherwise points `--assets` at a placeholder page; it says which.
  */
 import { existsSync } from "node:fs";
@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 
 const WRANGLER = "wrangler@4.90.0";
 const root = resolve(import.meta.dir, "..");
-const ui = resolve(root, "../ledger-ui");
+const ui = resolve(root, "../ledger-ui-svelte");
 const built = join(ui, "dist");
 
 const run = async (command: string[], cwd: string): Promise<boolean> => {
