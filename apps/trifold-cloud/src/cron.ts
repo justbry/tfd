@@ -11,9 +11,12 @@ export const runCron = async (
 	now: Date,
 	log: Pick<Console, "log" | "error"> = console,
 ) => {
-	const budget = Number(
+	const configured = Number(
 		env.BACKUP_SUBREQUEST_BUDGET ?? DEFAULT_SUBREQUEST_BUDGET,
 	);
+	if (!Number.isFinite(configured))
+		throw new Error("BACKUP_SUBREQUEST_BUDGET is not a number");
+	const budget = configured;
 	const backup = await runBackup(
 		{ db: env.DB, source: env.BOOKS, backup: env.BACKUPS },
 		now,
@@ -23,6 +26,7 @@ export const runCron = async (
 	let pruneFailed = 0;
 	if (backup.complete) {
 		const prune = await pruneSuperseded({
+			db: env.DB,
 			source: env.BOOKS,
 			backup: env.BACKUPS,
 			state: await readPruneState(env.DB),

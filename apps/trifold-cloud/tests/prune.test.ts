@@ -1,131 +1,123 @@
 import { describe, expect, test } from "bun:test";
 import { backupKey } from "../src/backup";
 import { pruneSuperseded, RETENTION_DAYS } from "../src/prune";
-import { memoryBucket } from "./fakes";
+import { memoryBucket, memoryD1 } from "./fakes";
 
 const quiet = { error: () => {} };
 const DAY = 86_400_000;
 const NOW = new Date("2026-12-31T00:00:00Z");
-const OLD = new Date(NOW.getTime() - (RETENTION_DAYS + 5) * DAY);
-const RECENT = new Date(NOW.getTime() - 2 * DAY);
+const LATER = new Date(NOW.getTime() + (RETENTION_DAYS + 1) * DAY);
+const OLD = new Date(NOW.getTime() - 365 * DAY);
 
-/** A source and a backup whose copies were uploaded at chosen times. */
+/** A source and a backup whose objects were written at chosen times, plus the D1 that remembers supersession. */
 const setup = () => {
 	let clock = OLD;
 	const source = memoryBucket({}, () => clock);
 	const backup = memoryBucket({}, () => clock);
-	const copy = (key: string, etag: string, at: Date) => {
-		clock = at;
-		backup.write(backupKey(key, etag), "copy");
-	};
+	const { db } = memoryD1();
 	const put = (key: string, bytes: string, at: Date) => {
 		clock = at;
 		source.write(key, bytes);
 		return source.objects.get(key)?.etag as string;
 	};
-	return { source, backup, copy, put };
+	const copy = (key: string, etag: string, at: Date) => {
+		clock = at;
+		backup.write(backupKey(key, etag), "copy");
+	};
+	const prune = (now: Date, budget = 900) =>
+		pruneSuperseded({
+			db,
+			source: source.bucket,
+			backup: backup.bucket,
+			state: {},
+			now,
+			budget,
+			log: quiet,
+		});
+	return { source, backup, put, copy, prune };
 };
 
 describe("pruning superseded copies", () => {
 	test("an old copy of an object that never changed is kept forever", async () => {
-		const { source, backup, copy, put } = setup();
-		const etag = put("schools/a/events/1.jsonl", "one", OLD);
-		copy("schools/a/events/1.jsonl", etag, OLD);
-		const result = await pruneSuperseded({
-			source: source.bucket,
-			backup: backup.bucket,
-			state: {},
-			now: NOW,
-			budget: 900,
-			log: quiet,
-		});
-		expect(result).toMatchObject({ deleted: 0, kept: 1, complete: true });
+		const { backup, put, copy, prune } = setup();
+		copy("a", put("a", "one", OLD), OLD);
+		await prune(NOW);
+		await prune(LATER);
 		expect(backup.objects.size).toBe(1);
 	});
 
-	test("an old copy of a rewritten object is deleted; the current version's copy stays", async () => {
-		const { source, backup, copy, put } = setup();
-		const first = put("schools/a/views/manifest.json", "m1", OLD);
-		copy("schools/a/views/manifest.json", first, OLD);
-		const second = put("schools/a/views/manifest.json", "m2", OLD);
-		copy("schools/a/views/manifest.json", second, OLD);
-		const result = await pruneSuperseded({
-			source: source.bucket,
-			backup: backup.bucket,
-			state: {},
-			now: NOW,
-			budget: 900,
-			log: quiet,
+	test("a year-old object deleted at the source just now keeps its copy for 30 days, then the copy goes", async () => {
+		const { source, backup, put, copy, prune } = setup();
+		const etag = put("a", "one", OLD);
+		copy("a", etag, OLD);
+		source.objects.delete("a");
+		expect(await prune(NOW)).toMatchObject({ deleted: 0 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(true);
+		expect(await prune(new Date(NOW.getTime() + 10 * DAY))).toMatchObject({
+			deleted: 0,
 		});
-		expect(result).toMatchObject({ deleted: 1, kept: 1 });
-		expect(
-			backup.objects.has(backupKey("schools/a/views/manifest.json", first)),
-		).toBe(false);
-		expect(
-			backup.objects.has(backupKey("schools/a/views/manifest.json", second)),
-		).toBe(true);
+		expect(await prune(LATER)).toMatchObject({ deleted: 1 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(false);
 	});
 
-	test("a superseded copy younger than the retention is kept", async () => {
-		const { source, backup, copy, put } = setup();
-		const first = put("k", "1", RECENT);
-		copy("k", first, RECENT);
-		put("k", "2", RECENT);
-		const result = await pruneSuperseded({
-			source: source.bucket,
-			backup: backup.bucket,
-			state: {},
-			now: NOW,
-			budget: 900,
-			log: quiet,
+	test("a year-old object rewritten just now keeps its old copy for 30 days, and longer until the new version is copied", async () => {
+		const { backup, put, copy, prune } = setup();
+		const first = put("a", "one", OLD);
+		copy("a", first, OLD);
+		const second = put("a", "two", NOW);
+		expect(await prune(NOW)).toMatchObject({ deleted: 0 });
+		// 30 days on, but the current version was never backed up: the old copy is the only one, so it stays.
+		expect(await prune(LATER)).toMatchObject({ deleted: 0 });
+		copy("a", second, LATER);
+		expect(await prune(new Date(LATER.getTime() + DAY))).toMatchObject({
+			deleted: 1,
 		});
-		expect(result).toMatchObject({ deleted: 0, kept: 1 });
+		expect(backup.objects.has(backupKey("a", first))).toBe(false);
+		expect(backup.objects.has(backupKey("a", second))).toBe(true);
 	});
 
-	test("an old copy of an object deleted at the source is deleted", async () => {
-		const { source, backup, copy, put } = setup();
-		const etag = put("gone", "x", OLD);
-		copy("gone", etag, OLD);
-		source.objects.delete("gone");
-		const result = await pruneSuperseded({
-			source: source.bucket,
-			backup: backup.bucket,
-			state: {},
-			now: NOW,
-			budget: 900,
-			log: quiet,
-		});
-		expect(result.deleted).toBe(1);
+	test("a young copy is never considered", async () => {
+		const { source, put, copy, prune } = setup();
+		const etag = put("a", "one", NOW);
+		copy("a", etag, NOW);
+		source.objects.delete("a");
+		expect(await prune(NOW)).toMatchObject({ deleted: 0, kept: 1 });
 	});
 
 	test("a large backup is pruned across runs within the budget", async () => {
-		const { source, backup, copy, put } = setup();
-		for (let index = 0; index < 500; index += 1) {
-			const key = `k/${index}`;
-			const first = put(key, "1", OLD);
-			copy(key, first, OLD);
-			put(key, "2", OLD);
+		const { source, backup, put, copy } = setup();
+		const { db } = memoryD1();
+		for (let index = 0; index < 300; index += 1) {
+			const key = `k/${String(index).padStart(4, "0")}`;
+			copy(key, put(key, "1", OLD), OLD);
+			copy(key, put(key, "2", OLD), OLD);
 		}
-		let state = {};
-		let deleted = 0;
-		let runs = 0;
-		while (runs < 20) {
-			const before = source.calls() + backup.calls();
-			const result = await pruneSuperseded({
-				source: source.bucket,
-				backup: backup.bucket,
-				state,
-				now: NOW,
-				budget: 300,
-				log: quiet,
-			});
-			expect(source.calls() + backup.calls() - before).toBeLessThanOrEqual(300);
-			deleted += result.deleted;
-			state = result.state;
-			runs += 1;
-			if (result.complete) break;
-		}
-		expect(deleted).toBe(500);
-		expect(runs).toBeGreaterThan(1);
+		const runPass = async (now: Date) => {
+			let state = {};
+			let deleted = 0;
+			for (let runs = 0; runs < 50; runs += 1) {
+				const before = source.calls() + backup.calls();
+				const result = await pruneSuperseded({
+					db,
+					source: source.bucket,
+					backup: backup.bucket,
+					state,
+					now,
+					budget: 300,
+					log: quiet,
+				});
+				expect(source.calls() + backup.calls() - before).toBeLessThanOrEqual(
+					300,
+				);
+				deleted += result.deleted;
+				state = result.state;
+				if (result.complete) return { deleted, runs: runs + 1 };
+			}
+			throw new Error("pass never completed");
+		};
+		expect((await runPass(NOW)).deleted).toBe(0);
+		const second = await runPass(LATER);
+		expect(second.deleted).toBe(300);
+		expect(second.runs).toBeGreaterThan(1);
 	});
 });

@@ -33,10 +33,12 @@ Only `staging` is bound. The top level of `wrangler.jsonc` is production and sta
 | R2 books | Hourly copy to `trifold-staging-backups` as `versions/<etag>/<key>` | copy the wanted versions back |
 
 The backup bucket has a 30-day bucket lock: a copy can't be deleted or overwritten for 30 days, which is why each
-version has its own key. There is no expiry rule. After each complete backup pass, the cron prunes copies that are
-older than 30 days **and** no longer the source's current version (rewritten or deleted at the source); the current
-version of every object is kept however old it is. So a deleted org's books are gone from the backups within 30 days
-plus one pass, which is the retention the privacy policy states (PLAN.md M6).
+version has its own key. There is no expiry rule. After each complete backup pass, the cron prunes a copy only once it has been
+**superseded for 30 days**: the pass records in D1 (`backup_superseded`) when it first sees a copy no longer match its
+source (rewritten or deleted there), deletes it 30 days after that, and for a rewritten object only once the backup
+holds the current version. The current version of every object is kept however old it is, and an accidental delete or
+bad write at the source leaves the last good copy for 30 days. A deleted org's books leave the backups 30 days after
+the deletion, plus one pass: the retention the privacy policy states (PLAN.md M6).
 
 ```sh
 bunx wrangler@4.90.0 r2 bucket lock add trifold-staging-backups --name keep-30-days --retention-days 30

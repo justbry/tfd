@@ -113,6 +113,7 @@ export const memoryBucket = (
 /** Just enough of D1 for `schema_meta` reads and upserts. */
 export const memoryD1 = (fail = false) => {
 	const meta = new Map<string, string>();
+	const superseded = new Map<string, string>();
 	const db: D1Database = {
 		prepare: (query) => {
 			let values: unknown[] = [];
@@ -123,6 +124,12 @@ export const memoryD1 = (fail = false) => {
 				},
 				first: async <T>() => {
 					if (fail) throw new Error("D1 down");
+					if (query.startsWith("SELECT first_seen FROM backup_superseded")) {
+						const firstSeen = superseded.get(values[0] as string);
+						return (
+							firstSeen === undefined ? null : { first_seen: firstSeen }
+						) as T | null;
+					}
 					if (query.startsWith("SELECT value FROM schema_meta")) {
 						const value = meta.get(values[0] as string);
 						return (value === undefined ? null : { value }) as T | null;
@@ -130,6 +137,14 @@ export const memoryD1 = (fail = false) => {
 					return { one: 1 } as T;
 				},
 				run: async () => {
+					if (query.startsWith("INSERT INTO backup_superseded")) {
+						superseded.set(values[0] as string, values[1] as string);
+						return {};
+					}
+					if (query.startsWith("DELETE FROM backup_superseded")) {
+						superseded.delete(values[0] as string);
+						return {};
+					}
 					meta.set(values[0] as string, values[1] as string);
 					return {};
 				},
@@ -137,7 +152,7 @@ export const memoryD1 = (fail = false) => {
 			return statement;
 		},
 	};
-	return { db, meta };
+	return { db, meta, superseded };
 };
 
 /** A fresh Ed25519 private key as PKCS8 PEM, as Secrets Store would hand it over. */

@@ -7,7 +7,7 @@ const quiet = { log: () => {}, error: () => {} };
 const DAY = 86_400_000;
 
 describe("hourly cron", () => {
-	test("backs up, then prunes superseded copies once the pass is complete", async () => {
+	test("backs up, then prunes copies superseded for longer than the retention", async () => {
 		const now = new Date("2026-12-31T00:00:00Z");
 		let clock = new Date(now.getTime() - 40 * DAY);
 		const books = memoryBucket({}, () => clock);
@@ -26,6 +26,9 @@ describe("hourly cron", () => {
 		await runCron(env, now, quiet);
 		const currentEtag = books.objects.get("k")?.etag as string;
 		expect(backups.objects.has(backupKey("k", currentEtag))).toBe(true);
+		// Superseded from now on: kept for the retention, then pruned.
+		expect(backups.objects.has(backupKey("k", oldEtag))).toBe(true);
+		await runCron(env, new Date(now.getTime() + 31 * DAY), quiet);
 		expect(backups.objects.has(backupKey("k", oldEtag))).toBe(false);
 	});
 

@@ -17,7 +17,6 @@ const probe = async (
 	}
 };
 
-/** `/healthz`: proves D1, both R2 buckets and the three signing keys answer. 503 when one fails, so a deploy check can gate on it. */
 /** Healthz is public: one probe round per 15 seconds per isolate, so hammering it costs nothing extra. */
 const CACHE_MS = 15_000;
 let cached: { at: number; checks: Record<string, boolean> } | undefined;
@@ -27,6 +26,7 @@ export const resetHealthCache = (): void => {
 	cached = undefined;
 };
 
+/** `/healthz`: proves D1, both R2 buckets and the three signing keys answer. 503 when one fails, so a deploy check can gate on it. */
 export const health = async (
 	env: CloudEnv,
 	surface: "ledger" | "api",
