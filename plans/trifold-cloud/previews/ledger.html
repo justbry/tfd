@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090F;--raised:#0E1424;--fg:#E9ECF4;--muted:#9AA3B8;--dim:#4A5268;--line:#FFFFFF14;--proof:#5BE3A1;--seal:#F2B447;--ember:#FF9B54;--alert:#E07A5F}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif}
+.win{border-radius:14px;overflow:hidden;border:1px solid #2a3145;background:var(--bg);color:var(--fg)}
+.chrome{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#141a2b;border-bottom:1px solid #222a3e}
+.dots i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:#3a4258}
+.url{flex:1;font:12px "JetBrains Mono",monospace;color:#c9cfdd;background:#0b1020;border-radius:7px;padding:5px 10px}
+.url b{color:var(--fg);font-weight:500}.lock{color:var(--proof)}
+.mono{font-family:"JetBrains Mono",monospace}.lbl{font:11px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.disp{font-family:Fraunces,serif;font-weight:300}
+.btn{display:inline-block;background:var(--seal);color:#16203a;font-weight:600;font-size:13px;border-radius:9px;padding:8px 14px}
+.ghost{display:inline-block;border:1px solid #2a3145;color:var(--fg);font-size:13px;border-radius:9px;padding:7px 13px}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:14px}
+.ok{color:var(--proof)}.tnum{font-variant-numeric:tabular-nums}
+.stage{background:var(--ember);color:#16203a;font:600 10px "JetBrains Mono",monospace;letter-spacing:.1em;padding:3px 7px;border-radius:5px}
+</style></head><body>
+<div class="win">
+ <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><div class="url"><span class="lock">🔒</span> <b>staging-ledger.trifold.app</b>/o/juniper-school/receipts</div><span class="stage">STAGING</span></div>
+ <div style="display:flex;min-height:520px">
+  <aside style="width:178px;border-right:1px solid var(--line);padding:14px 12px;font-size:13px">
+   <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none" stroke="#F2B447" stroke-width="1.6"/><path d="M4 9.3h16M4 14.6h16" stroke="#F2B447" stroke-width="1.2" stroke-dasharray="2 2"/></svg><b class="disp" style="font-size:17px">Trifold</b></div>
+   <div class="card" style="padding:8px 10px;margin-bottom:14px"><div class="lbl" style="font-size:9px">Organization</div><div style="font-weight:500">Juniper School ▾</div></div>
+   <div style="display:grid;gap:3px;color:var(--muted)">
+    <div style="padding:6px 8px">Dashboard</div><div style="padding:6px 8px">Members</div><div style="padding:6px 8px">Ledger</div>
+    <div style="padding:6px 8px;background:#ffffff0d;color:var(--fg);border-radius:7px">Receipts</div>
+    <div style="padding:6px 8px">Seals</div><div style="padding:6px 8px">Reports</div>
+    <div style="height:1px;background:var(--line);margin:8px 0"></div>
+    <div style="padding:6px 8px">People &amp; roles</div><div style="padding:6px 8px">Stripe</div><div style="padding:6px 8px">API keys</div><div style="padding:6px 8px">Plan &amp; limits</div><div style="padding:6px 8px">Export</div>
+   </div>
+  </aside>
+  <main style="flex:1;padding:18px 20px">
+   <div style="display:flex;justify-content:space-between;align-items:end;margin-bottom:14px">
+    <div><div class="lbl">04 · Receipts</div><h1 class="disp" style="margin:4px 0 0;font-size:28px">Every payment and refund, signed</h1></div>
+    <div style="display:flex;gap:8px"><span class="ghost">Export</span><span class="btn">Seal a closed month</span></div>
+   </div>
+   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+    <div class="card"><div class="lbl">Signed receipts · Oct</div><div class="disp tnum" style="font-size:26px">142</div></div>
+    <div class="card"><div class="lbl">Collected · Oct</div><div class="disp tnum" style="font-size:26px">$18,430.00</div></div>
+    <div class="card"><div class="lbl">Seal</div><div style="font-size:14px;margin-top:6px">September <span class="ok">sealed ✓</span> · October open</div></div>
+   </div>
+   <div class="card" style="padding:0">
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+     <thead><tr class="lbl" style="text-align:left"><th style="padding:10px 14px;font-weight:400">Date</th><th style="font-weight:400">Member</th><th style="font-weight:400">What</th><th style="font-weight:400;text-align:right">Amount</th><th style="font-weight:400;padding-right:14px;text-align:right">Receipt</th></tr></thead>
+     <tbody class="tnum">
+      <tr style="border-top:1px solid var(--line)"><td style="padding:10px 14px" class="mono">2026-10-31</td><td>customer 3be1</td><td>Tuition · monthly</td><td style="text-align:right">$640.00</td><td style="text-align:right;padding-right:14px"><span class="ok">✓ signed</span> · <u>Verify ↗</u></td></tr>
+      <tr style="border-top:1px solid var(--line)"><td style="padding:10px 14px" class="mono">2026-10-30</td><td>customer 91af</td><td>Class pack · 10</td><td style="text-align:right">$180.00</td><td style="text-align:right;padding-right:14px"><span class="ok">✓ signed</span> · <u>Verify ↗</u></td></tr>
+      <tr style="border-top:1px solid var(--line)"><td style="padding:10px 14px" class="mono">2026-10-29</td><td>customer 0c7e</td><td>Refund · field trip</td><td style="text-align:right;color:var(--alert)">−$35.00</td><td style="text-align:right;padding-right:14px"><span class="ok">✓ signed</span> · <u>Verify ↗</u></td></tr>
+      <tr style="border-top:1px solid var(--line)"><td style="padding:10px 14px" class="mono">2026-10-29</td><td>customer d412</td><td>Tuition · monthly</td><td style="text-align:right">$640.00</td><td style="text-align:right;padding-right:14px"><span class="ok">✓ signed</span> · <u>Verify ↗</u></td></tr>
+     </tbody></table>
+   </div>
+   <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:12px;color:var(--muted)">
+    <span>Stripe (test mode) connected · up to date</span><span class="mono">Starter plan · 612 / 5,000 events this month</span>
+   </div>
+  </main>
+ </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+ <div class="win"><div class="chrome"><div class="url"><b>ledger.trifold.app</b>/sign-in</div></div>
+  <div style="padding:30px 26px;text-align:center"><div class="disp" style="font-size:24px">Sign in to Trifold</div><p style="color:var(--muted);font-size:13px">We'll email you a link. No password.</p>
+  <div style="border:1px solid #2a3145;border-radius:9px;padding:9px;text-align:left;color:var(--dim);font-size:13px;margin:14px 0">treasurer@juniper.school</div><div style="border:1px solid #2a3145;border-radius:9px;padding:8px;font-size:12px;color:var(--muted);margin:0 0 12px;text-align:left">☑ Cloudflare Turnstile · verified</div><span class="btn" style="display:block">Email me a link</span></div></div>
+ <div class="win"><div class="chrome"><div class="url"><b>ledger.trifold.app</b>/o/new</div></div>
+  <div style="padding:22px 22px"><div class="lbl">Step 2 of 3</div><div class="disp" style="font-size:22px;margin:4px 0 10px">Connect Stripe</div>
+  <p style="color:var(--muted);font-size:13px;margin:0 0 12px">Trifold asks Stripe for read-only access: it sees payments, refunds and payouts, and can't move money.</p>
+  <div class="card" style="font-size:13px;margin-bottom:12px">✓ Organization: Juniper School<br><span style="color:var(--muted)">○ Stripe account · ○ Invite your team</span></div>
+  <span class="btn">Connect with Stripe →</span> <span class="ghost">Use test mode</span></div></div>
+</div>
+</body></html>
