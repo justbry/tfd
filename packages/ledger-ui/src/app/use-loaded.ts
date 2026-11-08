@@ -49,27 +49,26 @@ export function useLoaded<Value>(
 	const [loaded, setLoaded] = useState<{ key: string; value: Value } | null>(
 		null,
 	);
-	const [failure, setFailure] = useState<{
-		key: string;
-		error: unknown;
-	} | null>(null);
-	const [attempt, setAttempt] = useState(0);
+	const { failFor, attempt, ...status } = useReadFailure(key);
 	const latest = useRef(load);
 	latest.current = load;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		let current = true;
+		const failed = failFor(key);
 		latest.current().then(
 			(value) => {
 				if (current) setLoaded({ key, value });
 			},
 			(error: unknown) => {
-				if (current) setFailure({ key, error });
+				if (current) failed(error);
 			},
 		);
 		return () => {
 			current = false;
 		};
-	}, [key, attempt]);
+	}, [key, attempt, failFor]);
 	return [
 		loaded?.key === key ? loaded.value : null,
 		(update) =>
@@ -78,13 +77,6 @@ export function useLoaded<Value>(
 					? { key, value: update(previous.value) }
 					: previous,
 			),
-		{
-			failed: failure?.key === key,
-			error: failure?.key === key ? failure.error : null,
-			retry: () => {
-				setFailure(null);
-				setAttempt((before) => before + 1);
-			},
-		},
+		status,
 	];
 }

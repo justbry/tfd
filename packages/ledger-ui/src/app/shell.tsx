@@ -13,7 +13,6 @@ import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
 import { CoreIcon, type CoreIconName } from "./core-icon.tsx";
-import { DemoTabNote, demoNoteTabs } from "./demo-note.tsx";
 import { DialogSlot, useSlotOpener } from "./dialog-slot.tsx";
 import { LoadFailed } from "./load-failed.tsx";
 import type { Change as RosterChange } from "./members-model.ts";
@@ -92,6 +91,15 @@ const noPendingBookings: ReadonlySet<string> = new Set();
 const noMembershipChanges: Record<string, Change> = {};
 const noRosterChanges: RosterChange[] = [];
 const loadPanes = () => import("./panes.tsx");
+/** The panes whose data a demo school does not have: no B4 Uni school stands behind it (S8-contract section 11 "Demo
+ * schools"). The member portal is the Members tab's. They show `DemoTabNote` instead. */
+const demoNoteTabs: ReadonlySet<PaneName> = new Set([
+	"plans",
+	"members",
+	"portal",
+	"bookings",
+	"promos",
+]);
 const loadMenus = () => import("./menus.tsx");
 const loadSettings = () => import("./settings.tsx");
 
@@ -449,7 +457,9 @@ export function Shell({
 						onRetry={disclosureRead.retry}
 					/>
 				)}
-				{ready && school && demoNote && <DemoTabNote school={school} />}
+				{ready && school && panes && demoNote && (
+					<panes.DemoTabNote school={school} />
+				)}
 				<ViewingContext.Provider value={viewing}>
 					{ready && school && panes && paneName && !demoNote && (
 						<panes.Pane

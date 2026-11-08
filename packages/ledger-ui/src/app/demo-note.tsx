@@ -1,18 +1,7 @@
 import type { JSX } from "preact";
 import type { School } from "../data/types.ts";
 import { CoreIcon } from "./core-icon.tsx";
-import type { PaneName } from "./panes.tsx";
 import { formatRoute, type SchoolTab } from "./route.ts";
-
-/** The panes whose data a demo school does not have: no B4 Uni school stands behind it (S8-contract section 11 "Demo
- * schools"). The member portal is the Members tab's. */
-export const demoNoteTabs: ReadonlySet<PaneName> = new Set([
-	"plans",
-	"members",
-	"portal",
-	"bookings",
-	"promos",
-]);
 
 const booksTabs: ReadonlyArray<{ tab: SchoolTab; label: string }> = [
 	{ tab: "dashboard", label: "Dashboard" },
@@ -20,7 +9,8 @@ const booksTabs: ReadonlyArray<{ tab: SchoolTab; label: string }> = [
 	{ tab: "reports", label: "Reports" },
 ];
 
-/** What a demo school shows on a tab it has no data for, with the way to the tabs it has, never an empty pane. */
+/** What a demo school shows on a tab it has no data for (`shell.tsx` `demoNoteTabs`), with the way to the tabs it
+ * has, never an empty pane. Loaded with the panes, not on the first load. */
 export function DemoTabNote({ school }: { school: School }): JSX.Element {
 	return (
 		<output class="note" data-test="demo-tab-note">
