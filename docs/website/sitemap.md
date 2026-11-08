@@ -54,7 +54,7 @@ Deferred until after launch: `/rifo` (folded into Close and Roadmap), `/standard
 5. **Built for schools first.** The school story, a sample receipt (child, hours, EIN), and an "Also for" line linking studios, non-profits, accountants, developers.
 6. **People.** Design partners (B4 Uni, Vibes of Light, with permission) and the founder. Placeholder until approved.
 7. **FAQ.** The six objections from `messaging.md` §8.
-8. **Closing CTA.** "Every dollar, three ways. Every month, sealed." Get early access.
+8. **Closing CTA.** "Every payment gives the payer a receipt they can check, and every closed month is sealed, so a later change shows." Get early access. (Was "Every dollar, three ways": retired until milestone 3.)
 
 ## How it works (`/how-it-works`)
 

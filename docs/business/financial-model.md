@@ -1,6 +1,6 @@
 # Trifold financial model
 
-Status: draft, 2026-11-06; updated 2026-11-07 for what has since landed on `dev` (demo orgs, `upgradeRate`, MRR in the books) and the soft event limit. Every number in the worked example is an assumption to test, not a forecast. Code references are to `packages/atm` on `dev` as of 2026-11-06 (tfd 0.9.0, before 0.10.0) unless a path says otherwise; line numbers may have moved since. tfd is the engine and CLI (the `atm` command until the rename lands, so a command such as `tfd scenario kpis` runs as `atm scenario kpis` today).
+Status: draft, 2026-11-06; updated 2026-11-07 for what has since landed on `dev` (demo orgs, `upgradeRate`, MRR in the books), the soft event limit, the review's model assumptions and the owner's plan decisions (Free at about 300 events, Starter as the wedge plan, Witnessed renamed Audited, a flat 20% affiliate rate). Every number in the worked example is an assumption to test, not a forecast. Code references are to `packages/atm` on `dev` as of 2026-11-06 (tfd 0.9.0, before 0.10.0) unless a path says otherwise; line numbers may have moved since. tfd is the engine and CLI (the `atm` command until the rename lands, so a command such as `tfd scenario kpis` runs as `atm scenario kpis` today).
 
 This doc answers four questions:
 1. Can tfd's scenario generator model Trifold's own business for 1–3 years today?
@@ -8,7 +8,7 @@ This doc answers four questions:
 3. How should expenses get into tfd?
 4. What is the plan, step by step, and what would a 36-month Trifold run look like?
 
-Companion docs: `business-plan.md` (section 8, the outlook this model should reproduce) and `pricing-strategy.md` (tiers, credits, overage).
+Companion docs: `business-plan.md` (section 8, the outlook this model should reproduce) and `pricing-strategy.md` (tiers, credits, overage). Unit economics live in section 7 of this doc.
 
 ## 1. Short answer
 
@@ -22,9 +22,9 @@ Three changes would make it usable: pass in a menu (section 5, phase 1), add gro
 |---|---|---|---|
 | Trifold itself | The school (`SCHOOL_ID`) | `src/scenario/school.ts:10` | Name only: hard-coded to `sch_before_university` |
 | A customer business | A member ("family"), one in-memory subject each | `src/scenario/generate.ts:176-218` | Yes, as a concept |
-| Starter, Pro, Witnessed | Menu tiers with monthly and yearly prices | `fixtures/billing/menu/before-university.json` | No: the generator only uses the demo menu (section 3, gap 1) |
+| Starter, Pro, Audited | Menu tiers with monthly and yearly prices | `fixtures/billing/menu/before-university.json` | No: the generator only uses the demo menu (section 3, gap 1) |
 | Free (cloud) | A tier at $0 | `schema/catalog/menu.v1.json` `amount` minimum 50 cents | No: a tier price must be at least 50 cents. Closest today: `freeShare`, a 100%-discounted invoice, drawn across all tiers |
-| Witnessed + Bookkeeper (~$349) | Witnessed plus a monthly add-on, with the partner's part as a cost | Add-ons; `share.*` postings as the pattern for the partner's part (`src/ledger/postings.ts:255-277`) | Partly: the add-on fits, the passthrough does not exist |
+| Audited + Bookkeeper (~$349) | Audited plus a monthly add-on, with the partner's part as a cost | Add-ons; `share.*` postings as the pattern for the partner's part (`src/ledger/postings.ts:255-277`) | Partly: the add-on fits, the passthrough does not exist |
 | Credits (1 credit = $0.01, one month rollover) | A credit feature granted monthly with `rollover: { months: 1 }` | `menu.v1.json` `grant` and `rollover` (grant up to 100,000 units, rollover 1–24 months) | The menu can say it. The generator cannot spend it (gap 6) |
 | Ledger events per month (the tier limit) | A second credit feature, or a cap outside tfd | — | Not as a limit: tfd has credit balances, not usage caps on a non-credit metric |
 | Compliance packs ($15–30 per state program) | Recurring add-ons | `menu.v1.json` up to 6 add-ons | The menu fits. The generator buys at most one add-on per member, at sign-up, and only the first recurring add-on of an interval (`generate.ts:160-162`, `:198-203`) |
@@ -47,14 +47,14 @@ What works now, with no change: 36 months; monthly and yearly payments; refunds,
 | 3 | **Constant growth.** One `newMembersPerMonth` for every month: no ramp, no S-curve, no school-year seasonality | Section 8 grows paying schools 50 → 300 → 1,000. A constant rate that ends at 1,000 in month 36 puts about 360 paying schools at month 12, seven times the plan (worked in section 5) | `params.ts:61-66`; `generate.ts:164-167` | A `joinsByMonth` series knob (up to 36 whole numbers, overriding `newMembersPerMonth`). A new knob kind, `series`, in `PARAMS`. Code, small |
 | 4 | **No free-to-paid conversion and no downgrades.** Upgrades now exist: `upgradeRate` moves a monthly member to the next dearer tier, and `seatChangeRate` changes a quantity, each billed on a prorated `subscription_update` (on `dev` since 2026-11-06). Otherwise a member keeps its first tier | The plan's biggest unknown is "how many free schools convert to paid" (`business-plan.md` section 8). Net revenue retention above 110% (phase 3 of the plan) needs expansion | `FamilyPlan` is fixed before the run (`generate.ts:88-100`, `:320-519`). The engine already handles an upgrade (`subscription_update` with a proration line) and a downgrade at renewal (`src/billing/grants.ts:788-800`); `invoicePaid` already accepts `subscription_update` (`src/scenario/stripe-events.ts:68-72`). The generator now sends upgrades, not downgrades | Knobs `freeTier` (members on it get zero invoices), `conversionRate` (monthly chance a free member moves to a paid tier, drawn from `tierMix`), `downgradeRate`. The engine is unchanged. Code, medium |
 | 5 | **Constant churn.** One `churnRate` for all months, tiers and ages | Churn is usually higher in the first months and differs by tier; a single rate hides that | `params.ts:90-95`; `generate.ts:362-363` | `churnByTier` weights and, optionally, `firstYearChurnRate`. Code, small |
-| 6 | **No credit consumption model.** Usage is "a chance to book a class, per class credit, at most 3 a month", one unit per booking | AI credits and witnessed receipts are Trifold's metered revenue and its largest variable cost. 500–1,500 credits per Rifo close can't be booked one unit at a time | `params.ts:120-125`; `generate.ts:410-425`; the store's `consume` always tracks `value: 1` (`src/scenario/store.ts:265-290`), though the engine's `track` takes any value | `usage: { [featureId]: { meanPerMonth, byTier? } }` and `consume({ value })`. A top-up add-on bought when a balance runs out (`topUpAddon`). Code, medium |
+| 6 | **No credit consumption model.** Usage is "a chance to book a class, per class credit, at most 3 a month", one unit per booking | AI credits and countersigned receipts are Trifold's metered revenue and its largest variable cost. 500–1,500 credits per Rifo close can't be booked one unit at a time | `params.ts:120-125`; `generate.ts:410-425`; the store's `consume` always tracks `value: 1` (`src/scenario/store.ts:265-290`), though the engine's `track` takes any value | `usage: { [featureId]: { meanPerMonth, byTier? } }` and `consume({ value })`. A top-up add-on bought when a balance runs out (`topUpAddon`). Code, medium |
 | 7 | **Cash basis only: no ARR or deferred revenue. MRR is now built on `dev` (unreleased):** a `mrr.changed` event in a memo commodity `MRR`, booked from a subscription's recurring lines, with KPIs `mrr`, `new_mrr`, `expansion_mrr`, `contraction_mrr`, `churned_mrr` and `net_new_mrr` in all three channels (`CHANGELOG.md`, Unreleased). What follows is the gap as it was on 2026-11-06; deferred revenue is still open | Investors and pricing decisions read MRR, ARR, expansion and churned MRR. On cash basis a yearly payment is a spike; `paying_members` falls to 0 in months with no yearly renewal | `docs/scenarios.md`, "Dropped, and why"; `ROADMAP.md`, "Revenue is booked when the invoice is paid" (owner decision open); `payment.succeeded`'s payload has no interval (`src/billing/money.ts:198-210`), although the invoice line has one (`generate.ts:344`) | The fix `docs/scenarios.md` proposes: `interval` and `period_end` labels on `payment.succeeded`, from the invoice line. Then MRR is a KPI spec entry (a yearly payment counted as amount / 12 in each month to `period_end`) — but that spread is a new spec operation, not a `sum`. Code in the production write path, plus a payload schema change and every golden. Needs the owner's decision |
 | 8 | **No expenses beyond Stripe and disputes.** | Without COGS and opex there is no gross margin, operating income, burn or runway | The only expense accounts are `expenses:billing:stripe-fees`, `:disputes`, `:dispute-fees` and `:b4uni-share` (`src/ledger/postings.ts:197-277`) | Section 4. Code, medium |
-| 9 | **Partner passthrough (the bundle).** | The plan counts only Trifold's ~$149 of the ~$349 bundle. Booked as one income line, gross collected overstates revenue by about $200 per bundle | No partner account exists. `share.accrued` is the shape to copy: `expenses:billing:b4uni-share` + / `liabilities:b4uni` − (`postings.ts:255-264`) | Model the bundle as Witnessed plus a `bookkeeper` add-on; book the partner's part as `expenses:billing:partner-share` against `liabilities:partners:<partner>`; add a `net_revenue` KPI (gross less refunds and partner share). Part of the expense work |
+| 9 | **Partner passthrough (the bundle).** | The plan counts only Trifold's ~$149 of the ~$349 bundle. Booked as one income line, gross collected overstates revenue by about $200 per bundle | No partner account exists. `share.accrued` is the shape to copy: `expenses:billing:b4uni-share` + / `liabilities:b4uni` − (`postings.ts:255-264`) | Model the bundle as Audited plus a `bookkeeper` add-on; book the partner's part as `expenses:billing:partner-share` against `liabilities:partners:<partner>`; add a `net_revenue` KPI (gross less refunds and partner share). Part of the expense work |
 | 10 | **No metered revenue.** Platform's event fee and Witness API receipts are post-paid usage (the other tiers' event limit is soft, with no overage) | Small in years 1–2 (section 8 says "small"); 10–20% on top in year 3 | `docs/usage-metering.md`: metered pricing is out of scope; an invoice line the menu doesn't know refuses the invoice (`ROADMAP.md`, D4) | Model as prepaid packs (one-time add-ons that grant credits), which is what `pricing-strategy.md` already sells through credits. Post-paid metering: outside tfd |
 | 11 | **No cohorts.** | Net revenue retention, payback by cohort and conversion curves are cohort views | The KPI spec has `sum`, `count`, `distinct` (with `first`), `ratio`, `combine` (`schema/kpis.v1.json`); nothing groups holders by first-payment month | Outside tfd: DuckDB over the event Parquet, grouping by each holder's first `payment.succeeded`. A spec operation only if this becomes a dashboard |
 | 12 | **SaaS KPIs missing.** MRR, ARR, NRR, logo churn, CAC, payback, gross margin, burn, runway | They are the outputs a 1–3 year plan is read by | `kpis/school.v1.json` has money, counts, rates, members, credits and balances only | Most become spec entries once gaps 7 and 8 are closed (table below). One file, `kpis/saas.v1.json`, and a `--kpis <file>` option (`runParity` already takes a `spec`, `src/scenario/parity.ts:73-86`; the CLI always passes the default) |
-| 13 | **The Free tier can't be priced at $0, and the menu holds 4 tiers.** | Free, Starter, Pro, Witnessed and the bundle are five offers | `menu.v1.json`: `amount` minimum 50, `tiers` `maxItems` 4 | Four tiers: free (a nominal price, always invoiced at zero via `freeTier`), starter, pro, witnessed. The bundle is witnessed plus the `bookkeeper` add-on. No schema change |
+| 13 | **The Free tier can't be priced at $0, and the menu holds 4 tiers.** | Free, Starter, Pro, Audited and the bundle are five offers | `menu.v1.json`: `amount` minimum 50, `tiers` `maxItems` 4 | Four tiers: free (a nominal price, always invoiced at zero via `freeTier`), starter, pro, audited. The bundle is audited plus the `bookkeeper` add-on. No schema change |
 | 14 | **Zero invoices leave no ledger event after the first month.** | Free schools can't be counted from the books month by month | `docs/scenarios.md`, "A renewal that moves nothing leaves no credit event"; `paying_members` counts payments only | Count active free schools from `credit.spent` (distinct holders with no membership payment), or report them from the generator's `stats`. A KPI entry or a stat |
 
 ### KPIs a SaaS model needs
@@ -83,10 +83,13 @@ What works now, with no change: 36 months; monthly and yearly payments; refunds,
 | Dispute losses and fees | Per dispute | Variable | `expenses:billing:disputes`, `expenses:billing:dispute-fees` (exist) |
 | Partner bookkeeper payouts | Per bundle per month | Variable | `expenses:billing:partner-share`, owed on `liabilities:partners:<partner>` until paid |
 | AI tokens | Per credit consumed by Rifo | Variable | `expenses:cogs:ai-tokens` |
-| Witness operations (key service, transparency log) | Per witnessed receipt and seal; a fixed floor | Mixed | `expenses:cogs:witness` |
+| Witness operations (key service, transparency log) | Per countersigned receipt and seal; a fixed floor | Mixed | `expenses:cogs:witness` |
 | Hosting (Workers, R2, D1) | Per ledger event; a fixed floor | Mixed, small | `expenses:cogs:hosting` |
-| Support | Per paying school, then a person | Mixed | `expenses:opex:support` |
-| People | Salary schedule | Fixed | `expenses:opex:payroll` |
+| Support | Per paying school, $8–12 a month (section 7) | Variable; counted as COGS | `expenses:cogs:support` |
+| Affiliate commissions | 20% of a referred school's subscription for 24 months | Variable | `expenses:opex:affiliate-commissions` (Trifold's own `share.*` ledger, `go-to-market.md` 3.5) |
+| Firm wholesale | Practice clients at 30% off, Practice Pro at wholesale | Variable | None: book the lower price as revenue; it lowers ARPU, not CAC |
+| People | Salary schedule, at 1.2× salary for taxes and benefits | Fixed | `expenses:opex:payroll` |
+| Founder pay | Schedule | Fixed | `expenses:opex:payroll:founder` |
 | Contractors | Schedule | Fixed | `expenses:opex:contractors` |
 | Legal (license, trademarks, witness terms, partner contracts) | One-off and yearly | Fixed | `expenses:opex:legal` |
 | Software and tools | Monthly | Fixed | `expenses:opex:software` |
@@ -174,40 +177,44 @@ Every value is an assumption. Knobs marked "new" don't exist yet; the phase that
 
 | Id | Kind | Price | Grants |
 |---|---|---|---|
-| `free` | tier | 50 cents nominal, always invoiced at zero (`freeTier`) | 200 `credit` a month, rollover 1 month |
+| `free` | tier | 50 cents nominal, always invoiced at zero (`freeTier`); about 300 events a month, a soft limit outside tfd | 200 `credit` a month, rollover 1 month |
 | `starter` | tier | $29 a month, $290 a year (`pricing-strategy.md` section 4) | 1,000 `credit` a month, rollover 1 month |
 | `pro` | tier | $79 a month, $790 a year | 5,000 `credit`, rollover 1 month |
-| `witnessed` | tier | $149 a month, $1,490 a year | 8,000 `credit`, rollover 1 month |
-| `bookkeeper` | add-on, monthly | $200 (makes the ~$349 bundle with Witnessed) | none |
-| `compliance-pack` | add-on, monthly | $20 (assumption, middle of $15–30) | none |
+| `audited` | tier | $149 a month, $1,490 a year | 8,000 `credit`, rollover 1 month |
+| `bookkeeper` | add-on, monthly | $200 (makes the ~$349 bundle with Audited) | none |
+| `compliance-pack` | add-on, monthly | $20 (assumption, middle of $15–30); included in `audited` | none |
 | `credits-1000` | add-on, once | $10 | 1,000 `credit` |
-| `witness-1000` | add-on, once | $30 (Witness API pack, low end of $0.03–0.05) | 1,000 `credit` |
+| `witness-1000` | add-on, once | $30 (Witness API pack for platforms, low end of $0.03–0.05) | 1,000 `credit` |
 
 **Knobs:**
 
 | Knob | Value | Note |
 |---|---|---|
 | `months`, `start` | 36, `2027-01` | Assumption: phase 1 of the plan starts in January |
-| `members` | 10 | The design-partner schools, paying from month 1 |
+| `members` | 10 | The design partners (`go-to-market.md` §0), on `free` with free hosted setup; about half pay after the day-60 price conversation. Related parties (B4 Uni, Vibes of Light) are not counted |
 | `joinsByMonth` (new, 2) | 35 a month in year 1, 200 in year 2, 730 in year 3 | Sign-ups land on `free` |
+| `paidJoinsByMonth` (new, 2) | 4 a month in year 1, 15 in year 2, 35 in year 3 | Direct paid sign-ups from founder-led sales, firms and referrals |
 | `freeTier` (new, 3) | `free` | |
-| `conversionRate` (new, 3) | 0.02 a month | Free → paid, drawn from `tierMix` |
-| `tierMix` | `starter` 40, `pro` 35, `witnessed` 25 | Section 8's mix, the bundle inside Witnessed |
-| `addonRates` (new, 3) | `bookkeeper` 0.2 of Witnessed (5% of paying), `compliance-pack` 0.3 | |
+| `conversionRate` (new, 3) | 0.0075 a month (range 0.005–0.01) | Free → paid, drawn from `tierMix`. Free's smaller limit (about 40 families) pushes growing schools to Starter |
+| `tierMix` | `starter` 40, `pro` 35, `audited` 25 | Section 8's steady mix, the bundle inside Audited. In year 1 only `starter` is on sale; `pro` comes in year 2 and `audited` late in year 2 (`business-plan.md` §8) |
+| `addonRates` (new, 3) | `bookkeeper` 0.2 of Audited (5% of paying); `compliance-pack` 0.6 of Starter in year 1, then 0.3 of non-Audited schools | |
 | `upgradeRate` (exists), `downgradeRate` (new, 3) | 0.01, 0.003 a month | |
-| `churnRate` | 0.02 a month paid; free schools 0.03 (new, 3) | |
+| `churnRate` | 0.03 a month paid; free schools 0.03 (new, 3) | |
 | `yearlyShare` | 0.15 | |
-| `usage` (new, 3) | `credit` per month: free 50, starter 300, pro 1,500, witnessed 3,000 | Witnessed: ~100 receipts × 3, a seal, a Rifo close |
+| `usage` (new, 3) | `credit` per month: free 50, starter 300, pro 1,500, audited 1,800 | Pro: a Rifo close (~1,000) plus questions and Pricing Lab. Audited: Pro's use plus ~100 countersigned receipts × 3 and a seal at 25 (`pricing-strategy.md` §5) |
 | `refundRate`, `disputeRate` | 0.01, 0.002 | |
 | `feePercent`, `feeFixedCents` | 2.9, 30 | Exist today |
-| `aiCostPerCreditMicros` (new, 5b) | 4,000 (0.4 cents a credit, 40% of face) | Assumption; replace with measured token cost |
+| `aiCostPerCreditMicros` (new, 5b) | 3,300 (0.33 cents a credit, under a third of face, `pricing-strategy.md` §4) | A ceiling; replace with measured token cost (experiment C) |
+| `supportCostPerSchoolCents` (new, 5b) | 1,000 a paying school a month (range 800–1,200) | COGS; experiment C tests under 30 minutes a school a month |
+| `affiliateShare` (new, 5b) | 20% for 24 months on affiliate-sourced schools, from Stage C (about 15% of new paying schools) | The owner's flat rate, `go-to-market.md` 3.1 |
+| `firmWholesale` (new, 5b) | 30% off for Practice clients (about 10% of paying schools from year 2) | Lowers revenue, not CAC |
 | `hostingFixedCents`, `hostingCostPerThousandEventsCents` (new, 5b) | 5,000 a month, 5 | Assumption, generous; R2 storage alone is under a cent a school (`pricing-strategy.md` section 3) |
-| `partnerShare` (new, 5b) | `bookkeeper` 100% | Trifold keeps the $149 Witnessed price |
-| `opex` (new, 5b) | software $300/mo; legal $15,000 over months 1–6, then $500/mo; support contractor $2,000/mo from month 13; marketing $1,000/mo year 1, $3,000 year 2, $8,000 year 3; one hire at $8,000/mo from month 19, two more from month 28 | All assumptions; founder pay left out |
+| `partnerShare` (new, 5b) | `bookkeeper` 100% | Trifold keeps the $149 Audited price |
+| `opex` (new, 5b) | software $300/mo; legal $15,000 over months 1–6, then $500/mo; marketing $1,000/mo year 1, $3,000 year 2, $25,000 year 3; founder pay $6,000/mo; one hire at $8,000/mo salary ($9,600 at 1.2×) from month 19, two more from month 28 | All assumptions. Support is now COGS. Founder pay at $0 gives the bootstrapped case |
 
-Why the growth knobs matter: with today's constant `newMembersPerMonth` and 1.5% monthly churn, reaching ~1,000 paying schools at month 36 needs about 35 new paying schools a month (35 × (1 − 0.985^35) / 0.015 ≈ 960). The same rate puts about 360 paying schools at month 12 (35 × (1 − 0.985^11) / 0.015), against the plan's 50.
+Why the growth knobs matter: with today's constant `newMembersPerMonth` and 3% monthly churn, reaching ~1,000 paying schools at month 36 needs about 46 new paying schools a month (46 × (1 − 0.97^35) / 0.03 ≈ 1,005). The same rate puts about 440 paying schools at month 12 (46 × (1 − 0.97^11) / 0.03), against the plan's 50.
 
-Rough check of the year-end counts with these knobs (hand arithmetic, to tune against the run): year 1 ends with about 300 free and 50 paying (10 partners plus ~3 conversions a month); year 2 about 2,000 free and 270–300 paying; year 3 about 8,000 free and 1,000–1,300 paying. That's about 11,600 members created, which is why phase 2's caps and planning mode come before anything else in this run.
+Rough check of the year-end counts with these knobs (a monthly hand model, to tune against the run): year 1 ends with about 330 free and 55 paying (about 16 from the free pool, the rest direct, including design partners who pay after day 60); year 2 about 2,100 free and 300 paying; year 3 about 8,200 free and 1,030 paying. At 0.5% conversion year 3 ends near 850 paying; at 1%, near 1,200. That's about 13,000 members created, which is why phase 2's caps and planning mode come before anything else in this run.
 
 **What it would output, per month** (`kpis.json` and `kpis.parquet`):
 - Revenue: `gross_collected`, `revenue_by_tier:<tier>`, `revenue_by_kind:membership|addon`, `refunds`, `net_revenue` (new).
@@ -216,7 +223,13 @@ Rough check of the year-end counts with these knobs (hand arithmetic, to tune ag
 - Costs: `stripe_fees`, `dispute_fees`, `partner_share`, `cogs` (AI, witness, hosting), `gross_margin`, `opex` by account, `operating_income`, `cac` (all new except the first two).
 - Cash: `payouts`, cash on hand (new). Runway and NRR from the notebook.
 
-**What month 36 should roughly show**, from section 8's assumptions (hand arithmetic, not a run): 1,000 paying schools × ~$76.50 subscription ≈ $76,500, plus ~$2,500 credit packs (about $2.50 per paying school), plus ~$10,000 bookkeeper passthrough (50 bundles × $200), so gross collected ≈ $89,000 and net revenue ≈ $79,000. Costs: Stripe ≈ $3,000; partner share $10,000; AI ≈ $6,000 for paying schools (1,500 credits average × 1,000 × 0.4 cents) plus ≈ $1,600 for 8,000 free schools; hosting under $1,000. Gross margin about 85% of net revenue. Opex in month 36 ≈ $35,000 with the schedule above, so operating income is positive by year 3 under these assumptions and negative through most of year 2.
+**What month 36 should roughly show** (hand arithmetic, not a run; all assumptions):
+- **Collected:** 1,000 paying schools × ~$64.70 realized (subscriptions ~$60 plus compliance packs ~$4.70) ≈ $64,700; credit packs ≈ $2,500; bookkeeper passthrough ≈ $10,000 (50 bundles × $200). Gross collected ≈ $77,200.
+- **Net revenue** ≈ $65,400: gross less the passthrough (the partner's money, never Trifold's revenue) and firm wholesale discounts (≈ $1,800: 100 schools × 30% × $60). The passthrough is netted here once, so it is not a cost below.
+- **COGS** ≈ $16,500–20,500: Stripe ≈ $2,600; support $8,000–12,000; AI ≤ $4,700 (paying schools average about 1,000 AI credits a month, free schools 50, at 0.33 cents); witness operations ≈ $500; hosting under $1,000.
+- **Gross margin** ≈ 69–75% of net revenue, company-wide, including the free schools' AI. Per paying school it is 75–80% when support lands near $8 (section 7).
+- **Opex** ≈ $62,000: marketing $25,000, three hires $28,800, founder pay $6,000, affiliate commissions ≈ $1,400 (about 120 schools inside their 24 months × 20% × $60), software and legal $800.
+- **Operating income** ≈ −$13,000 to −$17,000 a month. Under these assumptions Trifold isn't yet profitable at month 36. Break-even needs about 1,250–1,350 paying schools at this cost base, or marketing held near $8,000 a month, or the list-price case.
 
 ## 6. What this doesn't cover
 
@@ -224,3 +237,30 @@ Rough check of the year-end counts with these knobs (hand arithmetic, to tune ag
 - Taxes, sales tax on SaaS by state, and income tax.
 - Fundraising and equity. tfd has `fundraise.*` for Zeffy donations, which is not equity.
 - Price response (how conversion changes when a price changes). That is Pricing Lab's forward forecast (`pricing-strategy.md` section 7), which would build on phases 1–4.
+
+## 7. Unit economics (assumptions)
+
+The one home for unit economics; other docs link here. Every number is an assumption to test, mostly by the experiments in `business-plan.md` §11. Per paying school, per month, base case:
+
+| Line | Base | Basis |
+|---|---|---|
+| Realized ARPU | ~$60 | The list mix ($76.50) less non-profit, annual, partner and referral discounts (`business-plan.md` §8). By year: ~$40, ~$55, ~$65 |
+| Stripe fees | ~$2 | 2.9% + 30 cents |
+| Support | $8–12 | Counted as COGS; under 30 minutes a school a month (experiment C) |
+| AI tokens | ≤ $3.40 | About 1,000 AI credits used a month across the mix, at under a third of face value |
+| Witness operations and hosting | ~$1 | Key service, transparency log, Workers and R2 |
+| Gross margin | 75–80% | Needs support near $8; at $12 it is about 70%. Company-wide, with free schools' AI, ≈ 69–75% (month 36 above) |
+| Contribution | ~$45–48 | ARPU × gross margin |
+| Paid churn | 3% a month | |
+| Lifetime | ~33 months | 1 / churn |
+| LTV | ~$1,500 | Contribution × lifetime |
+
+**CAC by channel:**
+
+| Channel | CAC | Basis | LTV / CAC | Payback |
+|---|---|---|---|---|
+| Founder-led direct | ~$300–500 | About 5–8 hours of founder time per school, plus travel | 3–5× | 7–11 months |
+| Schools refer schools | ~$130 | Give a month, get a month: two months at ~$60, plus handling | ~11× | ~3 months |
+| Affiliates | ~$245–325 | 20% of ~$60 for the months the school pays within 24 (about 17 at 3% churn, at most 24), plus the referred school's 20% off three months (~$36). Paid as it is earned, not up front | 5–6× | 5–7 months equivalent |
+| Firms | ~$0 cash | The cost is the Practice discount or the wholesale margin, booked as lower revenue | n/a | n/a |
+| Paid ads and content | ~$800–1,500 | The reviewers' estimate; not measured | 1–2× | 18–33 months. **Avoid in years 1–2** |
