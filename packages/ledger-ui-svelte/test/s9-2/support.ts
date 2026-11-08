@@ -10,7 +10,7 @@ import { manualClock } from "../../src/effect/clock.ts";
 import { memoryLog } from "../../src/effect/log.ts";
 import type { Toast } from "../../src/effect/toast-model.ts";
 import { until } from "../app-harness.ts";
-import { calendar } from "../helpers.ts";
+import { calendar, noConfig } from "../helpers.ts";
 
 export const fixtureReader = (): Reader =>
 	createFixtureReader({ clock: calendar });
@@ -44,6 +44,7 @@ export async function openPane(
 		appLayer({
 			reader: options.reader ?? fixtureReader(),
 			writer: options.writer ?? fixtureWriter(),
+			config: noConfig,
 			clockLayer: manualClock().layer,
 		}),
 		log.layer,

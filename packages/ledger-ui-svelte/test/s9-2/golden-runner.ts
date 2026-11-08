@@ -9,7 +9,7 @@ import { type MountedApp, mountApp } from "../../src/app/mount.ts";
 import { appLayer } from "../../src/effect/app-layer.ts";
 import { manualClock } from "../../src/effect/clock.ts";
 import { until } from "../app-harness.ts";
-import { calendar } from "../helpers.ts";
+import { calendar, noConfig } from "../helpers.ts";
 
 /**
  * The Preact package's golden files S2 (Bookings) and S4 (Members), read in place and unchanged, run against the Svelte
@@ -323,7 +323,12 @@ const runEntry = async (
 	const root = document.getElementById("app") as HTMLElement;
 	const writer = createFixtureWriter({ mode: entry.writer ?? "instant" });
 	mounted = mountApp(root, {
-		layer: appLayer({ reader, writer, clockLayer: manualClock().layer }),
+		layer: appLayer({
+			reader,
+			writer,
+			config: noConfig,
+			clockLayer: manualClock().layer,
+		}),
 		calendar,
 	});
 	await until(

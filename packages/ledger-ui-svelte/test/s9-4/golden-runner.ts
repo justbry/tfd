@@ -9,7 +9,7 @@ import { type MountedApp, mountApp } from "../../src/app/mount.ts";
 import { appLayer } from "../../src/effect/app-layer.ts";
 import { manualClock } from "../../src/effect/clock.ts";
 import { until } from "../app-harness.ts";
-import { calendar } from "../helpers.ts";
+import { calendar, noConfig } from "../helpers.ts";
 
 /**
  * The Ledger and Reports entries of the Preact package's golden file S5 (packages/ledger-ui/test/golden/S5.json, read in
@@ -317,7 +317,12 @@ const runEntry = async (
 	const root = document.getElementById("app") as HTMLElement;
 	const writer = createFixtureWriter({ mode: entry.writer ?? "instant" });
 	mounted = mountApp(root, {
-		layer: appLayer({ reader, writer, clockLayer: manualClock().layer }),
+		layer: appLayer({
+			reader,
+			writer,
+			config: noConfig,
+			clockLayer: manualClock().layer,
+		}),
 		calendar,
 	});
 	await until(

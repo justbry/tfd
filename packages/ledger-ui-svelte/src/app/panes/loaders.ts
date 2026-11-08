@@ -6,4 +6,6 @@ export const loaders = {
 	members: () => import("../members/Members.svelte"),
 	ledger: () => import("../ledger/Ledger.svelte"),
 	reports: () => import("../reports/Reports.svelte"),
+	plans: () => import("../plans/Plans.svelte"),
+	promos: () => import("../promos/Promos.svelte"),
 };
