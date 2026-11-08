@@ -31,6 +31,7 @@ import {
 	eventLabel,
 	formatDay,
 	formatPaymentDay,
+	formatPeriodEnd,
 	formatWallTime,
 	historyOf,
 	paymentsOf,
@@ -132,7 +133,7 @@ function BookingRow({
 	booking: MemberBooking;
 	context: PersonContext;
 	unit: DrawerProps["unit"];
-	currency: string;
+	currency: string | null;
 	busy: DrawerProps["busy"];
 	onAction: DrawerProps["onBookingAction"];
 }): JSX.Element {
@@ -330,8 +331,8 @@ export function MemberDrawer({
 					<AttentionBadges reasons={reasons} unitPlural={unit.other} />{" "}
 					<span class="badge" data-test="renews-badge">
 						{ended
-							? `ends ${standing?.endsToday ? "today" : formatDay(member.currentPeriodEnd, school.timeZone)}`
-							: `renews ${formatDay(member.currentPeriodEnd, school.timeZone)}`}
+							? `ends ${standing?.endsToday ? "today" : formatPeriodEnd(member.currentPeriodEnd, school.timeZone)}`
+							: `renews ${formatPeriodEnd(member.currentPeriodEnd, school.timeZone)}`}
 					</span>
 				</>
 			)}

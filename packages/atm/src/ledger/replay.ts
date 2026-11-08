@@ -300,6 +300,56 @@ export const compareChanges = (
 	return "partial";
 };
 
+type RolloverWrite = {
+	table: "rollovers";
+	op: "update" | "delete";
+	id: string;
+	after?: { balance?: number; entities?: unknown };
+};
+
+/**
+ * The changes an older engine's reset made to rollovers already expired at the reset: its rollover cap counted them and
+ * trimmed or deleted them, where the engine now leaves them for the cron to lapse. They move no available balance (the
+ * row had lapsed), so a log written then still replays: what is left of the recorded reset must be what the engine
+ * decides, and the replay keeps the rows the log's writer stored.
+ */
+const expiredRolloverWrites = ({
+	changes,
+	state,
+	atMs,
+}: {
+	changes: readonly unknown[];
+	state: SubjectState | null;
+	atMs: number;
+}): RolloverWrite[] =>
+	changes.filter((change): change is RolloverWrite => {
+		const write = change as Partial<RolloverWrite>;
+		if (
+			write.table !== "rollovers" ||
+			(write.op !== "update" && write.op !== "delete")
+		)
+			return false;
+		const row = state?.rollovers.find((r) => r.id === write.id);
+		return row?.expires_at != null && row.expires_at <= atMs;
+	});
+
+/** The engine's state with an older reset's writes to expired rollovers applied, as the log's writer stored it. */
+const withRolloverWrites = (
+	state: SubjectState,
+	writes: readonly RolloverWrite[],
+): SubjectState => {
+	const byId = new Map(writes.map((write) => [write.id, write]));
+	return {
+		...state,
+		rollovers: state.rollovers.flatMap((row) => {
+			const write = byId.get(row.id);
+			if (!write) return [row];
+			if (write.op === "delete") return [];
+			return [{ ...row, ...write.after } as typeof row];
+		}),
+	};
+};
+
 /** Where an event's own changes sit in the decided mutation's: the cut an old booking was made from. */
 const positionsIn = (
 	decided: readonly unknown[],
@@ -501,10 +551,30 @@ export const replayEvents = ({
 					string,
 					unknown
 				>;
-				const fit = compareChanges(
-					decided.changes as unknown[],
-					recorded.changes,
-				);
+				const decidedChanges = decided.changes as unknown[];
+				const expiredWrites =
+					cmd.type === "reset"
+						? expiredRolloverWrites({
+								changes: recorded.changes,
+								state: start,
+								atMs: ms,
+							})
+						: [];
+				const olderReset =
+					expiredWrites.length > 0 &&
+					compareChanges(decidedChanges, recorded.changes) === "differs" &&
+					compareChanges(
+						decidedChanges,
+						recorded.changes.filter(
+							(change) => !expiredWrites.includes(change as RolloverWrite),
+						),
+					) === "same"
+						? expiredWrites
+						: [];
+				const fit =
+					olderReset.length > 0
+						? "same"
+						: compareChanges(decidedChanges, recorded.changes);
 				const sameRest =
 					canonicalize({ ...decided, changes: null }) ===
 					canonicalize({ ...recorded, changes: null });
@@ -520,9 +590,18 @@ export const replayEvents = ({
 					);
 				}
 				states[key] = inStoredOrder(
-					run.state as SubjectState,
+					withRolloverWrites(run.state as SubjectState, olderReset),
 				) as unknown as AtmSubjectState;
-				entry = { mutation: run.mutation, before };
+				entry = {
+					mutation:
+						olderReset.length > 0
+							? {
+									...run.mutation,
+									changes: recorded.changes as SubjectStateMutation["changes"],
+								}
+							: run.mutation,
+					before,
+				};
 				cache.set(cacheKey, entry);
 			}
 			if (entry && !e.event_type.startsWith("plan.")) {

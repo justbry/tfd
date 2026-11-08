@@ -125,6 +125,7 @@ export function createFixtureWriter(options: {
 		cancelBooking,
 		remindHost: (request) => record("remindHost", [request], nothing),
 		saveMenu: (schoolId, menu) => record("saveMenu", [schoolId, menu], nothing),
+		/* The PIN is never recorded: a write's record holds no secret. */
 		publishMenu: (schoolId) => record("publishMenu", [schoolId], nothing),
 		refund: (request) =>
 			record("refund", [request], () => ({
@@ -148,6 +149,8 @@ export function createFixtureWriter(options: {
 		resumeMembership: (request) =>
 			record("resumeMembership", [request], accepted),
 		resendReceipt: (request) => record("resendReceipt", [request], accepted),
+		/* The fixtures check no PIN: every PIN opens the books, at once and unrecorded, in either mode. */
+		unlockBooks: async () => ({ unlocked: true }),
 		download: (file) => record("download", [file], nothing),
 		createPromo: (request) =>
 			record("createPromo", [request], () => ({

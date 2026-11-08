@@ -1,0 +1,13 @@
+Copyright 2026 Trifold. All rights reserved.
+
+The Trifold brief in this directory (its slides, copy, figures, design, code,
+scripts and rendered pages) is proprietary and confidential. You may view it
+if Trifold gave you access. You may not copy, modify, host or redistribute
+it, in whole or in part, without written permission from Trifold. "Trifold",
+"tfd" and "Rifo" are Trifold's brands.
+
+The typefaces embedded in the rendered pages (Fraunces, Inter and JetBrains
+Mono, in fonts/) are not Trifold's: they are under the SIL Open Font License,
+Version 1.1, whose text and copyright notices are in fonts/*-OFL.txt. The
+rendered pages also embed reveal.js (MIT) and Quarto's presentation code,
+which keep their own licenses.

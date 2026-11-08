@@ -246,12 +246,15 @@ const sum = (values: Iterable<number>): number => {
 	return total;
 };
 
+/** The fixtures record every line, so none of their amounts is null. */
+type RecordedAmounts = { [Line in keyof StatementAmounts]: number };
+
 function statementOf(
 	sources: SourceEvent[],
 	from: string,
 	to: string,
 ): {
-	amounts: StatementAmounts;
+	amounts: RecordedAmounts;
 	counts: IncomeStatement["counts"];
 } {
 	const inPeriod = sources.filter(({ at }) => {
@@ -343,7 +346,9 @@ function incomeSeries(
 	};
 }
 
-function giftsOutstanding(school: string): IncomeStatement["giftsOutstanding"] {
+function giftsOutstanding(
+	school: string,
+): NonNullable<IncomeStatement["giftsOutstanding"]> {
 	const active = (promosBySchool[school] ?? []).filter(
 		({ type, status }) => type !== "member" && status === "active",
 	);
@@ -720,14 +725,18 @@ function donorSpread(
 
 // ---- The Reader methods.
 
+/** A fixture school: every one has a currency (`School.currency` is null only for a real school with no menu and no
+ * Stripe account). */
+export type FixtureSchool = School & { currency: string };
+
 export function createLedgerReader(options: {
 	clock: Clock;
-	schools: School[];
+	schools: FixtureSchool[];
 	/** The KPI document the Dashboard shows for this school and audience: Reports reads its cells. */
 	reportDocument: (query: AudienceReportQuery) => KpiDocument;
 }): LedgerReader {
 	const { clock, schools } = options;
-	const schoolOf = (id: string): School => {
+	const schoolOf = (id: string): FixtureSchool => {
 		const school = schools.find((candidate) => candidate.id === id);
 		if (!school) throw new Error(`no school ${id}`);
 		return school;
@@ -743,7 +752,7 @@ export function createLedgerReader(options: {
 			const changes = Object.fromEntries(
 				Object.entries(amounts).map(([line, cents]) => [
 					line,
-					cents - before[line as keyof StatementAmounts],
+					cents - before[line as keyof RecordedAmounts],
 				]),
 			) as StatementAmounts;
 			return {

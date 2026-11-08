@@ -575,24 +575,6 @@
           "op": "insert",
           "id": "roll_cmd_032_1",
           "detail": "{\"row\":{\"balance\":1,\"cus_ent_id\":\"ce_1\",\"entities\":{},\"expires_at\":1786982580000,\"id\":\"roll_cmd_032_1\",\"usage\":0}}"
-        },
-        {
-          "table": "rollovers",
-          "op": "delete",
-          "id": "roll_cmd_010_1",
-          "detail": "{}"
-        },
-        {
-          "table": "rollovers",
-          "op": "delete",
-          "id": "roll_cmd_023_1",
-          "detail": "{}"
-        },
-        {
-          "table": "rollovers",
-          "op": "delete",
-          "id": "roll_cmd_028_1",
-          "detail": "{}"
         }
       ],
       "added": [
@@ -663,12 +645,6 @@
           "op": "insert",
           "id": "roll_cmd_035_1",
           "detail": "{\"row\":{\"balance\":1,\"cus_ent_id\":\"ce_1\",\"entities\":{},\"expires_at\":1789660980000,\"id\":\"roll_cmd_035_1\",\"usage\":0}}"
-        },
-        {
-          "table": "rollovers",
-          "op": "delete",
-          "id": "roll_cmd_032_1",
-          "detail": "{}"
         }
       ],
       "added": [
@@ -718,25 +694,6 @@
         }
       ],
       "resultChanged": true
-    },
-    {
-      "key": "family:fam_th6z",
-      "commandId": "cmd_051",
-      "command": "reset",
-      "at": "2026-12-17T16:03:18Z",
-      "eventIds": [
-        "01MA2BWQBG00037E3MME8Y2BFQ"
-      ],
-      "removed": [
-        {
-          "table": "rollovers",
-          "op": "delete",
-          "id": "roll_cmd_035_1",
-          "detail": "{}"
-        }
-      ],
-      "added": [],
-      "resultChanged": false
     }
   ],
   "refused": [
@@ -875,7 +832,7 @@
       "payment.refunded": 1
     }
   },
-  "differences": 40,
+  "differences": 39,
   "asOf": "2026-12-28T17:00:00Z",
-  "summary": "simulate: 81 events replayed against the candidate, balances as of 2026-12-28T17:00:00Z; 40 differences\nbalances that differ: none\nposting totals that differ: 19\n  2026-02 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-02 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-03 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-03 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-04 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-04 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-05 credits:forfeited VISIT: 1 -> 0\n  2026-05 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-06 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-06 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-07 credits:avail:family:fam_th6z:visit VISIT: -1 -> 0\n  2026-07 credits:expired VISIT: 1 -> 0\n  2026-08 credits:avail:family:fam_th6z:visit VISIT: -2 -> 0\n  2026-08 credits:held:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-08 credits:spent:energy-45 VISIT: 1 -> 0\n  2026-09 credits:avail:family:fam_th6z:visit VISIT: -1 -> 0\n  2026-09 credits:expired VISIT: 1 -> 0\n  2026-09 credits:held:family:fam_th6z:visit VISIT: -1 -> 0\n  2026-09 credits:spent:massage-90 VISIT: 1 -> 0\ncommands decided differently: 15\n  2026-02-17T16:03:14Z reset cmd_006: not made customerEntitlements ce_1 update; made instead customerEntitlements ce_1 update\n  2026-03-17T16:03:09Z reset cmd_010: not made customerEntitlements ce_1 update, rollovers roll_cmd_010_1 insert; made instead customerEntitlements ce_1 update\n  2026-03-19T21:03:00Z track cmd_011: not made rollovers roll_cmd_010_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_1klyta insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_1klyta insert; the engine's answer differs\n  2026-03-25T18:03:00Z track cmd_014: not made customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_ygdzpj insert; made instead customerEntitlements ce_gift_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_ygdzpj insert; the engine's answer differs\n  2026-03-29T23:03:00Z track cmd_016: not made customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_t2sn3b insert; made instead customerEntitlements ce_gift_2 increment {\"add\":{\"balance\":-1}}, locks lock_bk_t2sn3b insert; the engine's answer differs\n  2026-04-17T16:03:08Z reset cmd_018: not made customerEntitlements ce_1 update; made instead customerEntitlements ce_1 update\n  2026-05-17T16:03:23Z reset cmd_023: not made customerEntitlements ce_1 update, rollovers roll_cmd_023_1 insert; made instead customerEntitlements ce_1 update\n  2026-05-20T18:03:00Z track cmd_024: not made rollovers roll_cmd_023_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_7anx48 insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_7anx48 insert; the engine's answer differs\n  2026-06-17T16:03:10Z reset cmd_028: not made customerEntitlements ce_1 update, rollovers roll_cmd_028_1 insert; made instead customerEntitlements ce_1 update\n  2026-06-19T21:03:00Z track cmd_029: not made rollovers roll_cmd_028_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_kpilz6 insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_kpilz6 insert; the engine's answer differs\n  2026-07-17T16:03:27Z reset cmd_032: not made customerEntitlements ce_1 update, rollovers roll_cmd_032_1 insert, rollovers roll_cmd_010_1 delete, rollovers roll_cmd_023_1 delete, rollovers roll_cmd_028_1 delete; made instead customerEntitlements ce_1 update\n  2026-07-21T00:03:00Z track cmd_033: not made rollovers roll_cmd_032_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_6eupto insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_6eupto insert; the engine's answer differs\n  2026-08-17T16:03:19Z reset cmd_035: not made customerEntitlements ce_1 update, rollovers roll_cmd_035_1 insert, rollovers roll_cmd_032_1 delete; made instead customerEntitlements ce_1 update\n  2026-08-21T00:03:00Z track cmd_036: not made rollovers roll_cmd_035_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_9fugcl insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_9fugcl insert; the engine's answer differs\n  2026-12-17T16:03:18Z reset cmd_051: not made rollovers roll_cmd_035_1 delete; made instead nothing\ncommands the candidate refuses: 6\n  2026-05-24T21:03:00Z track cmd_026: the engine rejected it: insufficient_balance\n  2026-05-28T04:08:00Z confirmExpiredLock cmd_027: the engine refused: Lock not found: bk_z49d3q\n  2026-08-24T17:03:00Z track cmd_038: the engine rejected it: insufficient_balance\n  2026-08-27T20:03:00Z finalize cmd_039: the engine refused: Lock not found: bk_mp4aad\n  2026-08-30T18:03:00Z track cmd_040: the engine rejected it: insufficient_balance\n  2026-09-02T23:03:00Z finalize cmd_041: the engine refused: Lock not found: bk_nnv23g\nunaffected: 24 events no command made, carried over as they are (payment.refunded 1, payment.succeeded 12, payout.paid 11); a replay re-decides credits only and cannot change what Stripe charged"
+  "summary": "simulate: 81 events replayed against the candidate, balances as of 2026-12-28T17:00:00Z; 39 differences\nbalances that differ: none\nposting totals that differ: 19\n  2026-02 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-02 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-03 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-03 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-04 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-04 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-05 credits:forfeited VISIT: 1 -> 0\n  2026-05 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-06 credits:avail:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-06 credits:issued:sparkle-2@v1 VISIT: -2 -> -1\n  2026-07 credits:avail:family:fam_th6z:visit VISIT: -1 -> 0\n  2026-07 credits:expired VISIT: 1 -> 0\n  2026-08 credits:avail:family:fam_th6z:visit VISIT: -2 -> 0\n  2026-08 credits:held:family:fam_th6z:visit VISIT: 1 -> 0\n  2026-08 credits:spent:energy-45 VISIT: 1 -> 0\n  2026-09 credits:avail:family:fam_th6z:visit VISIT: -1 -> 0\n  2026-09 credits:expired VISIT: 1 -> 0\n  2026-09 credits:held:family:fam_th6z:visit VISIT: -1 -> 0\n  2026-09 credits:spent:massage-90 VISIT: 1 -> 0\ncommands decided differently: 14\n  2026-02-17T16:03:14Z reset cmd_006: not made customerEntitlements ce_1 update; made instead customerEntitlements ce_1 update\n  2026-03-17T16:03:09Z reset cmd_010: not made customerEntitlements ce_1 update, rollovers roll_cmd_010_1 insert; made instead customerEntitlements ce_1 update\n  2026-03-19T21:03:00Z track cmd_011: not made rollovers roll_cmd_010_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_1klyta insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_1klyta insert; the engine's answer differs\n  2026-03-25T18:03:00Z track cmd_014: not made customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_ygdzpj insert; made instead customerEntitlements ce_gift_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_ygdzpj insert; the engine's answer differs\n  2026-03-29T23:03:00Z track cmd_016: not made customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_t2sn3b insert; made instead customerEntitlements ce_gift_2 increment {\"add\":{\"balance\":-1}}, locks lock_bk_t2sn3b insert; the engine's answer differs\n  2026-04-17T16:03:08Z reset cmd_018: not made customerEntitlements ce_1 update; made instead customerEntitlements ce_1 update\n  2026-05-17T16:03:23Z reset cmd_023: not made customerEntitlements ce_1 update, rollovers roll_cmd_023_1 insert; made instead customerEntitlements ce_1 update\n  2026-05-20T18:03:00Z track cmd_024: not made rollovers roll_cmd_023_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_7anx48 insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_7anx48 insert; the engine's answer differs\n  2026-06-17T16:03:10Z reset cmd_028: not made customerEntitlements ce_1 update, rollovers roll_cmd_028_1 insert; made instead customerEntitlements ce_1 update\n  2026-06-19T21:03:00Z track cmd_029: not made rollovers roll_cmd_028_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_kpilz6 insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_kpilz6 insert; the engine's answer differs\n  2026-07-17T16:03:27Z reset cmd_032: not made customerEntitlements ce_1 update, rollovers roll_cmd_032_1 insert; made instead customerEntitlements ce_1 update\n  2026-07-21T00:03:00Z track cmd_033: not made rollovers roll_cmd_032_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_6eupto insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_6eupto insert; the engine's answer differs\n  2026-08-17T16:03:19Z reset cmd_035: not made customerEntitlements ce_1 update, rollovers roll_cmd_035_1 insert; made instead customerEntitlements ce_1 update\n  2026-08-21T00:03:00Z track cmd_036: not made rollovers roll_cmd_035_1 increment {\"add\":{\"balance\":-1,\"usage\":1}}, locks lock_bk_9fugcl insert; made instead customerEntitlements ce_1 increment {\"add\":{\"balance\":-1}}, locks lock_bk_9fugcl insert; the engine's answer differs\ncommands the candidate refuses: 6\n  2026-05-24T21:03:00Z track cmd_026: the engine rejected it: insufficient_balance\n  2026-05-28T04:08:00Z confirmExpiredLock cmd_027: the engine refused: Lock not found: bk_z49d3q\n  2026-08-24T17:03:00Z track cmd_038: the engine rejected it: insufficient_balance\n  2026-08-27T20:03:00Z finalize cmd_039: the engine refused: Lock not found: bk_mp4aad\n  2026-08-30T18:03:00Z track cmd_040: the engine rejected it: insufficient_balance\n  2026-09-02T23:03:00Z finalize cmd_041: the engine refused: Lock not found: bk_nnv23g\nunaffected: 24 events no command made, carried over as they are (payment.refunded 1, payment.succeeded 12, payout.paid 11); a replay re-decides credits only and cannot change what Stripe charged"
 }

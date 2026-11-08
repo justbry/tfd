@@ -1,0 +1,50 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
+	"root": false,
+	"extends": "//",
+	"files": {
+		"includes": [
+			"**",
+			"!src/app/dashboard/dashboard.css",
+			"!src/app/bookings/bookings.css",
+			"!src/app/members/members.css",
+			"!src/app/ledger/ledger.css",
+			"!src/app/reports/reports.css",
+			"!src/app/all-schools.css",
+			"!src/app/settings-sheet.css"
+		]
+	},
+	"overrides": [
+		{
+			"includes": ["**/*.svelte"],
+			"formatter": {
+				"enabled": false
+			},
+			"assist": {
+				"enabled": false
+			},
+			"linter": {
+				"rules": {
+					"style": {
+						"useConst": "off",
+						"useImportType": "off"
+					},
+					"correctness": {
+						"noUnusedVariables": "off",
+						"noUnusedImports": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/**/*.css"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noUnknownAtRules": "off"
+					}
+				}
+			}
+		}
+	]
+}

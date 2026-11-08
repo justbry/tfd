@@ -14,12 +14,14 @@ import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
 import { CoreIcon, type CoreIconName } from "./core-icon.tsx";
 import { DialogSlot, useSlotOpener } from "./dialog-slot.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import type { Change as RosterChange } from "./members-model.ts";
 import type { PaneName } from "./panes.tsx";
 import type { AudienceMove, PlansSession } from "./plans-menu.ts";
 import type { Change } from "./portal-format.ts";
 import {
 	allSchools,
+	defaultTabOf,
 	type Route,
 	type SchoolTab,
 	schoolTabs,
@@ -28,7 +30,7 @@ import {
 } from "./route.ts";
 import { SettingsDrawer } from "./settings-drawer.tsx";
 import { TopBar } from "./top-bar.tsx";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { opensOnTabs, ViewingContext, viewedPeriod } from "./viewing.ts";
 
 const toastMilliseconds = 4600;
@@ -46,15 +48,17 @@ const counted = (count: number, noun: string): string =>
 	`${count} ${noun}${count === 1 ? "" : "s"}`;
 
 /** A tab's badge from the school's counts and whether its Plans draft has changes (mockup `#plbadge`, `#bkbadge`, `#pbadge`), or null when it has none.
- * `meaning` is what a screen reader hears for the badge. */
+ * `meaning` is what a screen reader hears for the badge. A school with no counts (`tabBadges` null) shows no count
+ * badge, never 0. */
 function tabBadge(
 	tab: SchoolTab,
 	{ tabBadges }: School,
 	plansDraft: boolean,
 ): { text: string; meaning: string; tone: "b-warn" | "b-bad" } | null {
-	const { bookingsOverdue, promosExpiring } = tabBadges;
 	if (tab === "plans" && plansDraft)
 		return { text: "draft", meaning: "draft", tone: "b-warn" };
+	if (!tabBadges) return null;
+	const { bookingsOverdue, promosExpiring } = tabBadges;
 	if (tab === "bookings" && bookingsOverdue > 0)
 		return {
 			text: String(bookingsOverdue),
@@ -87,6 +91,9 @@ const noPendingBookings: ReadonlySet<string> = new Set();
 const noMembershipChanges: Record<string, Change> = {};
 const noRosterChanges: RosterChange[] = [];
 const loadPanes = () => import("./panes.tsx");
+/** The panes whose data a demo school does not have (S8-contract section 11 "Demo schools"): the scenarios hold no
+ * promo or gift events. They show `DemoTabNote` instead. */
+const demoNoteTabs: ReadonlySet<PaneName> = new Set(["promos"]);
 const loadMenus = () => import("./menus.tsx");
 const loadSettings = () => import("./settings.tsx");
 
@@ -239,16 +246,26 @@ export function Shell({
 	const [loadedDisclosure, setLoadedDisclosure] = useState<Disclosure | null>(
 		null,
 	);
+	const disclosureRead = useReadFailure(schoolId ?? allSchools);
+	const { failFor, attempt } = disclosureRead;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		if (!schoolId) return;
 		let current = true;
-		reader.disclosure(schoolId).then((disclosure) => {
-			if (current) setLoadedDisclosure(disclosure);
-		}, keepLoading);
+		const failed = failFor(schoolId);
+		reader.disclosure(schoolId).then(
+			(disclosure) => {
+				if (current) setLoadedDisclosure(disclosure);
+			},
+			(error: unknown) => {
+				if (current) failed(error);
+			},
+		);
 		return () => {
 			current = false;
 		};
-	}, [reader, schoolId]);
+	}, [reader, schoolId, failFor, attempt]);
 	const disclosure =
 		loadedDisclosure?.school === schoolId ? loadedDisclosure : null;
 	const asked = route.query.get("as");
@@ -266,10 +283,15 @@ export function Shell({
 	const theme = themeOf(route.query);
 
 	const ready = Boolean(menus && settingsModule && (!school || viewing));
+	/** A demo school's tab with no data shows the demo note instead of its pane. */
+	const demoNote = Boolean(
+		school?.demo && paneName !== null && demoNoteTabs.has(paneName),
+	);
 	/** Every school tab's pane reports its own render once its data is on screen. */
-	const paneReports = Boolean(school && paneName);
+	const paneReports = Boolean(school && paneName && !demoNote);
+	const disclosureFailed = Boolean(school && disclosureRead.failed);
 	useLayoutEffect(() => {
-		if (ready && !paneReports) onRendered();
+		if ((ready && !paneReports) || (menus && disclosureFailed)) onRendered();
 	});
 
 	/** Each school's last tab, in memory only (mockup `s.last`): switching school, or leaving All schools, returns to
@@ -292,7 +314,9 @@ export function Shell({
 		else
 			navigate({
 				schoolId: chosen,
-				tab: lastTabs.current[chosen] ?? "plans",
+				tab:
+					lastTabs.current[chosen] ??
+					defaultTabOf(schools.find(({ id }) => id === chosen)),
 				query,
 			});
 	};
@@ -353,7 +377,7 @@ export function Shell({
 							/* A session exists only once the panes have loaded, which is what can tell its draft from the live menu. */
 							planSession && panes
 								? panes.plansDraftChanged(planSession)
-								: school.tabBadges.plansDraft,
+								: (school.tabBadges?.plansDraft ?? false),
 						);
 						return (
 							<button
@@ -391,7 +415,7 @@ export function Shell({
 					onExit={() => navigate(withQuery(route, "as", null))}
 				/>
 			)}
-			{school?.stale && (
+			{school?.stale && school.lagMinutes !== null && (
 				<div
 					class="banner"
 					data-test="stale-banner"
@@ -399,6 +423,16 @@ export function Shell({
 				>
 					<CoreIcon name="alert" /> Data is {school.lagMinutes} min behind: the
 					shipper may be stuck. Recent events can be missing.
+				</div>
+			)}
+			{school && school.lagMinutes === null && (
+				<div
+					class="banner"
+					style="color:var(--muted-foreground);border-bottom-color:var(--border)"
+					data-test="no-data-banner"
+					inert={settingsOpen || portalShown}
+				>
+					No ledger data for this school yet.
 				</div>
 			)}
 			<section
@@ -410,8 +444,16 @@ export function Shell({
 				aria-labelledby={school ? `tab-${route.tab}` : undefined}
 				aria-label={school ? undefined : "All schools"}
 			>
+				{disclosureFailed && (
+					<LoadFailed
+						what="the school's audiences"
+						error={disclosureRead.error}
+						onRetry={disclosureRead.retry}
+					/>
+				)}
+				{ready && school && panes && demoNote && <panes.DemoTabNote />}
 				<ViewingContext.Provider value={viewing}>
-					{ready && school && panes && paneName && (
+					{ready && school && panes && paneName && !demoNote && (
 						<panes.Pane
 							key={school.id}
 							name={paneName}

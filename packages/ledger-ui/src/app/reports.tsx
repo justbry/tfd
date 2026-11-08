@@ -22,7 +22,7 @@ import { Donors } from "./donors.tsx";
 import { DownloadButton } from "./download-button.tsx";
 import { Icon, type IconName } from "./icon.tsx";
 import { LoadFailed } from "./load-failed.tsx";
-import { formatMoney } from "./money.ts";
+import { csvCurrency, formatMoney } from "./money.ts";
 import {
 	monthAndDay,
 	type Period,
@@ -40,6 +40,17 @@ const sparkHeight = 56;
 const drillTitle = "Show these events in the ledger";
 const financeOnlyTitle = "Finance admins only: the rows behind a figure";
 const grainWords = { year: "years", quarter: "quarters", month: "months" };
+/** A figure the source does not record yet (the Worker answers null): never shown as 0. */
+const notAvailableText = "—";
+const donorsNotAvailableText = "Not available yet: no source records donors.";
+/** The statement as Reports shows it: a school with no published menu has no statement currency or unit, so the
+ * school's own stand in (as the Ledger's do). */
+type ShownStatement = IncomeStatement & { unit: CreditUnit };
+
+const statementAmount = (
+	cents: number | null,
+	currency: string | null,
+): string => (cents === null ? notAvailableText : formatMoney(cents, currency));
 const whoSees: Record<AudienceReport["audience"], string> = {
 	public: "Public sees",
 	member: "Members see",
@@ -48,7 +59,7 @@ const whoSees: Record<AudienceReport["audience"], string> = {
 
 /** A money figure of the document, rounded or exact as the document says. */
 const documentFigure =
-	(document: AudienceReport, currency: string) =>
+	(document: AudienceReport, currency: string | null) =>
 	(cell: ReportCell, noun = "payers"): JSX.Element => (
 		<Figure
 			cell={cell}
@@ -77,7 +88,7 @@ function Spark({
 	series: IncomeSeries;
 	previous: IncomeSeries | null;
 	from: string;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	if (series.points.length === 0)
 		return (
@@ -293,7 +304,11 @@ const statementRows: Array<{
 ];
 
 /** "▲ $X vs <period>": the server's change of the line, signed; the UI formats it and never subtracts. */
-const changeText = (change: number, currency: string, label: string): string =>
+const changeText = (
+	change: number,
+	currency: string | null,
+	label: string,
+): string =>
 	`${change >= 0 ? "▲" : "▼"} ${formatMoney(Math.abs(change), currency)} vs ${label}`;
 
 function StatementBody({
@@ -302,7 +317,7 @@ function StatementBody({
 	onDrill,
 	onPromos,
 }: {
-	statement: IncomeStatement;
+	statement: ShownStatement;
 	period: Period;
 	onDrill: (drill: LedgerDrill) => void;
 	onPromos: () => void;
@@ -316,15 +331,21 @@ function StatementBody({
 				changes: previous.changes,
 			}
 		: null;
-	const gifts = `${money(giftsOutstanding.amountCents)}${
-		giftsOutstanding.credits > 0
-			? ` + ${giftsOutstanding.credits} ${giftsOutstanding.credits === 1 ? unit.one : unit.other}`
-			: ""
-	}`;
+	const gifts = giftsOutstanding
+		? `${money(giftsOutstanding.amountCents)}${
+				giftsOutstanding.credits > 0
+					? ` + ${giftsOutstanding.credits} ${giftsOutstanding.credits === 1 ? unit.one : unit.other}`
+					: ""
+			}`
+		: notAvailableText;
 	return (
 		<>
 			<p class="okline" data-test="report-status">
-				{statement.matchesStripe ? (
+				{statement.matchesStripe === null ? (
+					<span class="mut" data-test="report-stripe-unchecked">
+						Not checked against Stripe yet.
+					</span>
+				) : statement.matchesStripe ? (
 					<>
 						<span class="ok">
 							<Icon name="check" /> Matches Stripe
@@ -405,7 +426,9 @@ function StatementBody({
 					</small>
 					<b data-test="report-kpi-value">{gifts}</b>
 					<i class="s" data-test="report-kpi-change">
-						{`${giftsOutstanding.count} unredeemed gift${giftsOutstanding.count === 1 ? "" : "s"} (a liability)`}
+						{giftsOutstanding
+							? `${giftsOutstanding.count} unredeemed gift${giftsOutstanding.count === 1 ? "" : "s"} (a liability)`
+							: "Not available yet"}
 					</i>
 				</button>
 			</div>
@@ -418,7 +441,7 @@ function Statement({
 	period,
 	onDrill,
 }: {
-	statement: IncomeStatement;
+	statement: ShownStatement;
 	period: Period;
 	onDrill: (drill: LedgerDrill) => void;
 }): JSX.Element {
@@ -452,9 +475,9 @@ function Statement({
 				</td>
 				<td class={row.negative ? "r neg" : "r"} data-test="report-line-amount">
 					{row.bold && row.line === "net" ? (
-						<b>{formatMoney(amounts[row.field], currency)}</b>
+						<b>{statementAmount(amounts[row.field], currency)}</b>
 					) : (
-						formatMoney(amounts[row.field], currency)
+						statementAmount(amounts[row.field], currency)
 					)}
 				</td>
 			</tr>
@@ -478,7 +501,9 @@ function Statement({
 				>
 					<td class="mut" colSpan={2} style="padding-top:10px">
 						<button type="button" class="drill">
-							{`Not income: gift certificates sold ${formatMoney(amounts.giftsSold, currency)} (held as a liability until redeemed)`}
+							{amounts.giftsSold === null
+								? "Not income: gift certificates sold: not available yet"
+								: `Not income: gift certificates sold ${formatMoney(amounts.giftsSold, currency)} (held as a liability until redeemed)`}
 						</button>
 					</td>
 				</tr>
@@ -494,7 +519,7 @@ function DocumentBody({
 	currency,
 }: {
 	document: AudienceReport;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	const { audience, grain, figures } = document;
 	const name = audienceNames[audience];
@@ -606,7 +631,7 @@ function DocumentStatement({
 	currency,
 }: {
 	document: AudienceReport;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	const { audience, grain, figures, rounding } = document;
 	const figure = documentFigure(document, currency);
@@ -728,14 +753,19 @@ function DocumentStatement({
 
 // ---- Rules in force.
 
+/** A rule with no source (D11): the row says so and claims no cutoff. */
+const ruleNotAvailable = "Not available";
+
 function Rules({
 	rules,
 	unit,
 	canEdit,
 	onEdit,
 }: {
-	rules: SchoolRules;
+	/** Null where no source has the rules (D11). */
+	rules: SchoolRules | null;
 	unit: CreditUnit;
+	/** An admin of a real school; a demo school is read-only, so it has no way to an edit. */
 	canEdit: boolean;
 	onEdit: () => void;
 }): JSX.Element {
@@ -743,17 +773,23 @@ function Rules({
 		{
 			rule: "cutoff",
 			label: "Cancel cutoff (default)",
-			value: `${rules.cancelCutoffHours} hours before`,
+			value: rules
+				? `${rules.cancelCutoffHours} hours before`
+				: ruleNotAvailable,
 		},
 		{
 			rule: "no-show",
 			label: "No-show",
-			value: `${unit.other} are ${rules.noShow === "spend" ? "spent" : "released"}`,
+			value: rules
+				? `${unit.other} are ${rules.noShow === "spend" ? "spent" : "released"}`
+				: ruleNotAvailable,
 		},
 		{
 			rule: "late-cancel",
 			label: "Late cancel",
-			value: `${unit.other} are ${rules.lateCancel === "spend" ? "forfeited" : "released"}`,
+			value: rules
+				? `${unit.other} are ${rules.lateCancel === "spend" ? "forfeited" : "released"}`
+				: ruleNotAvailable,
 		},
 	];
 	return (
@@ -818,11 +854,15 @@ export function Reports({
 		if (pinLocked) return null;
 		const [rules, donors] = await Promise.all([
 			reader.schoolRules(school.id),
-			reader.donors({
-				school: school.id,
-				audience,
-				year: Number(clock.today.slice(0, 4)),
-			}),
+			// Donor names have no source yet (S8-contract section 11): a donors read that fails leaves the card not
+			// available and the rest of the report as it is.
+			reader
+				.donors({
+					school: school.id,
+					audience,
+					year: Number(clock.today.slice(0, 4)),
+				})
+				.catch(() => null),
 		]);
 		const common = { rules, donors };
 		return documentAudience === null
@@ -856,17 +896,29 @@ export function Reports({
 			<PinLock
 				key={audience}
 				levelName={audienceNames[audience]}
-				onUnlock={() => {
+				unlock={(pin) => writer.unlockBooks(school.id, pin)}
+				onUnlocked={() => {
 					navigate(withQuery(route, "pin", null));
 					onToast("Books unlocked for this session.");
 				}}
 			/>
 		);
 	if (status.failed)
-		return <LoadFailed what="the report" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the report"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
-	const { rules, donors, statement, document } = loaded;
+	const { rules, donors, document } = loaded;
+	const statement: ShownStatement | null = loaded.statement && {
+		...loaded.statement,
+		currency: loaded.statement.currency ?? school.currency,
+		unit: loaded.statement.unit ?? school.creditUnit,
+	};
 	const openLedger = (drill: LedgerDrill): void =>
 		navigate(ledgerRoute(route, drill));
 	const download = statement ? (
@@ -878,7 +930,10 @@ export function Reports({
 			title="Download the income statement as CSV"
 			label="Download"
 			name={csvFileNames.statement(statement.from, statement.to)}
-			columns={statementColumns(statement)}
+			columns={statementColumns({
+				...statement,
+				currency: csvCurrency(statement.currency),
+			})}
 			rows={statementLines.map(([line, field]) => ({
 				line,
 				amountCents: statement.amounts[field],
@@ -930,20 +985,31 @@ export function Reports({
 				</div>
 				<Rules
 					rules={rules.rules}
-					unit={rules.unit}
-					canEdit={admin}
+					unit={rules.unit ?? school.creditUnit}
+					canEdit={admin && !school.demo}
 					onEdit={() => onToast("Opening school settings in buzz-school…")}
 				/>
 			</div>
 			<div class="card" data-test="donors" style="margin-top:10px">
-				<Donors
-					report={donors}
-					audience={audience}
-					currency={school.currency}
-					today={clock.today}
-					writer={writer}
-					onToast={onToast}
-				/>
+				{donors ? (
+					<Donors
+						report={donors}
+						audience={audience}
+						currency={school.currency}
+						today={clock.today}
+						writer={writer}
+						onToast={onToast}
+					/>
+				) : (
+					<>
+						<h5 data-test="donors-title">
+							<Icon name="users" /> Donors and payers
+						</h5>
+						<div class="mut" data-test="donors-not-available">
+							{donorsNotAvailableText}
+						</div>
+					</>
+				)}
 			</div>
 		</>
 	);
@@ -973,7 +1039,7 @@ const documentColumns = (
 /** The document's six figures as `reportDocCsv` lists them. */
 function documentRows(
 	document: AudienceReport,
-	currency: string,
+	currency: string | null,
 ): DocumentRow[] {
 	const { figures } = document;
 	const whole = document.rounding !== null;

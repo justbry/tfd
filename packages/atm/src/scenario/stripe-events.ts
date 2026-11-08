@@ -56,6 +56,8 @@ export type EventLine = {
 	proration?: boolean;
 	periodStart?: number;
 	periodEnd?: number;
+	/** What a coupon takes off the line (minor units): its one `discount_amounts` entry. Absent or 0: none. */
+	discount?: number;
 };
 
 export type InvoiceEvent = {
@@ -118,8 +120,16 @@ export const invoicePaid = (e: InvoiceEvent): RawEvent => {
 		out.pricing.unit_amount_decimal = String(l.amount);
 		out.parent.subscription_item_details.proration = l.proration ?? false;
 		out.parent.subscription_item_details.subscription_item = `si_${e.invoiceId}_${i}`;
+		out.discount_amounts = l.discount
+			? [{ amount: l.discount, discount: `di_${e.invoiceId}` }]
+			: [];
 		return out;
 	});
+	const discounted = e.lines.reduce((n, l) => n + (l.discount ?? 0), 0);
+	invoice.total_discount_amounts =
+		discounted > 0
+			? [{ amount: discounted, discount: `di_${e.invoiceId}` }]
+			: [];
 	return event;
 };
 
@@ -265,6 +275,8 @@ export const subscriptionEvent = (e: {
 		interval: "month" | "year";
 		/** Units of the price; default 1. */
 		quantity?: number;
+		/** The price's `unit_amount` (minor units); the template's when absent. */
+		unitAmount?: number;
 	}[];
 	periodStart: number;
 	periodEnd: number;
@@ -292,6 +304,8 @@ export const subscriptionEvent = (e: {
 			...base.price,
 			id: priceIdOf(item.lookupKey),
 			lookup_key: item.lookupKey,
+			unit_amount: item.unitAmount ?? base.price.unit_amount,
+			unit_amount_decimal: String(item.unitAmount ?? base.price.unit_amount),
 			recurring: { interval: item.interval, interval_count: 1 },
 		},
 	}));

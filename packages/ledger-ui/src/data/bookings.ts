@@ -40,8 +40,9 @@ export type Booking = {
 	attendee: BookingAttendee | null;
 	guest: boolean;
 	state: BookingState;
-	/** The item's own cancel cutoff (`booking_events.change_cutoff_min`). */
-	cutoffMinutes: number;
+	/** The item's own cancel cutoff (`booking_events.change_cutoff_min`), or null where no source names one (a demo
+	 * school's bookings): never inside a cutoff then. */
+	cutoffMinutes: number | null;
 	seriesId: string | null;
 	/**
 	 * The series badge as the mockup's Status column shows it ("weekly · 3 left"), worded by the server. NOT in brief A
@@ -131,4 +132,5 @@ export const needsOutcome = (booking: Booking, clock: Clock): boolean =>
 export const insideCutoff = (booking: Booking, clock: Clock): boolean =>
 	booking.state === "confirmed" &&
 	booking.startsAt >= clock.now &&
+	booking.cutoffMinutes !== null &&
 	minutesBetween(clock.now, booking.startsAt) < booking.cutoffMinutes;

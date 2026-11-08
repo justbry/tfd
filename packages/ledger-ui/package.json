@@ -9,7 +9,8 @@
 		"build": "bun run fixtures && vite build",
 		"build:size": "vite build --config gates/vite.size.config.ts",
 		"test": "bun run fixtures && bun scripts/test-all.ts",
-		"gates": "bun gates/run.ts"
+		"gates": "bun gates/run.ts",
+		"staging-ui": "bun scripts/staging-ui.ts"
 	},
 	"dependencies": {
 		"preact": "10.29.8"

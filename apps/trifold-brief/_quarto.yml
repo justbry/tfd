@@ -1,0 +1,35 @@
+# The Trifold brief: one Quarto project, five reveal.js decks (one per audience) and the audience picker.
+# Shared slides live in _partials/ (files starting with "_" are never rendered on their own).
+project:
+  type: default
+  render:
+    - index.qmd
+    - overview/index.qmd
+    - investors/index.qmd
+    - firms/index.qmd
+    - schools/index.qmd
+    - partners/index.qmd
+
+lang: en
+pagetitle: "Trifold brief"
+
+# Every deck. The picker (index.qmd) declares its own html format and does not render as a deck.
+format:
+  revealjs:
+    theme: [default, brief.scss]
+    css: _fonts.css
+    embed-resources: true
+    center: false
+    hash: true
+    slide-number: c/t
+    transition: fade
+    transition-speed: fast
+    width: 1280
+    height: 720
+    margin: 0.08
+    menu:
+      side: left
+      numbers: true
+    pdf-separate-fragments: false
+    footer: "Confidential draft · not legal, tax or investment advice"
+    include-after-body: nav.html

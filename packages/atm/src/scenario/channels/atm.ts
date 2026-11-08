@@ -9,6 +9,11 @@ import {
 } from "../kpi-evaluate.js";
 
 const USD = "USD";
+const MRR = "MRR";
+
+/** The spec's name for a posting's commodity: money, recurring revenue, or any other (a credit unit). */
+const commodityClass = (commodity: string): "usd" | "mrr" | "credits" =>
+	commodity === USD ? "usd" : commodity === MRR ? "mrr" : "credits";
 
 const dimensionOf = (
 	by: NonNullable<BaseKpi["compute"]["by"]>,
@@ -61,7 +66,7 @@ export const atmChannel = {
 				if (!wanted || !matchesEvent(event, c.where)) continue;
 				if (c.op === "sum") {
 					for (const p of event.postings) {
-						if ((p.commodity === USD) !== (c.commodity === "usd")) continue;
+						if (commodityClass(p.commodity) !== c.commodity) continue;
 						if (account && !account.test(p.account)) continue;
 						const dim = c.by
 							? dimensionOf(

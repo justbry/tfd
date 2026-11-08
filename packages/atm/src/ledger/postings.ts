@@ -21,6 +21,16 @@ import {
 /** The money commodity: dollars in the books. A credit's commodity must never be this one. */
 export const MONEY_COMMODITY = "USD";
 
+/**
+ * Monthly recurring revenue, in whole cents a month (no decimal places, as a credit unit): a memo commodity that never
+ * adds up with money. A credit's commodity must never be this one either.
+ */
+export const MRR_COMMODITY = "MRR";
+
+/** A credit unit's commodity: neither money nor MRR. */
+export const isCreditCommodity = (commodity: string): boolean =>
+	commodity !== MONEY_COMMODITY && commodity !== MRR_COMMODITY;
+
 /** `visit` -> `VISIT`: a credit commodity is the feature id in capitals, letters only (hledger needs quotes otherwise). */
 export const commodityOf = (feature: string): string => {
 	const code = feature.toUpperCase().replace(/[^A-Z]/g, "");
@@ -112,7 +122,7 @@ type CreditRule = {
 
 const avail = (r: CreditRule) => `credits:avail:${r.holder}:${r.feature}`;
 const held = (r: CreditRule) => `credits:held:${r.holder}:${r.feature}`;
-const need = (v: string | undefined, what: string): string => {
+const need = <T>(v: T | undefined, what: string): T => {
 	if (!v) throw new Error(`${what} is required`);
 	return v;
 };
@@ -276,6 +286,16 @@ export const moneyPostings = (i: AtmLedgerEventInput): AtmPosting[] => {
 				usd("liabilities:b4uni", positive()),
 				usd("assets:clearing:b4uni-payments", -amount),
 			];
+		case "mrr.changed": {
+			// Postings even when nothing moved (a free subscription's start, its end): the subscription stays in the books.
+			const { delta, movement } = need(i.mrr, "mrr");
+			if (!Number.isInteger(delta))
+				throw new Error("mrr.changed needs a whole delta of cents a month");
+			return [
+				post(`mrr:recurring:${i.key}`, unitsToString(delta), MRR_COMMODITY),
+				post(`mrr:movement:${movement}`, unitsToString(-delta), MRR_COMMODITY),
+			];
+		}
 		case "plan.attached":
 		case "money.skipped":
 		case "plan.changed":
@@ -296,7 +316,8 @@ const defaultSource = (type: AtmEventType): string => {
 		type.startsWith("payment.") ||
 		type === "dispute.closed" ||
 		type === "payout.paid" ||
-		type === "money.skipped"
+		type === "money.skipped" ||
+		type === "mrr.changed"
 	)
 		return "stripe";
 	if (type.startsWith("fundraise.")) return "zeffy";

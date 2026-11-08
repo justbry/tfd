@@ -63,7 +63,7 @@ test("the Ledger's file for B4 Uni in November is the table's rows in the table'
 		promo: null,
 	});
 	const rows = page.days.flatMap((day) => day.entries);
-	expect(toCsv(ledgerColumns(page.currency), rows)).toBe(
+	expect(toCsv(ledgerColumns(page.currency ?? ""), rows)).toBe(
 		[
 			`${byteOrderMark}date,member,description,amount,currency,status,invoice_id,payment_id,event,credits`,
 			"2026-11-03,s_26,Plan allowance,,USD,Posted,,,credit.granted,8.00",
@@ -90,7 +90,10 @@ test("the income statement's file lists the eight lines, signed, with the curren
 		line,
 		amountCents: statement.amounts[field],
 	}));
-	expect(toCsv(statementColumns(statement), rows)).toBe(
+	const { currency } = statement;
+	if (currency === null)
+		throw new Error("the fixture statement has a currency");
+	expect(toCsv(statementColumns({ ...statement, currency }), rows)).toBe(
 		[
 			`${byteOrderMark}line,amount,currency,period_from,period_to`,
 			"Memberships,260.00,USD,2026-11-01,2026-11-30",

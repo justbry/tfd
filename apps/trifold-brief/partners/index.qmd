@@ -1,0 +1,119 @@
+---
+pagetitle: "Trifold brief · Partners"
+brief-audience: "Partners: networks, co-ops, affiliates, software"
+brief-oneliner: "Receipts your customers can check, with or without either of us; a bounded 24-month commission."
+brief-length: "10 slides, about 8 minutes"
+include-in-header:
+  text: "<style>:root { --path: #55607a; --path-text: #55607a; }</style>"
+---
+
+{{< include ../_partials/_title.qmd >}}
+
+{{< include ../_partials/_receipts.qmd >}}
+
+## First come organizations referring organizations, and networks joining as one {#ships-first}
+
+<span class="kicker">What ships first</span>
+
+<div class="timeline">
+<div class="stage stage--next"><span class="when">Stage A · first</span><h3>Referrals</h3>
+<ul><li>A month for a month, as credit</li><li>Up to 12 months; never cash</li></ul></div>
+<div class="stage stage--next"><span class="when">Stage A · first</span><h3>Networks and co-ops</h3>
+<ul><li>Join as one affiliate</li><li>A sub-link per member or staff</li><li>One payout; you split it</li></ul></div>
+<div class="stage stage--later"><span class="when">Stage C · later</span><h3>After ~20 paying</h3>
+<ul><li>Cash affiliates</li><li>Firm Practice Pro</li><li>Implementers</li><li>Witness API</li></ul></div>
+</div>
+
+::: {.notes}
+Sources: `docs/business/go-to-market.md` §3.2 (organizations referring organizations: "Give a month, get a month", account credit, never cash, capped at 12 months; every school already has a code), §3.4 item 1 (a co-op, network or consulting firm joins as one affiliate; sub-links per staff member or member school; all sales count toward the organization; Trifold pays one party per sale), §1 (channels). Stage order: agreed in the 2026-11-07 review and the owner's decisions of the same day (Stage C after about 20 paying; Practice Pro after about 100 paying clients). Nothing in the referral or affiliate programs is built (go-to-market header).
+:::
+
+## Stage C, later: affiliates earn a flat 20% for 24 months, never for life {#affiliates}
+
+<span class="kicker">Cash affiliates · Stage C</span>
+
+<div class="cards">
+<div class="card"><span class="big">20%</span><p>of the subscription revenue you bring</p></div>
+<div class="card card--green"><span class="big">24 mo</span><p>matching the engine license's two years</p></div>
+<div class="card card--ink"><span class="big">≈ $290</span><p>the most one school can earn you: about 4.8 months of its revenue</p></div>
+</div>
+
+<p class="fine">Paid monthly after the 30-day refund window, on what was actually paid. Credits and API use don't count. Your first 3 customers are reviewed by hand.</p>
+
+<p class="assume-note"><span class="tag tag--assume">Assumption</span> At about $60 a school a month, realized.</p>
+
+::: {.notes}
+Owner decision of 2026-11-07: one flat 20% of subscription revenue for 24 months, replacing the docs' 25 / 30 / 35% tiers (`docs/business/go-to-market.md` §3.1) and dropping the optional recruit bonus (§3.4 item 3). The 24-month limit is the owner's earlier decision (go-to-market §3: "Cash is limited to 24 months", matching the FSL's two years). Cost bound: 0.20 × 24 = 4.8 months of a school's revenue; at about $60 a month realized (the investor path's base case) that is about $288.
+
+Mechanics: go-to-market §3.5 (subscriptions and compliance packs count; credits and metered API use are excluded; 90-day cookie, last click, plus a referral code at checkout; monthly payout after the 30-day refund window, $50 minimum, Stripe Connect, 1099-NEC above the IRS threshold; commission follows what was actually paid; manual approval of the first 3 customers). Revenue share is already ledger events in tfd (`share.accrued`, `share.reversed`, `share.settled`; `tfd share`). Comparison (§3): GoHighLevel pays 40% for life; Xero and QuickBooks pay CPAs through discounts, not cash.
+:::
+
+## No downline, no paid ranks, no income claims {#anti-mlm}
+
+<span class="kicker">Published rules</span>
+
+<ul class="ticks">
+<li>Free to join; no purchase, no paid ranks</li>
+<li>Commission only on subscriptions customers paid for</li>
+<li>Recruiting affiliates never raises your rate</li>
+<li>No income claims; disclose your commission</li>
+<li>No bidding on "Trifold" in search ads, no coupon sites, no self-referral</li>
+</ul>
+
+::: {.notes}
+Source: `docs/business/go-to-market.md` §3.4 (no second tier: pay driven by recruitment is the FTC's multi-level-marketing warning sign; tiers count only your own referrals; item 4, the published anti-MLM rules, verbatim in substance) and §3.5 ("Banned": bidding on "Trifold" in search ads, coupon sites, self-referral, income claims, breaking the claim rules such as "we file your taxes"). The FTC endorsement guides require disclosure. A lawyer reviews the terms before launch (§4).
+:::
+
+## Vertical software can embed Trifold or adopt the open receipt format {#platforms}
+
+<span class="kicker">Platforms</span>
+
+<div class="cards">
+<div class="card"><h3>Partner, don't compete</h3><p>You run scheduling and enrollment; Trifold keeps the books. Revenue share by contract.</p></div>
+<div class="card card--green"><h3>Adopt the format</h3><p>Receipts in the open format check in the same free checker, once you pass the published test data.</p></div>
+<div class="card card--ink"><h3>Witness API <span class="tag tag--later">later</span></h3><p>Trifold's countersignature alone: 500 receipts a month free, then 3–5 cents each.</p></div>
+</div>
+
+::: {.notes}
+Sources: `docs/business/market-research.md` §1 (vertical software such as Jackrabbit, Pike13, Mindbody-style tools: "Partner and embed (Witness API). They run operations; Trifold keeps the books"); `docs/business/business-plan.md` §4 and §7 (growth loop 2: others adopt the standard; Witness API in phase 2); `docs/business/pricing-strategy.md` §4 (Witness API: first 500 receipts a month free, then $0.03–0.05 each; Platform / Enterprise: rollups, revenue share, SSO, SLA, embedding rights); `docs/business/go-to-market.md` §1 (revenue-share contract). `TRADEMARKS.md`: say "implements the Trifold receipt format v1" only if you pass the test vectors (`packages/atm/tests/golden/receipt/`, CC0-1.0). The receipt and seal format, spec and checker are Apache-2.0 (AGENTS.md). The witness is not built.
+:::
+
+## Proposal: implementers earn 20% for 24 months on hosted clients they source {#implementers}
+
+<span class="kicker">Implementers and integrators · Stage C · proposal</span>
+
+<div class="tiers">
+<div class="tier"><span class="riser">Sign the terms</span><div class="tread"><h3>Registered</h3><p>Listing, 90-day deal registration</p></div></div>
+<div class="tier"><span class="riser">Clients + certified staff</span><div class="tread"><h3>Certified</h3><p>Leads routed to you; an exam on our test data</p></div></div>
+<div class="tier"><span class="riser">More of both</span><div class="tread"><h3>Premier</h3><p>Priority leads; a marketplace for your templates; paid integration bounties</p></div></div>
+</div>
+
+<p class="fine">Limits: no one install for many clients. White label only through Practice Pro; never on the receipt link or the witness badge. Each client owns its data.</p>
+
+<p class="assume-note"><span class="tag tag--assume">Proposal</span> Not in the business docs; thresholds not set.</p>
+
+::: {.notes}
+PROPOSAL from the 2026-11-07 review, not yet in `docs/business/go-to-market.md`: Registered / Certified / Premier by sourced and serviced clients and certified staff; leads routed to Certified partners; a certification exam built on tfd's scenario fixtures (`packages/atm/fixtures/`) and the receipt test vectors; 20% of subscription revenue for 24 months on hosted clients they source (matching the owner's flat affiliate rate); a marketplace for books templates, dashboard specs and mappings; integration bounties under the CLA (decided, text not yet published, `CONTRIBUTING.md`); 90-day deal registration. The earlier 10% on Witness API usage is removed: metered API use is excluded from commissions (go-to-market §3.5).
+
+Limits from the docs: one tfd for many clients is probably a Competing Use under the FSL (`docs/business/pricing-strategy.md` §4c); white label exists only in Practice Pro and stops at the proof (go-to-market §2); export is never paywalled (pricing-strategy §2). Dashboard and KPI specs are FSL, not part of the open standard (AGENTS.md open item 4).
+:::
+
+{{< include ../_partials/_built-next.qmd >}}
+
+## Apply as a network, an affiliate or a software partner {#apply}
+
+<span class="kicker">Next step</span>
+
+<div class="cards">
+<div class="card"><h3>Networks and co-ops</h3><p>Join as one affiliate, with a sub-link per member.</p></div>
+<div class="card card--green"><h3>Affiliates</h3><p>Open in Stage C, after about 20 organizations pay.</p></div>
+<div class="card card--ink"><h3>Software</h3><p>Talk to us about embedding or adopting the format.</p></div>
+</div>
+
+<div class="placeholder"><strong>Owner to fill in</strong>Where to apply. Terms are reviewed by a lawyer before launch.</div>
+
+::: {.notes}
+Sources: `docs/business/go-to-market.md` §3.4 item 1 (organization affiliates), §4 (a lawyer reviews the affiliate terms, disclosures and FTC wording before launch); Stage C timing from the 2026-11-07 decisions. Placeholder: no application channel is in the docs.
+:::
+
+{{< include ../_partials/_paths.qmd >}}

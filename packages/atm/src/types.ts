@@ -126,7 +126,13 @@ export type TfdEventType =
 	| "share.reversed"
 	| "share.settled"
 	/** A Stripe money fact the books did not take (a payment, refund, payout or dispute in a currency other than USD): no postings, a count. */
-	| "money.skipped";
+	| "money.skipped"
+	/**
+	 * A subscription's monthly recurring revenue moved (or was first seen): postings in the `MRR` commodity, whole cents a
+	 * month, from `mrr:movement:<movement>` to `mrr:recurring:<holder>`. A log that holds one is rejected by a reader built
+	 * before it existed.
+	 */
+	| "mrr.changed";
 
 /** One line of a transaction. `amount` is a decimal string (two places for USD, none for credits), never a float. */
 export type TfdPosting = {
@@ -244,11 +250,19 @@ export type TfdLedgerEventInput = {
 	 * down); its payload says `failed: true`. An older reader takes it for a payout line that happens to run backwards.
 	 */
 	failed?: boolean;
+	/**
+	 * On `mrr.changed`: how the holder's recurring revenue moved, in whole cents a month (`after - before`), and which
+	 * movement account takes the other side (`mrr:movement:<movement>`).
+	 */
+	mrr?: { delta: number; movement: MrrMovement };
 	payload?: Record<string, unknown>;
 	redacted?: Record<string, unknown>;
 	text?: string;
 	revision?: number;
 };
+
+/** How a subscription's MRR moved: started (from nothing or from 0), rose, fell while it runs, or ended. */
+export type MrrMovement = "new" | "expansion" | "contraction" | "churned";
 
 export type TfdCatalogRow = { table: string; row: Record<string, unknown> };
 
@@ -976,6 +990,13 @@ export type SubscriptionItem = {
 	interval: Interval | null;
 	/** Stripe's item quantity, a whole number from 0 (a paused item) up: the truth for how many units are paid for. */
 	quantity: number;
+	/**
+	 * The price's `unit_amount` (minor units) and `recurring.interval_count`, as the subscription event carries them: what
+	 * the MRR of a changed item is made from. Absent on a fact built before they were mapped, or for a price with no unit
+	 * amount (tiered pricing), whose item then adds nothing to MRR.
+	 */
+	unitAmount?: number;
+	intervalCount?: number;
 };
 
 /** A subscription's state after a `customer.subscription.*` event. */
@@ -1168,6 +1189,44 @@ export type GrantsState = {
 	bookings?: Record<string, BookingRecord>;
 	/** Gift codes this holder has redeemed, by code id (0.8.0). Absent until the first, as `bookings`. */
 	redeemed?: Record<string, RedeemedCode>;
+	/**
+	 * The monthly recurring revenue the books hold for the holder's subscription, as its last `mrr.changed` left it. Absent
+	 * until the first USD invoice of a subscription is handled (a state stored before MRR was booked has none: its next
+	 * invoice books the subscription as new), so a state that never had a subscription is written as before.
+	 */
+	mrr?: MrrRecord;
+};
+
+/** One recurring item of a subscription, as MRR counts it. */
+export type MrrItem = {
+	priceId: string;
+	interval: Interval;
+	/** Months of one period of the price: 1 a month, 12 a year, times Stripe's interval count. */
+	months: number;
+	quantity: number;
+	/** What a full period of the item costs (minor units): the invoice line's amount, or unit amount x quantity. */
+	amount: number;
+	/** What discounts take off that amount (minor units), from 0 to `amount`. */
+	discount: number;
+	/** Whole cents a month this item adds: (amount - discount) / months, half up. */
+	cents: number;
+};
+
+/** What `GrantsState.mrr` holds: the subscription, its recurring items and the discount its last full invoice gave. */
+export type MrrRecord = {
+	subscriptionId: string;
+	/** Sum of the items' cents: what `mrr:recurring:<holder>` holds. */
+	cents: number;
+	items: MrrItem[];
+	/**
+	 * What discounts took off the recurring lines of the last invoice that billed them in full, and those lines' amount:
+	 * the share an item changed by a subscription event is discounted by (all of it on a 100% coupon). 0 and 0: none.
+	 */
+	discount: { amount: number; gross: number };
+	/** The time of the fact that last set it (ms): an older subscription event arriving late changes nothing. */
+	at: number;
+	/** The subscription ended: MRR is 0 and stays so. */
+	ended: boolean;
 };
 
 /** A subscription as the membership shows it (`subscriptionStatus`), with the plan the menu names for its price. */
@@ -3551,6 +3610,21 @@ export type ReconcileVerdictInput = {
 	counts: unknown;
 	ignored: unknown;
 	skipped: unknown;
+};
+
+/** What `catalogPublishedEvent` takes. */
+export type CatalogPublishedInput = {
+	school: string;
+	menu: Menu;
+	/** The menu's version: the `@v<version>` of every plan it publishes, and the idempotency key's tail. */
+	version: number | string;
+	/** UTC instant (ISO) or epoch ms of the publish. */
+	eventTime: string | number;
+	/** Default: the menu's own time zone. */
+	tz?: string;
+	/** Who wrote it; default `family`. */
+	source?: string;
+	ingestTime?: string | number;
 };
 
 // ---- The old names, for the rename window ------------------------------------------------------------------------

@@ -31,6 +31,8 @@
 			"packages/logging",
 			"packages/balance-engine",
 			"packages/atm",
+			"packages/verify",
+			"packages/ledger-worker",
 			"packages/catalog-lru",
 			"packages/edge-config",
 			"packages/blue-green",

@@ -274,6 +274,26 @@ const catalog: Record<string, Catalog> = {
 		ruleOf: "paying_members",
 		need: "spread",
 	},
+	/** Monthly recurring revenue at the month's end, from atm's `mrr.changed` events: a quarter or a year is its last month. */
+	mrr: { title: "MRR", kind: "money", ruleOf: "mrr" },
+	net_new_mrr: {
+		title: "Net new MRR",
+		kind: "money",
+		ruleOf: "net_new_mrr",
+		inputs: ["new_mrr", "expansion_mrr", "contraction_mrr", "churned_mrr"],
+	},
+	new_mrr: { title: "New MRR", kind: "money", ruleOf: "new_mrr" },
+	expansion_mrr: {
+		title: "Expansion MRR",
+		kind: "money",
+		ruleOf: "expansion_mrr",
+	},
+	contraction_mrr: {
+		title: "Contraction MRR",
+		kind: "money",
+		ruleOf: "contraction_mrr",
+	},
+	churned_mrr: { title: "Churned MRR", kind: "money", ruleOf: "churned_mrr" },
 };
 /** The mockup's donor buckets (`bkBuckets`), in cents. */
 const donorBuckets: Array<Dimension & { below: number | null }> = [
@@ -653,6 +673,12 @@ export function kpiDocument(input: KpiDocumentInput): KpiDocument {
 			: null;
 	};
 	const figureOf = (id: string, period: Period): number | null => {
+		if (id === "mrr") {
+			const found = period.months
+				.map((month) => monthValue(id, period.year, month))
+				.filter((value): value is number => value !== null);
+			return found.at(-1) ?? null;
+		}
 		if (id === "paying_members") {
 			const found = period.months
 				.map((month) => monthValue(id, period.year, month))
@@ -1248,11 +1274,6 @@ export function kpiDocument(input: KpiDocumentInput): KpiDocument {
 		tables,
 		meta,
 		notComputed: [
-			{
-				id: "mrr",
-				reason:
-					"MRR is not computed: cash basis, a yearly payer counts in the month paid",
-			},
 			{ id: "churned_members", reason: "Churn is not computed: cash basis" },
 		],
 		notes,

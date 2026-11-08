@@ -69,7 +69,8 @@ describe("baseline identity: the recorded sandbox scenarios through the handler"
 			eventsTotal += events.length;
 		}
 		expect(inputsTotal).toBe(44);
-		expect(eventsTotal).toBe(39);
+		// 39 before MRR was booked, and the 12 mrr.changed the subscriptions' invoices and events now book
+		expect(eventsTotal).toBe(51);
 	});
 });
 

@@ -11,6 +11,7 @@ import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
 import { Icon } from "./icon.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import type { PaneProps } from "./panes.tsx";
 import { monthOfPeriod } from "./period.ts";
 import { PlanCode } from "./plan-code.tsx";
@@ -42,7 +43,7 @@ import {
 } from "./plans-menu.ts";
 import { parseMenu } from "./plans-yaml.ts";
 import { type Route, type SchoolTab, withQuery } from "./route.ts";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { usePlanYaml } from "./use-plan-yaml.ts";
 import { exitPreviewTitle, useViewedPeriod, useViewing } from "./viewing.ts";
 
@@ -188,18 +189,28 @@ export function Plans({
 	const [publishing, setPublishing] = useState(false);
 	const reasonId = useId();
 	const loaded = session !== undefined;
+	const read = useReadFailure(school.id);
+	const { failFor, attempt } = read;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		if (loaded) return;
 		let current = true;
-		loadSession(reader, school).then((read) => {
-			if (current) onSession(school.id, read);
-		}, keepLoading);
+		const failed = failFor(school.id);
+		loadSession(reader, school).then(
+			(session) => {
+				if (current) onSession(school.id, session);
+			},
+			(error: unknown) => {
+				if (current) failed(error);
+			},
+		);
 		return () => {
 			current = false;
 		};
-	}, [reader, school, loaded, onSession]);
+	}, [reader, school, loaded, onSession, failFor, attempt]);
 	useLayoutEffect(() => {
-		if (loaded) onRendered();
+		if (loaded || read.failed) onRendered();
 	});
 
 	/** The newest session, which a handler may read before the render that follows its own commit. */
@@ -244,7 +255,10 @@ export function Plans({
 	};
 	const yaml = usePlanYaml({ latest, commit, save, onToast });
 
-	if (!session) return null;
+	if (!session)
+		return read.failed ? (
+			<LoadFailed what="the plans" error={read.error} onRetry={read.retry} />
+		) : null;
 	const { live, draft, summary, saveStatus } = session;
 	const view = plansViewOf(viewing);
 	const owner = school.role === "owner";
@@ -284,10 +298,9 @@ export function Plans({
 	const open = (kind: PlanKind, id: string | null): void =>
 		setEditing({ kind, id });
 
-	/** Publishes once the last save has settled. The family PIN is typed in the review and handed over here and goes no
-	 * further: the Writer contract has no PIN parameter (buzz-school checks it on the session). S8 hand-off: open the
-	 * session with `_pin` before the `publishMenu` call below. */
-	const publish = async (_pin: string): Promise<void> => {
+	/** Publishes once the last save has settled, with the family PIN typed in the review: the Writer opens the PIN
+	 * with it (buzz-school checks it on the session) and keeps it nowhere. */
+	const publish = async (pin: string): Promise<void> => {
 		setPublishing(true);
 		if (!(await session.lastSave)) {
 			setPublishing(false);
@@ -295,7 +308,7 @@ export function Plans({
 			return;
 		}
 		try {
-			await writer.publishMenu(school.id);
+			await writer.publishMenu(school.id, pin);
 		} catch {
 			setPublishing(false);
 			onToast(publishFailedToast);

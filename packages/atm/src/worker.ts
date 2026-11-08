@@ -5,6 +5,9 @@
  * pure and Ajv-free. `isLedgerTokenAudience` is the `aud` check of a ledger token (`tfd-ledger`, and `atm-ledger` for the
  * rename window). Needs the `nodejs_compat` flag (see README).
  */
+
+export * from "./ledger/audience-view-types.js";
+export * from "./ledger/audience-views.js";
 export * from "./ledger/catalog.js";
 export * from "./ledger/contributions.js";
 export * from "./ledger/finance.js";
@@ -17,6 +20,7 @@ export * from "./ledger/read.js";
 export * from "./ledger/run-views.js";
 export * from "./ledger/summary.js";
 export * from "./ledger/views.js";
+export { atmChannel } from "./scenario/channels/atm.js";
 export * from "./scenario/kpi-evaluate.js";
 export * from "./scenario/suppress-core.js";
 export * from "./store/r2-binding-store.js";

@@ -235,10 +235,11 @@ export type LedgerPage = {
 	school: string;
 	from: string;
 	to: string;
-	timeZone: string;
+	/** The school's time zone, currency and credit unit come from its latest published menu: null when it has none. */
+	timeZone: string | null;
 	/** ISO 4217. */
-	currency: string;
-	unit: CreditUnit;
+	currency: string | null;
+	unit: CreditUnit | null;
 	/** Every event the page holds, pending ones included: `<count> events · <timeZone>`. */
 	count: number;
 	/** Shown first, under "Waiting to ship (<n>) · each ships within 5 min". */
@@ -298,13 +299,14 @@ export type IncomeStatementQuery = {
 export type StatementAmounts = {
 	memberships: number;
 	bookings: number;
-	discounts: number;
+	/** Null when the source records no discounts (no atm event carries one yet). */
+	discounts: number | null;
 	income: number;
 	refunds: number;
 	fees: number;
 	net: number;
 	/** "Not income: gift certificates sold …": a liability until redeemed. */
-	giftsSold: number;
+	giftsSold: number | null;
 	paidOut: number;
 };
 
@@ -333,16 +335,22 @@ export type IncomeStatement = {
 	school: string;
 	from: string;
 	to: string;
-	currency: string;
-	unit: CreditUnit;
+	/** ISO 4217. The school's currency and credit unit come from its latest published menu: null when it has none, and
+	 * Reports uses the school's own (`School.currency`, `School.creditUnit`). */
+	currency: string | null;
+	unit: CreditUnit | null;
 	basis: { kind: "cash" } | { kind: "deferred"; from: string };
 	/** True when the period is whole months and atm's reconciliation matches Stripe: "Matches Stripe · …"; otherwise
 	 * the "Partial month" line. */
-	matchesStripe: boolean;
+	matchesStripe: boolean | null;
 	counts: { payments: number; refunds: number; payouts: number };
 	amounts: StatementAmounts;
 	/** Active dollar gifts' value, active credit gifts' credits, and how many gifts that is. */
-	giftsOutstanding: { amountCents: number; credits: number; count: number };
+	giftsOutstanding: {
+		amountCents: number;
+		credits: number;
+		count: number;
+	} | null;
 	income: IncomeSeries;
 	/** The previous period of the same length, when `compare`. */
 	previous: {
@@ -622,10 +630,10 @@ export const statementLines: ReadonlyArray<
 	["Gift certificates sold (not income)", "giftsSold"],
 ];
 
-export type StatementCsvRow = { line: string; amountCents: number };
+export type StatementCsvRow = { line: string; amountCents: number | null };
 
 export const statementColumns = (
-	statement: Pick<IncomeStatement, "currency" | "from" | "to">,
+	statement: Pick<IncomeStatement, "from" | "to"> & { currency: string },
 ): Array<CsvColumn<StatementCsvRow>> => [
 	{ header: "line", kind: "text", value: (row) => row.line },
 	{ header: "amount", kind: "money", value: (row) => row.amountCents },
@@ -683,13 +691,25 @@ export interface LedgerReader {
 	audienceReport(query: AudienceReportQuery): Promise<AudienceReport>;
 	donors(query: DonorsQuery): Promise<DonorsReport>;
 	promos(query: PromosQuery): Promise<PromoList>;
-	/** The school's rules in force (every audience sees them, v2 "School policy: every audience sees it."). */
+	/** The school's rules in force (every audience sees them, v2 "School policy: every audience sees it."). Either is
+	 * null where no source has it (D11): no cutoff claim, no offer that rests on the rules, and the school's own
+	 * `creditUnit` for a null unit. */
 	schoolRules(
 		school: string,
-	): Promise<{ rules: SchoolRules; unit: CreditUnit }>;
+	): Promise<{ rules: SchoolRules | null; unit: CreditUnit | null }>;
 }
 
+/** The server's answer to the family PIN typed on a PIN-locked books pane: open, or why not (`pin_wrong`: not the
+ * family PIN; `pin_locked`: too many tries, the PIN is locked for a while). Any other failure rejects. */
+export type BooksUnlock =
+	| { unlocked: true }
+	| { unlocked: false; reason: "pin_wrong" | "pin_locked" };
+
 export interface LedgerWriter {
+	/** Opens the books with the family PIN for this session (mockup `bkLock`'s Unlock). buzz-school checks the PIN on the
+	 * session (`POST /family/pin/verify`): the session stays open for its money writes (refund, adjust, invoice) and for
+	 * the Worker reads of an audience that opens the books with the PIN. Never stored or recorded. */
+	unlockBooks(schoolId: string, pin: string): Promise<BooksUnlock>;
 	download(file: DownloadFile): Promise<void>;
 	createPromo(request: CreatePromo): Promise<Promo>;
 	disablePromo(request: DisablePromo): Promise<Promo>;

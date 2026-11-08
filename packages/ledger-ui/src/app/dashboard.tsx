@@ -22,16 +22,36 @@ import {
 	notComputedCell,
 	withheldKinds,
 } from "./kpi-cell.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import { monthName, type Period, parsePeriod } from "./period.ts";
 import { PinLock } from "./pin-lock.tsx";
 import { withQuery } from "./route.ts";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { useViewing } from "./viewing.ts";
 
 /** The mockup's four fixture scenarios (its `Fixture scenario` segmented control) come first in the Reader's list. The
  * other presets of the mart have no control: they stay reachable by the route's `preset=<id>`, and the segmented control
  * then shows none pressed. */
 const featuredScenarios = 4;
+/** Real data has no presets: the query then names none, and the Reader answers the school's one document (the HTTP
+ * Reader sends no preset to the Worker). */
+const noPreset = "";
+/** The longest the other audiences' documents wait for the browser to be idle after the first paint. */
+const idleTimeoutMilliseconds = 2000;
+/** Where the browser has no idle callback (Safari), the wait past the first paint instead. */
+const idleFallbackMilliseconds = 200;
+
+/** Runs `run` once the browser is idle, after the paint of what is on screen; the answer cancels it. */
+function whenIdle(run: () => void): () => void {
+	if (typeof requestIdleCallback === "function") {
+		const handle = requestIdleCallback(run, {
+			timeout: idleTimeoutMilliseconds,
+		});
+		return () => cancelIdleCallback(handle);
+	}
+	const timer = setTimeout(run, idleFallbackMilliseconds);
+	return () => clearTimeout(timer);
+}
 
 type DashboardView = "money" | "members" | "risk";
 type ViewOption = { id: DashboardView; label: string; icon: IconName };
@@ -1353,6 +1373,7 @@ type Loaded = {
  * cell is never a 0. */
 export function Dashboard({
 	reader,
+	writer,
 	school,
 	clock,
 	route,
@@ -1368,15 +1389,22 @@ export function Dashboard({
 	const presetAsked = query.get("preset");
 	const key = `${school.id}/${presetAsked}/${audience}/${pinLocked}`;
 	const [loaded, setLoaded] = useState<Loaded | null>(null);
-	/** The documents read so far, by the `key` that asked for them, and the other audiences' right after the first paint:
-	 * picking another View as row shows its document in the same click, with no wait for the Reader. */
+	/** The documents read so far, by the `key` that asked for them, and the other audiences' once the browser is idle
+	 * after the first paint (so they never compete with it): picking another View as row shows its document in the same
+	 * click, with no wait for the Reader. */
 	const documents = useRef(new Map<string, KpiDocument>());
 	const heldAudiences = disclosure.viewAs.flatMap((row) =>
 		row.held ? [row.audience] : [],
 	);
 	const heldKey = heldAudiences.join(",");
+	const readStatus = useReadFailure(key);
+	const { failFor, attempt } = readStatus;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		let current = true;
+		let cancelIdle: (() => void) | null = null;
+		const failed = failFor(key);
 		const load = async (): Promise<void> => {
 			const { presets } = await reader.dashboardOptions();
 			const preset = presets.find(({ id }) => id === presetAsked) ?? presets[0];
@@ -1386,7 +1414,7 @@ export function Dashboard({
 			): Promise<KpiDocument | undefined> => {
 				const read = await reader.kpiDocument({
 					school: school.id,
-					preset: preset.id,
+					preset: preset?.id ?? noPreset,
 					audience: forAudience,
 					pinLocked: locked,
 				});
@@ -1398,27 +1426,48 @@ export function Dashboard({
 				return read;
 			};
 			const document = await read(audience, pinLocked);
-			if (current) setLoaded({ key, school: school.id, presets, document });
+			if (!current) return;
+			setLoaded({ key, school: school.id, presets, document });
 			const others = new Set(heldKey.split(",") as Array<typeof audience>);
 			others.delete(audience);
-			await Promise.all(
-				[...others].map((other) => read(other, false).catch(() => undefined)),
-			);
+			cancelIdle = whenIdle(() => {
+				for (const other of others) read(other, false).catch(() => undefined);
+			});
 		};
-		load().catch(keepLoading);
+		load().catch((error: unknown) => {
+			if (current) failed(error);
+		});
 		return () => {
 			current = false;
+			cancelIdle?.();
 		};
-	}, [reader, key, school.id, presetAsked, audience, pinLocked, heldKey]);
+	}, [
+		reader,
+		key,
+		school.id,
+		presetAsked,
+		audience,
+		pinLocked,
+		heldKey,
+		failFor,
+		attempt,
+	]);
 	const onScreen = loaded?.key === key && loaded.document !== undefined;
 	useLayoutEffect(() => {
-		if (onScreen) onRendered();
+		if (onScreen || readStatus.failed) onRendered();
 	});
 	/** While the next document loads, the one before stays on screen (the route is reported only once it is in). */
 	const document =
 		documents.current.get(key) ??
 		(loaded?.school === school.id ? loaded.document : undefined);
-	if (!(loaded && document)) return null;
+	if (!(loaded && document))
+		return readStatus.failed ? (
+			<LoadFailed
+				what="the dashboard"
+				error={readStatus.error}
+				onRetry={readStatus.retry}
+			/>
+		) : null;
 
 	const go = (name: string, value: string | null): void =>
 		navigate(withQuery(route, name, value));
@@ -1546,7 +1595,7 @@ export function Dashboard({
 						PIN locked
 					</button>
 				)}
-				{document.source.kind === "mart" && (
+				{document.source.kind === "mart" && featured.length > 0 && (
 					<>
 						<span class="sp" />
 						{/* biome-ignore lint/a11y/useSemanticElements: the mockup's segmented control is a div; a fieldset brings its own border and padding */}
@@ -1572,7 +1621,8 @@ export function Dashboard({
 				<PinLock
 					key={audience}
 					levelName={audienceNames[audience]}
-					onUnlock={() => {
+					unlock={(pin) => writer.unlockBooks(school.id, pin)}
+					onUnlocked={() => {
 						go("pin", null);
 						onToast("Books unlocked for this session.");
 					}}

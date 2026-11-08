@@ -17,16 +17,27 @@ export type CustomerEntitlementReset = {
 	row: ResetRow;
 };
 
-/** What is left on the row carries over, then the cap trims the oldest rollovers first. */
+/**
+ * What is left on the row carries over, then the cap trims the oldest rollovers first. A rollover that has
+ * expired by the reset is not counted or trimmed: the Postgres read never loads it, and the cron books its
+ * lapse at its own expiry, which a trim stamped after that expiry would rewrite.
+ */
 const customerEntitlementToRolloverChanges = ({
 	row,
 	cycleEndedAt,
+	now,
 }: {
 	row: DueRow;
 	cycleEndedAt: number;
+	now: number;
 }): RowChange[] =>
 	addRolloversWithinMax({
-		row,
+		row: {
+			...row,
+			rollovers: row.rollovers.filter(
+				(rollover) => rollover.expires_at === null || rollover.expires_at > now,
+			),
+		},
 		newRollovers: getRolloverUpdates({ cusEnt: row, nextResetAt: cycleEndedAt })
 			.toInsert,
 	});
@@ -134,7 +145,11 @@ export const customerEntitlementToResetChanges = ({
 				},
 				after: { ...balances, next_reset_at: nextResetAt },
 			},
-			...customerEntitlementToRolloverChanges({ row, cycleEndedAt }),
+			...customerEntitlementToRolloverChanges({
+				row,
+				cycleEndedAt,
+				now: command.occurredAt,
+			}),
 		],
 		row: {
 			customerEntitlementId: row.id,

@@ -83,7 +83,7 @@ What is fixed: `schema/envelope.v1.json` has `v: const 1`, `additionalProperties
 4. **A change that would make an existing type mean something different is not additive** and waits for 2.0 (or a new type). The `payout.failed`-reuses-`payout.paid` choice (`ROADMAP.md:129`) is the example to avoid: a reversal that old readers count as a payout. Decide before 1.0 whether to keep it (it makes `reconcile` and the mart count `failed: true` rows differently, and that is then the contract) or give the reversal its own type now, while the enum is still free to change.
 5. **Not recommended:** a versioned enum with a compatibility window (`event_types_v: 3`). It needs a negotiation channel between writer and reader that does not exist (the reader is whoever opens the folder), and the log has no header.
 
-**Also decide in this section:** `payout.paid.failed`, `refund`-by-event-id vs refund id (`ROADMAP.md:135`), and `payment.succeeded` lacking `interval` and `period_end` (`ROADMAP.md:100`, MRR/ARR/logo churn not computable). Adding optional labels later is allowed; if the owner wants MRR in the first 1.x, put the labels in before 1.0, since old payments will lack them forever.
+**Also decide in this section:** `payout.paid.failed`, `refund`-by-event-id vs refund id (`ROADMAP.md:135`), and ARR and logo churn (MRR is now booked as `mrr.changed`, `ROADMAP.md`; old logs lack it, so a holder's MRR starts at its next invoice).
 
 ### 1c. Handler DDL and migrations
 
@@ -204,7 +204,7 @@ Numbers are the lines of `ROADMAP.md` at `fed0d6c08`. "Owner" means it needs an 
 | 90 | Asks from the ledger UI session (labels, `cause` chain, admin source, gift liability account) | LATER, but each is a new label/account, additive | Depends on the cash-basis decision |
 | 91, 92, 93 | Booking ids unique per school and env; coupon id edge cases; member code expiry unchecked | SHOULD | Document as limits; the first (idem made from the booking id alone) loses a `credit.held` silently, so the notes must say "use a UUID" |
 | 94, 167 | Referral codes | LATER | Reserved event types; do not promise |
-| 100 | KPIs the cash-basis books cannot carry (MRR, ARR, churn) | SHOULD (owner) | Adding `interval` and `period_end` labels to `payment.succeeded` is additive but old payments never get them: decide before 1.0 if MRR is wanted |
+| 100 | KPIs the cash-basis books cannot carry (MRR, ARR, churn) | done for MRR; ARR and logo churn open | MRR is booked as its own event type (`mrr.changed`, `MRR` commodity) from the subscription facts, not as labels on `payment.succeeded`; a log from before it has no `mrr.changed`, so a holder's MRR starts at the next invoice the handler sees |
 | 101 | `atm billing simulate` | LATER | Superseded by `atm simulate` (built); delete the line |
 | 103 to 106, 109, 110 | Stored-inputs follow-ups (carried payment, `candidate.priceIds`, prune, `startsAt`, `booking_writes`, `replayEvents` out-of-order 1 in 135) | LATER; the `replayEvents` one SHOULD | All inside experimental surfaces; the 1-in-135 case means `replayEvents` can throw on a valid handler log: fix or document |
 | 107, 118 | R2 path of inputs ship / `R2Store` never run; FolderStore `.atm-tmp-*` sweep | B4; the sweep LATER | |

@@ -227,6 +227,8 @@ describe("recorded Stripe payloads (2025-10-29.clover)", () => {
 					interval: "month",
 					priceId: item.price.id,
 					quantity: 1,
+					unitAmount: item.price.unit_amount,
+					intervalCount: 1,
 				},
 			]);
 			expect(item.quantity).toBe(1);

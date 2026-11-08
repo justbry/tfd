@@ -100,8 +100,8 @@
 							"properties": {
 								"op": { "const": "sum" },
 								"commodity": {
-									"enum": ["usd", "credits"],
-									"description": "usd: USD postings, in cents; credits: every other commodity, in units."
+									"enum": ["usd", "mrr", "credits"],
+									"description": "usd: USD postings, in cents; mrr: MRR postings (monthly recurring revenue), in whole cents a month; credits: every other commodity, in units."
 								},
 								"sign": {
 									"enum": [1, -1],

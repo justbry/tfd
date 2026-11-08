@@ -730,7 +730,7 @@ function PickModal({
 						onClick={() => {
 							if (
 								context.insideCutoff(booking) &&
-								write.rules.lateCancel === "spend"
+								write.rules?.lateCancel === "spend"
 							) {
 								onPick(booking);
 								return;

@@ -23,8 +23,18 @@ export type Route = {
 
 export type Theme = "light" | "dark" | "system";
 
-/** An unknown school opens the first one; an unknown tab opens Plans. */
-export function parseRoute(hash: string, schoolIds: string[]): Route {
+/** The tab a school opens on: Plans, or the Dashboard for a demo school, whose plans are a scenario's, not its own to
+ * edit (S8-contract section 11). */
+export const defaultTabOf = (
+	school: { demo: boolean } | undefined,
+): SchoolTab => (school?.demo ? "dashboard" : "plans");
+
+/** An unknown school opens the first one; an unknown tab opens the school's default tab (`defaultTabOf`). */
+export function parseRoute(
+	hash: string,
+	schoolIds: string[],
+	defaultTab: (schoolId: string) => SchoolTab = () => "plans",
+): Route {
 	const [path = "", search = ""] = hash.replace(/^#\/?/, "").split("?", 2);
 	const [schoolSegment = "", tabSegment = ""] = path.split("/");
 	const query = new URLSearchParams(search);
@@ -33,7 +43,8 @@ export function parseRoute(hash: string, schoolIds: string[]): Route {
 			? schoolSegment
 			: (schoolIds[0] ?? allSchools);
 	if (schoolId === allSchools) return { schoolId, tab: allSchools, query };
-	const tab = schoolTabs.find((name) => name === tabSegment) ?? "plans";
+	const tab =
+		schoolTabs.find((name) => name === tabSegment) ?? defaultTab(schoolId);
 	return { schoolId, tab, query };
 }
 

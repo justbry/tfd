@@ -61,7 +61,7 @@ stripe-spec spec:
 release-dry:
     bun ./release.ts --dry-run
 
-# Create the GitHub releases tfd-v<version> and atm-v<version> at HEAD with their tarballs (needs a clean, pushed HEAD and the pinned bun)
+# Create the GitHub release tfd-v<version> at HEAD with the tarball (needs a clean, pushed HEAD and the pinned bun)
 [confirm("Create the GitHub release for the version in package.json?")]
 release:
     bun ./release.ts

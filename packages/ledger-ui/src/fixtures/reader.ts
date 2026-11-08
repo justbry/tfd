@@ -3,10 +3,10 @@ import type { KpiDocument, KpiQuery } from "../data/kpi-document.ts";
 import type { MembersFixture } from "../data/members.ts";
 import type { Reader } from "../data/reader.ts";
 import type { SchoolSettings } from "../data/settings.ts";
-import type { Clock, DashboardOptions, School } from "../data/types.ts";
+import type { Clock, DashboardOptions } from "../data/types.ts";
 import { bookingsBySchool } from "./bookings.ts";
 import disclosureFixture from "./disclosure.json";
-import { createLedgerReader } from "./ledger.ts";
+import { createLedgerReader, type FixtureSchool } from "./ledger.ts";
 import documentsFile from "./mart/documents.json";
 import { membersFixtures } from "./members.ts";
 import { plansBySchool } from "./plans.ts";
@@ -18,7 +18,7 @@ import settingsFixture from "./settings.json";
  * `expiring`, stale when `lag` is over 15 minutes. Vibes of Light's Plans tab shows `draft` as the mockup draws it.
  * Who the signed-in person is at each school, and so what the Dashboard opens as, is the disclosure's `viewer`. B4 Uni,
  * the mockup's fixture school, opens its Dashboard on Jun (`dm=5`). */
-const schools: School[] = [
+const schools: FixtureSchool[] = [
 	{
 		id: "vol",
 		name: "Vibes of Light",
@@ -29,6 +29,7 @@ const schools: School[] = [
 		stale: false,
 		lagMinutes: 2,
 		attentionCount: 4,
+		demo: false,
 		tabBadges: { plansDraft: true, bookingsOverdue: 2, promosExpiring: 1 },
 	},
 	{
@@ -42,6 +43,7 @@ const schools: School[] = [
 		stale: false,
 		lagMinutes: 3,
 		attentionCount: 2,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 1, promosExpiring: 0 },
 	},
 	{
@@ -54,6 +56,7 @@ const schools: School[] = [
 		stale: true,
 		lagMinutes: 26,
 		attentionCount: 1,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 0, promosExpiring: 0 },
 	},
 	{
@@ -66,6 +69,7 @@ const schools: School[] = [
 		stale: false,
 		lagMinutes: 1,
 		attentionCount: 0,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 0, promosExpiring: 0 },
 	},
 	{
@@ -78,6 +82,7 @@ const schools: School[] = [
 		stale: false,
 		lagMinutes: 2,
 		attentionCount: 0,
+		demo: false,
 		tabBadges: { plansDraft: false, bookingsOverdue: 0, promosExpiring: 0 },
 	},
 ];

@@ -21,6 +21,7 @@ const ENTRIES = [
 	"src/ledger/summary.ts",
 	"src/ledger/views.ts",
 	"src/ledger/kpi-document.ts",
+	"src/ledger/audience-views.ts",
 	"src/scenario/suppress-core.ts",
 	"src/ledger/finance.ts",
 	"src/ledger/contributions.ts",
@@ -148,6 +149,15 @@ describe("the Worker read path's import graph", () => {
 
 	test("kpi-document.ts imports nothing from the UI package", () => {
 		const { files, external } = reachFrom("src/ledger/kpi-document.ts");
+		expect([...files].filter((file) => file.includes("ledger-ui"))).toEqual([]);
+		expect(external).toEqual([]);
+	});
+
+	test("audience-views.ts is reached by worker.ts, imports nothing from the UI package and nothing outside this package", () => {
+		expect(
+			reachFrom("src/worker.ts").files.has("src/ledger/audience-views.ts"),
+		).toBe(true);
+		const { files, external } = reachFrom("src/ledger/audience-views.ts");
 		expect([...files].filter((file) => file.includes("ledger-ui"))).toEqual([]);
 		expect(external).toEqual([]);
 	});

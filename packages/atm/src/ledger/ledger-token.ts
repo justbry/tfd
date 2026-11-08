@@ -3,7 +3,7 @@
  * ledger Worker verifies on every read (`plans/ledger-ui/S8-contract.md`, section 2). The audience was `atm-ledger`;
  * it is now `tfd-ledger`. During the rename window (`plans/tfd-rename.md`, step 3) the Worker accepts both, until
  * buzz-school mints the new one; then `atm-ledger` is dropped here. The claim must be exactly one of these strings: an
- * array, another string or a missing claim is refused. Pure: no Ajv, no disk, so it is in `atm/worker`.
+ * array, another string or a missing claim is refused. Pure: no Ajv, no disk, so it is in `tfd/worker`.
  */
 
 /** The audience a ledger token carries from now on. */

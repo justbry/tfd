@@ -1,0 +1,23 @@
+{
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"esModuleInterop": true,
+		"isolatedModules": true,
+		"module": "Preserve",
+		"moduleResolution": "bundler",
+		"customConditions": ["bun"],
+		"noEmit": true,
+		"paths": {
+			"@api/*": ["../../shared/api/*"],
+			"@models/*": ["../../shared/models/*"],
+			"@utils/*": ["../../shared/utils/*"]
+		},
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "ES2022",
+		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"types": ["bun", "node"],
+		"resolveJsonModule": true
+	},
+	"include": ["src/**/*.ts", "tests/**/*.ts"]
+}

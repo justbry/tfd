@@ -1,0 +1,161 @@
+/* Tailwind 4, CSS-first. The mockup's tokens (plans/ledger-ui/design/mockup.html and mockup-host.css, as
+   packages/ledger-ui/src/theme.css carries them) are the variables below, one set per theme; `@theme inline` names
+   them for Tailwind and for the shadcn-svelte components (bg-background, text-muted-foreground, border-border…)
+   in tailwind-shared.css, which a pane's own stylesheet imports too.
+   The theme class sits on <html> (light, dark or system), so dialogs and sheets portalled to <body> take it too;
+   `system` follows the operating system's scheme. */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@import "./tailwind-shared.css";
+
+/* The Dashboard (and the books parts it alone uses) brings its own utilities with its chunk (dashboard.css), and so
+   do the card, table and sheet components that only panes loaded on demand draw (each pane's stylesheet names the
+   components it draws). */
+@source not "./app/dashboard";
+@source not "./app/books";
+@source not "./lib/components/ui/card";
+@source not "./lib/components/ui/table";
+@source not "./lib/components/ui/sheet";
+@source not "./app/AllSchools.svelte";
+@source not "./app/SettingsSheet.svelte";
+/* So do Bookings and Members (their folders, the parts they share, and the dialog, field and label components only
+   they draw). */
+@source not "./app/bookings";
+@source not "./app/members";
+@source not "./app/panes";
+@source not "./app/PaneIcon.svelte";
+@source not "./lib/components/ui/dialog";
+@source not "./lib/components/ui/native-select";
+/* And so do Ledger and Reports (their folders and the parts they share). */
+@source not "./app/ledger";
+@source not "./app/reports";
+@source not "./app/books-shared";
+
+:root {
+	--radius: 10px;
+	/* Stacking, lowest first: popovers, the settings sheet, toasts (always above both). */
+	--layer-popover: 70;
+	--layer-sheet: 80;
+	--layer-toast: 95;
+}
+
+:root,
+.light {
+	color-scheme: light;
+	--background: #ffffff;
+	--foreground: #16161a;
+	--card: #f5f5f7;
+	--popover: #ffffff;
+	--secondary: #ececf0;
+	--muted-foreground: #6b6b78;
+	--border: #dadae0;
+	--ring: #8f9bb3;
+	--primary: #2563eb;
+	--primary-foreground: #ffffff;
+	--destructive: #d92d20;
+	--warning: #b45309;
+	--success: #047857;
+	--info: #2563eb;
+	--code-background: #eeeef2;
+	--chart-1: #2563eb;
+	--chart-2: #0d9488;
+	--chart-3: #d97706;
+	--chart-4: #9333ea;
+	--chart-5: #db2777;
+}
+
+.dark {
+	color-scheme: dark;
+	--background: #0b0b0d;
+	--foreground: #ededf0;
+	--card: #141418;
+	--popover: #17171c;
+	--secondary: #1d1d23;
+	--muted-foreground: #9a9aa6;
+	--border: #2a2a32;
+	--ring: #555a70;
+	--primary: #4c7dff;
+	--primary-foreground: #ffffff;
+	--destructive: #f0524a;
+	--warning: #f0a020;
+	--success: #2fbf8a;
+	--info: #5b9dff;
+	--code-background: #1a1a20;
+	--chart-1: #4c7dff;
+	--chart-2: #2dd4bf;
+	--chart-3: #fbbf24;
+	--chart-4: #c084fc;
+	--chart-5: #f472b6;
+}
+
+@media (prefers-color-scheme: dark) {
+	.system {
+		color-scheme: dark;
+		--background: #0b0b0d;
+		--foreground: #ededf0;
+		--card: #141418;
+		--popover: #17171c;
+		--secondary: #1d1d23;
+		--muted-foreground: #9a9aa6;
+		--border: #2a2a32;
+		--ring: #555a70;
+		--primary: #4c7dff;
+		--primary-foreground: #ffffff;
+		--destructive: #f0524a;
+		--warning: #f0a020;
+		--success: #2fbf8a;
+		--info: #5b9dff;
+		--code-background: #1a1a20;
+		--chart-1: #4c7dff;
+		--chart-2: #2dd4bf;
+		--chart-3: #fbbf24;
+		--chart-4: #c084fc;
+		--chart-5: #f472b6;
+	}
+}
+
+@layer base {
+	* {
+		box-sizing: border-box;
+		border-color: var(--color-border);
+	}
+	html {
+		background: var(--background);
+	}
+	body {
+		margin: 0;
+		font-family: var(--font-sans);
+		font-size: 12px;
+		line-height: 1.4;
+		background: var(--background);
+		color: var(--foreground);
+	}
+	button {
+		cursor: pointer;
+	}
+}
+
+/* The mockup's frame (`.app`): the host draws it as a card with a 1px border and rounded corners. */
+@layer components {
+	.app {
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		overflow: hidden;
+		position: relative;
+		min-height: 780px;
+		background: var(--background);
+		color: var(--foreground);
+	}
+	/* The mockup's stroke icons (`.i`). */
+	.icon {
+		width: 14px;
+		height: 14px;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		flex: none;
+	}
+}

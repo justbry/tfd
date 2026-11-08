@@ -1,0 +1,38 @@
+---
+pagetitle: "Trifold brief · The 5-minute overview"
+brief-audience: "The 5-minute overview"
+brief-oneliner: "What Trifold does, what it costs, who it's for, and what's built versus next."
+brief-length: "8 slides, about 5 minutes"
+include-in-header:
+  text: "<style>:root { --path: #1e2a44; --path-text: #1e2a44; }</style>"
+---
+
+{{< include ../_partials/_title.qmd >}}
+
+{{< include ../_partials/_problem.qmd >}}
+
+{{< include ../_partials/_how.qmd >}}
+
+{{< include ../_partials/_receipts.qmd >}}
+
+{{< include ../_partials/_pricing.qmd >}}
+
+## First beachhead: Idaho and Utah microschools; market: the US and English-speaking countries {#market}
+
+<span class="kicker">Go-to-market</span>
+
+<div class="cards">
+<div class="card"><h3>Beachhead</h3><p>Microschools of 10 to 150 families on Stripe. Families in Idaho's tax credit and Utah's program need records that hold up.</p></div>
+<div class="card card--green"><h3>Market</h3><p>Any organization billing through Stripe in the US and English-speaking countries. Focus: schools, co-ops and churches.</p></div>
+<div class="card card--ink"><h3>Delivered with firms</h3><p>Accounting firms bring and serve clients. Each receipt will carry a "Verify at trifold…" link.</p></div>
+</div>
+
+::: {.notes}
+Owner decision, 2026-11-07 (coordinator's message): the market is the entire US and each English-speaking country; Idaho and Utah microschools are the first beachhead. The docs still say "the working default" (`docs/business/business-plan.md` §1 and §12 item 3) and may be updated on the stacked docs branch. Market size is being researched.
+
+Sources: business-plan §4 (10–150 families, Stripe; channels: CPAs and bookkeepers) and §7 (growth loops: the verify link, platforms adopting the format, CPAs). Focus on schools, co-ops and churches, delivered with accounting firms: owner decision, 2026-11-07; `docs/business/market-research.md` §4 (why Idaho and Utah; check each program's receipt rules). `docs/business/go-to-market.md` §3.2 (schools refer schools for account credit). Utah's program is not named while its appeal is pending. No school issues receipts yet, so the link is future tense.
+:::
+
+{{< include ../_partials/_built-next.qmd >}}
+
+{{< include ../_partials/_paths.qmd >}}

@@ -22,6 +22,12 @@ const forbiddenInSource: ReadonlyArray<readonly [string, RegExp]> = [
 	["Date.now(", /Date\.now\s*\(/],
 	["new Date()", /new\s+Date\s*\(\s*\)/],
 ];
+/** Orchestrator-approved exceptions (S8e), by file: the HTTP build's entry keeps the pending store in the browser's
+ * persistent storage (it must survive a reload) and reads the system time once, at mount, for its `Clock` (protocol §3:
+ * the entry supplies the clock). Every other file keeps every rule. */
+const allowedInSource: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+	["src/http/browser.ts", new Set(["localStorage", "Date.now("])],
+]);
 const forbiddenInBuild: ReadonlyArray<readonly [string, RegExp]> = [
 	["new Function", /new\s+Function\s*\(/],
 	["eval(", /\beval\s*\(/],
@@ -60,8 +66,9 @@ describe("gate H: source", () => {
 		const name = relative(packageRoot, file);
 		const text = readFileSync(file, "utf8");
 		test(`${name} has no forbidden construct`, () => {
+			const allowed = allowedInSource.get(name) ?? new Set<string>();
 			const found = forbiddenInSource
-				.filter(([, pattern]) => pattern.test(text))
+				.filter(([label, pattern]) => !allowed.has(label) && pattern.test(text))
 				.map(([label]) => label);
 			expect(found).toEqual([]);
 		});
@@ -93,6 +100,33 @@ describe("gate H: source", () => {
 			expect(problems).toEqual([]);
 		});
 	}
+});
+
+describe("gate H: the S8e allowance", () => {
+	test("only src/http/browser.ts is allowed anything, and only localStorage and one clock read", () => {
+		expect([...allowedInSource.keys()]).toEqual(["src/http/browser.ts"]);
+		expect([...(allowedInSource.get("src/http/browser.ts") ?? [])]).toEqual([
+			"localStorage",
+			"Date.now(",
+		]);
+	});
+	test("no other source file uses what the allowance lets src/http/browser.ts use", () => {
+		const allowance = forbiddenInSource.filter(([label]) =>
+			allowedInSource.get("src/http/browser.ts")?.has(label),
+		);
+		const users = sourceFiles.filter((file) => {
+			const text = readFileSync(file, "utf8");
+			return allowance.some(([, pattern]) => pattern.test(text));
+		});
+		expect(users.map((file) => relative(packageRoot, file))).toEqual([
+			"src/http/browser.ts",
+		]);
+	});
+	test("src/http/browser.ts reads the system time once", () => {
+		const text = readFileSync(join(sourceRoot, "http", "browser.ts"), "utf8");
+		expect(text.match(/Date\.now\s*\(/g)?.length).toBe(1);
+		expect(/new\s+Date\s*\(\s*\)/.test(text)).toBe(false);
+	});
 });
 
 describe("gate H: build", () => {

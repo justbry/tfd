@@ -536,9 +536,14 @@ describe("a member mid-cycle, moved onto atm", () => {
 		// Expiry: the credits of this invoice lapse where the caller's lot does (cycle end plus the rollover month).
 		expect(grantedNow.rolloverExpiresAt).toBe(expected.expires_at);
 		// Rollover: what February's cycle left carries over, expiring where the caller's February lot expires;
-		// January's leftover lapsed at the same instant the cycle turned, so it is gone in both.
+		// January's leftover lapsed at the same instant the cycle turned: the reset leaves it for the cron to book, and it
+		// counts in neither.
 		const caller = [februaryLot, expected];
-		const rollover = only(store.rowsOf("rollovers"));
+		const rollover = only(
+			store
+				.rowsOf("rollovers")
+				.filter((row) => (row.data.expires_at as number) > IN_3.atMs),
+		);
 		expect(rollover.data).toMatchObject({
 			balance: februaryLot.balance,
 			expires_at: februaryLot.expires_at,
@@ -646,11 +651,15 @@ describe("what the rows determine, and what moving does not make the same", () =
 		expect(engineOnly(imported.rows)).toEqual(engineOnly(native.rows));
 		// The grants state differs only in what the lots cannot say (the billing anchor) and the membership record.
 		const { anchor, membership: record, ...importedRest } = imported.state;
+		// ...and in the MRR atm booked for its own invoice: an adopted member's starts at the next invoice atm handles.
 		const {
 			anchor: nativeAnchor,
 			membership: nativeRecord,
+			mrr: nativeMrr,
 			...nativeRest
 		} = native.grants;
+		expect(nativeMrr?.cents).toBe(26_000);
+		expect(imported.state.mrr).toBeUndefined();
 		// ...and in `paid`: atm's own invoice remembers that the books took its payment, an adopted one is the caller's to book.
 		const unbooked = Object.fromEntries(
 			Object.entries(nativeRest.invoices).map(([id, record]) => {

@@ -1,22 +1,18 @@
-name: Release tfd (and atm)
+name: Release tfd
 
-# Pushing a tag tfd-v<version> or atm-v<version> builds packages/atm at that tag and puts the tarball on the GitHub
-# releases of justbry/tfd. For the rename window one version is published under both names: tfd-v<version> with
-# tfd-<version>.tgz and atm-v<version> with atm-<version>.tgz, at the same commit (release.ts). A release that already
-# exists (`bun run --cwd packages/atm release` made it from a laptop) is checked: its asset must be exactly what this
-# commit builds, or the run fails; a missing one is created. B4 Uni's family service pins the asset URL and its sha512.
+# Pushing a tag tfd-v<version> (atm-v<version> through 0.10.0) builds packages/atm at that tag and puts tfd-<version>.tgz on the GitHub release for it.
+# If the release already exists (`bun run --cwd packages/atm release` made it from a laptop), this checks that its asset
+# is exactly what this commit builds, and fails if not. B4 Uni's family service pins the asset URL and its sha512.
 
 on:
   push:
-    tags: ["tfd-v*", "atm-v*"]
+    tags: ["tfd-v*"]
 
 permissions:
   contents: write
 
-# One group for both tag names, so the two runs a release starts take turns instead of racing to create the same
-# release; the second finds both releases and only checks them.
 concurrency:
-  group: release-tfd
+  group: release-atm-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

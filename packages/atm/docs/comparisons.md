@@ -18,7 +18,7 @@ Written 2026-11-05 from memory of their public docs, not read or run; check a ro
 - Other payment providers (Lago, Kill Bill, Flexprice): the Trifold engine is Stripe only. Not planned.
 - Own subscription lifecycle (proration, trials, dunning, coupons): left to Stripe, see Ruled out.
 - Tax, invoice PDFs, the customer portal itself (the Trifold engine only builds the configuration for tiers sold in quantities: `portalConfigOf`), admin UI, REST API, multi-tenant auth: left to Stripe and the caller.
-- Revenue analytics (MRR and similar): only the ledger export; the Parquet export and any dashboard are not built.
+- Revenue analytics: MRR and its movements (new, expansion, contraction, churned) are KPIs of the spec, computed by the atm fold, hledger and DuckDB; ARR, cohorts and NRR are not built.
 - Expiry alerts by the clock: see Alerts above.
 - Rebuild from the log: `replayEvents` now reproduces what `handleStripeEvent` wrote (see Review above); `simulate` and a rebuild of a subject's rows from a stored log are not built.
 - Reuse outside B4 Uni: see "Decouple, the cheap parts" (prefix, `family_id`, `env`, menu limits), and the Worker handler blocked on `ajv`.
