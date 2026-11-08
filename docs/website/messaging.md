@@ -2,7 +2,7 @@
 
 Status: draft, round 2, 2026-11-06. Round 1 reviews: `reviews/round-1-sonnet.md` (conversion, GTM) and `reviews/round-1-fable.md` (brand, narrative, motion). What changed and why: `decisions.md`.
 
-Names, voice and claim rules come from `docs/brand/trifold-brand-and-messaging.md` (PR #121). Prices come from `docs/business/pricing-strategy.md` (PR #140).
+Names, voice and claim rules come from `docs/brand/trifold-brand-and-messaging.md` (`justbry/atm` #121). Prices come from `docs/business/pricing-strategy.md` (`justbry/atm` #140). Claim rules in `AGENTS.md` win over anything here.
 
 ## 1. The question we lead with
 
@@ -41,9 +41,9 @@ The owner's direction: trust means **durable, fast and resilient**, and on top o
 | **Durable** | Your books outlive any app, including ours | Append-only events; write-once batches; export to Parquet, hledger, CSV; the engine is free to self-host | 02 Books |
 | **Provable** | Anyone can check any number, without asking us | Signed receipts; sealed months; free verifier; open spec | 03 Proof |
 | **Resilient** | Lose everything but the events and rebuild it all, exactly | Replay rebuilds balances and journals byte-for-byte; seals still verify after a key rotation | 03 Proof |
-| **Fast** | A year of books rebuilt in seconds | Replay and Pricing Lab run a year of events locally in seconds; the month-close by Rifo is marked Next | 04 Close |
+| **Fast** | A year of books rebuilt on your own machine | Replay (`tfd simulate`) runs a year of events locally; no speed numbers (`AGENTS.md`). The month-close by Rifo is marked Next | 04 Close |
 
-The sentence to carry everywhere: **"Not even Trifold can quietly change your books."** It's true of what's shipped: receipts are held by payers and seals chain month to month.
+The sentence to carry everywhere: open. The earlier carry line, "Not even Trifold can quietly change your books", is banned by `AGENTS.md` (corrected 2026-11-07): Trifold would hold the signing key, and there is no per-event chain or witness yet, so it isn't true of what's shipped. Until the owner picks another, reuse the hero line, **"Books that show their work."**
 
 Low cost appears only as a fact on the pricing page.
 
@@ -71,7 +71,7 @@ The human version of the trust story. One line each, same Verify button.
 - **A parent at tax time** checks the tuition receipt their state program asked for.
 - **A treasurer before the board meeting** shows a sealed month instead of a spreadsheet.
 - **A CPA in January** traces every number to the payment behind it.
-- **An auditor with no account** verifies a seal in seconds.
+- **An auditor with no account** verifies a seal in the browser.
 - **A donor** checks that their gift was acknowledged and recorded.
 
 ## 7. Audiences
@@ -85,7 +85,7 @@ Two front doors for launch: **owners** (schools first) and **their accountants**
 | Studios, gyms, tutoring | Sell plans and packs; know who has visits left; books close themselves. | Get early access | Vibes of Light story | `/for/studios` |
 | Non-profits and co-ops | Open books donors, board and members can check. | See non-profit pricing | Donation acknowledgments; open-books page (Next) | `/for/nonprofits` |
 | Developers and platforms | A provable ledger for credits, plans and bookings; open spec; free verifier. | Install the CLI, free | Engine, CLI, spec, test vectors | `/for/developers` |
-| Verifiers (families, auditors, grantors) | Check any receipt or seal in seconds. No account. | Verify | The page itself | `/verify` |
+| Verifiers (families, auditors, grantors) | Check any receipt or seal in the browser. No account. | Verify | The page itself | `/verify` |
 
 ## 8. Objections, answered on the site
 

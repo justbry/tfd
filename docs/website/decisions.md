@@ -31,10 +31,19 @@ Owner decisions, final.
 
 | Change | From | Why |
 |---|---|---|
-| The engine and CLI are named `tfd` in all copy; "(the `atm` command until the rename lands)" appears once per page or doc | "atm" for the engine, `tfd` as the planned CLI name | The CLI already answers to `tfd`; the package and directory rename comes after open PRs land. Literal paths (`packages/atm/...`) and `github.com/justbry/atm` stay |
+| The engine and CLI are named `tfd` in all copy; "(the `atm` command until the rename lands)" appears once per page or doc | "atm" for the engine, `tfd` as the planned CLI name | The CLI already answers to `tfd`; the package and directory rename comes after open PRs land. Literal paths (`packages/atm/...`) and `github.com/justbry/atm` stay (the working repo moved to `justbry/tfd` on 2026-11-07; release URLs stay on `justbry/atm`) |
 | Engine license: FSL-1.1-ALv2 (source-available, free to self-host, each release becomes Apache-2.0 two years after it ships) | "License being finalised" | Protects the engine from a hosted clone, and the public conversion date backs the durability promise |
 | Receipt and seal format, spec and verifier: Apache-2.0; test vectors: CC0-1.0; hosted service, Rifo and the witness: proprietary; forked Autumn code stays Apache-2.0 | — | "Anyone can check, forever" needs checking to be unrestrictable |
 | Copy never says "open source" for the engine; it says "source-available", "Fair Source" or "free to self-host". "Open formats", "open spec" and "open verifier" stay | "Open core", "open engine" | FSL isn't OSI-approved. Only the Apache-2.0 and CC0 parts can be called open |
 | The in-browser verifier comes from `tfd-verify` (`packages/verify`, Apache-2.0, SPDX headers); the site itself, all of it, is proprietary, and its build writes `/licenses.txt` for the packages it ships (2026-11-07). The licensing table on Trust, About and Developers; the footer line names the license | `// SPDX-License-Identifier: Apache-2.0` on the site's `src/lib/verify/*.ts` | The verifier stays Apache-2.0 in a package anyone can use, and the website can be wholly copyrighted |
+
+## Kept, decided or corrected (2026-11-07)
+
+| Change | From | Why |
+|---|---|---|
+| FSL-1.1-ALv2 kept with its fixed two-year conversion | The owner considered three years | Three years would mean BUSL-1.1 with a custom grant, not FSL |
+| A CLA for outside contributions (`CONTRIBUTING.md`) | DCO, or nothing | Code moves between the repo's FSL, Apache-2.0 and proprietary parts; a DCO can't allow that |
+| `TRADEMARKS.md`, a draft policy for Trifold, Witnessed by Trifold, tfd, Rifo and the logo | No policy | Forks and hosted services must rename; a lawyer reviews it before launch |
+| `messaging.md` and `sitemap.md` drop "Not even Trifold can quietly change your books" and "a year rebuilt in seconds" | The carry line and the Fast pillar's number | `AGENTS.md` bans both: Trifold holds the signing key today, and no speed numbers are claimed |
 
 Open: the licensor's legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (before the accountant partner program); contributor terms are decided (a CLA, `CONTRIBUTING.md`); whether the event envelope schema should also be Apache-2.0.

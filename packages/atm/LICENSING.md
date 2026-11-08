@@ -18,7 +18,7 @@ Allowed, for example:
 - Non-commercial education and research.
 - An accountant or bookkeeper working on a client's own tfd install.
 
-**Each release becomes Apache-2.0 on the second anniversary of its release**, with no further action from anyone. The Apache-2.0 parts above are Apache-2.0 from day one, so anyone can check a receipt or a seal, forever, without asking.
+**Each release becomes Apache-2.0 on the second anniversary of its release**, with no further action from anyone. 0.10.0 (2026-11-07) is the first FSL release; releases up to 0.9.0 are Apache-2.0. The Apache-2.0 parts above are Apache-2.0 from day one, so anyone can check a receipt or a seal, forever, without asking.
 
 ## Why
 
