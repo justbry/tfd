@@ -1,0 +1,49 @@
+didkey.A-rdfc                            WARNING  | 
+didkey.A-rdfc-escapes                    WARNING  | 
+didkey.A-rdfc-nostatus                   VALID    | 
+didkey.B-jcs                             ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report. || errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+didkey.C-set                             WARNING  | 
+didkey.C-set-jcs-first                   ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+didkey.E-expired                         FATAL    | fatals: ExpirationProbe: The credential has expired (expiration date or validUntil was 2025-12-31T00:00:00Z).
+didkey.E-revoked                         FATAL    | fatals: BitstringStatusListProbe: Credential has been revoked
+didkey.E-standing-ok                     WARNING  | 
+didkey.E-suspended                       WARNING  | 
+didkey.G-A-context-302                   ERROR    | errors: JsonLDValidationProbe: Error while validation JSON LD object: JSON-LD problem. (Undefined JSON-LD term: awardedDate) || errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report. || warnings: ContextPropertyProbe|OpenBadgeCredential|@context: expected @context uri https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json at position 2, gotten https:
+didkey.G-A-context-copy                  ERROR    | errors: ContextPropertyProbe|OpenBadgeCredential|@context: missing required @context uri https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json at position 2 || errors: JsonSchemaProbe|https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json: $.@context: must be valid to one and only one schem
+didkey.G-A-field                         ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+didkey.G-A-no-proof                      ERROR    | errors: EmbeddedProofProbe: The verifiable credential is missing a proof.
+didkey.G-A-rogue-key                     ERROR    | errors: EmbeddedProofProbe: Key controller does not match issuer: did:key:z6MkgMaWU6fT2zRAGXNZ4TDGaRrLyMtR8a27PRma38r9dKDB
+didkey.G-A-unmapped-subject-term         ERROR    | errors: JsonLDValidationProbe: Error while validation JSON LD object: JSON-LD problem. (Undefined JSON-LD term: favouriteColour)
+didkey.G-A-unmapped-term                 ERROR    | errors: JsonLDValidationProbe: Error while validation JSON LD object: JSON-LD problem. (Undefined JSON-LD term: unmappedTerm)
+didkey.G-A-vm-swap                       ERROR    | errors: EmbeddedProofProbe: Key controller does not match issuer: did:key:z6MkgMaWU6fT2zRAGXNZ4TDGaRrLyMtR8a27PRma38r9dKDB
+didkey.G-C-bad-jcs                       WARNING  | 
+didkey.G-C-bad-rdfc                      ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+didkey.G-C-field                         ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+didkey.G-C-rogue-rdfc                    ERROR    | errors: EmbeddedProofProbe: Key controller does not match issuer: did:key:z6MkgMaWU6fT2zRAGXNZ4TDGaRrLyMtR8a27PRma38r9dKDB
+didkey.G-C-strip-jcs                     WARNING  | 
+didkey.G-C-strip-rdfc                    ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webpath.A-rdfc                           WARNING  | 
+webpath.A-rdfc-escapes                   WARNING  | 
+webpath.A-rdfc-nostatus                  VALID    | 
+webpath.B-jcs                            ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report. || errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webpath.C-set                            WARNING  | 
+webpath.C-set-jcs-first                  ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webpath.E-expired                        FATAL    | fatals: ExpirationProbe: The credential has expired (expiration date or validUntil was 2025-12-31T00:00:00Z).
+webpath.E-revoked                        FATAL    | fatals: BitstringStatusListProbe: Credential has been revoked
+webpath.E-standing-ok                    WARNING  | 
+webpath.E-suspended                      WARNING  | 
+webpath.G-A-context-302                  ERROR    | errors: JsonLDValidationProbe: Error while validation JSON LD object: JSON-LD problem. (Undefined JSON-LD term: awardedDate) || errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report. || warnings: ContextPropertyProbe|OpenBadgeCredential|@context: expected @context uri https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json at position 2, gotten https:
+webpath.G-A-context-copy                 ERROR    | errors: ContextPropertyProbe|OpenBadgeCredential|@context: missing required @context uri https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json at position 2 || errors: JsonSchemaProbe|https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json: $.@context: must be valid to one and only one schem
+webpath.G-A-field                        ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webpath.G-A-no-proof                     ERROR    | errors: EmbeddedProofProbe: The verifiable credential is missing a proof.
+webpath.G-A-rogue-key                    ERROR    | errors: EmbeddedProofProbe: Assertion method did:web:localhost%3A8443:issuers:webpath#key-2 not found in DID document.
+webpath.G-A-unmapped-subject-term        ERROR    | errors: JsonLDValidationProbe: Error while validation JSON LD object: JSON-LD problem. (Undefined JSON-LD term: favouriteColour)
+webpath.G-A-unmapped-term                ERROR    | errors: JsonLDValidationProbe: Error while validation JSON LD object: JSON-LD problem. (Undefined JSON-LD term: unmappedTerm)
+webpath.G-A-vm-swap                      ERROR    | errors: EmbeddedProofProbe: Assertion method did:web:localhost%3A8443:issuers:webpath#key-2 not found in DID document.
+webpath.G-C-bad-jcs                      WARNING  | 
+webpath.G-C-bad-rdfc                     ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webpath.G-C-field                        ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webpath.G-C-rogue-rdfc                   ERROR    | errors: EmbeddedProofProbe: Assertion method did:web:localhost%3A8443:issuers:webpath#key-2 not found in DID document.
+webpath.G-C-strip-jcs                    WARNING  | 
+webpath.G-C-strip-rdfc                   ERROR    | errors: EmbeddedProofProbe: Embedded proof verification failed. You can see intermediate results for proof calculations by downloading the report.
+webroot.A-rdfc                           ERROR    | errors: EmbeddedProofProbe: Key document not found at did:web:localhost%3A8443#key-1. URI: https://localhost%3A8443/.well-known/did.json doesn't return a valid document.  || errors: EmbeddedProofProbe: Key document not found at did:web:localhost%3A8443#key-1. URI: https://localhost%3A8443/.well-known/did.json doesn't return a valid document. 
