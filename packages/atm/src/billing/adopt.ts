@@ -11,7 +11,7 @@
  * membership's tier, a tier grant or add-on with no lot (atm would never refill it), rows on different cycles.
  *
  * What the caller does that atm's rules place on their own rows (D12 T2):
- * - an admin adjustment (`adjust:<kind>`): a row of its own that never refills and never lapses (`adjust-row.ts`);
+ * - an admin adjustment (`adjust:<kind>`): a row of its own that never refills and never lapses (`adjustRowOp`, the row `adjustCredits` writes);
  * - a quantity raise mid-cycle (a `subscription_update` invoice's tier lot, lasting to the same cycle end as the cycle's
  *   lot): folded into the cycle's row, as atm's own raise adds to it. The quantity is the membership's, never read back
  *   from a lot's amount (a prorated raise can be a whole number of units by chance);
@@ -26,6 +26,7 @@
 import { deterministicUlid } from "../ledger/ids.js";
 import { runOnState, toCatalog } from "../ledger/run.js";
 import type {
+	AdjustKind,
 	AtmEnv,
 	AtmEvent,
 	BillingRow,
@@ -42,7 +43,7 @@ import type {
 	MenuAddon,
 	MenuTier,
 } from "../types.js";
-import { adjustKindOf, adjustmentRow, adjustRowId } from "./adjust-row.js";
+import { adjustKindOfLabel, adjustRowOp } from "./adjust.js";
 import { resolveEnv } from "./env.js";
 import {
 	addonCp,
@@ -74,8 +75,6 @@ const TIER_SOURCE = "tier";
 const ADDON_SOURCE_PREFIX = "addon:";
 /** `allowance / amount` is a whole quantity up to the floating point a REAL column carries. */
 const QUANTITY_TOLERANCE = 1e-9;
-/** The caller's own adjustment invoices are `adjust:<key>`; the key names the adjustment's row. */
-const ADJUST_INVOICE_PREFIX = "adjust:";
 const IMPORT_MAPPING = "import/caller-rows";
 const IMPORT_REASON = "imported from the caller's credit lots";
 
@@ -98,7 +97,7 @@ type RowPlan = {
 type OncePlan = { lot: Lot; addon: MenuAddon; feature: string };
 
 /** An admin adjustment's lot: its own row, never refilled, never lapsing. */
-type AdjustPlan = { lot: Lot; kind: string; key: string };
+type AdjustPlan = { lot: Lot; kind: AdjustKind };
 
 /** UTF-16 code unit order (not the locale's), so the output is the same wherever it runs. */
 const compareText = (left: string, right: string): number => {
@@ -263,7 +262,7 @@ export const grantsStateFromCallerRows = (
 			planOf(spec, TIER_CP).lots.push(lot);
 			continue;
 		}
-		const adjustKind = adjustKindOf(lot.source);
+		const adjustKind = adjustKindOfLabel(lot.source);
 		if (adjustKind !== null) {
 			if (lot.expires_at !== null) {
 				problem(
@@ -271,10 +270,7 @@ export const grantsStateFromCallerRows = (
 				);
 				continue;
 			}
-			const key = lot.invoice_id.startsWith(ADJUST_INVOICE_PREFIX)
-				? lot.invoice_id.slice(ADJUST_INVOICE_PREFIX.length)
-				: lot.id;
-			adjustLots.push({ lot, kind: adjustKind, key });
+			adjustLots.push({ lot, kind: adjustKind });
 			continue;
 		}
 		if (!lot.source.startsWith(ADDON_SOURCE_PREFIX)) {
@@ -364,14 +360,6 @@ export const grantsStateFromCallerRows = (
 			}
 		epochs.set(plan.rowId, byInvoice);
 	}
-	const adjustRowIds = new Set<string>();
-	for (const { lot, key } of adjustLots) {
-		const rowId = adjustRowId(key, lot.feature_id);
-		if (adjustRowIds.has(rowId))
-			problem(`adjustment ${key} has two lots of ${lot.feature_id}`);
-		adjustRowIds.add(rowId);
-	}
-
 	// ---- the cycle the credits are in: read from the newest refill of every row that refills with the plan ---------
 	const zone = menu.timeZone;
 	const cycleRows = [...rowPlans.values()].filter(
@@ -589,15 +577,15 @@ export const grantsStateFromCallerRows = (
 	}
 
 	// An adjustment is no invoice: its row holds what is left of it, and no invoice record names it.
-	for (const { lot, kind, key } of adjustLots) {
-		const row = adjustmentRow({
-			key,
+	for (const { lot, kind } of adjustLots) {
+		const row = adjustRowOp({
+			adjustmentId: lot.id,
 			kind,
 			feature: lot.feature_id,
 			customerId,
-			balance: lot.balance,
-			t: lot.created_at,
-		});
+			credits: lot.balance,
+			at: lot.created_at,
+		}).row as Record<string, unknown>;
 		row.adjustment = lot.adjustment;
 		row.additional_balance = lot.additional_balance;
 		addRow("customerEntitlements", row.id as string, row);
@@ -608,7 +596,7 @@ export const grantsStateFromCallerRows = (
 	// lot taken back is taken back (a refund takes back a whole invoice; the lots still holding credits keep them).
 	const lotsByInvoice = new Map<string, Lot[]>();
 	for (const lot of lots) {
-		if (adjustKindOf(lot.source) !== null) continue;
+		if (adjustKindOfLabel(lot.source) !== null) continue;
 		const same = lotsByInvoice.get(lot.invoice_id) ?? [];
 		same.push(lot);
 		lotsByInvoice.set(lot.invoice_id, same);

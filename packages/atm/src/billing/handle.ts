@@ -38,7 +38,7 @@ import type {
 	StripePayout,
 	SubscriptionFact,
 } from "../types.js";
-import { ADJUST_ROW_PREFIX } from "./adjust-row.js";
+import { ADJUST_ROW_PREFIX } from "./adjust.js";
 import {
 	decideBookingRefund,
 	decideCheckoutSession,

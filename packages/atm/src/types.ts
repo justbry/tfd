@@ -180,7 +180,10 @@ export type TfdEventContext = {
 	plan?: string;
 	/** The service a spend or its refund is booked to: `credits:spent:<service>`. */
 	service?: string;
-	/** An `updateBalance` that adds credit is `credit.refunded` (as `refunded`) or `credit.adjusted` (the default). */
+	/**
+	 * An `updateBalance` that adds credit is `credit.refunded` (as `refunded`) or `credit.adjusted` (the default). An
+	 * `applyBillingPlan` that adds credit is `credit.granted`, or `credit.adjusted` as `adjusted` (an admin adjustment).
+	 */
 	as?: "refunded" | "adjusted";
 	/** Required on `credit.adjusted`. */
 	reason?: string;
@@ -1189,6 +1192,8 @@ export type GrantsState = {
 	bookings?: Record<string, BookingRecord>;
 	/** Gift codes this holder has redeemed, by code id (0.8.0). Absent until the first, as `bookings`. */
 	redeemed?: Record<string, RedeemedCode>;
+	/** Admin adjustments made with `adjustCredits`, by the caller's command id. Absent until the first, as `bookings`. */
+	adjusted?: Record<string, AdjustmentRecord>;
 	/**
 	 * The monthly recurring revenue the books hold for the holder's subscription, as its last `mrr.changed` left it. Absent
 	 * until the first USD invoice of a subscription is handled (a state stored before MRR was booked has none: its next
@@ -1854,6 +1859,65 @@ export type RedeemSessionGiftCodeResult =
 			redeemed: RedeemedCode;
 	  }
 	| GiftCodeRefusal;
+
+// ---- Admin credit adjustments (D12) ----
+
+/** Why an admin changed a balance: `goodwill` and `gift` only add, a `correction` goes either way. */
+export type AdjustKind = "goodwill" | "gift" | "correction";
+
+/** One adjustment as the holder's grants state remembers it: a second call with the same command id finds it. */
+export type AdjustmentRecord = {
+	commandId: string;
+	kind: AdjustKind;
+	feature: string;
+	/** Signed whole credits: positive added, negative taken. */
+	credits: number;
+	at: number;
+	/** The credit rows it moved: the new `ce_adjust_` row when it added, the rows it drew on when it took. */
+	rowIds: string[];
+};
+
+/**
+ * An admin's change to a holder's balance of one feature. `commandId` is the caller's idempotency key: it names the
+ * engine commands (`adjust:<commandId>:<step>`), so it must be unique in the school. `credits` is a signed whole number,
+ * never 0; `goodwill` and `gift` must be positive.
+ */
+export type AdjustCreditsInput = BookingContext & {
+	commandId: string;
+	kind: AdjustKind;
+	featureId: string;
+	credits: number;
+	/** Whose credits these are when the subject has no rows yet. */
+	holder: { orgId: string; customerId: string };
+};
+
+export type AdjustCreditsRefusalReason =
+	| "bad_command"
+	| "bad_kind"
+	| "bad_credits"
+	| "unknown_feature"
+	| "insufficient_credits"
+	| "idempotency_conflict";
+
+export type AdjustCreditsRefusal = {
+	ok: false;
+	reason: AdjustCreditsRefusalReason;
+	message: string;
+};
+
+/**
+ * Write `rowChanges` and append `events` to the outbox in one transaction. `replayed` is true when the grants state
+ * already held this command id with the same fields: nothing to write, no events.
+ */
+export type AdjustCreditsResult =
+	| {
+			ok: true;
+			rowChanges: RowChanges | null;
+			events: TfdEvent[];
+			adjusted: AdjustmentRecord;
+			replayed: boolean;
+	  }
+	| AdjustCreditsRefusal;
 
 /** Stripe steps for a dollar gift certificate: a coupon for a fixed amount off, and a promotion code that works once and ends. Not a `StripeOp`: they come per gift, not per menu. */
 export type GiftStripeOp =
@@ -2917,6 +2981,92 @@ export interface SqlDatabase {
 	 */
 	transaction<T>(fn: () => T): T;
 }
+
+/**
+ * Why a member's balance in the compare-only shadow differs from the caller's own (plan §5), or `unexplained`. Each
+ * excused reason is a rule difference the owner accepted (D12 decisions 1-7):
+ * - `admin_adjust`: the caller's `adjust:*` lots made after the import (the shadow never sees an admin adjustment);
+ * - `unrenewed_cycle`: tfd still holds a refilling row past its reset (the cycle ended unpaid; the caller's lots read 0);
+ * - `upgrade_grant`: tfd granted more for an invoice since the import than the caller's lots of it (a mid-cycle upgrade
+ *   or raise, which tfd grants at once);
+ * - `rollover_cap`: tfd is lower by at most what it expired at its renewals since the import (the cap the caller never
+ *   applied);
+ * - `expiry_dst`: a lot and a tfd row or rollover lapse within an hour of each other, and `now` falls between (the zone
+ *   the expiry was computed in, across a DST change);
+ * - `gift_expiry`: a one-time lot and tfd's row of the same invoice lapse at different times, and `now` falls between.
+ */
+export type ShadowDiffReason =
+	| "admin_adjust"
+	| "unrenewed_cycle"
+	| "upgrade_grant"
+	| "rollover_cap"
+	| "expiry_dst"
+	| "gift_expiry"
+	| "unexplained";
+
+/** One member as the caller's own billing holds it, at the compare's `now`. */
+export type ShadowMember = {
+	/** The holder, as the shadow's subject names it: `family:<id>` or `profile:<id>`. */
+	customerId: string;
+	/** The caller's available balance per feature at `now`: the sum of `balance` over unremoved lots live at `now`. */
+	balances: Record<string, number>;
+	/** The member's lots: the evidence for `admin_adjust`, `upgrade_grant`, `expiry_dst` and `gift_expiry`. Without them those are never excused. */
+	lots?: readonly CallerCreditLotRow[];
+};
+
+export type DiffBalancesInput = {
+	/** The shadow database (`HANDLER_DDL`): its `atm_rows`, `atm_subjects` and `ledger_outbox`. */
+	db: SqlDatabase;
+	school: string;
+	env?: TfdEnv;
+	/** The engine catalog rows (`menuCatalogRows`) the shadow decides with. */
+	catalog: readonly TfdCatalogRow[];
+	/** One instant (ms) for both sides. */
+	now: number;
+	/** When the members were imported into the shadow (ms): only what happened since counts as evidence. */
+	importedAt: number;
+	members: readonly ShadowMember[];
+};
+
+/** A member's feature whose balances differ. `delta` is tfd's minus the caller's. */
+export type BalanceDifference = {
+	customerId: string;
+	feature: string;
+	callerBalance: number;
+	tfdBalance: number;
+	delta: number;
+	reason: ShadowDiffReason;
+	/** The credits of the caller's `adjust:*` lots since the import, part of `delta` whatever the reason. */
+	adjustedSinceImport: number;
+};
+
+/** An invoice the caller's own billing handled before the import: whose it was, and what paid it. */
+export type SeededInvoice = {
+	/** The Stripe invoice id (`in_...`). */
+	invoiceId: string;
+	/** Whose credits it paid for: the subject the import wrote. */
+	holder: { orgId: string; customerId: string };
+	/** The payment intent (`pi_...`) and charge (`ch_...`) ids that paid it, as a refund or dispute names them. */
+	paymentRefs?: readonly string[];
+};
+
+/** What `seedHandlerIndexes` writes, in the handler's env (`deps.env`; default `live`). */
+export type SeedHandlerIndexesInput = {
+	env?: TfdEnv;
+	/** The time (ms) the claims are marked done at. */
+	at: number;
+	/** Stripe event ids (`evt_...`) the caller already handled: a redelivery of one is answered `duplicate`. */
+	eventIds: readonly string[];
+	/** Every invoice paid before the import, so a refund or dispute of it finds its holder. */
+	invoices: readonly SeededInvoice[];
+};
+
+/** The rows each table gained (0 everywhere on a second run). */
+export type SeedHandlerIndexesResult = {
+	claims: number;
+	invoices: number;
+	payments: number;
+};
 
 /** What `migrateHandlerSchema` did: the tables it rebuilt with an `env` key (none when the database was current). */
 export type HandlerMigrationResult = {
