@@ -116,6 +116,9 @@
 				"scripts/org-demos/dashboard.client.js"
 			]
 		},
+		"packages/tfd-credentials": {
+			"entry": ["spikes/validators/*.{ts,mjs}"]
+		},
 		"packages/verify": {
 			"entry": ["tests/**/*.test.ts"],
 			"project": ["src/**/*.ts"]

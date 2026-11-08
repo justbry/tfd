@@ -1,0 +1,329 @@
+== dcc-v2
+v2_ed25519_didKey_oidf-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didKey_legacy-noStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+v2_ed25519_didKey_legacy-tamperedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue type issuer: must be an object
+    issue required validFrom: required
+    issue required credentialSubject.type: required
+    issue required credentialSubject: needs an id or at least one identifier
+    issue required credentialSubject.achievement: required
+v2_dataIntegrityProof_didKey_noRegistry-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-OBSpecExample verified=true status=unchecked proof eddsa-rdfc-2022: verified
+v2_bothSignatureTypes_didkey_oidf-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didWeb_oidf-noStatus-notExpired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didKey_legacy-noStatus-noExpiry-tampered verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+v2_ed25519_didKey_legacy-noStatus-noExpiry-lcwExperience verified=false status=unchecked 
+    structure: context_invalid: 3 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-alignments verified=true status=unchecked proof eddsa-rdfc-2022: verified
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-credName verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_bothSignatureTypes_didkey_noRegistry-revokedStatus-notExpired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-notExpired-withSchema verified=false status=unchecked 
+    structure: credential_malformed: 1 structural issue(s)
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didweb_legacy-revokedStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_bothSignatureTypes_didweb_legacy-revokedStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-identityHash verified=false status=unchecked 
+    structure: context_invalid: 3 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue type credentialSubject.identifier: must be an array
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-basicOBv3 verified=true status=unchecked proof eddsa-rdfc-2022: verified
+v2_ed25519_didWeb_badDidWeb                verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_noRegsitry-revokedStatus-notExpired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_bothSignatureTypes_didkey_legacy-noStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+v2_bothSignatureTypes_didkey_legacy-noStatus-notExpired-endorsement verified=false status=unchecked 
+    structure: context_invalid: 5 structural issue(s)
+    issue context @context[2]: https://purl.imsglobal.org/spec/ob/v3p0/extensions.json is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue value credentialSubject.type: must include AchievementSubject
+    issue required credentialSubject.achievement: required
+v2_bothSignatureTypes_didkey_legacy-noStatus-notExpired-endorsement-withSchema verified=false status=unchecked 
+    structure: context_invalid: 5 structural issue(s)
+    issue context @context[2]: https://purl.imsglobal.org/spec/ob/v3p0/extensions.json is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue value credentialSubject.type: must include AchievementSubject
+    issue required credentialSubject.achievement: required
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-credSubjName verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-_noExpiry-credSubjName verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didWeb_legacy-revokedStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didKey_legacy-noStatus-expired  verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+v2_bothSignatureTypes_didweb_oidf-noStatus-notExpired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didWeb_legacy-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didKey_legacy-missingTypeStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue type issuer: must be an object
+    issue required validFrom: required
+    issue required credentialSubject.type: required
+    issue required credentialSubject: needs an id or at least one identifier
+    issue required credentialSubject.achievement: required
+v2_ed25519_didKey_noRegistry-revokedStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-minimal verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue type issuer: must be an object
+    issue required validFrom: required
+    issue required credentialSubject.type: required
+    issue required credentialSubject: needs an id or at least one identifier
+    issue required credentialSubject.achievement: required
+v2_ed25519_didKey_legacy-noStatus-noExpiry-stringIssuerId verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue type issuer: must be an object
+v2_dataIntegrityProof_didweb_legacy-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-achievementTypeExample verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_twoOIDF-revoked-notExpired-badSchema verified=false status=unchecked 
+    structure: context_invalid: 3 structural issue(s)
+    issue context @context[2]: inline contexts are not accepted
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didKey_legacy-notYetValidStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue type issuer: must be an object
+    issue required validFrom: required
+    issue required credentialSubject.type: required
+    issue required credentialSubject: needs an id or at least one identifier
+    issue required credentialSubject.achievement: required
+v2_ed25519_didKey_legacy-expiredStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue type issuer: must be an object
+    issue required validFrom: required
+    issue required credentialSubject.type: required
+    issue required credentialSubject: needs an id or at least one identifier
+    issue required credentialSubject.achievement: required
+v2_bothSignatureTypes_didkey_legacy-noStatus-noExpiry-nonOBWithOBContext verified=false status=unchecked 
+    structure: context_invalid: 5 structural issue(s)
+    issue context @context[2]: https://purl.imsglobal.org/spec/ob/v3p0/extensions.json is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue value credentialSubject.type: must include AchievementSubject
+    issue required credentialSubject.achievement: required
+v2_bothSignatureTypes_didkey_noRegistry-revokedStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_bothSignatureTypes_didweb_legacy-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_oidf-noStatus-notExpired-complexIssuer verified=false status=unchecked 
+    structure: credential_malformed: 1 structural issue(s)
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_oidf-revokedStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_twoOIDF-validStatus-expired verified=false status=unchecked 
+    structure: credential_malformed: 1 structural issue(s)
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didweb_oidf-noStatus-notExpired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+v2_dataIntegrityProof_didKey_oidf-noStatus-notExpired-notYetValid verified=false status=unchecked 
+    structure: credential_malformed: 1 structural issue(s)
+    issue required credentialSubject: needs an id or at least one identifier
+v2_ed25519_didKey_noRegistry-revokedStatus-notExpired verified=false status=unchecked 
+    structure: context_invalid: 2 structural issue(s)
+    issue context @context[2]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required credentialSubject: needs an id or at least one identifier
+== dcc-v1
+v1_dataIntegrityProof_didKey_oidf-revokedStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue context @context[2]: https://www.w3.org/ns/credentials/status/v1 is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue context @context[4]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v1_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-OBSpecExample verified=false status=unchecked 
+    structure: context_invalid: 3 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+v1_dataIntegrityProof_didKey_legacyRegistry-noStatus-noExpiry-oldDCCExample verified=false status=unchecked 
+    structure: context_invalid: 10 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue context @context[2]: https://w3id.org/dcc/v1 is not an accepted context
+    issue context @context[3]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue value type: must include one of OpenBadgeCredential, AchievementCredential
+    issue required issuer.type: required
+    issue required validFrom: required
+    issue required credentialSubject.type: required
+    issue required credentialSubject: needs an id or at least one identifier
+    issue required credentialSubject.achievement: required
+v1_dataIntegrityProof_didKey_legacy-noStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v1_bothSignatureTypes_didKey_legacy-noStatus-noExpiry-basicOBv3 verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required validFrom: required
+v1_dataIntegrityProof_didKey_noRegistry-noStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v1_dataIntegrityProof_didKey_oidf-noStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v1_dataIntegrityProof_didKey_oidf-noStatus-expired verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v1_dataIntegrityProof_didKey_fourRegistry-noStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[2]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+v1_dataIntegrityProof_didKey_mixedRegistry-validStatus-noExpiry verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue context @context[2]: https://www.w3.org/ns/credentials/status/v1 is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue context @context[4]: https://w3id.org/security/data-integrity/v2 is not an accepted context
+    issue required validFrom: required
+    issue required credentialSubject: needs an id or at least one identifier
+== 1edtech-tests
+simple-did-key-method                      verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[2]: https://purl.imsglobal.org/spec/ob/v3p0/extensions.json is not an accepted context
+simple-context-alias                       verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_unresolved)
+    signature: verification_method_unresolved: no key could be read for https://example.com/issuers/876543#z6MkjZRZv3aez3r18pB1RBFJR1kwUVJ5jHt92JmQwXbd5hwi
+    issuerKey: did_resolution_failed: https://example.com/issuers/876543: unsupported DID method: https://example.com/issuers/876543
+simple                                     verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_unresolved)
+    signature: verification_method_unresolved: no key could be read for https://example.com/issuers/876543#z6MkjZRZv3aez3r18pB1RBFJR1kwUVJ5jHt92JmQwXbd5hwi
+    issuerKey: did_resolution_failed: https://example.com/issuers/876543: unsupported DID method: https://example.com/issuers/876543
+credential-status-revoked                  verified=false status=unchecked 
+    structure: context_invalid: 9 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue context @context[2]: https://purl.imsglobal.org/spec/ob/v3p0/extensions.json is not an accepted context
+    issue context @context[3]: https://w3id.org/security/suites/ed25519-2020/v1 is not an accepted context
+    issue required validFrom: required
+    issue value credentialStatus.type: must be BitstringStatusListEntry
+    issue value credentialStatus.statusPurpose: must be revocation or suspension
+    issue required credentialStatus.statusListIndex: required
+    issue required credentialStatus.statusListCredential: required
+simple-err-expired                         verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_unresolved)
+    signature: verification_method_unresolved: no key could be read for https://example.com/issuers/876543#z6MkjZRZv3aez3r18pB1RBFJR1kwUVJ5jHt92JmQwXbd5hwi
+    issuerKey: did_resolution_failed: https://example.com/issuers/876543: unsupported DID method: https://example.com/issuers/876543
+    validity: expired: valid until 2010-01-01T00:00:00Z
+complete                                   verified=false status=unchecked 
+    structure: context_invalid: 7 structural issue(s)
+    issue context @context[2]: https://purl.imsglobal.org/spec/ob/v3p0/extensions.json is not an accepted context
+    issue value credentialStatus.type: must be BitstringStatusListEntry
+    issue value credentialStatus.statusPurpose: must be revocation or suspension
+    issue required credentialStatus.statusListIndex: required
+    issue required credentialStatus.statusListCredential: required
+    issue required evidence[0].digestMultibase: required
+    issue required evidence[1].digestMultibase: required
+simple-multiple-proofs                     verified=false status=unchecked proof null: unsupported (proof_type_unsupported); proof eddsa-rdfc-2022: failed (verification_method_unresolved)
+    signature: verification_method_unresolved: no key could be read for https://example.com/issuers/876543#z6MkjZRZv3aez3r18pB1RBFJR1kwUVJ5jHt92JmQwXbd5hwi
+    issuerKey: did_resolution_failed: https://example.com/issuers/876543: unsupported DID method: https://example.com/issuers/876543
+simple-did-web-method                      verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_unresolved)
+    signature: verification_method_unresolved: no key could be read for https://1edtech.edu/issuers/565049#z6MkjZRZv3aez3r18pB1RBFJR1kwUVJ5jHt92JmQwXbd5hwi
+    issuerKey: did_resolution_failed: https://1edtech.edu/issuers/565049: unsupported DID method: https://1edtech.edu/issuers/565049
+simple-err-proof-value                     verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_unresolved)
+    signature: verification_method_unresolved: no key could be read for https://example.com/issuers/876543#z6MkrvfzkMnvCroEUP2DVc9SHPE48CRsvHiVSusHioxTYu1x
+    issuerKey: did_resolution_failed: https://example.com/issuers/876543: unsupported DID method: https://example.com/issuers/876543
+simple-eddsa-2022                          verified=false status=unchecked 
+    structure: context_invalid: 4 structural issue(s)
+    issue context @context[0]: must be https://www.w3.org/ns/credentials/v2
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+    issue context @context[2]: https://w3id.org/security/data-integrity/v1 is not an accepted context
+    issue required validFrom: required
+simple-context-version                     verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
