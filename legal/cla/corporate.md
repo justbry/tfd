@@ -12,29 +12,29 @@ Version 0.1, 2026-11-08 (draft). Adapted from the Apache Software Foundation's S
 | 1 | Throughout | "The Apache Software Foundation (the 'Foundation')" | "Trifold" | The licensor. No legal entity exists yet. |
 | 2 | Section 1, new definition of "Trifold" | None | Trifold is the project's owner until a legal entity exists, and includes successors and assignees | The license has to pass to the entity once it's formed. |
 | 3 | Opening paragraph | Promises not to use Contributions "contrary to the public benefit or inconsistent with its nonprofit status and bylaws" | Removed | Trifold isn't a nonprofit, and the promise would conflict with proprietary licensing. |
-| 4 | Section 2, new last sentence | Grants a license to "sublicense, and distribute" | Adds that Trifold may license Contributions under any terms, naming open source, source-available (FSL-1.1-ALv2) and proprietary | Says outright what CONTRIBUTING.md promises. |
-| 5 | How to sign | Email a PDF to secretary@apache.org | Sign with an e-signature service and send the PDF to Trifold | Trifold has no secretary. |
+| 4 | Section 2, new last sentence | Grants a license to "sublicense, and distribute" | Adds that Trifold may license Contributions under any terms, at any time, naming open source (Apache-2.0), source-available (FSL-1.1-ALv2), public domain (CC0 1.0) and proprietary | Says outright what CONTRIBUTING.md promises. |
+| 5 | How to sign | Fill in the PDF, attach a signature, email it to secretary@apache.org | A person authorized to enter into contracts for the Corporation signs through an e-signature service, and the signed PDF goes to Trifold | Trifold has no secretary. Apache's form doesn't say who may sign. |
 | 6 | New paragraph "How Trifold records this Agreement" | None | Trifold keeps the signed PDF and adds Schedule A's GitHub logins to the CLA bot's allowlist | Says what happens to the signature. |
 | 7 | Schedule A | Names only | Name, GitHub login and email, plus a "Changes to Schedule A" procedure | The allowlist is keyed by GitHub login; Apache only says "subsequent written modification". |
 | 8 | Section 8, new last sentence | None | Removing someone from Schedule A takes effect when Trifold receives the notice and doesn't affect earlier Contributions | Makes add and remove predictable. |
 | 9 | Title | "Software Grant and Corporate Contributor License Agreement" | "Corporate Contributor License Agreement" | Schedule B (the optional software grant) is kept, but the name is shorter. |
 | 10 | "products owned or managed by" | the Foundation | Trifold | Follows from 1. |
 
-Apache's sections 3 (patents), 5, 6 and 7 change only the licensor's name.
+Apache's sections 3 to 7 change at most the licensor's name. Section 3 (patents, with its termination on patent litigation) and section 6 (no support expected, no warranty) are kept whole.
 
-**A practice change, not a text change.** The ASF also requires every employee to sign their own ICLA, even when their employer has signed a CCLA. This draft doesn't: an employee named in Schedule A goes on the allowlist and isn't asked to sign the individual CLA. Each employee's own representations (individual CLA sections 4, 5 and 8) are therefore missing. See question 2 below.
+**A practice change, not a text change.** The ASF requires every committer to sign their own ICLA; a CCLA only backs it up. This draft doesn't: an employee named in Schedule A goes on the allowlist and isn't asked to sign the individual CLA. Each employee's own representations (individual CLA sections 4, 5 and 8) are therefore missing. See question 2 below.
 
 ## For the reviewing lawyer
 
 1. All the questions in `individual.md` apply here too: licensor and assignment, the relicensing sentence, patents after a move to another product, and personal data.
-2. **Employees without an individual CLA.** Is the corporation's signature enough for its Schedule A employees, or should they also sign the individual CLA, as the ASF requires? If they should, the allowlist step in `SETUP.md` goes away.
+2. **Employees without an individual CLA.** Is the corporation's signature enough for its Schedule A employees, or should they also sign the individual CLA, as the ASF requires of committers? If they should, the allowlist step in `SETUP.md` goes away. Note that the allowlist exempts a login for every pull request, so a Schedule A employee's own, non-work contributions also pass the check unsigned.
 3. **Who may sign.** The form asks for someone with authority to bind the corporation. Should Trifold check that, for example by asking for the signer's title or proof of authority?
 4. **Changes to Schedule A.** Is an email from the Point of Contact enough to add or remove an employee, or should each change be signed?
 5. **Schedule B.** Keep the software grant schedule, or drop it until someone wants to donate an existing code base?
 
 ## License of this text
 
-These drafts fall under the repository's default license, Apache-2.0 (see `LICENSING.md`). apache.org, where the Apache agreements are published, is under the same license; the table above is the notice of changes that Apache-2.0 section 4(b) asks for.
+These drafts fall under the repository's default license, Apache-2.0 (see `LICENSING.md`). The ASF lets anyone reuse and change its CLAs, as long as the result doesn't name the ASF except to say it's derived and differs (<https://www.apache.org/foundation/license-faq.html>, "May I re-use (and modify) the ASF Contributor License Agreements"). apache.org itself is under Apache-2.0, and the table above is the notice of changes its section 4(b) asks for.
 
 ---
 
@@ -64,7 +64,7 @@ You accept and agree to the following terms and conditions for Your present and 
 
    "You" (or "Your") shall mean the copyright owner or legal entity authorized by the copyright owner that is making this Agreement with Trifold. For legal entities, the entity making a Contribution and all other entities that control, are controlled by, or are under common control with that entity are considered to be a single Contributor. For the purposes of this definition, "control" means (i) the power, direct or indirect, to cause the direction or management of such entity, whether by contract or otherwise, or (ii) ownership of fifty percent (50%) or more of the outstanding shares, or (iii) beneficial ownership of such entity.
 
-   "Trifold" shall mean the owner of the Trifold project, including the tfd repository at https://github.com/justbry/tfd. Until a legal entity is formed to hold the project, that owner is [legal name of the project's owner]. "Trifold" includes its successors and assignees, including any legal entity to which the project is transferred.
+   "Trifold" shall mean the owner of the Trifold project, including the tfd repository at <https://github.com/justbry/tfd>. Until a legal entity is formed to hold the project, that owner is [legal name of the project's owner]. "Trifold" includes its successors and assignees, including any legal entity to which the project is transferred.
 
    "Contribution" shall mean the code, documentation or other original works of authorship expressly identified in Schedule B, as well as any original work of authorship, including any modifications or additions to an existing work, that is intentionally submitted by You to Trifold for inclusion in, or documentation of, any of the products owned or managed by Trifold (the "Work"). For the purposes of this definition, "submitted" means any form of electronic, verbal, or written communication sent to Trifold or its representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems that are managed by, or on behalf of, Trifold for the purpose of discussing and improving the Work, but excluding communication that is conspicuously marked or otherwise designated in writing by You as "Not a Contribution."
 
@@ -112,4 +112,4 @@ Please sign: ______________________________ Date: ________________
 
 [describe grant here]
 
-*Adapted from the Apache Software Foundation Software Grant and Corporate Contributor License Agreement (v r190612).*
+*Adapted from the Apache Software Foundation Software Grant and Corporate Contributor License Agreement (v r190612), and different from it.*

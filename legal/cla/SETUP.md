@@ -18,7 +18,7 @@ The owner's checklist for collecting CLA signatures on `justbry/tfd`. None of it
 CLA assistant reads the CLA from a GitHub gist. Each edit to the gist makes a new revision, and CLA assistant records which revision each person signed. The gist's revision history is the CLA's version history.
 
 - [ ] Signed in as `justbry`, create a **public** gist at <https://gist.github.com>.
-- [ ] Name the file `trifold-individual-cla.md`. Paste everything in `individual.md` below the `## Agreement` heading. Leave out the changes table and the lawyer notes.
+- [ ] Name the file `trifold-individual-cla.md`. Paste the text of `individual.md` from the `### Trifold Individual Contributor License Agreement` heading to the end. Leave out the changes table, the lawyer notes and the "Everything below this line" note.
 - [ ] Add a second file named `metadata` (no extension). CLA assistant turns it into the form people fill in before they sign:
 
   ```json
@@ -30,7 +30,7 @@ CLA assistant reads the CLA from a GitHub gist. Each edit to the gist makes a ne
   }
   ```
 
-  Drop `address` if the lawyer says not to collect it.
+  Keep these fields in step with the list in the agreement. If the lawyer says not to collect the address, drop `address` here and "Residence address" there.
 - [ ] Copy the gist's URL.
 
 The corporate CLA doesn't go in a gist. Companies sign it as a PDF (step 5).
@@ -39,10 +39,11 @@ The corporate CLA doesn't go in a gist. Companies sign it as a PDF (step 5).
 
 - [ ] Install the CLA assistant GitHub App (<https://github.com/apps/cla-assistant>) on the `justbry` account, for `justbry/tfd` only. Its README recommends the App over the older OAuth sign-in.
 - [ ] Sign in at <https://cla-assistant.io> with GitHub and choose **Configure CLA**. Pick `justbry/tfd` and paste the gist URL.
-- [ ] Open the linked repository's settings:
-  - **Exempted users** (the allowlist): see step 4.
-  - **Privacy policy URL**: Trifold's privacy notice.
-  - **Minimum file or code changes**: leave empty, so every pull request needs a signature, typo fixes included.
+- [ ] Edit the linked repository and open **Optional Settings**:
+  - **Specify usernames and source organizations to be exempt from signing the CLA** (the allowlist): see step 4.
+  - **Specify organizations whose public members are exempt**: leave empty (step 4).
+  - **Privacy policy link**: Trifold's privacy notice. CLA assistant then asks signers to consent to it.
+  - **Minimum File Number Changes** and **Minimum Line Number Changes**: leave empty, so every pull request needs a signature, typo fixes included.
 - [ ] Test it. Open a pull request from an account that isn't on the allowlist. CLA assistant should comment, and the commit should get a `license/cla` status that stays pending until the account signs.
 
 ## 4. The allowlist
@@ -56,7 +57,7 @@ justbry,dependabot[bot],github-actions[bot]
 - `justbry` is the owner, who is the licensor and has no one to sign to.
 - **Bots** can't sign. Name each bot that opens pull requests here, rather than `*[bot]`, which would exempt every GitHub App account, including ones you never chose. Today only `justbry` opens pull requests and there's no `dependabot.yml`; add Dependabot, Renovate or any other bot when you turn it on.
 - **Corporate signers**: add each GitHub login from a signed Schedule A (step 5).
-- CLA assistant also has an organization allowlist. It exempts every public member of an organization when the pull request comes from that organization's fork. Don't use it for a corporate CLA, because Schedule A names people, not whole organizations.
+- **Don't exempt organizations** for a corporate CLA. CLA assistant can exempt every public member of a GitHub organization (the second field), or pull requests from an organization's own fork (an organization name in the first field). Either one follows the company's GitHub membership, not Schedule A, which names people.
 
 A commit whose email isn't linked to a GitHub account can't be matched to anyone, so the check stays pending. The contributor has to add that email to their GitHub account, or amend the commit with one that is.
 
@@ -90,7 +91,7 @@ A commit whose email isn't linked to a GitHub account can't be matched to anyone
 
   This replaces any protection rule `dev` already has, so add other checks to `contexts` if you want them required too. With `enforce_admins` false the owner can still merge past a stuck check.
 
-Bots on the allowlist get a passing `license/cla` status, so their pull requests aren't blocked.
+When every commit author on a pull request is on the allowlist, CLA assistant posts a passing `license/cla` status ("All CLA requirements met"), so bot pull requests aren't blocked.
 
 ## 7. When the CLA text changes
 
