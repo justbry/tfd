@@ -31,6 +31,10 @@
 @source not "./app/plans";
 @source not "./app/promos";
 @source not "./lib/components/ui/textarea";
+/* And the school's settings in the drawer, the config editor's panels, and the member portal. */
+@source not "./app/settings";
+@source not "./app/config";
+@source not "./app/portal";
 /* And so do Ledger and Reports (their folders and the parts they share). */
 @source not "./app/ledger";
 @source not "./app/reports";
