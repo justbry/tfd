@@ -223,7 +223,7 @@ the views job stores them, for the harness clock's day. `mintToken` is async.
 
 Also on the harness: `seeded` (id → `{ preset, asOf, events }`), `seedEvents(id, events, { views? })` for a custom log,
 `runCron()`, `clock` (`now()`, `set(iso)`, `advance(ms)`: the clock the Worker and the tokens use; it starts one minute after
-the latest seeded `asOf`), `jwks` (`fetches()`, `setKeys()`, `keys()`), `signRaw(claims, header?)` for a token with exactly
+the latest seeded `asOf`), `jwks` (`fetches()`, `holdNext()`, `setKeys()`, `keys()`), `signRaw(claims, header?)` for a token with exactly
 these claims, `extraSigner(fill)`, `signer`, `issuer`, `bucket` (the Worker's R2 binding).
 
 ## Tests

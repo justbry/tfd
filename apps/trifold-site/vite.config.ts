@@ -11,6 +11,9 @@ import { thirdPartyNotices } from "./third-party-notices.ts";
 // Files in build/ that are neither pages nor static/: the agent files, and licenses.txt (third-party-notices.ts).
 const POST_BUILD_FILE =
 	/(\.md|^\/llms(-full)?\.txt|^\/licenses\.txt|^\/samples\/[\w-]+\.json)$/;
+// The demo orgs' dashboards (static/demo/orgs/<org>.html) are linked by their clean URLs, which Pages serves (it 308s
+// the .html form) but the prerenderer can't resolve. tests/org-demos.test.ts checks each one exists.
+const DEMO_ORG_PAGE = /^\/demo\/orgs\/([a-z]+)?$/;
 
 export default defineConfig({
 	envPrefix: ["VITE_", "PUBLIC_"],
@@ -59,9 +62,9 @@ export default defineConfig({
 			prerender: {
 				// The agent files (*.md mirrors, llms.txt, llms-full.txt, /samples/*.json) are written after the build by
 				// scripts/agent-files.ts, and licenses.txt is a client build asset, so links to them can't resolve while
-				// prerendering. Every other 404 still fails.
+				// prerendering; nor can the demo dashboards' clean URLs. Every other 404 still fails.
 				handleHttpError: ({ path, message }) => {
-					if (POST_BUILD_FILE.test(path)) return;
+					if (POST_BUILD_FILE.test(path) || DEMO_ORG_PAGE.test(path)) return;
 					throw new Error(message);
 				},
 				handleMissingId: "fail",

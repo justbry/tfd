@@ -1,10 +1,11 @@
 # Cloudflare Pages headers. Prerendered pages also carry a <meta> CSP from SvelteKit that allows only the hashed inline
 # scripts (its bootstrap and the theme script); this header's 'unsafe-inline' for scripts is narrowed by that meta CSP,
 # since a browser enforces both. Inline styles are allowed (component style attributes). No third-party origins.
-# connect-src/form-action allow https: so the early-access form can post to PUBLIC_FORM_ENDPOINT; narrow them to that
-# origin once it is chosen.
+# connect-src/form-action are 'self': the early-access form posts to PUBLIC_FORM_ENDPOINT, which is
+# https://trifold.app/api/early-access, served by the apex Worker on this origin (apps/trifold-apex). mailto: stays for
+# builds without an endpoint.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https:; form-action 'self' https: mailto:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self' mailto:; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin

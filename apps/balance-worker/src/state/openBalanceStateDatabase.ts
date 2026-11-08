@@ -3,10 +3,18 @@ import { UnsupportedBalanceStateSchemaVersionError } from "./stateStoreErrors.js
 
 export const SQLITE_SCHEMA_VERSION = 1;
 
+/**
+ * The checkpoint thread reads this file through its own connection and is terminated mid-job on revoke;
+ * its connection can hold a lock for a moment while it tears down. Without a timeout the serving
+ * connection's next write fails at once with SQLITE_BUSY instead of waiting that moment out.
+ */
+const WRITER_BUSY_TIMEOUT_MS = 1_000;
+
 const configureDatabase = ({ database }: { database: Database }) => {
 	database.run("PRAGMA foreign_keys = ON");
 	database.run("PRAGMA journal_mode = WAL");
 	database.run("PRAGMA synchronous = FULL");
+	database.run(`PRAGMA busy_timeout = ${WRITER_BUSY_TIMEOUT_MS}`);
 };
 
 const initializeSchema = ({ database }: { database: Database }) => {

@@ -1,10 +1,12 @@
 // trifold.app and www.trifold.app. A Worker custom domain manages its own DNS record, which a Pages custom domain can't
 // without DNS edit access on the zone. The apex passes every request through to the Pages production deploy
 // (tfd-ledger.pages.dev, deployed by .github/workflows/trifold-site.yml); www redirects to the apex; verify.trifold.app
-// points at the site's /verify until the verifier app (apps/trifold-verify) is promoted there.
+// points at the site's /verify until the verifier app (apps/trifold-verify) is promoted there. POST /api/early-access
+// on the apex sends the site's early-access form on as an email; its destination is the EARLY_ACCESS_TO secret
+// (`wrangler secret put EARLY_ACCESS_TO`), a verified Email Routing address, so it stays out of this public repo.
 {
 	"name": "trifold-apex",
-	"main": "src/index.ts",
+	"main": "src/worker.ts",
 	"compatibility_date": "2026-07-01",
 	"workers_dev": false,
 	"observability": { "enabled": true },
@@ -12,6 +14,17 @@
 		{ "pattern": "trifold.app", "custom_domain": true },
 		{ "pattern": "www.trifold.app", "custom_domain": true },
 		{ "pattern": "verify.trifold.app", "custom_domain": true }
+	],
+	// No destination_address: the binding may send to any verified Email Routing address, and the code sends only to
+	// EARLY_ACCESS_TO.
+	"send_email": [{ "name": "EARLY_ACCESS_EMAIL" }],
+	// 5 early-access posts a minute per IP. namespace_id is any account-unique integer string.
+	"ratelimits": [
+		{
+			"name": "EARLY_ACCESS_LIMIT",
+			"namespace_id": "1001",
+			"simple": { "limit": 5, "period": 60 }
+		}
 	],
 	"vars": {
 		"APEX": "trifold.app",
