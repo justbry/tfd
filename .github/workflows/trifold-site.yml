@@ -12,7 +12,8 @@ name: Trifold site
 # The repository variable PUBLIC_FORM_ENDPOINT, if set, is where the early-access form posts; unset, the form falls
 # back to mailto, as in a hand build.
 #
-# The site has its own bun.lock, but its verifier tests import packages/atm, so the root workspace is installed too.
+# The site has its own bun.lock, but its verifier tests and the pricing catalog check (catalog/trifold) import
+# packages/atm, so the root workspace is installed too.
 
 on:
   pull_request:
@@ -21,6 +22,7 @@ on:
     paths:
       - "apps/trifold-site/**"
       - "packages/atm/**"
+      - "catalog/**"
       - "bun.lock"
       - ".bun-version"
       - ".github/workflows/trifold-site.yml"
@@ -29,6 +31,7 @@ on:
     paths:
       - "apps/trifold-site/**"
       - "packages/atm/**"
+      - "catalog/**"
       - "bun.lock"
       - ".bun-version"
       - ".github/workflows/trifold-site.yml"
