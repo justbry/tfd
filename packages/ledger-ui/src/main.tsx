@@ -15,6 +15,12 @@ if (root) {
 			// The Worker serves the UI and /v1 from one origin (S8-contract section 11).
 			workerBase: import.meta.env.VITE_LEDGER_WORKER_BASE ?? "/v1",
 			webBase: import.meta.env.VITE_WEB_BASE ?? "https://b4uni.com",
+			// Signed out or no school: the fixture schools as a demo, on the fixtures' own clock.
+			demo: () => ({
+				reader: createFixtureReader({ clock }),
+				writer: createFixtureWriter({ mode: "instant" }),
+				clock,
+			}),
 		});
 	else
 		mountApp(root, {

@@ -1,5 +1,5 @@
 import "../theme.css";
-import { type JSX, render } from "preact";
+import { type ComponentChild, type JSX, render } from "preact";
 import {
 	useCallback,
 	useEffect,
@@ -22,12 +22,14 @@ function App({
 	writer,
 	clock,
 	signInUrl,
+	banner,
 }: {
 	root: HTMLElement;
 	reader: Reader;
 	writer: Writer;
 	clock: Clock;
 	signInUrl: string | undefined;
+	banner: ComponentChild;
 }): JSX.Element | null {
 	const [hash, setHash] = useState(window.location.hash);
 	const [schools, setSchools] = useState<School[] | null>(null);
@@ -82,17 +84,20 @@ function App({
 		);
 	if (!schools) return null;
 	return (
-		<Shell
-			route={route}
-			schools={schools}
-			clock={clock}
-			reader={reader}
-			writer={writer}
-			navigate={navigate}
-			onRendered={() => {
-				root.dataset.route = hash;
-			}}
-		/>
+		<>
+			{banner}
+			<Shell
+				route={route}
+				schools={schools}
+				clock={clock}
+				reader={reader}
+				writer={writer}
+				navigate={navigate}
+				onRendered={() => {
+					root.dataset.route = hash;
+				}}
+			/>
+		</>
 	);
 }
 
@@ -146,6 +151,8 @@ export function mountApp(
 		clock: Clock;
 		/** Where a signed-out visitor signs in (the HTTP build); the fixture build is never signed out. */
 		signInUrl?: string;
+		/** Drawn above the app: the HTTP build's demo alert when it shows the demo schools. */
+		banner?: ComponentChild;
 	},
 ): { unmount(): void } {
 	root.classList.add("app");
@@ -156,6 +163,7 @@ export function mountApp(
 			writer={options.writer}
 			clock={options.clock}
 			signInUrl={options.signInUrl}
+			banner={options.banner}
 		/>,
 		root,
 	);
