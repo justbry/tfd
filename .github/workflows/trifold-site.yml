@@ -1,0 +1,101 @@
+name: Trifold site
+
+# Checks, builds, tests and deploys apps/trifold-site to Cloudflare Pages (project tfd-ledger). Replaces the hand-run
+# `bunx wrangler pages deploy build --project-name tfd-ledger --branch main`; setup is in docs/ci-and-deploy.md.
+#   - pull request: check, build, test, then a preview deploy at <branch>.tfd-ledger.pages.dev
+#   - push to dev, or run by hand: the same, then the production deploy (Pages branch `main`)
+#
+# The deploy needs the repository secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Without them (or on a pull
+# request from a fork, which gets no secrets) the checks still run and the deploy is skipped with a warning, so a missing
+# secret never turns the run red. Runner and draft rules follow atm-tests.yml.
+#
+# The repository variable PUBLIC_FORM_ENDPOINT, if set, is where the early-access form posts; unset, the form falls
+# back to mailto, as in a hand build.
+#
+# The site has its own bun.lock, but its verifier tests import packages/atm, so the root workspace is installed too.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [dev]
+    paths:
+      - "apps/trifold-site/**"
+      - "packages/atm/**"
+      - "bun.lock"
+      - ".bun-version"
+      - ".github/workflows/trifold-site.yml"
+  push:
+    branches: [dev]
+    paths:
+      - "apps/trifold-site/**"
+      - "packages/atm/**"
+      - "bun.lock"
+      - ".bun-version"
+      - ".github/workflows/trifold-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trifold-site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site:
+    name: site (check, build, test, deploy)
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    env:
+      CAN_DEPLOY: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+      PAGES_BRANCH: ${{ github.event_name == 'pull_request' && github.head_ref || 'main' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Cache Bun install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bun-version', 'bun.lock', 'apps/trifold-site/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          bun install --frozen-lockfile --cwd apps/trifold-site
+
+      - name: Check
+        working-directory: apps/trifold-site
+        run: bun run check
+
+      # The tests read build/ (llms.txt, the agent files), so the build runs first.
+      - name: Build
+        working-directory: apps/trifold-site
+        env:
+          PUBLIC_FORM_ENDPOINT: ${{ vars.PUBLIC_FORM_ENDPOINT }}
+        run: bun run build
+
+      - name: Test
+        working-directory: apps/trifold-site
+        run: bun run test
+
+      - name: Skip deploy
+        if: env.CAN_DEPLOY != 'true'
+        run: echo "::warning::Not deployed, CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set (see docs/ci-and-deploy.md)"
+
+      - name: Deploy
+        if: env.CAN_DEPLOY == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/trifold-site
+          command: pages deploy build --project-name tfd-ledger --branch ${{ env.PAGES_BRANCH }} --commit-hash ${{ github.sha }} --commit-dirty=true

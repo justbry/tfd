@@ -26,6 +26,7 @@ This repository is `justbry/atm`, a fork of `github.com/sidgaikwad/autumn` (bran
 | `packages/balance-engine/src/deduction/utils/classifyDeductionUtils.ts` | `expiryFirst` in `isSameSelection` | selections that draw in different orders must not share a context |
 | `packages/balance-engine/src/models/command/commandOrg.ts` | `deduction_order` typed on the org config | so the setting is typed in the engine without touching `shared` |
 | `packages/balance-engine/tests/unit/deduction/deduct.test.ts` | tests for the expiry-first draw order | the opt-in order is pinned at its group boundaries and its rollover tie-break |
+| `.github/workflows/build.yml`, `mark-shipped-pr-ci.yml`, `post-cubic-summary.yml`, with their tests and `.github/scripts/deploy-gate.ts` | removed | Autumn's deploy pipeline (its ECR image, its deploy server's shipped-PR reactions, its Slack): this repo has none of those secrets, so they only failed. Deploys are `trifold-site.yml` and `deploy-ledger-worker.yml`; see `docs/ci-and-deploy.md` |
 
 Every upstream file we change is listed here, with a line at its top saying it was modified (Apache-2.0 section 4).
 
