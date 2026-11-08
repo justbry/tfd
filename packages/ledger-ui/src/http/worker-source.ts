@@ -119,7 +119,10 @@ export type WorkerMemberMoney = {
 };
 
 export interface WorkerSource {
-	schools(): Promise<WorkerAnswer<{ schools: WorkerSchoolStatus[] }>>;
+	/** `anonymous`: with no bearer, and without waiting for a token: the demo schools alone (signed out). */
+	schools(options?: {
+		anonymous?: boolean;
+	}): Promise<WorkerAnswer<{ schools: WorkerSchoolStatus[] }>>;
 	kpiDocument(query: {
 		school: string;
 		audience: Audience;
@@ -232,10 +235,15 @@ function answerOf<Data>(path: string, body: unknown): WorkerAnswer<Data> {
 	};
 }
 
+/** How a read is authorized: the ledger token, the token if there is one (signed out or no school: none), or no
+ * bearer at all, so the read does not wait for a token. */
+type Bearer = "token" | "optional" | "none";
+
 /** The fetch source over section 11: base `/v1` on the UI's own origin, GET only, the ledger token as the bearer. A
  * 401 mints a new token and tries once more; a `409 view_mismatch` waits `retryAfterSeconds` and tries once more.
- * `GET /schools` and a demo school's reads go without a bearer when there is no token (signed out, or no school): the
- * Worker serves those to anyone on staging. */
+ * `GET /schools` goes without a bearer when there is no token (signed out, or no school), and a demo school's reads
+ * always do: the Worker serves those to anyone on staging, and a demo school's answers are the same for every caller,
+ * so they never wait for the token. */
 export function createFetchWorkerSource(options: {
 	fetch: Fetch;
 	/** `/v1` on the UI's origin, or a full URL in tests. */
@@ -251,7 +259,7 @@ export function createFetchWorkerSource(options: {
 	const get = async <Data>(
 		path: string,
 		query: Record<string, string | undefined> = {},
-		open = false,
+		bearer: Bearer = "token",
 	): Promise<WorkerAnswer<Data>> => {
 		const search = new URLSearchParams();
 		for (const [name, value] of Object.entries(query))
@@ -261,12 +269,15 @@ export function createFetchWorkerSource(options: {
 		let refreshed = false;
 		let waited = false;
 		for (;;) {
-			const token = open
-				? await optionalToken(refreshed)
-				: refreshed
-					? await options.tokens.refresh()
-					: await options.tokens.current();
-			if (!token && !open)
+			const token =
+				bearer === "none"
+					? null
+					: bearer === "optional"
+						? await optionalToken(refreshed)
+						: refreshed
+							? await options.tokens.refresh()
+							: await options.tokens.current();
+			if (!token && bearer === "token")
 				throw new AdapterError(
 					"not_found",
 					"no ledger token: the person administers no school",
@@ -314,14 +325,20 @@ export function createFetchWorkerSource(options: {
 		}
 	};
 	const school = (id: string) => `/schools/${encodeURIComponent(id)}`;
-	/** A read of one school's: open (no bearer needed) for a demo school. */
+	/** A read of one school's: with no bearer for a demo school. */
 	const read = <Data>(
 		id: string,
 		path: string,
 		query: Record<string, string | undefined> = {},
-	) => get<Data>(`${school(id)}${path}`, query, isDemoSchool(id));
+	) =>
+		get<Data>(
+			`${school(id)}${path}`,
+			query,
+			isDemoSchool(id) ? "none" : "token",
+		);
 	return {
-		schools: () => get("/schools", {}, true),
+		schools: (asked) =>
+			get("/schools", {}, asked?.anonymous ? "none" : "optional"),
 		kpiDocument: ({ school: id, audience, pinLocked }) =>
 			read(id, "/kpi", {
 				audience,

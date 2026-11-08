@@ -835,7 +835,8 @@ export const mutationToEvents = ({
 			break;
 		}
 		case "applyBillingPlan": {
-			if (moves.delta > 0) {
+			// A plan that adds credit grants them, unless it is an admin's adjustment (`adjustCredits`'s new row).
+			if (moves.delta > 0 && context.as !== "adjusted") {
 				const grantExpiry = moved.changes.flatMap((c) =>
 					c.table === "customerEntitlements" &&
 					c.op === "insert" &&
@@ -855,12 +856,12 @@ export const mutationToEvents = ({
 								: { expires_at: isoInstant(grantExpiry) },
 					},
 				);
-			} else if (moves.delta < 0) {
+			} else if (moves.delta !== 0) {
 				emit(
 					"credit.adjusted",
 					"adjusted",
-					-moves.delta,
-					`adjusted ${what(moves.delta)}`,
+					Math.abs(moves.delta),
+					`adjusted ${moves.delta > 0 ? "+" : ""}${what(moves.delta)}`,
 					{
 						signed: moves.delta,
 						payload: { reason: need(context.reason, "context.reason") },

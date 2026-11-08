@@ -28,6 +28,7 @@ import {
 	bookingsOpenOffset,
 	readBookingsPeriod,
 } from "./bookings-period.ts";
+import { DemoReadOnlyNote } from "./demo-note.tsx";
 import { Icon, type IconName } from "./icon.tsx";
 import { LoadFailed } from "./load-failed.tsx";
 import { LockPanel } from "./lock-panel.tsx";
@@ -301,16 +302,19 @@ function BookingRow(props: RowProps): JSX.Element {
 			</td>
 			<td class="r">
 				<div class="a">
-					<RowActions
-						booking={booking}
-						pending={pending}
-						reminding={props.reminding}
-						clock={clock}
-						onConfirm={props.onConfirm}
-						onNoShow={props.onNoShow}
-						onRelease={props.onRelease}
-						onRemind={props.onRemind}
-					/>
+					{/* A demo school refuses every write, so its rows offer none. */}
+					{!school.demo && (
+						<RowActions
+							booking={booking}
+							pending={pending}
+							reminding={props.reminding}
+							clock={clock}
+							onConfirm={props.onConfirm}
+							onNoShow={props.onNoShow}
+							onRelease={props.onRelease}
+							onRemind={props.onRemind}
+						/>
+					)}
 				</div>
 			</td>
 		</tr>
@@ -602,7 +606,7 @@ export function Bookings({
 			>
 				<td colSpan={6}>
 					<Icon name={group.icon} /> {group.heading}
-					{needing.length > 1 && (
+					{needing.length > 1 && !school.demo && (
 						<button
 							type="button"
 							class="btn s bookings-bulk"
@@ -668,6 +672,7 @@ export function Bookings({
 					{from === to ? "" : ` – ${monthAndDay(to)}`} · change it in the period
 					control
 				</span>
+				{school.demo && <DemoReadOnlyNote />}
 				<span class="sp" />
 				{chips.map(({ slug, filter, label }) => (
 					<button
