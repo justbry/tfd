@@ -41,10 +41,11 @@
 		const outcome = await perform(
 			app,
 			write((writer) => writer.unlockBooks(schoolId, pin)),
-			{ enter_pin: () => input?.focus() },
+			{ handlers: { enter_pin: () => input?.focus() } },
 		);
 		checking = false;
 		if (!outcome.ok) {
+			if (outcome.interrupted) return;
 			const message = messageFor(outcome.error);
 			problem = `${message.title}. ${message.doThis}`;
 			return;
