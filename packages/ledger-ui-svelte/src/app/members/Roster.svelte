@@ -188,7 +188,7 @@
 
 	const go = (name: string, value: string | null): void => navigate(withQuery(route, name, value));
 	const memberOf = (person: Person): Member | null =>
-		members.find(({ profileId }) => profileId === person.id) ?? null;
+		members.find(({ profileId, familyId }) => (profileId ?? familyId) === person.id) ?? null;
 	const renewalOf = (member: Member | null): string =>
 		member ? formatPeriodEnd(member.currentPeriodEnd, school.timeZone) : "";
 	const writeBaseOf = (person: Person): Omit<WriteContext, "writer"> => ({
@@ -371,7 +371,7 @@
 	};
 	const bookingAction = (person: Person, action: BookingAction, booking: MemberBooking): void => {
 		const inside = insideCutoffOf(person, booking);
-		const needsDialog = action === "release" && inside && summary.bookingRules.lateCancel === "spend";
+		const needsDialog = action === "release" && inside && summary.bookingRules?.lateCancel === "spend";
 		if (action === "remind") remindHost(booking);
 		else if (action === "noshow") startModal(person.id, { kind: "noshow", bookingId: booking.id });
 		else if (action === "refund") startModal(person.id, { kind: "refund", bookingId: booking.id });

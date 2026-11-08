@@ -4,4 +4,6 @@
 export const loaders = {
 	bookings: () => import("../bookings/Bookings.svelte"),
 	members: () => import("../members/Members.svelte"),
+	ledger: () => import("../ledger/Ledger.svelte"),
+	reports: () => import("../reports/Reports.svelte"),
 };

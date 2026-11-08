@@ -4,6 +4,8 @@
 		dashboard: () => import("./dashboard/Dashboard.svelte"),
 		bookings: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.bookings()),
 		members: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.members()),
+		ledger: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.ledger()),
+		reports: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.reports()),
 		allSchools: () => import("./AllSchools.svelte"),
 	};
 </script>

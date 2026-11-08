@@ -11,10 +11,11 @@
  * 2. Cascade audit: a pane's stylesheet loads after app.css, so a plain utility in it can override a rule the first
  *    page load styled the shell with. For the top bar, the tabs row, the stale and preview banners and the toast stack
  *    (with a focused dismiss button, `:focus-visible`), every computed property of every element is read on a fresh
- *    page and again after the Dashboard, Bookings, Members, All schools and the settings sheet have loaded their CSS;
+ *    page and again after the Dashboard, Bookings, Members, Ledger, Reports, All schools and the settings sheet have loaded their CSS;
  *    any difference fails.
  * 3. The chosen row of each period popover (the shell's, and the Bookings pane's) is in the primary colour once the
  *    panes' CSS is loaded.
+ * (Ledger and Reports, S9.4: their stylesheets load with the lazy routes of 2, and every state of both tabs is in 4.)
  * 4. Differential (with `--reference <origin>`, a build made with LEDGER_NO_DEDUPE=1, which keeps every rule in every
  *    pane stylesheet): for each pane view and the popover, menu, drawer and dialog states the shots cover, the computed
  *    style of every element outside the shell's chrome is the same in both builds. The deduplicated stylesheets may
@@ -73,11 +74,13 @@ const tabs = [
 	"ledger",
 	"reports",
 ];
-/** The routes that load each lazy stylesheet: the Dashboard, Bookings, Members, All schools; the settings sheet is opened. */
+/** The routes that load each lazy stylesheet: the Dashboard, Bookings, Members, Ledger, Reports, All schools; the settings sheet is opened. */
 const lazyRoutes = [
 	"#/vol/dashboard",
 	"#/vol/bookings",
 	"#/vol/members",
+	"#/vol/ledger",
+	"#/vol/reports",
 	"#/all/all",
 ];
 const audited = [
@@ -387,6 +390,34 @@ const paneStates: Array<{
 		name: "dashboard, PIN locked",
 		route: "#/b4u/dashboard?as=governance&pin=locked",
 	},
+	{ name: "ledger, rows", route: "#/vol/ledger" },
+	{
+		name: "ledger, filtered with a row's details open",
+		route: "#/vol/ledger?type=payment",
+		act: clicked("[data-test=ledger-row][data-event=vol-e5]"),
+	},
+	{ name: "ledger, drill-down chip", route: "#/vol/ledger?drill=refund" },
+	{ name: "ledger, lock panel", route: "#/b4u/ledger?as=public" },
+	{
+		name: "ledger, PIN locked",
+		route: "#/b4u/ledger?as=finance&pin=locked",
+	},
+	{ name: "ledger, no events", route: "#/nw/ledger" },
+	{ name: "reports, finance statement", route: "#/vol/reports" },
+	{
+		name: "reports, compared with the previous period",
+		route: "#/vol/reports?compare=1",
+	},
+	{
+		name: "reports, governance document",
+		route: "#/b4u/reports?as=governance&month=2026-06",
+	},
+	{
+		name: "reports, public document",
+		route: "#/b4u/reports?as=public&month=2026-06",
+	},
+	{ name: "reports, member document", route: "#/vol/reports?as=member" },
+	{ name: "reports, PIN locked", route: "#/vol/reports?pin=locked" },
 	{ name: "all schools", route: "#/all/all" },
 	{
 		name: "settings sheet",

@@ -7,7 +7,7 @@
  *   bun scripts/shots.ts [--out shots] [--side app|mock|both] [--app http://localhost:5191] [--nonce K7QX]
  *     [--only dash-]
  * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`, Bookings' with `bk-`,
- * Members' with `mem-`).
+ * Members' with `mem-`, the Ledger's with `led-`, Reports' with `rep-`).
  * Needs playwright-core in /tmp/ledger-shots and the cached Chromium headless shell, as shoot.mjs does.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -77,6 +77,8 @@ const widths = [1100, 728, 390];
 const dashboardTab = "document.querySelector('.tab[data-p=dash]').click()";
 const bookingsTab = "document.querySelector('.tab[data-p=bk]').click()";
 const membersTab = "document.querySelector('.tab[data-p=mem]').click()";
+const ledgerTab = "document.querySelector('.tab[data-p=led]').click()";
+const reportsTab = "document.querySelector('.tab[data-p=rep]').click()";
 const themes = ["light", "dark"] as const;
 
 /** The shell's entries: the S0 golden file's three shots, then the stale banner, All schools, a toast and the
@@ -244,6 +246,61 @@ const entries: Array<{
 		route: "#/vol/members?as=public",
 		clicks: [],
 		mockupSteps: `${membersTab};setVa('public')`,
+	},
+	// S9.4: the Ledger and Reports tabs, each audience's view of them.
+	{
+		id: "led-default",
+		route: "#/vol/ledger",
+		clicks: [],
+		mockupSteps: ledgerTab,
+	},
+	{
+		id: "led-payments-details",
+		route: "#/vol/ledger?type=payment",
+		clicks: ["[data-test=ledger-row][data-event=vol-e5]"],
+		mockupSteps: `${ledgerTab};document.querySelector('[data-t=payment]').click();document.querySelector('tr.row').click()`,
+	},
+	{
+		id: "led-drill-refund",
+		route: "#/vol/ledger?drill=refund",
+		clicks: [],
+		mockupSteps: `${ledgerTab};document.querySelector('.tab[data-p=rep]').click();document.querySelector('[data-dd=refund]').click()`,
+	},
+	{
+		id: "led-lock-public",
+		route: "#/b4u/ledger?as=public",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${ledgerTab};setVa('public')`,
+	},
+	{
+		id: "led-pin-locked",
+		route: "#/b4u/ledger?as=finance&pin=locked",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${ledgerTab};setVa('finance');bkPin=true;render()`,
+	},
+	{
+		id: "rep-finance",
+		route: "#/vol/reports",
+		clicks: [],
+		mockupSteps: reportsTab,
+	},
+	{
+		id: "rep-compare",
+		route: "#/vol/reports?compare=1",
+		clicks: [],
+		mockupSteps: `${reportsTab};cmp=true;render()`,
+	},
+	{
+		id: "rep-governance",
+		route: "#/b4u/reports?as=governance&month=2026-06",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${reportsTab};setVa('governance')`,
+	},
+	{
+		id: "rep-public",
+		route: "#/b4u/reports?as=public&month=2026-06",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${reportsTab};setVa('public')`,
 	},
 ].filter((entry) => entry.id.startsWith(only));
 

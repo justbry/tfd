@@ -441,6 +441,7 @@ export function capabilityReason(
 		return place === "menu" || action !== "refund"
 			? "Owner role needed"
 			: "Refunds need the owner role in this school";
+	if (capability.reason === "demo") return "Demo school: read-only";
 	return "Not available yet";
 }
 

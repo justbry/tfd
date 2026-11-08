@@ -39,7 +39,7 @@
 				disabled={submitter.busy}
 				aria-busy={submitter.busy && waiting === booking.id ? "true" : undefined}
 				onclick={() => {
-					if (context.insideCutoff(booking) && write.rules.lateCancel === "spend") {
+					if (context.insideCutoff(booking) && write.rules?.lateCancel === "spend") {
 						onPick(booking);
 						return;
 					}
