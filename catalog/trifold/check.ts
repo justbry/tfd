@@ -67,7 +67,10 @@ export function checkTrifoldCatalog(): {
 			},
 		],
 	});
-	if (!withFree.ok) problems.push(`free plan: ${withFree.problems.join("; ")}`);
+	if (!withFree.ok)
+		problems.push(
+			`free plan: ${[...withFree.problems, ...(withFree.messages ?? [])].join("; ")}`,
+		);
 	let policy: BillingPolicy | null = null;
 	try {
 		policy = resolvePolicy(TRIFOLD_POLICY);

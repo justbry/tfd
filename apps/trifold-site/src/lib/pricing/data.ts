@@ -20,6 +20,8 @@ export const EVENTS_PER_FAMILY = 7;
 export const COUNTERSIGNED_RECEIPT_CREDITS = 3;
 
 const count = (value: number) => value.toLocaleString("en-US");
+/** The number in a plan's family blurb: "3,500" in "About 3,500 families". */
+const FAMILY_COUNT = /[\d,]+/;
 
 export type Org = "std" | "np";
 export type Feature =
@@ -242,8 +244,12 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			],
 			[
 				"Roughly how many families",
-				"At about 7 events each",
-				["Any", "~40", "~700", "~3,500", "~3,500", "Any"],
+				`At about ${EVENTS_PER_FAMILY} events each`,
+				[
+					"Any",
+					...PLANS.map((plan) => `~${plan.families.match(FAMILY_COUNT)?.[0]}`),
+					"Any",
+				],
 			],
 			[
 				"Credits a month",

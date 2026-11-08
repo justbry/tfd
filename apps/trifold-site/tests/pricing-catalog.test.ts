@@ -19,7 +19,12 @@ import {
 } from "../../../catalog/trifold/index.ts";
 import { menuToStripe, validateMenu } from "../../../packages/atm/src/index.ts";
 import { BUILD } from "../scripts/agent-files";
-import { EVENTS_PER_FAMILY, PLANS } from "../src/lib/pricing/data";
+import {
+	COLUMNS,
+	EVENTS_PER_FAMILY,
+	MATRIX,
+	PLANS,
+} from "../src/lib/pricing/data";
 
 const paid = TRIFOLD_PLANS.filter((plan) => plan.monthly.std > 0);
 const count = (value: number) => value.toLocaleString("en-US");
@@ -42,21 +47,24 @@ describe("the catalog, checked by tfd", () => {
 
 	test("the non-profit menu differs from the standard one only in its amounts", () => {
 		const withoutAmounts = (org: (typeof TRIFOLD_ORGS)[number]) =>
-			JSON.stringify(TRIFOLD_MENUS[org], (key, value) =>
-				key === "amount" && typeof value === "number" && value >= 50
-					? 0
-					: value,
-			);
+			JSON.stringify({
+				...TRIFOLD_MENUS[org],
+				tiers: TRIFOLD_MENUS[org].tiers.map((tier) => ({
+					...tier,
+					prices: tier.prices.map((price) => ({ ...price, amount: 0 })),
+				})),
+			});
 		expect(withoutAmounts("np")).toBe(withoutAmounts("std"));
 	});
 
 	test("each menu publishes one price per sold plan and interval, at trifoldLookupKey", () => {
+		const { menus, policy } = checkTrifoldCatalog();
 		for (const org of TRIFOLD_ORGS) {
 			const ops = menuToStripe({
 				schoolId: TRIFOLD_SCHOOL_IDS[org],
-				menu: checkTrifoldCatalog().menus[org],
+				menu: menus[org],
 				previous: null,
-				policy: checkTrifoldCatalog().policy,
+				policy,
 			});
 			const published = ops
 				.flatMap((op) => (op.op === "price.create" ? [op.lookupKey] : []))
@@ -80,8 +88,8 @@ describe("the catalog, checked by tfd", () => {
 	test("yearly prices charge the same number of months for every plan", () => {
 		for (const plan of paid)
 			for (const org of TRIFOLD_ORGS)
-				expect(plan.yearly[org]).toBe(
-					plan.monthly[org] * TRIFOLD_ANNUAL_MONTHS,
+				expect(Math.round(plan.yearly[org] * 100)).toBe(
+					Math.round(plan.monthly[org] * 100) * TRIFOLD_ANNUAL_MONTHS,
 				);
 	});
 });
@@ -115,6 +123,12 @@ describe("the pricing data", () => {
 				FAMILY_ROUNDING,
 			);
 		}
+	});
+
+	test("every matrix row has one cell per column", () => {
+		for (const [, rows] of MATRIX)
+			for (const [label, , cells] of rows)
+				expect([label, cells.length]).toEqual([label, COLUMNS.length]);
 	});
 });
 

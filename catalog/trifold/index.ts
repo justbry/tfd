@@ -97,14 +97,16 @@ const monthlyAmount = (grants: readonly CatalogGrant[], featureId: string) => {
 	return grant.amount;
 };
 
-const dollarsOf = (tier: CatalogTier, interval: Interval): number => {
+const centsOf = (tier: CatalogTier, interval: Interval): number => {
 	const price = tier.prices.find((entry) => entry.interval === interval);
 	if (!price)
 		throw new Error(
 			`Trifold catalog: tier ${tier.id} has no ${interval} price`,
 		);
-	return price.amount / 100;
+	return price.amount;
 };
+const dollarsOf = (tier: CatalogTier, interval: Interval): number =>
+	centsOf(tier, interval) / 100;
 
 function tierOf(org: TrifoldOrg, id: string): CatalogTier {
 	const tier = TRIFOLD_MENUS[org].tiers.find((entry) => entry.id === id);
@@ -169,11 +171,16 @@ export function trifoldPlan(id: string): TrifoldPlan {
 	return plan;
 }
 
-/** How many monthly prices a yearly price charges: the same for every paid plan and org, or the catalog throws. */
+/**
+ * How many monthly prices a yearly price charges: the same for every paid plan and org, or the catalog throws. Worked
+ * out in cents, as the menus store them, so a price like $19.99 does not come out as 10.000000000000002 months.
+ */
 export const TRIFOLD_ANNUAL_MONTHS: number = (() => {
 	const ratios = new Set(
-		TRIFOLD_PLANS.filter((plan) => plan.monthly.std > 0).flatMap((plan) =>
-			TRIFOLD_ORGS.map((org) => plan.yearly[org] / plan.monthly[org]),
+		TRIFOLD_ORGS.flatMap((org) =>
+			TRIFOLD_MENUS[org].tiers.map(
+				(tier) => centsOf(tier, "year") / centsOf(tier, "month"),
+			),
 		),
 	);
 	const [ratio, ...others] = [...ratios];
