@@ -73,6 +73,9 @@ const allowedContract = [
 	/^fixtures\/[a-z-]+\.ts$/,
 	/^app\/(route|period)\.ts$/,
 ];
+/** The ledger Worker's config modules the ConfigClient takes read-only (`$worker-config`): its types, validators,
+ * canonical JSON and diff, which carry no Worker runtime. */
+const allowedWorkerConfig = [/^(canonical|definitions|diff|types|validate)\.ts$/];
 /** Only the fixture layer reads the fixtures. */
 const fixtureImporters = new Set(["src/effect/layers.ts"]);
 
@@ -117,6 +120,12 @@ describe("gate H: source", () => {
 						problems.push(`contract ${target}`);
 					if (target.startsWith("fixtures/") && !fixtureImporters.has(name))
 						problems.push(`only the fixture layer reads fixtures: ${target}`);
+					continue;
+				}
+				if (specifier.startsWith("$worker-config/")) {
+					const target = specifier.slice("$worker-config/".length);
+					if (!allowedWorkerConfig.some((pattern) => pattern.test(target)))
+						problems.push(`worker config ${target}`);
 					continue;
 				}
 				if (!allowedPackages.some((pattern) => pattern.test(specifier)))

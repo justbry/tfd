@@ -1,0 +1,8 @@
+/* The Promos pane's utilities, loaded with its chunk (see plans/plans.css). */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../../tailwind-shared.css";
+@source "./";
+@source "../plans/styles.ts";
+@source "../../lib/components/ui/dialog";
+@source "../../lib/components/ui/textarea";

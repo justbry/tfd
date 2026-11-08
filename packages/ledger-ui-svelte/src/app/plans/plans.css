@@ -1,0 +1,10 @@
+/* The Plans pane's utilities, loaded with its chunk so that the first page load does not carry them (app.css leaves
+   this folder out of its sources). Theme and utilities only: the base styles and the tokens are app.css's.
+   `source(none)` keeps Tailwind from scanning the whole project for this file; Biome 2.2 cannot parse it, so the
+   package's biome.json leaves this one file out. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../../tailwind-shared.css";
+@source "./";
+@source "../../lib/components/ui/dialog";
+@source "../../lib/components/ui/textarea";

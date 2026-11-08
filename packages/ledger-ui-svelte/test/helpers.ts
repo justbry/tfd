@@ -1,4 +1,5 @@
 import { Layer, ManagedRuntime } from "effect";
+import type { ConfigApi } from "../src/effect/config-client.ts";
 import type { AppServices } from "../src/effect/app-layer.ts";
 import { manualClock } from "../src/effect/clock.ts";
 import { fixtureLayer } from "../src/effect/layers.ts";
@@ -6,6 +7,16 @@ import { memoryLog } from "../src/effect/log.ts";
 import { Toasts } from "../src/effect/services.ts";
 import { emptyToastState, type ToastState } from "../src/effect/toast-model.ts";
 import { toastsLayer } from "../src/effect/toasts.ts";
+
+/** A config client the test never calls: any call fails the test. */
+export const noConfig = new Proxy(
+	{},
+	{
+		get: (_target, name) => () => {
+			throw new Error(`the test did not expect config.${String(name)}`);
+		},
+	},
+) as ConfigApi;
 
 export const calendar = { today: "2026-11-05", now: "2026-11-05T12:00" };
 

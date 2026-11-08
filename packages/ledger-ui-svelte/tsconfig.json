@@ -19,7 +19,8 @@
 		"paths": {
 			"$lib": ["./src/lib"],
 			"$lib/*": ["./src/lib/*"],
-			"$contract/*": ["../ledger-ui/src/*"]
+			"$contract/*": ["../ledger-ui/src/*"],
+			"$worker-config/*": ["../ledger-worker/src/config/*"]
 		}
 	},
 	"include": [

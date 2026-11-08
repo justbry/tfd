@@ -12,6 +12,10 @@
 /* The Dashboard (and the books parts it alone uses) brings its own utilities with its chunk (dashboard.css). */
 @source not "./app/dashboard";
 @source not "./app/books";
+@source not "./app/plans";
+@source not "./app/promos";
+@source not "./lib/components/ui/dialog";
+@source not "./lib/components/ui/textarea";
 
 :root {
 	--radius: 10px;

@@ -3,7 +3,12 @@
 	"root": false,
 	"extends": "//",
 	"files": {
-		"includes": ["**", "!src/app/dashboard/dashboard.css"]
+		"includes": [
+			"**",
+			"!src/app/dashboard/dashboard.css",
+			"!src/app/plans/plans.css",
+			"!src/app/promos/promos.css"
+		]
 	},
 	"overrides": [
 		{
