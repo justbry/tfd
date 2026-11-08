@@ -5,7 +5,7 @@
 
 	type Link = { href: string; label: string; external?: boolean };
 	let {
-		title = "Every dollar, three ways. Every month, sealed.",
+		title = "Every payment, signed. Every month, sealed.",
 		primary = { href: "/early-access", label: "Get early access" },
 		secondary = { href: "/verify", label: "Verify a sample receipt" },
 		note = "Design partners: founder onboarding, free during the pilot.",

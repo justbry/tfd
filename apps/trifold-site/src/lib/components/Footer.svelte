@@ -18,7 +18,7 @@
 		<div class="grid gap-12 md:grid-cols-[minmax(220px,1fr)_2.4fr]">
 			<div>
 				<Wordmark />
-				<p class="mt-3.5 font-display text-[19px] text-muted-foreground">Three sides of every dollar.</p>
+				<p class="mt-3.5 font-display text-[19px] text-muted-foreground">Books that show their work.</p>
 				<a class="link-arrow mt-4 inline-block text-[15px] text-foreground" href="/verify">Verify a receipt</a>
 			</div>
 			<nav class="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-5" aria-label="Footer">

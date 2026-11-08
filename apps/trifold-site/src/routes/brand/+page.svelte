@@ -51,8 +51,7 @@
 	<div class="container-page">
 		<h2 class="display-3">The mark</h2>
 		<p class={intro}>
-			Three panels folding into a triangle: a receipt folded in thirds, and the three records of every dollar. The hero
-			animation ends on this same fold.
+			Three panels folding into a triangle: a receipt folded in thirds. The hero animation ends on this same fold.
 		</p>
 		<div class="mt-7 grid gap-4 md:grid-cols-3">
 			{#each [{ style: DARK_TILE, caption: "On ink", mark: false }, { style: LIGHT_TILE, caption: "On paper", mark: false }, { style: DARK_TILE, caption: "The mark alone, for small spaces and the favicon", mark: true }] as tile (tile.caption)}

@@ -1,6 +1,7 @@
 /**
- * Planned prices, ported from docs/business/pricing-page.html (draft, 2026-11-06). Proposals, not offers. CTAs follow
- * the site's rule: nothing says "Start free" for the hosted product, which isn't open yet.
+ * Planned prices, from docs/business/pricing-strategy.md (the owner's plan decisions of 2026-11-07: Free at about 300
+ * events, Starter as the wedge plan, Witnessed renamed Audited). Proposals, not offers. CTAs follow the site's rule:
+ * nothing says "Start free" for the hosted product, which isn't open yet.
  */
 import { CLI_URL } from "#lib/config";
 
@@ -35,8 +36,8 @@ export const PLANS: Plan[] = [
 		name: "Free",
 		tagline: "Hosted books for small organizations getting started.",
 		price: { std: 0, np: 0 },
-		events: 1000,
-		families: "About 140 families",
+		events: 300,
+		families: "About 40 families",
 		cta: EARLY,
 		features: [
 			"Books built from your Stripe events",
@@ -45,7 +46,7 @@ export const PLANS: Plan[] = [
 			"Reports and on-demand reconcile",
 			"1 Pricing Lab forecast a month",
 			{
-				text: "Witnessed free for non-profits under $50K a year",
+				text: "Countersigned receipts free for non-profits under $50K a year",
 				np: true,
 				plus: true,
 				soon: true,
@@ -55,13 +56,19 @@ export const PLANS: Plan[] = [
 	{
 		id: "starter",
 		name: "Starter",
-		tagline: "Signed receipts on top of the books you already keep.",
+		tagline: "The plan for small schools: hosted books and signed receipts.",
 		price: { std: 29, np: 15 },
+		badge: "Recommended",
+		featured: true,
 		events: 5000,
 		families: "About 700 families",
 		cta: EARLY,
 		features: [
 			"Everything in Free",
+			{
+				text: "Compliance pack for state program receipts (add-on)",
+				soon: true,
+			},
 			{ text: "QuickBooks or Xero sync", soon: true },
 			"Email support",
 			"Free seats for your CPA",
@@ -70,10 +77,8 @@ export const PLANS: Plan[] = [
 	{
 		id: "pro",
 		name: "Pro",
-		tagline: "Your month closes on a schedule.",
+		tagline: "Your month closes on a schedule. On sale once its features ship.",
 		price: { std: 79, np: 39 },
-		badge: "Recommended",
-		featured: true,
 		events: 25000,
 		families: "About 3,500 families",
 		cta: EARLY,
@@ -93,9 +98,10 @@ export const PLANS: Plan[] = [
 		],
 	},
 	{
-		id: "witnessed",
-		name: "Witnessed",
-		tagline: "Books an auditor, grantor or state program can verify.",
+		id: "audited",
+		name: "Audited",
+		tagline:
+			"Audit-ready books an auditor, grantor or state program can check.",
 		price: { std: 149, np: 79 },
 		badge: "Early access",
 		witness: true,
@@ -105,13 +111,14 @@ export const PLANS: Plan[] = [
 		features: [
 			"Everything in Pro",
 			{
-				text: "Trifold countersigns every receipt and seal",
+				text: 'Trifold countersigns every receipt and seal ("Witnessed by Trifold")',
 				soon: true,
 				plus: true,
 			},
-			{ text: "Public transparency log", soon: true, plus: true },
 			{ text: "Auditor portal", soon: true, plus: true },
+			{ text: "Compliance pack included", soon: true, plus: true },
 			{ text: "Daily matching to Stripe payouts", soon: true, plus: true },
+			{ text: "Public transparency log", soon: true, plus: true },
 			"Priority support",
 			{ text: "Donation receipts use no credits", np: true, plus: true },
 			{ text: "Unlimited board and member seats", np: true, plus: true },
@@ -145,14 +152,14 @@ export const ADDONS: {
 	npOnly?: boolean;
 }[] = [
 	{
-		name: "Witnessed + Bookkeeper",
+		name: "Audited + Bookkeeper",
 		price: { std: "~$349/mo", np: "~$249/mo" },
-		body: "A partner bookkeeper closes your month on witnessed books. Less than most bookkeeping services alone.",
+		body: "A partner bookkeeper closes your month on audited books. Less than most bookkeeping services alone.",
 	},
 	{
-		name: "State program pack",
+		name: "Compliance pack",
 		price: { std: "$15–30/mo per program", np: "$15–30/mo per program" },
-		body: "Itemised receipts for education savings and tax-credit programs, kept current as the rules change.",
+		body: "Not built yet (Next). Itemised receipts for one education savings or tax-credit program, with who paid, per child, kept current as the rules change. Included in Audited.",
 	},
 	{
 		name: "Non-profit pack",
@@ -169,7 +176,7 @@ export const ADDONS: {
 	{
 		name: "Credit top-ups",
 		price: { std: "$10 = 1,000 credits", np: "$10 = 1,000 credits" },
-		body: "For heavy Rifo use or a busy month of witnessed receipts. Opt-in only.",
+		body: "For heavy Rifo use or a busy month of countersigned receipts. Opt-in only.",
 	},
 	{
 		name: "Witness API",
@@ -177,7 +184,7 @@ export const ADDONS: {
 			std: "500/mo free, then $0.03–0.05",
 			np: "500/mo free, then $0.03–0.05",
 		},
-		body: "Just the witness, for self-hosters and platforms that issue their own receipts.",
+		body: "Just the witness, for platforms and other software that issue their own receipts, under the Platform agreement. Not sold to a single organization in place of Audited.",
 	},
 ];
 
@@ -201,7 +208,7 @@ export const COLUMNS: {
 	{ id: "free", name: "Free", price: { std: 0, np: 0 } },
 	{ id: "starter", name: "Starter", price: { std: 29, np: 15 } },
 	{ id: "pro", name: "Pro", price: { std: 79, np: 39 } },
-	{ id: "witnessed", name: "Witnessed", price: { std: 149, np: 79 } },
+	{ id: "audited", name: "Audited", price: { std: 149, np: 79 } },
 	{ id: "platform", name: "Platform", custom: true },
 ];
 
@@ -212,12 +219,12 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			[
 				"Ledger events a month",
 				"",
-				["Unlimited", "1,000", "5,000", "25,000", "25,000", "Custom"],
+				["Unlimited", "300", "5,000", "25,000", "25,000", "Custom"],
 			],
 			[
 				"Roughly how many families",
 				"At about 7 events each",
-				["Any", "~140", "~700", "~3,500", "~3,500", "Any"],
+				["Any", "~40", "~700", "~3,500", "~3,500", "Any"],
 			],
 			[
 				"Credits a month",
@@ -309,6 +316,11 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			],
 			["Anyone can verify, free", "", [true, true, true, true, true, true]],
 			[
+				"Itemised receipts for state programs",
+				"The compliance pack: who paid, per child",
+				[false, false, S("Pack"), S("Pack"), S(true), S(true)],
+			],
+			[
 				"Trifold as independent witness",
 				"",
 				[false, N(false, S("Under $50K")), false, false, S(true), S(true)],
@@ -342,7 +354,7 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			],
 			[
 				"Daily matching to Stripe payouts",
-				"Recorded in the witnessed books",
+				"Recorded in the countersigned record",
 				[false, false, false, false, S(true), S(true)],
 			],
 		],
@@ -431,15 +443,8 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			],
 			[
 				"Witness API",
-				"",
-				[
-					"Metered",
-					"Metered",
-					"Metered",
-					"Metered",
-					S("Included"),
-					S("Included"),
-				],
+				"For platforms and issuers",
+				[false, false, false, false, S("Included"), S("Included")],
 			],
 		],
 	],
@@ -532,8 +537,12 @@ export const CREDITS: [string, string, string][] = [
 		"Categorize, reconcile, write the summary",
 	],
 	["Pricing Lab forecast", "25", "Replays a year of events under new prices"],
-	["Witnessed receipt", "3", "Kept cheap on purpose: one per payment"],
-	["Witnessed month seal", "25", "Once a month"],
+	[
+		'Countersigned receipt ("Witnessed by Trifold")',
+		"3",
+		"Kept cheap on purpose: one per payment",
+	],
+	["Countersigned month seal", "25", "Once a month"],
 	[
 		"Donation acknowledgment (verified non-profits)",
 		"0",
@@ -567,11 +576,11 @@ export const PRICING_FAQ = [
 	},
 	{
 		q: "What's a ledger event?",
-		a: "One thing that happened to your money: a payment, a refund, a credit used, a booking. A typical family or member makes about 7 a month, so Free's 1,000 events covers about 140 families. Most organizations upgrade for features, not limits.",
+		a: "One thing that happened to your money: a payment, a refund, a credit used, a booking. A typical family or member makes about 7 a month, so Free's 300 events cover about 40 families. Most organizations upgrade for features, not limits.",
 	},
 	{
 		q: "What happens if I go over my limit?",
-		a: "Nothing stops and nothing is billed. Event limits are soft on Free, Starter, Pro and Witnessed: your books keep running, and if you stay over for a while we'll suggest a plan that fits. There is no metered overage. Only Platform pays per event, about $1 per 10,000.",
+		a: "Nothing stops and nothing is billed. Event limits are soft on Free, Starter, Pro and Audited: your books keep running, and if you stay over for two months we'll suggest a plan that fits. There is no metered overage. Only Platform pays per event, about $1 per 10,000.",
 	},
 	{
 		q: "Can I get a refund?",
@@ -595,15 +604,15 @@ export const PRICING_FAQ = [
 	},
 	{
 		q: "Who qualifies for non-profit & co-op pricing?",
-		a: "US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). The plan for non-profits with gross receipts of $50,000 or less is Witnessed free on the Free plan, with up to about 200 witnessed receipts a month, once the witness ships.",
+		a: "US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). The plan for non-profits with gross receipts of $50,000 or less is Trifold's witness free on the Free plan, up to about 66 countersigned receipts a month (Free's 200 credits at 3 each), once the witness ships.",
 	},
 	{
 		q: "Do the annual and non-profit discounts stack?",
 		a: "Yes. Annual billing is ten months' price for twelve months, applied to whichever price you qualify for.",
 	},
 	{
-		q: 'What will "Witnessed" mean? Is it an audit?',
-		a: "It isn't an audit. Once it ships, Trifold will countersign each receipt and monthly seal and log it publicly, which proves Trifold saw that exact record at that time and that nobody changed it afterwards. It doesn't prove the money moved or that the books are complete. That makes your auditor's job faster, not unnecessary.",
+		q: "Does the Audited plan mean my books are audited?",
+		a: "No. Audited is the plan for audit-ready books; it isn't an audit and doesn't replace your auditor. Once the witness ships, Trifold will countersign each receipt and monthly seal (\"Witnessed by Trifold\") and log it publicly, which proves Trifold saw that exact record at that time and that nobody changed it afterwards. The countersignature doesn't prove the money moved or that the books are complete. With the auditor portal, the compliance pack and daily Stripe matching, it makes your auditor's job easier, not unnecessary.",
 	},
 	{
 		q: "I'm an accountant. What do I pay?",
