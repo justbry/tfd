@@ -1,3 +1,4 @@
+// Modified by justbry/atm: a test for the reset's rollover_time_zone.
 import { describe, expect, test } from "bun:test";
 import {
 	EntInterval,
@@ -17,6 +18,7 @@ import {
 	type WorkerCustomerEntitlement,
 	type WorkerCustomerProduct,
 } from "../../../../src/balanceEngine.js";
+import { addMonthsInTimeZone } from "../../../../src/commands/reset/zonedRolloverExpiry.js";
 import {
 	createCustomerEntitlement,
 	createCustomerProduct,
@@ -254,6 +256,54 @@ describe("computeReset", () => {
 		expect(refilled.rollovers.map((rollover) => rollover.balance)).toEqual([
 			30,
 		]);
+	});
+
+	test("with org.config.rollover_time_zone the rollover's months are counted on that zone's calendar", () => {
+		// 11:00 MST on 15 February; a month on is 11:00 MDT on 15 March, an hour earlier than the UTC calendar gives.
+		const cycleEndedAt = Date.parse("2026-02-15T18:00:00Z");
+		const state = stateWith({
+			row: { balance: 30, next_reset_at: cycleEndedAt },
+		});
+		const fullSubject = createSubjectFor({ state });
+		const grant = fullSubject.customer_products[0]?.customer_entitlements[0];
+		if (!grant) throw new Error("expected the fixture row");
+		grant.entitlement.rollover = {
+			max: 50,
+			duration: RolloverExpiryDurationType.Month,
+			length: 1,
+		};
+		const command = resetCommand();
+		const expiryOf = (rolloverTimeZone?: string) => {
+			const mutation = computeReset({
+				fullSubject,
+				command: {
+					...command,
+					occurredAt: cycleEndedAt + 1,
+					org: {
+						...command.org,
+						config: {
+							...command.org.config,
+							...(rolloverTimeZone
+								? { rollover_time_zone: rolloverTimeZone }
+								: {}),
+						},
+					},
+				},
+			});
+			const inserted = mutation?.changes.find(
+				(change) => change.table === "rollovers" && change.op === "insert",
+			);
+			return inserted?.op === "insert" ? inserted.row.expires_at : undefined;
+		};
+		expect(expiryOf("America/Denver")).toBe(Date.parse("2026-03-15T17:00:00Z"));
+		expect(expiryOf("UTC")).toBe(Date.parse("2026-03-15T18:00:00Z"));
+		expect(
+			addMonthsInTimeZone({
+				instant: cycleEndedAt,
+				months: 1,
+				timeZone: "America/Denver",
+			}),
+		).toBe(Date.parse("2026-03-15T17:00:00Z"));
 	});
 
 	test("the cap trims the oldest rollover first and the new one is inserted trimmed if it overflows alone", () => {

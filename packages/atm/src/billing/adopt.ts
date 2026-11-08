@@ -53,6 +53,7 @@ import {
 	addZonedMonths,
 	customerRow,
 	EMPTY_GRANTS_STATE,
+	expiryZoneOf,
 	giftEntId,
 	menuCatalogRows,
 	ORG,
@@ -145,6 +146,7 @@ export const grantsStateFromCallerRows = (
 ): CallerRowsImport => {
 	const { membership, lots, menu, now } = input;
 	const env = resolveEnv(input.env);
+	const expiryZone = expiryZoneOf(input.policy, menu);
 	const problems: string[] = [];
 	const problem = (message: string) => problems.push(message);
 	const label = `membership ${membership.id}`;
@@ -541,6 +543,7 @@ export const grantsStateFromCallerRows = (
 					current: current.includes(lot) && !plan.retired,
 					rollover: spec.rollover,
 					boundary,
+					zone: expiryZone,
 				}),
 			});
 		}
@@ -720,19 +723,24 @@ const opened = ({
 	};
 };
 
-/** The current refill's leftovers roll over at `boundary`; an older refill's already are a rollover, expiring where the lot does. */
+/**
+ * The current refill's leftovers roll over at `boundary`, lapsing as the policy's rules count the months (`zone`); an
+ * older refill's already are a rollover, expiring where the lot does.
+ */
 const rolloverExpiresAtOf = ({
 	lot,
 	current,
 	rollover,
 	boundary,
+	zone,
 }: {
 	lot: Lot;
 	current: boolean;
 	rollover: RowSpec["rollover"];
 	boundary: number;
+	zone: string | null;
 }): number | null => {
-	if (current) return rolloverExpiry(rollover, boundary);
+	if (current) return rolloverExpiry(rollover, boundary, zone);
 	return rollover ? lot.expires_at : null;
 };
 

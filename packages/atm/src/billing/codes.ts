@@ -56,7 +56,8 @@ const isWhole = (value: unknown): value is number =>
  * A session gift code, or why it cannot be made: `bad_code` (an empty id, or a code text outside letters, digits, `-` and
  * `_`, 6 to 40), `unknown_feature` (the menu has no such feature), `bad_credits` (not a whole number from 1 to
  * `MAX_GIFT_CREDITS`), `bad_expiry` (`redeemBy` must be a whole number of ms after `createdAt`). Its credits will lapse
- * `policy.giftSessionMonths` after the redemption (stored on the code, so a later policy change leaves it alone).
+ * `policy.giftSessionMonths` after the redemption, or never when that is null (stored on the code, so a later policy
+ * change leaves it alone).
  * Unique code text is the caller's rule: it stores the code in a table with a unique index on the text without case.
  */
 export const createSessionGiftCode = (
@@ -128,7 +129,7 @@ const giftRowId = (code: SessionGiftCode): string =>
  *
  * Then `credits` of the feature become a NEW credit row (one `applyBillingPlan` insert, the way a session gift add-on
  * bought at Checkout does: the entitlement `ent_gift_<feature>`, the row `ce_gift_code_<length of codeId>_<codeId>_<feature>`), lapsing
- * `code.creditMonths` months after `now` on the school's calendar; a holder with no engine rows gets a customer made in the
+ * `code.creditMonths` months after `now` on the school's calendar (null: never); a holder with no engine rows gets a customer made in the
  * same plan. `GrantsState.redeemed[code.id]` records it. The events come from the engine's own mutation (`credit.granted`
  * on the plan `gift`), labelled with the menu and policy versions.
  *
@@ -174,7 +175,10 @@ export const redeemSessionGiftCode = (
 		entityId: null,
 	};
 	const rowId = giftRowId(code);
-	const expiresAt = addZonedMonths(now, code.creditMonths, input.menu.timeZone);
+	const expiresAt =
+		code.creditMonths === null
+			? null
+			: addZonedMonths(now, code.creditMonths, input.menu.timeZone);
 	const engineRows = input.rows.filter((row) => row.table !== GRANTS_TABLE);
 	const hasEngineRows = engineRows.length > 0;
 	// A subject whose only row so far is the grants row (a dollar gift came first) holds a later revision: its engine rows

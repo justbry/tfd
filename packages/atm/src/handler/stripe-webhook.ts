@@ -177,6 +177,7 @@ import {
 	assertCurrentSchema as assertCurrentTables,
 	assertInputTables,
 } from "./schema.js";
+import { STRIPE_WEBHOOK_EVENTS } from "./stripe-endpoint.js";
 import { verifyStripeSignature } from "./stripe-signature.js";
 import type {
 	SqlDatabase,
@@ -193,18 +194,8 @@ const INVOICE_PAYMENT_EVENT = "invoice_payment.paid";
 const PAYOUT_EVENT = "payout.paid";
 /** The customer id the books key a payout by; a payout names no family, so this stands in for the subject. */
 const PAYOUT_CUSTOMER_ID = "stripe:payouts";
-const HANDLED_TYPES: ReadonlySet<string> = new Set([
-	"invoice.paid",
-	INVOICE_PAYMENT_EVENT,
-	"customer.subscription.created",
-	"customer.subscription.updated",
-	"customer.subscription.deleted",
-	"charge.refunded",
-	"charge.dispute.created",
-	"charge.dispute.closed",
-	PAYOUT_EVENT,
-	PAYOUT_FAILED_TYPE,
-]);
+/** The types a school's endpoint is created with (`createCloverEndpoint`) are the ones handled: one list. */
+const HANDLED_TYPES: ReadonlySet<string> = new Set(STRIPE_WEBHOOK_EVENTS);
 const RETRYABLE_REFUSALS: ReadonlySet<StripeEventRefusal["reason"]> = new Set([
 	"unmatched_invoice",
 	"unknown_subscription",

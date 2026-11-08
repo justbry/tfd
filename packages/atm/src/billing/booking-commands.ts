@@ -60,7 +60,7 @@ import {
 	settleOwed,
 } from "./booking-holds.js";
 import { resolveEnv } from "./env.js";
-import { addUtcMonths } from "./grants.js";
+import { addExpiryMonths, expiryZoneOf } from "./grants.js";
 import { commandOrg, DEFAULT_POLICY } from "./policy.js";
 import {
 	applyRowChanges,
@@ -685,7 +685,11 @@ const rolloverRoom = ({
 		!Number.isSafeInteger(rollover.length)
 	)
 		return null;
-	const expiresAt = addUtcMonths(due, rollover.length as number);
+	const expiresAt = addExpiryMonths(
+		due,
+		rollover.length as number,
+		expiryZoneOf(input.policy, input.menu),
+	);
 	if (expiresAt <= input.now) return null;
 	const quantity =
 		state.customerProducts.find((p) => p.id === row.customer_product_id)

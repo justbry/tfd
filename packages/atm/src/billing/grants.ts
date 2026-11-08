@@ -13,8 +13,9 @@
  * `menuCatalogRows` from the same menu; every command carries `${source.eventId}:${step}` as `commandId` and
  * `requestId`, so the ledger event it makes can name the input event as its cause.
  *
- * The one date calculation here is `addUtcMonths`, for the `expires_at` of a one-off grant (the engine takes that
- * instant as input; its own month arithmetic is for resets and rollovers).
+ * The one date calculation here is adding months (`addExpiryMonths`), for the `expires_at` of a one-off grant (the
+ * engine takes that instant as input; its own month arithmetic is for resets and rollovers): on the UTC calendar, or on
+ * the menu's under `policy.rulesVersion` 2.
  */
 
 import type { AtmEnv } from "../types.js";
@@ -32,6 +33,7 @@ import type {
 	AtmSubject,
 	BillingDispute,
 	BillingInvoice,
+	BillingPolicy,
 	BillingRefund,
 	FactSource,
 	GrantCommand,
@@ -439,11 +441,32 @@ export const labelsOf = (source: FactSource, v: Versions): GrantLabels => ({
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
-/** When a refill's leftovers lapse if the engine rolls them over at `boundary` (the end of the cycle that refilled the row). */
+/**
+ * The zone a grant's expiry months are counted in under `policy.rulesVersion`: null (the UTC calendar) for rules
+ * version 1 and a policy stored without one, the menu's zone for 2.
+ */
+export const expiryZoneOf = (
+	policy: Pick<BillingPolicy, "rulesVersion"> | undefined,
+	menu: Pick<Menu, "timeZone">,
+): string | null => (policy?.rulesVersion === 2 ? menu.timeZone : null);
+
+/** `ms` plus whole months on the UTC calendar (`zone` null) or on `zone`'s (`addZonedMonths`). */
+export const addExpiryMonths = (
+	ms: number,
+	months: number,
+	zone: string | null,
+): number =>
+	zone === null ? addUtcMonths(ms, months) : addZonedMonths(ms, months, zone);
+
+/**
+ * When a refill's leftovers lapse if the engine rolls them over at `boundary` (the end of the cycle that refilled the
+ * row): the rollover's months later, on the UTC calendar or on `zone`'s (`expiryZoneOf`), as the engine's `reset` counts them.
+ */
 export const rolloverExpiry = (
 	rollover: Rollover | undefined,
 	boundary: number,
-) => (rollover ? addUtcMonths(boundary, rollover.months) : null);
+	zone: string | null = null,
+) => (rollover ? addExpiryMonths(boundary, rollover.months, zone) : null);
 
 type HeldRollover = {
 	id: string;
@@ -503,6 +526,8 @@ export type Op = Record<string, unknown>;
 class Builder {
 	readonly commands: GrantCommand[] = [];
 	private readonly env: AtmEnv;
+	/** The zone the engine's `reset` counts rollover expiry in (`expiryZoneOf`); null keeps the engine's UTC calendar. */
+	private readonly zone: string | null;
 	constructor(
 		private readonly source: FactSource,
 		private readonly identity: {
@@ -510,8 +535,10 @@ class Builder {
 			customerId: string;
 		},
 		env: AtmEnv,
+		zone: string | null = null,
 	) {
 		this.env = env;
+		this.zone = zone;
 	}
 	get ident() {
 		return {
@@ -544,7 +571,16 @@ class Builder {
 		});
 	}
 	reset(occurredAt: number) {
-		this.commands.push(this.base("reset", occurredAt));
+		const command = this.base("reset", occurredAt);
+		// Rules version 1 sends the org as it always has, so its commands (and the log they make) keep their bytes.
+		this.commands.push(
+			this.zone === null
+				? command
+				: {
+						...command,
+						org: { config: { ...ORG.config, rollover_time_zone: this.zone } },
+					},
+		);
 	}
 	add(occurredAt: number, feature: string, rowId: string, units: number) {
 		this.commands.push({
@@ -798,8 +834,12 @@ export const tierLinesOfOtherSubscription = ({
  *   same tier at no more units than the credits reflect (a raise after a decrease that waits for the renewal), grants
  *   nothing.
  * - Gift certificate (an add-on with `gift`, or a line whose Stripe price says so): `sessions` is a one-off row per
- *   grant with `expires_at` = `policy.giftSessionMonths` after `paidAt` on the menu's calendar (`menu.timeZone`);
+ *   grant with `expires_at` = `policy.giftSessionMonths` after `paidAt` on the menu's calendar (`menu.timeZone`), or,
+ *   when that is null, the grant's rollover months after it (no rollover: never), as a one-time add-on;
  *   `dollars` grants no credits.
+ *
+ * Under `policy.rulesVersion` 2 every rollover month and one-time add-on month is counted on the menu's calendar
+ * (`expiryZoneOf`), and the engine's `reset` is told the zone; under 1 (or none) on the UTC calendar.
  *
  * A replayed invoice (already in `state.invoices`) gives no commands.
  */
@@ -812,7 +852,8 @@ export const invoiceToCommands = (input: InvoiceGrantInput): GrantResult => {
 	const state = clone(input.state);
 	const who = identityFrom(invoice, state);
 	state.holder ??= who;
-	const b = new Builder(invoice.source, who, env);
+	const zone = expiryZoneOf(policy, menu);
+	const b = new Builder(invoice.source, who, env, zone);
 	const record: InvoiceRecord = {
 		paidAt: invoice.paidAt,
 		granted: [],
@@ -871,7 +912,7 @@ export const invoiceToCommands = (input: InvoiceGrantInput): GrantResult => {
 			feature: s.feature,
 			units,
 			epoch: state.rows[s.rowId] ?? 1,
-			rolloverExpiresAt: rolloverExpiry(s.rollover, boundary),
+			rolloverExpiresAt: rolloverExpiry(s.rollover, boundary, zone),
 		});
 	};
 	/** Insert a plan's row: full allowance now when its cycle is the invoice's, else seeded and refilled by `reset`. */
@@ -1217,20 +1258,22 @@ export const invoiceToCommands = (input: InvoiceGrantInput): GrantResult => {
 	}
 	for (const l of credited) {
 		const addon = addonOf(menu, l.addonId as string);
-		// A session gift lives `giftSessionMonths` on the school's calendar; other one-time grants lapse by their own rollover months.
+		// A session gift lives `giftSessionMonths` on the school's calendar; other one-time grants (and a gift, when the policy
+		// gives gifts no months of their own) lapse by their own rollover months, or never.
 		const gift = giftOf(l) === "sessions";
 		for (const g of addon.grants) {
 			const rowId = `ce_${gift ? "gift" : "once"}_${invoice.id}_${addon.id}_${g.featureId}`;
 			const units = g.amount * l.quantity;
-			const expiresAt = gift
-				? addZonedMonths(
-						invoice.paidAt,
-						policy.giftSessionMonths,
-						menu.timeZone,
-					)
-				: g.rollover
-					? addUtcMonths(invoice.paidAt, g.rollover.months)
-					: null;
+			const expiresAt =
+				gift && policy.giftSessionMonths !== null
+					? addZonedMonths(
+							invoice.paidAt,
+							policy.giftSessionMonths,
+							menu.timeZone,
+						)
+					: g.rollover
+						? addExpiryMonths(invoice.paidAt, g.rollover.months, zone)
+						: null;
 			ops.push(
 				rowOp({
 					rowId,
@@ -1500,6 +1543,7 @@ export const subscriptionEndedToCommands = (
 		return none;
 	const state = clone(prior);
 	state.endedAt = fact.at;
+	const zone = expiryZoneOf(input.policy, menu);
 	const held = heldOf(input.subject);
 	const ops: Op[] = [];
 	const specs = [
@@ -1516,7 +1560,7 @@ export const subscriptionEndedToCommands = (
 			id: s.rowId,
 			set: {
 				next_reset_at: null,
-				expires_at: rolloverExpiry(s.rollover, boundary) ?? boundary,
+				expires_at: rolloverExpiry(s.rollover, boundary, zone) ?? boundary,
 			},
 		});
 	}
@@ -1536,7 +1580,9 @@ export const subscriptionEndedToCommands = (
 			op: "update",
 			table: "customerEntitlements",
 			id: rowId,
-			set: { expires_at: rolloverExpiry(rollover, boundary) ?? boundary },
+			set: {
+				expires_at: rolloverExpiry(rollover, boundary, zone) ?? boundary,
+			},
 		});
 	}
 	const b = new Builder(fact.source, prior.identity, env);

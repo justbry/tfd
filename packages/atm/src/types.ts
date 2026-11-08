@@ -743,8 +743,12 @@ export type BillingPolicy = {
 	removeOnFullRefund: boolean;
 	/** On a lost dispute, remove that payment's unused credits. */
 	removeOnLostDispute: boolean;
-	/** A session gift certificate lasts this many months from purchase. */
-	giftSessionMonths: number;
+	/**
+	 * A session gift certificate lasts this many months from purchase, on the menu's calendar. `null`: a gift add-on's
+	 * credits follow the add-on grant's own rule, like any one-time add-on (its rollover months, or never when it has none),
+	 * and a gift code's credits never lapse. A policy stored before 0.11.0 is never `null`.
+	 */
+	giftSessionMonths: number | null;
 	/** Smallest dollar gift certificate, in cents. */
 	giftDollarMinimum: number;
 	/** A dollar gift certificate lasts this many months. */
@@ -783,6 +787,15 @@ export type BillingPolicy = {
 	 * than two decimals; a hand-built one with such a rate (or NaN) makes no share and never blocks a payment or its credits.
 	 */
 	revenueShare: { percent: number } | null;
+	/**
+	 * Which date rules the grants follow, so a log written under one replays under it unchanged. `1`, and absent (every
+	 * policy stored before 0.11.0, and the default): a rollover, a one-time add-on and a canceled membership's last credits
+	 * lapse on the UTC calendar. `2`: on the menu's calendar (`menu.timeZone`), the same wall-clock time some months on,
+	 * across clock changes (the engine's `reset` takes the zone as `org.config.rollover_time_zone`). Set it on a school's
+	 * policy before its first event, or at a context change (a new `policyVersion`); a log changes rules only where a
+	 * stored context says so.
+	 */
+	rulesVersion?: 1 | 2;
 };
 
 /**
@@ -1838,8 +1851,8 @@ export type SessionGiftCode = {
 	credits: number;
 	/** The code cannot be redeemed after this time (ms). */
 	redeemBy: number;
-	/** The granted credits lapse this many months after redemption: `policy.giftSessionMonths` when it was made. */
-	creditMonths: number;
+	/** The granted credits lapse this many months after redemption: `policy.giftSessionMonths` when it was made; null: never. */
+	creditMonths: number | null;
 	createdAt: number;
 	/** null until redeemed. */
 	redeemed: { holderId: string; at: number } | null;
@@ -2857,6 +2870,11 @@ export type CallerRowsInput = {
 	/** The instant of the import (ms): a lot past its `expires_at` then holds nothing. atm reads no clock. */
 	now: number;
 	/**
+	 * The policy the member's events will run under; only its `rulesVersion` is read, for when the current refill's
+	 * leftovers lapse once the next renewal rolls them over. Absent: rules version 1.
+	 */
+	policy?: Pick<BillingPolicy, "rulesVersion">;
+	/**
 	 * The import's id, a ULID: the `cause` of the opening events and their command's id (`import:<importId>`). Default: one
 	 * derived from the membership's id and `now`, so the same import at the same instant gives the same events.
 	 */
@@ -3154,6 +3172,50 @@ export type WebhookContextSubject = {
 };
 
 /** What the handler needs to know about a school to decide its events. */
+/** The Stripe account a call runs on: the school's own secret or restricted key, and the `fetch` to send it with. */
+export type StripeAccountAccess = {
+	/** `sk_…` or `rk_…` of the school's account, with Webhook Endpoints: write. Never logged or returned. */
+	secretKey: string;
+	/** Default `globalThis.fetch`. Tests pass a fake Stripe. */
+	fetch?: typeof fetch;
+};
+
+/** A Stripe webhook endpoint as `retrieveWebhookEndpoint` reads it. */
+export type WebhookEndpointInfo = {
+	/** `we_…`. */
+	id: string;
+	url: string;
+	/** The version its events are shaped by; null when the endpoint follows the account's default. */
+	apiVersion: string | null;
+	/** `enabled` or `disabled`. */
+	status: string | null;
+	enabledEvents: string[];
+	metadata: Record<string, string>;
+};
+
+/** What `createCloverEndpoint` returns: the endpoint, and its signing secret (`whsec_…`), which Stripe shows only once. */
+export type CreatedWebhookEndpoint = WebhookEndpointInfo & { secret: string };
+
+export type CreateCloverEndpointInput = StripeAccountAccess & {
+	/** The route the school's events go to, https, e.g. `https://…/hooks/stripe/school?school=<id>`; `v=clover` is added. */
+	url: string;
+	description?: string;
+	/** Stripe metadata on the endpoint (e.g. the school id), for whoever reads the account's dashboard. */
+	metadata?: Readonly<Record<string, string>>;
+	/** Stripe's `Idempotency-Key` for the create, so a retry within 24 hours makes one endpoint. */
+	idempotencyKey?: string;
+};
+
+/** `checkCloverEndpoint`: ok, or each problem; `missingEvents` lists the handled types the endpoint does not send. */
+export type CloverEndpointCheck =
+	| { ok: true; endpoint: WebhookEndpointInfo; missingEvents: [] }
+	| {
+			ok: false;
+			endpoint: WebhookEndpointInfo;
+			missingEvents: string[];
+			problems: string[];
+	  };
+
 export type WebhookContext = {
 	menu: Menu;
 	menuVersion: number | string;
