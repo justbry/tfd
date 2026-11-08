@@ -151,7 +151,7 @@ export const pruneSuperseded = async ({
 			} catch (error) {
 				counts.failed += 1;
 				log.error(
-					`prune failed for a copy: ${error instanceof Error ? error.message : String(error)}`,
+					`prune failed for ${copy.key}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 		}

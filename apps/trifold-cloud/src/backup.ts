@@ -131,7 +131,7 @@ export const backupBucket = async ({
 				if (!(body && "body" in body)) {
 					counts.failed += 1;
 					log.error(
-						"backup skipped an object that changed or vanished since the listing",
+						`backup skipped ${object.key}: it changed or vanished since the listing`,
 					);
 					continue;
 				}
@@ -142,7 +142,7 @@ export const backupBucket = async ({
 			} catch (error) {
 				counts.failed += 1;
 				log.error(
-					`backup failed for an object: ${error instanceof Error ? error.message : String(error)}`,
+					`backup failed for ${object.key}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 		}
