@@ -1,10 +1,12 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { trifoldLookupKey } from "../../../catalog/trifold/check.ts";
-import { HANDLER_DDL } from "../../../packages/atm/src/cloud.ts";
+import {
+	HANDLER_DDL,
+	signStripePayload,
+} from "../../../packages/atm/src/cloud.ts";
 import { invoicePaid } from "../../../packages/atm/src/scenario/stripe-events.ts";
 import { PUBLISHED } from "../src/billing/plans";
-import { signStripePayload } from "../src/billing/stripe-signature";
 import { schoolHintOf } from "../src/billing/webhook";
 import { durableSqlDatabase, splitStatements } from "../src/do-sql";
 import worker from "../src/index";

@@ -15,6 +15,7 @@ const EMAIL =
 const TIER_ID = /^[a-z0-9-]{1,40}$/;
 /** A test-mode key: staging never holds a live one. */
 const TEST_KEY = /^(sk|rk)_test_/;
+const encoder = new TextEncoder();
 
 export type CheckoutRequest = {
 	tier: string;
@@ -148,7 +149,15 @@ export const createCheckoutSession = async (
 /** Light per-isolate limit: a few checkouts a minute per client address. */
 const WINDOW_MS = 60_000;
 const PER_WINDOW = 10;
+/** Clients tracked at once; past it, clients with no checkout in the window are dropped (never the limited ones). */
+const MAX_TRACKED_CLIENTS = 10_000;
 const recent = new Map<string, number[]>();
+
+const dropIdleClients = (nowMs: number): void => {
+	for (const [client, times] of recent)
+		if (times.every((at) => nowMs - at >= WINDOW_MS)) recent.delete(client);
+	if (recent.size > MAX_TRACKED_CLIENTS) recent.clear();
+};
 
 export const allowCheckout = (client: string, nowMs: number): boolean => {
 	const kept = (recent.get(client) ?? []).filter(
@@ -160,7 +169,7 @@ export const allowCheckout = (client: string, nowMs: number): boolean => {
 	}
 	kept.push(nowMs);
 	recent.set(client, kept);
-	if (recent.size > 10_000) recent.clear();
+	if (recent.size > MAX_TRACKED_CLIENTS) dropIdleClients(nowMs);
 	return true;
 };
 
@@ -222,14 +231,17 @@ export const checkoutRoute = async (
 			{ error: { code: "rate_limited", message: "Try again in a minute." } },
 			cors,
 		);
-	const text = await request.text();
-	if (text.length > MAX_BODY_BYTES)
-		return answer(
+	const tooLarge = (): Response =>
+		answer(
 			env,
 			413,
 			{ error: { code: "too_large", message: "Too large." } },
 			cors,
 		);
+	if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY_BYTES)
+		return tooLarge();
+	const text = await request.text();
+	if (encoder.encode(text).byteLength > MAX_BODY_BYTES) return tooLarge();
 	let body: unknown;
 	try {
 		body = JSON.parse(text);

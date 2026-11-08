@@ -35,10 +35,11 @@ export const route = async (
 		const response = await health(env, surface);
 		return request.method === "HEAD" ? new Response(null, response) : response;
 	}
+	// Billing is staging-only until the hosted product opens (AGENTS.md claim rules; PLAN.md section 10). The webhook too:
+	// its catalog is the test-mode published-plans.json, so production must not book live events against it.
+	if (env.ENVIRONMENT !== "staging") return notFound();
 	if (surface === "api" && url.pathname === "/webhooks/billing")
 		return billingWebhookRoute(request, env);
-	// Checkout and its pages are staging-only until the hosted product opens (AGENTS.md claim rules; PLAN.md section 10).
-	if (env.ENVIRONMENT !== "staging") return notFound();
 	if (surface === "api" && url.pathname === "/v1/billing/checkout")
 		return checkoutRoute(request, env);
 	if (

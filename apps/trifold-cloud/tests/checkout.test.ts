@@ -287,7 +287,7 @@ describe("POST /v1/billing/checkout", () => {
 		expect(statuses[10]).toBe(429);
 	});
 
-	test("checkout and the billing pages are not served outside staging; the webhook is", async () => {
+	test("checkout, the billing pages and the webhook are not served outside staging", async () => {
 		const production = { ...env(), ENVIRONMENT: "production" as const };
 		const checkout = await worker.fetch(
 			post({ tier: "starter", org: "std", interval: "month" }),
@@ -306,7 +306,7 @@ describe("POST /v1/billing/checkout", () => {
 			}),
 			production,
 		);
-		expect(webhook.status).toBe(503);
+		expect(webhook.status).toBe(404);
 	});
 });
 

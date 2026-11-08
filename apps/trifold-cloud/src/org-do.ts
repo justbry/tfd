@@ -15,11 +15,7 @@ import {
 	type WebhookResponse,
 } from "../../../packages/atm/src/cloud.ts";
 import { SCHOOL_IDS, webhookContext } from "./billing/plans";
-import {
-	type DurableSqlStorage,
-	durableSqlDatabase,
-	splitStatements,
-} from "./do-sql";
+import { type DurableSqlStorage, durableSqlDatabase } from "./do-sql";
 import type { CloudEnv } from "./env";
 
 /** The Durable Object that keeps Trifold's own books (its subscriptions, PLAN.md section 5). */
@@ -47,6 +43,7 @@ export const ORG_MIGRATIONS: readonly string[] = [
 
 export const migrateOrg = (state: DurableObjectState): number => {
 	const { sql } = state.storage;
+	const db = durableSqlDatabase(state.storage);
 	sql.exec(
 		"CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)",
 	);
@@ -57,10 +54,13 @@ export const migrateOrg = (state: DurableObjectState): number => {
 	for (; version < ORG_MIGRATIONS.length; version += 1) {
 		const step = ORG_MIGRATIONS[version] as string;
 		state.storage.transactionSync(() => {
-			for (const statement of splitStatements(step)) sql.exec(statement);
+			db.exec(step);
 			sql.exec("UPDATE schema_version SET version = ?", version + 1);
 		});
 	}
+	// HANDLER_DDL is tfd's, and grows additively (all IF NOT EXISTS): step 2 ran the release it was on, so apply the
+	// current one on every wake, or a DO made before a tfd upgrade lacks the new tables and every delivery throws.
+	state.storage.transactionSync(() => db.exec(HANDLER_DDL));
 	return version;
 };
 

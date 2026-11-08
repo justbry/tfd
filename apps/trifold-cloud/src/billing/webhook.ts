@@ -1,7 +1,7 @@
+import { verifyStripeSignature } from "../../../../packages/atm/src/cloud.ts";
 import type { CloudEnv } from "../env";
 import { TRIFOLD_BOOKS } from "../org-do";
 import { SCHOOL_IDS } from "./plans";
-import { verifyStripeSignature } from "./stripe-signature";
 
 /** Stripe's events are small; anything larger is not one of them (PLAN.md section 3.3). */
 export const MAX_WEBHOOK_BYTES = 256 * 1024;
@@ -59,12 +59,10 @@ export const billingWebhookRoute = async (
 	const payload = await request.text();
 	if (payload.length > MAX_WEBHOOK_BYTES)
 		return reply(413, { error: { code: "too_large" } });
-	const verdict = await verifyStripeSignature({
-		payload,
-		header: request.headers.get("Stripe-Signature"),
-		secret,
-		nowMs,
-	});
+	const header = request.headers.get("Stripe-Signature");
+	const verdict = header
+		? verifyStripeSignature({ payload, header, secret, nowMs })
+		: ({ ok: false, reason: "missing" } as const);
 	if (!verdict.ok)
 		return reply(400, {
 			error: { code: "bad_signature", reason: verdict.reason },
