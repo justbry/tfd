@@ -6,7 +6,9 @@
  * - canonical bytes: JSON.stringify with object keys sorted (UTF-16 code unit order) and undefined values dropped;
  * - event_hash and events_hash: sha256 (hex) of those bytes as UTF-8;
  * - sig: Ed25519 (RFC 8032, strict) over the receipt's canonical bytes, base64url without padding, one spelling only;
- * - keys: key id to a PEM, read as tfd's createPublicKey reads it under Bun (ed25519FromPem has the one difference).
+ * - keys: key id to a PEM, read as tfd's createPublicKey reads it under Bun (ed25519FromPem has the one difference), or to
+ *   { pem, purpose, not_before, not_after, revoked_at? }: a key of another purpose, a v2 receipt's issued_at or a seal's
+ *   sealed_at outside the window, and anything a revoked key ever signed, fail (tfd's keyUse).
  *
  * In a browser it runs entirely on the page: no network, nothing uploaded. Hashing uses WebCrypto; Ed25519 uses
  * @noble/ed25519, whose own SHA-512 also comes from WebCrypto, so the code shipped is small. No node:* imports.
@@ -14,9 +16,21 @@
  */
 import { getPublicKeyAsync, verifyAsync } from "@noble/ed25519";
 
-export type PublicKeys = Record<string, string>;
+export type KeyPurpose = "receipt" | "seal" | "directory";
 
-export type Receipt = {
+/** A published key with its purpose and window: tfd's TfdKeyEntry. `not_after: null` is a window still open. */
+export type KeyEntry = {
+	pem: string;
+	purpose: KeyPurpose;
+	not_before: string;
+	not_after: string | null;
+	revoked_at?: string;
+};
+
+/** Key id to a PEM (the first form: any purpose, no window, never revoked) or to a KeyEntry. */
+export type PublicKeys = Record<string, string | KeyEntry>;
+
+export type ReceiptV1 = {
 	v: 1;
 	school: string;
 	key: string;
@@ -30,6 +44,11 @@ export type Receipt = {
 	cause: string | null;
 	event_hash: string;
 };
+
+/** Receipt v2: v1's fields plus issued_at (RFC 3339 UTC), the signing time, inside the signature. */
+export type ReceiptV2 = Omit<ReceiptV1, "v"> & { v: 2; issued_at: string };
+
+export type Receipt = ReceiptV1 | ReceiptV2;
 
 export type SignedReceipt = { receipt: Receipt; key_id: string; sig: string };
 
@@ -61,11 +80,18 @@ export type BooksEvent = {
 	[field: string]: unknown;
 };
 
+/** Why a well-signed document's key does not vouch for it. */
+export type KeyUseVerdict =
+	| "key_revoked"
+	| "key_wrong_purpose"
+	| "outside_key_window";
+
 export type SignatureVerdict =
 	| "ok"
 	| "malformed"
 	| "unknown_key"
-	| "bad_signature";
+	| "bad_signature"
+	| KeyUseVerdict;
 export type BooksVerdict =
 	| "ok"
 	| "missing_event"
@@ -77,7 +103,10 @@ export type SealVerdict =
 	| "unknown_key"
 	| "bad_signature"
 	| "broken_link"
-	| "events_changed";
+	| "events_changed"
+	| KeyUseVerdict
+	/** Signed by a revoked key, with a later ok seal of the same month: not a failure. */
+	| "superseded";
 
 // ---- canonical bytes (tfd src/ledger/util.ts) ----
 
@@ -327,6 +356,59 @@ export const ed25519FromPem = async (
 	return seed ? getPublicKeyAsync(seed) : null;
 };
 
+const PURPOSES: readonly string[] = ["receipt", "seal", "directory"];
+
+const isTime = (value: unknown): value is string =>
+	typeof value === "string" && !Number.isNaN(Date.parse(value));
+
+/**
+ * tfd's keyEntryOf: the key published as `keyId`, its PEM and, for the object form, its purpose and window (`use: null`
+ * for a bare PEM). An object missing a field or with a bad one is null, which the checks call unknown_key.
+ */
+export const keyEntryOf = (
+	keys: PublicKeys,
+	keyId: string,
+): { pem: string; use: KeyEntry | null } | null => {
+	const entry: unknown = Object.hasOwn(keys, keyId) ? keys[keyId] : undefined;
+	if (typeof entry === "string") return { pem: entry, use: null };
+	if (typeof entry !== "object" || entry === null || Array.isArray(entry))
+		return null;
+	const { pem, purpose, not_before, not_after, revoked_at } = entry as Record<
+		string,
+		unknown
+	>;
+	const whole =
+		typeof pem === "string" &&
+		typeof purpose === "string" &&
+		PURPOSES.includes(purpose) &&
+		isTime(not_before) &&
+		(not_after === null || isTime(not_after)) &&
+		(revoked_at === undefined || isTime(revoked_at));
+	return whole ? { pem, use: entry as KeyEntry } : null;
+};
+
+/**
+ * tfd's keyUse, after a good signature: a revoked key never vouches (whatever `at` says, as a thief can backdate it), then
+ * the purpose, then `at` (null for a v1 receipt) in [not_before, not_after). A bare PEM vouches for anything.
+ */
+export const keyUse = (
+	keys: PublicKeys,
+	keyId: string,
+	purpose: KeyPurpose,
+	at: string | null,
+): "ok" | KeyUseVerdict => {
+	const use = keyEntryOf(keys, keyId)?.use;
+	if (!use) return "ok";
+	if (use.revoked_at !== undefined) return "key_revoked";
+	if (use.purpose !== purpose) return "key_wrong_purpose";
+	if (at === null) return "ok";
+	const time = Date.parse(at);
+	const inWindow =
+		time >= Date.parse(use.not_before) &&
+		(use.not_after === null || time < Date.parse(use.not_after));
+	return inWindow ? "ok" : "outside_key_window";
+};
+
 /** tfd's verifyBytes: the key by id, then the one base64url spelling of 64 bytes, then strict Ed25519. Never throws. */
 export const verifyBytes = async (
 	text: string,
@@ -334,8 +416,8 @@ export const verifyBytes = async (
 	sig: string,
 	keys: PublicKeys,
 ): Promise<"ok" | "unknown_key" | "bad_signature"> => {
-	const pem = Object.hasOwn(keys, keyId) ? keys[keyId] : undefined;
-	if (typeof pem !== "string") return "unknown_key";
+	const pem = keyEntryOf(keys, keyId)?.pem;
+	if (pem === undefined) return "unknown_key";
 	const publicKey = await ed25519FromPem(pem);
 	if (!publicKey) return "unknown_key";
 	const bytes = base64urlDecode(sig);
@@ -351,7 +433,7 @@ export const verifyBytes = async (
 	}
 };
 
-// ---- shape checks (schema/receipt.v1.json, schema/seal.v1.json) ----
+// ---- shape checks (schema/receipt.v1.json, schema/receipt.v2.json, schema/seal.v1.json) ----
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
@@ -395,6 +477,8 @@ const RECEIPT_FIELDS = [
 	"event_hash",
 ] as const;
 
+const RECEIPT_V2_FIELDS = [...RECEIPT_FIELDS, "issued_at"] as const;
+
 const SEAL_FIELDS = [
 	"v",
 	"school",
@@ -409,10 +493,8 @@ const SEAL_FIELDS = [
 
 const SIGNED_FIELDS = (inner: string) => [inner, "key_id", "sig"] as const;
 
-const isReceipt = (value: unknown): value is Receipt =>
-	isObject(value) &&
-	hasExactly(value, RECEIPT_FIELDS) &&
-	value.v === 1 &&
+/** The fields v1 and v2 share, checked as tfd's Ajv checks them. */
+const hasReceiptFields = (value: Record<string, unknown>): boolean =>
 	isText(value.school) &&
 	isText(value.key) &&
 	matches(value.event_id, EVENT_ID) &&
@@ -426,7 +508,22 @@ const isReceipt = (value: unknown): value is Receipt =>
 	(value.cause === null || isText(value.cause)) &&
 	matches(value.event_hash, HASH);
 
-/** schema/receipt.v1.json, as tfd's Ajv check reads it. */
+const isReceipt = (value: unknown): value is Receipt => {
+	if (!isObject(value)) return false;
+	if (value.v === 2)
+		return (
+			hasExactly(value, RECEIPT_V2_FIELDS) &&
+			hasReceiptFields(value) &&
+			matches(value.issued_at, INSTANT)
+		);
+	return (
+		value.v === 1 &&
+		hasExactly(value, RECEIPT_FIELDS) &&
+		hasReceiptFields(value)
+	);
+};
+
+/** schema/receipt.v1.json or schema/receipt.v2.json (by `v`), as tfd's Ajv check reads it. */
 export const isSignedReceipt = (value: unknown): value is SignedReceipt =>
 	isObject(value) &&
 	hasExactly(value, SIGNED_FIELDS("receipt")) &&
@@ -476,7 +573,9 @@ const isCents = (value: unknown): value is number =>
 	typeof value === "number" && Number.isInteger(value) && value > 0;
 
 /** tfd's receiptOf: null for an event type that gets no receipt; throws when a required payload field is missing. */
-export const receiptOf = async (event: BooksEvent): Promise<Receipt | null> => {
+export const receiptOf = async (
+	event: BooksEvent,
+): Promise<ReceiptV1 | null> => {
 	const amountField = Object.hasOwn(AMOUNT_FIELD, event.event_type)
 		? AMOUNT_FIELD[event.event_type]
 		: undefined;
@@ -493,7 +592,7 @@ export const receiptOf = async (event: BooksEvent): Promise<Receipt | null> => {
 		school: event.school,
 		key: event.key,
 		event_id: event.id,
-		event_type: event.event_type as Receipt["event_type"],
+		event_type: event.event_type as ReceiptV1["event_type"],
 		event_time: event.event_time,
 		date: event.date,
 		amount,
@@ -504,17 +603,33 @@ export const receiptOf = async (event: BooksEvent): Promise<Receipt | null> => {
 	};
 };
 
-/** tfd's verifyReceipt: shape, then key id, then signature. Never throws. */
+/** tfd's receiptOfV2: receiptOf's receipt with v 2 and issued_at; throws when issuedAt is not an RFC 3339 UTC instant. */
+export const receiptOfV2 = async (
+	event: BooksEvent,
+	issuedAt: string,
+): Promise<ReceiptV2 | null> => {
+	if (!(INSTANT.test(issuedAt) && !Number.isNaN(Date.parse(issuedAt))))
+		throw new Error(
+			`issuedAt must be an RFC 3339 UTC instant, got ${issuedAt}`,
+		);
+	const v1 = await receiptOf(event);
+	return v1 ? { ...v1, v: 2, issued_at: issuedAt } : null;
+};
+
+/** tfd's verifyReceipt: shape, then key id, then signature, then the key's revocation, purpose and window. Never throws. */
 export const verifyReceipt = async (
 	signed: unknown,
 	keys: PublicKeys,
 ): Promise<SignatureVerdict> => {
 	if (!isSignedReceipt(signed)) return "malformed";
-	return verifyBytes(
-		canonicalize(signed.receipt),
-		signed.key_id,
-		signed.sig,
+	const { receipt, key_id, sig } = signed;
+	const signature = await verifyBytes(canonicalize(receipt), key_id, sig, keys);
+	if (signature !== "ok") return signature;
+	return keyUse(
 		keys,
+		key_id,
+		"receipt",
+		receipt.v === 2 ? receipt.issued_at : null,
 	);
 };
 
@@ -529,16 +644,18 @@ export const checkReceiptAgainstEvents = async (
 			isObject(candidate) && candidate.id === signed.receipt.event_id,
 	);
 	if (!event) return "missing_event";
+	const { receipt } = signed;
 	let again: Receipt | null;
 	try {
-		again = await receiptOf(event);
+		again =
+			receipt.v === 2
+				? await receiptOfV2(event, receipt.issued_at)
+				: await receiptOf(event);
 	} catch {
 		return "event_changed";
 	}
 	if (!again) return "not_receipted";
-	return canonicalize(again) === canonicalize(signed.receipt)
-		? "ok"
-		: "event_changed";
+	return canonicalize(again) === canonicalize(receipt) ? "ok" : "event_changed";
 };
 
 // ---- seals (tfd src/ledger/seal.ts) ----
@@ -548,8 +665,10 @@ const sealHash = (signed: unknown): Promise<string> =>
 	sha256Hex(canonicalize(signed));
 
 /**
- * tfd's verifySeals verdicts for a school's seal chain (in the order made) against its events: shape and signature,
- * the link to the seal before, then the named events hashed and counted again.
+ * tfd's verifySeals verdicts for a school's seal chain (in the order made) against its events: shape and signature, the
+ * key's revocation, purpose and window by sealed_at, the link to the seal before, then the named events hashed and counted
+ * again. A revoked key's seal is superseded once a later ok seal of the same month exists; the next seal links to it by
+ * its hash either way.
  */
 export const verifySealChain = async (
 	seals: readonly unknown[],
@@ -582,9 +701,18 @@ export const verifySealChain = async (
 			verdicts.push(signature);
 			continue;
 		}
+		const use = keyUse(keys, raw.key_id, "seal", raw.seal.sealed_at);
+		if (use !== "ok" && use !== "key_revoked") {
+			verdicts.push(use);
+			continue;
+		}
 		const expected = index === 0 ? null : await sealHash(seals[index - 1]);
 		if (raw.seal.prev_seal_hash !== expected) {
 			verdicts.push("broken_link");
+			continue;
+		}
+		if (use === "key_revoked") {
+			verdicts.push(use);
 			continue;
 		}
 		const inMonth = byMonth.get(raw.seal.month);
@@ -607,5 +735,15 @@ export const verifySealChain = async (
 				: "events_changed",
 		);
 	}
-	return verdicts;
+	const monthAt = (index: number): string | null =>
+		isSignedSeal(seals[index]) ? (seals[index] as SignedSeal).seal.month : null;
+	return verdicts.map((verdict, index) =>
+		verdict === "key_revoked" &&
+		verdicts.some(
+			(later, at) =>
+				at > index && later === "ok" && monthAt(at) === monthAt(index),
+		)
+			? "superseded"
+			: verdict,
+	);
 };
