@@ -27,9 +27,9 @@ export const signBytes = (text: string, signer: AtmSigner): string => {
 const PURPOSES: readonly string[] = ["receipt", "seal", "directory"];
 
 /** RFC 3339 UTC with `Z`: a key window or `issued_at` read the same in every verifier's time zone. */
-export const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
 
-const isInstant = (value: unknown): value is string =>
+export const isInstant = (value: unknown): value is string =>
 	typeof value === "string" &&
 	UTC_INSTANT.test(value) &&
 	!Number.isNaN(Date.parse(value));

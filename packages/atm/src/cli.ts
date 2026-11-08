@@ -1267,7 +1267,10 @@ const verifyReceiptCommand = verifyCommand
 		"check a signed receipt's shape, key id and signature; with --root and --school also make it again from the school's books and compare. Prints {ok} or {ok, reason} as one JSON line; exits 0 valid, 1 not, 2 for input it cannot use",
 	)
 	.argument("<file>", "the signed receipt JSON, or - for stdin")
-	.requiredOption("--keys <keys.json>", "{ key_id: public PEM }")
+	.requiredOption(
+		"--keys <keys.json>",
+		"{ key_id: public PEM or { pem, purpose, not_before, not_after, revoked_at? } }",
+	)
 	.option("--root <folder>", "the folder that holds schools/<id>/")
 	.option("--school <id>", "school id, as in schools/<id>/")
 	.action(
@@ -1312,7 +1315,10 @@ const verifySealsCommand = verifyCommand
 	)
 	.requiredOption("--root <folder>", "the folder that holds schools/<id>/")
 	.requiredOption("--school <id>", "school id, as in schools/<id>/")
-	.requiredOption("--keys <keys.json>", "{ key_id: public PEM }")
+	.requiredOption(
+		"--keys <keys.json>",
+		"{ key_id: public PEM or { pem, purpose, not_before, not_after, revoked_at? } }",
+	)
 	.action((opts: { root: string; school: string; keys: string }) =>
 		unattended("verify seals", false, async () => {
 			const keys = await keysFrom(opts.keys);

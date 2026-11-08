@@ -11,10 +11,10 @@ import type {
 } from "../types.js";
 import { receiptSchema, receiptV2Schema } from "./schemas.js";
 import {
+	isInstant,
 	keyUse,
 	shapeCheck,
 	signBytes,
-	UTC_INSTANT,
 	verifyBytes,
 } from "./sign.js";
 import { canonicalize, sha256Hex } from "./util.js";
@@ -92,7 +92,7 @@ export const receiptOfV2 = (
 	event: AtmEvent,
 	issuedAt: string,
 ): TfdReceiptV2 | null => {
-	if (!(UTC_INSTANT.test(issuedAt) && !Number.isNaN(Date.parse(issuedAt))))
+	if (!isInstant(issuedAt))
 		throw new Error(
 			`issuedAt must be an RFC 3339 UTC instant, got ${issuedAt}`,
 		);

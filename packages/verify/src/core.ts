@@ -611,7 +611,7 @@ export const receiptOfV2 = async (
 	event: BooksEvent,
 	issuedAt: string,
 ): Promise<ReceiptV2 | null> => {
-	if (!(INSTANT.test(issuedAt) && !Number.isNaN(Date.parse(issuedAt))))
+	if (!isTime(issuedAt))
 		throw new Error(
 			`issuedAt must be an RFC 3339 UTC instant, got ${issuedAt}`,
 		);
@@ -738,13 +738,16 @@ export const verifySealChain = async (
 				: "events_changed",
 		);
 	}
-	const monthAt = (index: number): string | null =>
-		isSignedSeal(seals[index]) ? (seals[index] as SignedSeal).seal.month : null;
+	const months = seals.map((raw) =>
+		isSignedSeal(raw) ? raw.seal.month : null,
+	);
 	return verdicts.map((verdict, index) =>
 		verdict === "key_revoked" &&
 		verdicts.some(
-			(later, at) =>
-				at > index && later === "ok" && monthAt(at) === monthAt(index),
+			(later, laterIndex) =>
+				laterIndex > index &&
+				later === "ok" &&
+				months[laterIndex] === months[index],
 		)
 			? "superseded"
 			: verdict,

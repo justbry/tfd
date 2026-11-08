@@ -152,18 +152,20 @@ export const verifySeals = (
 			again.events_hash === seal.events_hash;
 		return same ? "ok" : "events_changed";
 	});
-	const rows = seals.map((raw, index) => {
-		const month = textOr(raw, "month");
-		const verdict = verdicts[index] as Verdict;
+	const sealMonths = seals.map((raw) => textOr(raw, "month"));
+	const rows = verdicts.map((verdict, index) => {
+		const month = sealMonths[index] as string;
 		const resealed =
 			verdict === "key_revoked" &&
 			verdicts.some(
-				(later, at) =>
-					at > index && later === "ok" && textOr(seals[at], "month") === month,
+				(later, laterIndex) =>
+					laterIndex > index &&
+					later === "ok" &&
+					sealMonths[laterIndex] === month,
 			);
 		return {
 			month,
-			sealed_at: textOr(raw, "sealed_at"),
+			sealed_at: textOr(seals[index], "sealed_at"),
 			verdict: resealed ? ("superseded" as const) : verdict,
 		};
 	});
