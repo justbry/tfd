@@ -46,9 +46,12 @@ export function statusBadges(
 		badges.push({ text: "Waiting for approval", tone: "warning" });
 	if (needsOutcome(booking, clock) && !pending)
 		badges.push({ text: "Needs outcome", tone: "bad" });
-	else if (booking.cutoffMinutes !== null && insideCutoff(booking, clock))
+	else if (insideCutoff(booking, clock))
 		badges.push({
-			text: `Inside ${cutoffHours(booking.cutoffMinutes)} cutoff`,
+			text:
+				booking.cutoffMinutes === null
+					? "Inside cutoff"
+					: `Inside ${cutoffHours(booking.cutoffMinutes)} cutoff`,
 			tone: "warning",
 		});
 	else if (booking.attendance)

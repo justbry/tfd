@@ -18,6 +18,10 @@ import {
  * and when it fires the next token is fetched. A caller that finds no fresh token waits for one. A 404 means the
  * person administers no school (the route's "not an administrator anywhere"): the answer is `null`, a real "no
  * schools"; a 503 is `unavailable`, never "no schools".
+ *
+ * A 401 means no one is signed in, and that holds for the page's life: the source keeps the answer and gives it to
+ * every later `current()` and `refresh()` without asking again, so a signed-out page asks once
+ * (`forgetSignedOut` asks again, for an explicit "I have signed in").
  */
 
 export type LedgerSchoolClaim = {
@@ -42,6 +46,8 @@ export interface LedgerTokenSource {
 	current(): Promise<LedgerToken | null>;
 	/** A new token now (after a Worker 401). */
 	refresh(): Promise<LedgerToken | null>;
+	/** Forgets a 401 kept from before, so the next `current()` asks again (the person may have signed in since). */
+	forgetSignedOut(): void;
 	/** Cancels the refresh timer. */
 	stop(): void;
 }
@@ -99,9 +105,12 @@ export function createLedgerTokenSource(options: {
 	let held: LedgerToken | null | undefined;
 	let fresh = false;
 	let inFlight: Promise<LedgerToken | null> | null = null;
+	/** The 401 that said no one is signed in, kept until `forgetSignedOut`. */
+	let signedOut: AdapterError | null = null;
 	let cancelTimer: (() => void) | null = null;
 
 	const fetchToken = (): Promise<LedgerToken | null> => {
+		if (signedOut) return Promise.reject(signedOut);
 		if (inFlight) return inFlight;
 		inFlight = (async () => {
 			try {
@@ -130,6 +139,8 @@ export function createLedgerTokenSource(options: {
 					return null;
 				}
 				fresh = false;
+				if (error instanceof AdapterError && error.kind === "unauthenticated")
+					signedOut = error;
 				throw error;
 			} finally {
 				inFlight = null;
@@ -146,6 +157,9 @@ export function createLedgerTokenSource(options: {
 		refresh: () => {
 			fresh = false;
 			return fetchToken();
+		},
+		forgetSignedOut: () => {
+			signedOut = null;
 		},
 		stop: () => {
 			cancelTimer?.();

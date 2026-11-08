@@ -90,6 +90,7 @@ const tokenSource = (): LedgerTokenSource & { refreshes: number } => {
 			source.refreshes += 1;
 			return token;
 		},
+		forgetSignedOut: () => undefined,
 		stop: () => undefined,
 	};
 	return source;

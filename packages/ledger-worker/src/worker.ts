@@ -2,9 +2,12 @@
  * The ledger Worker: the read endpoints of the ledger UI (contract `plans/ledger-ui/S8-contract.md` section 11) over a
  * school's R2 views and event log, behind a ledger token, and a cron job that keeps the views current.
  *
- * Every `/v1` answer is `Cache-Control: private, no-store`. Order of checks: the token (401), the route, the school in the
- * token's `schools[]` (404 `not_found`, the same for an unknown school), the gate of the endpoint (403), the query (400),
- * then the data (404 `no_data`, 409, 503).
+ * Every `/v1` answer is `Cache-Control: private, no-store`, but a stored answer (`routes/stored.ts`): the KPI document,
+ * the disclosure and the audience report of a generation whose answers the views job has stored are read from them, with
+ * an `ETag` (`If-None-Match` answers 304) and `private, max-age=0, must-revalidate` (`public, max-age=60` on a demo
+ * school). Order of checks: the token (401), the route, the school in the token's `schools[]` (404 `not_found`, the
+ * same for an unknown school), the gate of the endpoint (403), the query (400), then the data (404 `no_data`, 409, 503).
+ * Every check runs before a stored answer is looked up.
  *
  * Demo schools (`demo.ts`, `LEDGER_DEMO_SCHOOLS=on`): `GET /v1/schools` and a demo school's paths need no token. A
  * token that is sent is checked all the same (an invalid or expired one is a 401); a valid one that does not list the
@@ -24,6 +27,13 @@ import {
 } from "./auth/claims.js";
 import { JwksCache, JwksUnavailable } from "./auth/jwks.js";
 import { type Jwks, kidOf, LEDGER_AUDIENCE, verifyJwt } from "./auth/jwt.js";
+import {
+	ANSWERS_VERSION,
+	disclosureAnswerName,
+	kpiAnswerName,
+	openGeneration,
+	pinLockedOf,
+} from "./data/answers.js";
 import { openSnapshot } from "./data/snapshot.js";
 import { DEMO_GRANT, demoSchoolsOn, isDemoSchool } from "./demo.js";
 import type { LedgerEnv, ScheduledController } from "./env.js";
@@ -31,8 +41,10 @@ import {
 	ApiError,
 	errorResponse,
 	lagMinutesOf,
+	notModifiedResponse,
 	okResponse,
 	plainResponse,
+	storedResponse,
 } from "./http.js";
 import {
 	type ConfigAction,
@@ -48,6 +60,7 @@ import {
 	membersIncomeRoute,
 } from "./routes/income-statement.js";
 import {
+	audienceReportOf,
 	audienceReportRoute,
 	clockOf,
 	disclosureBeforeViews,
@@ -56,8 +69,14 @@ import {
 } from "./routes/kpi.js";
 import { ledgerRoute } from "./routes/ledger.js";
 import { memberMoneyRoute } from "./routes/member-money.js";
-import { oneOf } from "./routes/query.js";
+import { dayRange, oneOf } from "./routes/query.js";
 import { demoSchoolsRoute, schoolsRoute } from "./routes/schools.js";
+import {
+	type AnswersCache,
+	pointerFor,
+	storedAnswer,
+	type WaitUntil,
+} from "./routes/stored.js";
 import { runViewsJob, type ViewsJobResult } from "./views-job.js";
 
 const SCHOOL_PATH = /^\/v1\/schools\/([^/]+)\/(.+)$/;
@@ -73,13 +92,24 @@ const JWKS_FETCH_TIMEOUT_MS = 5000;
 const IAT_LEEWAY_SECONDS = 5;
 const REPORT_AUDIENCES = ["public", "member", "governance"] as const;
 const ALL_AUDIENCES = audiences;
+/** A stored answer of a real school: the browser keeps it, and asks again (`If-None-Match`) before each use. */
+const STORED_PRIVATE = "private, max-age=0, must-revalidate";
+/** A stored answer of a demo school (fictional, the same for every caller): anyone may keep it a minute. */
+const STORED_DEMO = "public, max-age=60";
+const ETAG_LIST = /\s*,\s*/;
+const WEAK_PREFIX = /^W\//;
 
 export type LedgerWorkerOptions = {
 	/** The clock, in epoch milliseconds. */
 	clock?: (env: LedgerEnv) => number | Promise<number>;
 	/** How the JWKS is fetched. */
 	fetchJwks?: (url: string) => Promise<Response>;
+	/** The cache for stored answers; default `caches.default` where the runtime has it, else none. */
+	answersCache?: AnswersCache | null;
 };
+
+/** What the fetch handler is handed beside the request: Workers' `ExecutionContext`, of which only `waitUntil`. */
+export type FetchContext = { waitUntil(promise: Promise<unknown>): void };
 
 type Handler = (context: RouteContext) => Promise<unknown>;
 type RouteContext = {
@@ -90,11 +120,23 @@ type RouteContext = {
 	grant: SchoolGrant;
 };
 
+/** Which stored answer serves a request, once the checks have passed. */
+type StoredUse = {
+	/** The answer's name in the generation's answers (`data/answers.ts`). */
+	name: string;
+	/** What else the answer depends on, for its ETag: the audience, and the query fields it reads. */
+	tag: string;
+	/** The data of the response from the stored answer's; the stored answer as it is when absent. */
+	render?: (stored: string) => string;
+};
+
 type Route = {
 	/** Who may call it: `finance` needs `finance:true`. */
 	gate: "any" | "finance";
 	/** Checks the query against the caller's grant before any data is read. */
 	check?: (query: URLSearchParams, grant: SchoolGrant) => void;
+	/** The stored answer that serves it, when the generation has one; called after `check`. */
+	stored?: (query: URLSearchParams, grant: SchoolGrant) => StoredUse;
 	handle: Handler;
 };
 
@@ -124,19 +166,30 @@ const routes: Record<string, Route> = {
 			audienceGate(query, grant, ALL_AUDIENCES);
 			oneOf(query, "pin", ["open", "locked"], true);
 		},
+		stored: (query) => {
+			const audience = query.get("audience") as Audience;
+			const locked = pinLockedOf(audience, query.get("pin"));
+			return {
+				name: kpiAnswerName(audience, locked),
+				tag: `kpi-${audience}-${locked ? "locked" : "open"}`,
+			};
+		},
 		handle: ({ snapshot, query, now }) =>
 			kpiRoute(
 				snapshot,
 				query.get("audience") as Audience,
 				// the PIN opens the books from governance up: below it `locked` is always allowed and means nothing
-				query.get("pin") === "locked" &&
-					ALL_AUDIENCES.indexOf(query.get("audience") as Audience) >=
-						ALL_AUDIENCES.indexOf("governance"),
+				pinLockedOf(query.get("audience") as Audience, query.get("pin")),
 				now,
 			),
 	},
 	disclosure: {
 		gate: "any",
+		// the caller's grant picks the answer: the ETag names it, so a browser that changes token reads it again
+		stored: (_query, grant) => ({
+			name: disclosureAnswerName(adminAudienceOf(grant)),
+			tag: `disclosure-${adminAudienceOf(grant)}`,
+		}),
 		handle: ({ snapshot, now, grant }) =>
 			disclosureRoute(snapshot, now, adminAudienceOf(grant)),
 	},
@@ -144,6 +197,19 @@ const routes: Record<string, Route> = {
 		gate: "any",
 		check: (query, grant) => {
 			audienceGate(query, grant, REPORT_AUDIENCES);
+		},
+		// the report is the audience's KPI document read at `from`: the stored document, then `audienceReportOf`
+		stored: (query) => {
+			const audience = query.get(
+				"audience",
+			) as (typeof REPORT_AUDIENCES)[number];
+			const { from } = dayRange(query);
+			return {
+				name: kpiAnswerName(audience, false),
+				tag: `audience-report-${audience}-${from}`,
+				render: (stored) =>
+					JSON.stringify(audienceReportOf(JSON.parse(stored), audience, from)),
+			};
 		},
 		handle: ({ snapshot, query, now }) =>
 			audienceReportRoute(snapshot, query, now),
@@ -223,8 +289,24 @@ const schoolOfPath = (pathname: string): string | null => {
 const tokenMissing = (): ApiError =>
 	new ApiError("token_missing", "A bearer token is required.");
 
+/** Whether `If-None-Match` names `etag` (or is `*`); a weak validator compares as a strong one. */
+const matchesEtag = (header: string | null, etag: string): boolean =>
+	(header ?? "")
+		.trim()
+		.split(ETAG_LIST)
+		.some((tag) => tag === "*" || tag.replace(WEAK_PREFIX, "") === etag);
+
+/** `caches.default`, where the runtime has one (Workers, Miniflare); none under Bun. */
+const defaultAnswersCache = (): AnswersCache | null =>
+	(globalThis as { caches?: { default?: AnswersCache } }).caches?.default ??
+	null;
+
 export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 	const clock = options.clock ?? (() => Date.now());
+	const answersCache = (): AnswersCache | null =>
+		options.answersCache === undefined
+			? defaultAnswersCache()
+			: options.answersCache;
 	const fetchJwks =
 		options.fetchJwks ??
 		((url: string) =>
@@ -292,6 +374,7 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		env: LedgerEnv,
 		url: URL,
 		now: number,
+		waitUntil: WaitUntil,
 	): Promise<Response> => {
 		const caller = await authenticate(request, env, now);
 		const demoApi = DEMO_API_PATH.exec(url.pathname);
@@ -334,10 +417,11 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		const store = new R2BindingStore(env.LEDGER_BUCKET);
 		if (url.pathname === "/v1/schools") {
 			const ids = caller === null ? [] : [...caller.schools.keys()];
-			const freshness = [
-				...(await schoolsRoute(store, ids, now)),
-				...(demoOn ? await demoSchoolsRoute(store, new Set(ids), now) : []),
-			];
+			const [listed, demo] = await Promise.all([
+				schoolsRoute(store, ids, now),
+				demoOn ? demoSchoolsRoute(store, new Set(ids), now) : [],
+			]);
+			const freshness = [...listed, ...demo];
 			const known = freshness.flatMap((school) =>
 				school.asOf === null ? [] : [school.asOf],
 			);
@@ -394,16 +478,48 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 				"This needs the finance grant on the school.",
 			);
 		route.check?.(url.searchParams, grant);
-		const snapshot = await openSnapshot(store, school).catch((error) => {
-			// The disclosure is policy, not data: a school with no views yet still answers it (the defaults).
-			if (
-				route === routes.disclosure &&
-				error instanceof ApiError &&
-				error.code === "no_data"
-			)
-				return null;
-			throw error;
-		});
+		const use = route.stored?.(url.searchParams, grant);
+		// every check above has passed: only now is a stored answer looked up
+		const opened = await openGeneration(store, school);
+		const pointer = use === undefined ? null : pointerFor(opened, now);
+		if (use !== undefined && pointer !== null) {
+			const etag = `"v${ANSWERS_VERSION}-${pointer.generation}-${pointer.day}-${use.tag}"`;
+			const headers = {
+				etag,
+				"cache-control": isDemoSchool(school, env)
+					? STORED_DEMO
+					: STORED_PRIVATE,
+			};
+			if (matchesEtag(request.headers.get("if-none-match"), etag))
+				return notModifiedResponse(headers);
+			const stored = await storedAnswer({
+				store,
+				school,
+				pointer,
+				name: use.name,
+				origin: url.origin,
+				cache: answersCache(),
+				waitUntil,
+			});
+			if (stored !== null)
+				return storedResponse(
+					use.render === undefined ? stored : use.render(stored),
+					{ asOf: pointer.asOf, lagMinutes: lagMinutesOf(pointer.asOf, now) },
+					headers,
+				);
+		}
+		const snapshot = await openSnapshot(store, school, { opened }).catch(
+			(error) => {
+				// The disclosure is policy, not data: a school with no views yet still answers it (the defaults).
+				if (
+					route === routes.disclosure &&
+					error instanceof ApiError &&
+					error.code === "no_data"
+				)
+					return null;
+				throw error;
+			},
+		);
 		if (snapshot === null)
 			return okResponse(
 				disclosureBeforeViews(school, now, adminAudienceOf(grant)),
@@ -423,7 +539,11 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 	};
 
 	return {
-		async fetch(request: Request, env: LedgerEnv): Promise<Response> {
+		async fetch(
+			request: Request,
+			env: LedgerEnv,
+			context?: FetchContext,
+		): Promise<Response> {
 			const url = new URL(request.url);
 			if (url.pathname === "/healthz") return plainResponse({ ok: true });
 			if (!url.pathname.startsWith("/v1/")) {
@@ -431,7 +551,21 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 				return errorResponse(new ApiError("not_found", "Not found."));
 			}
 			try {
-				return await serveV1(request, env, url, await clock(env));
+				// without a context (tests in-process) the cache is filled before the answer goes
+				const pending: Promise<unknown>[] = [];
+				const waitUntil: WaitUntil = (promise) =>
+					context === undefined
+						? pending.push(promise)
+						: context.waitUntil(promise);
+				const response = await serveV1(
+					request,
+					env,
+					url,
+					await clock(env),
+					waitUntil,
+				);
+				await Promise.all(pending);
+				return response;
 			} catch (error) {
 				if (error instanceof ApiError) return errorResponse(error);
 				// R2 or the runtime failed: nothing to show for it, and nothing about the request is logged

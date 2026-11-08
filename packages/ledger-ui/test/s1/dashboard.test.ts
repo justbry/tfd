@@ -320,6 +320,34 @@ test("a document with no year note when the audience reads years", async () => {
 	expect(count("[data-test=year-note]")).toBe(0);
 });
 
+test("the other audiences' documents are read once the page is idle, not with the first paint", async () => {
+	const idle: Array<() => void> = [];
+	const browserIdle = globalThis.requestIdleCallback;
+	globalThis.requestIdleCallback = (run) =>
+		idle.push(() => run({ didTimeout: false, timeRemaining: () => 0 }));
+	const base = createFixtureReader({ clock });
+	const asked: string[] = [];
+	try {
+		await open("#/b4u/dashboard?preset=monthly-members", {
+			...base,
+			kpiDocument: (query) => {
+				asked.push(query.audience);
+				return base.kpiDocument(query);
+			},
+		});
+		expect(count("[data-test=kpi-card]")).toBeGreaterThan(0);
+		// The first paint read the viewed audience's document alone; the rest wait for the idle callback.
+		expect(asked).toHaveLength(1);
+		expect(idle).toHaveLength(1);
+		idle.shift()?.();
+		await macrotask();
+		expect(asked.length).toBeGreaterThan(1);
+		expect(new Set(asked).size).toBe(asked.length);
+	} finally {
+		globalThis.requestIdleCallback = browserIdle;
+	}
+});
+
 test("picking a View as row shows that audience's Dashboard within the click", async () => {
 	await open("#/b4u/dashboard?preset=monthly-members");
 	// A person's click is drawn before it returns; the page's own scheduling would draw it a task later.

@@ -266,6 +266,35 @@ describe.skipIf(skip)("demo schools on the real Worker", () => {
 		}
 	});
 
+	test("signed out, a Dashboard load and a tab switch ask buzz-school for the ledger token once", async () => {
+		const school = "demo-monthly-members";
+		const app = await mounted([], `#/${school}/dashboard`, {
+			signedOut: true,
+		});
+		try {
+			await app.shown(`#/${school}/dashboard`);
+			// The other audiences' documents, read once the page is idle after the first paint.
+			const documents = () =>
+				app.buzzSchool.workerCalls.filter((path) =>
+					path.startsWith(`/v1/schools/${school}/kpi?`),
+				).length;
+			for (
+				let attempt = 0;
+				attempt < renderAttempts && documents() < 2;
+				attempt += 1
+			)
+				await macrotask();
+			expect(documents()).toBeGreaterThan(1);
+			await openTab(app, `#/${school}/ledger`);
+			expect(
+				app.root.querySelectorAll("[data-test=ledger-row]").length,
+			).toBeGreaterThan(0);
+			expect(app.buzzSchool.apiCalls).toEqual(["/school-admin/ledger-token"]);
+		} finally {
+			app.close();
+		}
+	});
+
 	test("signed out, the Ledger of a demo school lists rows named from the Worker's keys", async () => {
 		const app = await mounted([], "#/demo-monthly-members/ledger", {
 			signedOut: true,

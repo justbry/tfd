@@ -2,7 +2,9 @@
  * The ledger Worker on Miniflare over a seeded bucket, for another package's tests: `startLedgerWorker({ presets,
  * schools })` seeds each preset's events as a school, runs the views over them, starts the real Worker (the same code
  * Wrangler deploys, with a clock this harness controls) beside a test Ed25519 key pair and a JWKS endpoint, and hands
- * back the Worker's URL, a token minter and `stop()`. README.md, "Test harness".
+ * back the Worker's URL, a token minter and `stop()`. README.md, "Test harness". Each school with views gets its
+ * stored answers as the views job would write them at the harness's clock (`routes/stored.ts`), and the demo schools
+ * their index.
  */
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
@@ -13,6 +15,8 @@ import { Miniflare } from "miniflare";
 import type { AtmEvent } from "tfd";
 import { R2BindingStore, type R2BucketBinding } from "tfd/worker";
 import { LEDGER_AUDIENCE } from "../auth/jwt.js";
+import { refreshDemoIndex } from "../data/demo-index.js";
+import { storeAnswers } from "../routes/stored.js";
 import { bundleTestWorker } from "./bundle.js";
 import { demoSchoolIdOf, seedDemoSchool } from "./demo-seed.js";
 import {
@@ -238,6 +242,10 @@ export const startLedgerWorker = async (
 				: Number.isFinite(latest)
 					? latest + MS_PER_MINUTE
 					: Date.now();
+		const store = new R2BindingStore(bucket);
+		for (const id of Object.keys(seeded))
+			await storeAnswers(store, id, new Date(now));
+		if ((options.demoPresets ?? []).length > 0) await refreshDemoIndex(store);
 		const base = (await miniflare.ready).toString().replace(/\/$/, "");
 
 		return {
@@ -279,6 +287,12 @@ export const startLedgerWorker = async (
 			},
 			async seedEvents(schoolId, events, seedOptions) {
 				const school = await seedEvents(bucket, schoolId, events, seedOptions);
+				if (seedOptions?.views !== false)
+					await storeAnswers(
+						new R2BindingStore(bucket),
+						schoolId,
+						new Date(now),
+					);
 				seeded[schoolId] = school;
 				return school;
 			},

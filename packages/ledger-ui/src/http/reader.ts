@@ -243,6 +243,9 @@ export function createHttpReader(options: {
 		session: () => session,
 
 		schools: async () => {
+			// The schools are read once per page and again on Try again: a 401 kept from before is asked again here, and
+			// every other read keeps it (`ledger-token.ts`).
+			tokens.forgetSignedOut();
 			let token: LedgerToken | null;
 			try {
 				token = await tokens.current();

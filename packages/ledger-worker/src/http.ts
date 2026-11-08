@@ -126,5 +126,28 @@ export const okResponse = (
 	});
 };
 
+/**
+ * A stored answer (`routes/stored.ts`): `data` is its JSON text, put in the envelope as it is, so the bytes are the ones
+ * `okResponse` writes for the same value.
+ */
+export const storedResponse = (
+	data: string,
+	freshness: { asOf: string; lagMinutes: number },
+	headers: Record<string, string>,
+): Response => {
+	const responseHeaders = baseHeaders();
+	for (const [name, value] of Object.entries(headers))
+		responseHeaders.set(name, value);
+	return new Response(
+		`{"asOf":${JSON.stringify(freshness.asOf)},"lagMinutes":${JSON.stringify(freshness.lagMinutes)},"data":${data}}`,
+		{ status: 200, headers: responseHeaders },
+	);
+};
+
+/** `304 Not Modified` for an `If-None-Match` that names the answer's ETag: no body, the validators again. */
+export const notModifiedResponse = (
+	headers: Record<string, string>,
+): Response => new Response(null, { status: 304, headers });
+
 export const plainResponse = (body: unknown): Response =>
 	new Response(JSON.stringify(body), { status: 200, headers: baseHeaders() });

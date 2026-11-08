@@ -6,6 +6,8 @@
 		members: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.members()),
 		plans: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.plans()),
 		promos: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.promos()),
+		ledger: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.ledger()),
+		reports: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.reports()),
 		allSchools: () => import("./AllSchools.svelte"),
 	};
 </script>

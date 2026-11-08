@@ -31,6 +31,10 @@
 @source not "./app/plans";
 @source not "./app/promos";
 @source not "./lib/components/ui/textarea";
+/* And so do Ledger and Reports (their folders and the parts they share). */
+@source not "./app/ledger";
+@source not "./app/reports";
+@source not "./app/books-shared";
 
 :root {
 	--radius: 10px;

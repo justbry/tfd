@@ -160,11 +160,6 @@ export const kindMessages: Record<UiErrorKind, MessageEntry> = {
 		doThis: "Reload; if it stays, the app needs an update.",
 		action: "reload",
 	},
-	read_only: {
-		title: "A demo school",
-		what: "This school shows sample data, so nothing you do here is saved.",
-		doThis: "Sign in to change your own school.",
-	},
 	not_available: {
 		title: "Not available yet",
 		what: "Nothing provides this yet.",
@@ -174,6 +169,11 @@ export const kindMessages: Record<UiErrorKind, MessageEntry> = {
 		title: "Ledger not connected",
 		what: "The ledger service is not connected to this page yet.",
 		doThis: "Ask the owner to connect it.",
+	},
+	read_only: {
+		title: "Demo school",
+		what: "Demo schools are read-only.",
+		doThis: "Open one of your own schools to make changes.",
 	},
 	unexpected: {
 		title: "Something went wrong",

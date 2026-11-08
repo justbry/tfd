@@ -8,6 +8,8 @@
 			"!src/app/dashboard/dashboard.css",
 			"!src/app/bookings/bookings.css",
 			"!src/app/members/members.css",
+			"!src/app/ledger/ledger.css",
+			"!src/app/reports/reports.css",
 			"!src/app/all-schools.css",
 			"!src/app/settings-sheet.css",
 			"!src/app/plans/plans.css",
