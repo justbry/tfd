@@ -348,7 +348,7 @@ describe("the fetch WorkerSource over section 11", () => {
 			status: 200,
 			body: schoolFactsAnswer,
 		});
-		http.on("GET", workerPath("/schools"), {
+		http.always("GET", workerPath("/schools"), {
 			status: 200,
 			body: envelope({
 				schools: [
@@ -409,7 +409,7 @@ describe("the fetch WorkerSource over section 11", () => {
 			name: "Buzz Studio",
 			currency: null,
 		});
-		http.on("GET", workerPath("/schools"), {
+		http.always("GET", workerPath("/schools"), {
 			status: 200,
 			body: envelope({
 				schools: [schoolRow(schoolId), schoolRow(otherSchoolId)],
@@ -434,7 +434,7 @@ describe("the fetch WorkerSource over section 11", () => {
 			name: "Buzz Studio",
 			currency: null,
 		});
-		http.on("GET", workerPath("/schools"), {
+		http.always("GET", workerPath("/schools"), {
 			status: 200,
 			body: envelope({
 				schools: [schoolRow(schoolId), schoolRow(otherSchoolId, null)],
@@ -450,7 +450,7 @@ describe("the fetch WorkerSource over section 11", () => {
 
 	test("schools: a null time zone or credit unit leaves only that school out, and says why", async () => {
 		const { reader, http } = twoSchools({ timeZone: null, creditUnit: null });
-		http.on("GET", workerPath("/schools"), {
+		http.always("GET", workerPath("/schools"), {
 			status: 200,
 			body: envelope({
 				schools: [schoolRow(schoolId), schoolRow(otherSchoolId, null)],
@@ -469,7 +469,7 @@ describe("the fetch WorkerSource over section 11", () => {
 			status: 200,
 			body: { ...schoolFactsAnswer, timeZone: null },
 		});
-		http.on("GET", workerPath("/schools"), {
+		http.always("GET", workerPath("/schools"), {
 			status: 200,
 			body: envelope({
 				schools: [{ id: schoolId, asOf: null, lagMinutes: null, stale: true }],
