@@ -2,9 +2,9 @@
 
 The sections for past releases keep the name the engine had then, `atm`.
 
-## On `dev` since 0.10.0
+## Moving to 0.11.0 from 0.10.0
 
-Changes merged to `dev` after the `atm-v0.10.0` tag. Nothing here is in a release yet.
+Everything merged to `dev` after the `atm-v0.10.0` tag is in 0.11.0, the first release named `tfd-v0.11.0` (asset `tfd-0.11.0.tgz`). A caller that verifies receipts under keys with dates must change (the first item); the package-name item says how to pin; the rest is additive or says what to do.
 
 - **A key with dates vouches for v2 receipts only, and a seal's key verdict comes before its chain link (behavior change for windowed keys; v1 receipts under `{ key_id: PEM }` keys verify as before, and the v1 vectors are unchanged).** A v1 receipt has no signed time, so its window could never be checked: anyone holding an expired, unrevoked windowed key could still sign v1 receipts that passed. `verifyReceipt` now fails a v1 receipt signed by a key in the `{ pem, purpose, not_before, not_after, revoked_at? }` form with `key_requires_v2` (after `key_revoked` and `key_wrong_purpose`, which still win). In `verifySeals`, a seal's key verdicts (`key_revoked`, `key_wrong_purpose`, `outside_key_window`) now come before its link: a revoked key's seal with a broken `prev_seal_hash` is `key_revoked`, not `broken_link`, and becomes `superseded` once a later `ok` seal of its month exists; the next seal still links to it by its hash. What to do: handle `key_requires_v2` where you `switch` on `ReceiptVerdict["reason"]`; sign receipts as v2 (`receiptOfV2`) before publishing a key with dates; a chain that reported `broken_link` for a revoked key's seal now reports `key_revoked` or `superseded` for it.
 
