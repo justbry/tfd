@@ -61,6 +61,9 @@ const PAYMENT_PATTERN = /^(pi|ch|py)_[A-Za-z0-9_]{6,80}$/;
 const PIN_PATTERN = /^\d{4,12}$/;
 const SCRIPT_TAG_PATTERN = /<script\b[^>]*?\bsrc\s*=\s*["']([^"']+)["']/gi;
 const LINK_TAG_PATTERN = /<link\b[^>]*?\bhref\s*=\s*["']([^"']+)["']/gi;
+/** Text only the HTTP build carries: the signed-out demo alert (`ledger-ui/src/http/demo-banner.tsx`). Since that build
+ * shows the fixture schools as a demo to a signed-out visitor, fixture names alone no longer mean the fixture build. */
+const HTTP_BUILD_MARKER = "I have signed in";
 const FIXTURE_SCHOOL_PATTERN =
 	/\bid:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*timeZone:/g;
 const PROD_API_PATTERN = /(?<![\w-])api\.b4uni\.com/;
@@ -972,11 +975,16 @@ export const stage1 = async (context: Context): Promise<void> => {
 		};
 	});
 
-	await check(context, stage, "bundle-no-fixtures", async () => {
+	await check(context, stage, "bundle-http-build", async () => {
 		if (bundles.length === 0)
 			return {
 				status: "BLOCKED",
 				why: "needs a JS bundle from the assets check",
+			};
+		if (bundles.some((bundle) => bundle.text.includes(HTTP_BUILD_MARKER)))
+			return {
+				status: "PASS",
+				why: "bundle is the HTTP build (it carries the signed-out demo alert)",
 			};
 		let names: string[];
 		try {
@@ -995,15 +1003,13 @@ export const stage1 = async (context: Context): Promise<void> => {
 		const hits = new Set<string>();
 		for (const bundle of bundles)
 			for (const name of findFixtureNames(bundle.text, names)) hits.add(name);
-		return hits.size === 0
-			? {
-					status: "PASS",
-					why: `none of the ${names.length} fixture school names (${names.join(", ")}) is in the bundle`,
-				}
-			: {
-					status: "FAIL",
-					why: `fixture school name(s) in the deployed bundle: ${[...hits].join(", ")}`,
-				};
+		return {
+			status: "FAIL",
+			why:
+				hits.size === 0
+					? "bundle is not the HTTP build: no signed-out demo alert"
+					: `fixture build deployed: fixture school name(s) ${[...hits].join(", ")} and no signed-out demo alert`,
+		};
 	});
 
 	await check(context, stage, "spa-fallback", async () => {

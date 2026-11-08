@@ -29,6 +29,9 @@ This repository is `justbry/tfd` (moved from `justbry/atm` on 2026-11-07, which 
 | `packages/balance-engine/src/models/command/commandOrg.ts` | `deduction_order` typed on the org config | so the setting is typed in the engine without touching `shared` |
 | `packages/balance-engine/tests/unit/deduction/deduct.test.ts` | tests for the expiry-first draw order | the opt-in order is pinned at its group boundaries and its rollover tie-break |
 | `.github/workflows/build.yml`, `mark-shipped-pr-ci.yml`, `post-cubic-summary.yml`, with their tests and `.github/scripts/deploy-gate.ts` | removed | Autumn's deploy pipeline (its ECR image, its deploy server's shipped-PR reactions, its Slack): this repo has none of those secrets, so they only failed. Deploys are `trifold-site.yml` and `deploy-ledger-worker.yml`; see `docs/ci-and-deploy.md` |
+| `.github/workflows/{leaf-evals,leaf-unit-tests,sdk-fail-open,server-unit-tests,tw-unit-tests,twd-typecheck,vite-build,vite-unit-tests,validate-schema,publish,npm-publish,ui-publish,bump-autumn-js,publish-skills}.yml` | removed | Autumn's product CI and publishing: they ran on its paid runners (`peak-*`, `blacksmith-*`), which this repo doesn't have, so they sat queued forever, and they test or publish code tfd doesn't use |
+| `.github/workflows/{balance-unit-tests,knip,server-typecheck}.yml` | runner set to `vars.CI_RUNNER`, else `ubuntu-latest`; Bun from `.bun-version` | same reason; kept because tfd builds on `balance-engine`, and the type check job also guards generated paths and the workspace list |
+| `.github/scripts/check-workspaces.ts` | `STANDALONE`: `apps/trifold-site`, `packages/ledger-ui`, `packages/ledger-ui-svelte` | each has its own `bun.lock` and is outside the workspace on purpose |
 
 Every upstream file we change is listed here, with a line at its top saying it was modified (Apache-2.0 section 4).
 
