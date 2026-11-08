@@ -4,6 +4,7 @@
 		dashboard: () => import("./dashboard/Dashboard.svelte"),
 		bookings: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.bookings()),
 		members: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.members()),
+		portal: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.portal()),
 		plans: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.plans()),
 		promos: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.promos()),
 		ledger: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.ledger()),
@@ -86,6 +87,8 @@
 	/** Whether each school's Plans draft differs from its live menu, as the Plans tab says once it has worked it out: the
 	 * tabs row's draft badge follows it (the school's own count is the answer before the tab was opened). */
 	const draftChanges = $state<Record<string, boolean>>({});
+	/** The member portal covers the page (Members with `portal=`): the top bar and the tabs behind it are out of reach. */
+	let portalShown = $state(false);
 	let topBarHeight = $state(0);
 	let topBar = $state<HTMLElement | null>(null);
 	let tabsList = $state<HTMLElement | null>(null);
@@ -100,6 +103,7 @@
 		if (settingsOpen && !settingsSheet)
 			settingsSheet = import("./SettingsSheet.svelte");
 	});
+
 
 	const school = $derived(
 		schools.find((candidate) => candidate.id === route.schoolId),
@@ -227,7 +231,7 @@
 		"h-auto flex-none gap-0.5 rounded-none border-0 border-b-2 border-transparent px-2.5 py-2 text-[12px] font-normal text-muted-foreground shadow-none after:hidden hover:text-foreground data-active:border-primary data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:border-primary dark:data-active:bg-transparent [&_svg:not([class*='size-'])]:size-3.5 [&>svg]:mr-1";
 </script>
 
-<div bind:this={topBar} bind:clientHeight={topBarHeight}>
+<div bind:this={topBar} bind:clientHeight={topBarHeight} inert={portalShown}>
 <TopBar
 	{route}
 	{schools}
@@ -248,6 +252,7 @@
 		<Tabs.List
 			bind:ref={tabsList}
 			variant="line"
+			inert={portalShown}
 			aria-label={school.name}
 			class="h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b border-border p-0 px-2.5 group-data-horizontal/tabs:h-auto"
 			data-test="tabs"
@@ -321,10 +326,14 @@
 										navigate,
 										onRendered: onPaneRendered,
 										onOpenSettings: () => (settingsOpen = true),
+										onShownChange: (shown: boolean) => (portalShown = shown),
 										onDraftChange: (schoolId: string, changed: boolean) => (draftChanges[schoolId] = changed),
 									}
 								: null}
-							<LazyPane load={() => chunks[tab]()} props={paneProps} onFailed={chunkFailed} />
+							{@const paneKey = tab === "members" && route.query.has("portal") ? "portal" : tab}
+							{#key paneKey}
+								<LazyPane load={() => chunks[paneKey]()} props={paneProps} onFailed={chunkFailed} />
+							{/key}
 						{/if}
 					</div>
 				{:else if tab === route.tab}
@@ -350,7 +359,8 @@
 			top={topBarHeight}
 			subtitle={school ? `You and ${school.name}` : "All schools"}
 			allSchools={!school}
-			demo={school?.demo ?? false}
+			{school}
+			{viewing}
 			{theme}
 			onThemeChange={(chosen) =>
 				navigate(withQuery(route, "theme", chosen === "system" ? null : chosen))}

@@ -71,7 +71,7 @@ const allowedContract = [
 	/^data\/[a-z-]+\.ts$/,
 	/^http\/(?!browser\.ts$)[a-z-]+\.ts$/,
 	/^fixtures\/[a-z-]+\.ts$/,
-	/^app\/(route|period|booking-text)\.ts$/,
+	/^app\/(route|period|booking-text|portal-format)\.ts$/,
 ];
 /** The ledger Worker's config modules the ConfigClient takes read-only (`$worker-config`): its types, validators,
  * canonical JSON and diff, which carry no Worker runtime. */

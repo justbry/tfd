@@ -6,7 +6,7 @@
 </script>
 
 <output
-	class="mb-2 flex items-center gap-2 rounded-xl border border-warning px-2.5 py-[7px] text-warning"
+	class="mb-[8px] flex items-center gap-2 rounded-xl border border-warning px-2.5 py-[7px] text-warning"
 	data-test="demo-tab-note">
 	<Icon name="alert" />
 	<span>Not available for demo schools: the demo scenarios hold no promo or gift events.</span>

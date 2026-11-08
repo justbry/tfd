@@ -12,6 +12,16 @@ const circle = (cx: number, cy: number, r: number): Shape => ({
 
 export const paneShapes = {
 	ban: [circle(12, 12, 9), path("M5.6 5.6l12.8 12.8")],
+	card: [
+		{ tag: "rect", x: 3, y: 5, width: 18, height: 14, rx: 2 },
+		path("M3 10h18M7 15h3"),
+	],
+	cloud: [path("M7 18a4 4 0 01-.5-7.9A5.5 5.5 0 0117 9a4.5 4.5 0 01.5 9H7z")],
+	/* The mockup's ellipse (12, 5, 8, 3) as the path the shapes can carry. */
+	db: [
+		path("M4 5a8 3 0 1016 0 8 3 0 10-16 0z"),
+		path("M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"),
+	],
 	code: [path("M8 8l-5 4 5 4M16 8l5 4-5 4M14 4l-4 16")],
 	dot: [circle(12, 12, 2)],
 	download: [path("M12 4v11M7 10l5 5 5-5M5 20h14")],
@@ -24,6 +34,9 @@ export const paneShapes = {
 	gift: [
 		{ tag: "rect", x: 3, y: 8, width: 18, height: 4, rx: 0 },
 		path("M12 8v13M5 12v9h14v-9M12 8c-2-4-6-3-5 0M12 8c2-4 6-3 5 0"),
+	],
+	heart: [
+		path("M12 20s-8-5-8-11a4.5 4.5 0 018-2.8A4.5 4.5 0 0120 9c0 6-8 11-8 11z"),
 	],
 	mail: [
 		{ tag: "rect", x: 3, y: 5, width: 18, height: 14, rx: 2 },

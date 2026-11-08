@@ -20,8 +20,7 @@ import { apiBase, workerBase } from "./support.ts";
  * `demo-bookings-week.test.ts` (Preact package). A demo school refuses every write (`demo_read_only`), so it shows no
  * control that would write: no Confirm attended or No-show on Bookings; no Edit, Add, pencils or Review and publish on
  * Plans; none of the member drawer's money buttons or the menu's writes on Members; and the pane says so
- * ("Demo school: read-only") where the controls would be. A real school still has every one of them. The member's view
- * and the school settings are S9.5's: the sheet says read-only now, and S9.5's own tests port the rest. */
+ * ("Demo school: read-only") where the controls would be. A real school still has every one of them. */
 let close: (() => Promise<void>) | null = null;
 afterEach(async () => {
 	await close?.();
@@ -172,14 +171,43 @@ test("Members: a demo school's ⋯ menu lists only what reads", async () => {
 	).toBe(0);
 });
 
-test("the settings sheet says a demo school is read-only", async () => {
-	await open("#/vol/plans");
-	click("[data-test=settings-button]");
-	await until(() => count("[data-test=settings]") > 0, "the sheet");
-	expect(count("[data-test=settings-demo]")).toBe(0);
-	await open("#/vol/plans", demoReader("vol"));
-	click("[data-test=settings-button]");
-	await until(() => count("[data-test=settings]") > 0, "the sheet");
+test("the member's view: no Change amount, Cancel membership or Cancel booking on a demo school", async () => {
+	const selectors = [
+		"[data-test=portal-action][data-action=quantity]",
+		"[data-test=portal-action][data-action=cancel], [data-test=portal-action][data-action=resume]",
+	];
+	const { real, demo } = await countBoth(
+		"#/b4u/members?portal=s_21",
+		selectors,
+		"b4u",
+		() =>
+			until(() => count("[data-test=portal-plan]") > 0, "the member's view"),
+	);
+	for (const shown of real) expect(shown).toBeGreaterThan(0);
+	expect(demo).toEqual(none(selectors));
+	expect(count("[data-test=portal-plan]")).toBe(1);
+});
+
+test("the settings drawer: a demo school says read-only and offers no setting to change", async () => {
+	const selectors = [
+		"[data-test=basis-save]",
+		"[data-test=key-revoke]",
+		"[data-test=key-create]",
+		"[data-test=stripe-connect]",
+		"[data-test=zeffy-connect]",
+	];
+	const { real, demo } = await countBoth(
+		"#/vol/plans",
+		selectors,
+		"vol",
+		async () => {
+			click("[data-test=settings-button]");
+			await until(() => count("[data-test=settings]") > 0, "the sheet");
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		},
+	);
+	expect(real.some((shown) => shown > 0)).toBe(true);
+	expect(demo).toEqual(none(selectors));
 	expect(textOf("[data-test=settings-demo]")).toBe("Demo school: read-only");
 });
 

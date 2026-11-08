@@ -14,6 +14,8 @@
 			"!src/app/settings-sheet.css",
 			"!src/app/plans/plans.css",
 			"!src/app/promos/promos.css",
+			"!src/app/settings/settings.css",
+			"!src/app/portal/portal.css",
 			"!src/app/demo-banner/demo-banner.css"
 		]
 	},
