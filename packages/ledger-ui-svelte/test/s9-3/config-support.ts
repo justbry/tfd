@@ -1,14 +1,21 @@
 import { Cause, Effect, Exit } from "effect";
-import { UiError } from "../../src/effect/ui-error.ts";
-import type { LedgerToken, LedgerTokenSource } from "$contract/http/ledger-token.ts";
+import type {
+	LedgerToken,
+	LedgerTokenSource,
+} from "$contract/http/ledger-token.ts";
 import type { Fetch } from "$contract/http/transport.ts";
-import { sha256Hex, bytesOf, canonicalJson } from "$worker-config/canonical.ts";
-import type { ConfigApi, ConfigName, ConfigValues } from "../../src/effect/config-client.ts";
+import { bytesOf, canonicalJson, sha256Hex } from "$worker-config/canonical.ts";
+import type {
+	ConfigApi,
+	ConfigName,
+	ConfigValues,
+} from "../../src/effect/config-client.ts";
 import {
 	createFixtureConfig,
 	type FixtureConfig,
 	type FixtureGrant,
 } from "../../src/effect/config-fixture.ts";
+import { UiError } from "../../src/effect/ui-error.ts";
 
 export const OWNER: FixtureGrant = { role: "owner", finance: true };
 export const ADMIN: FixtureGrant = { role: "admin", finance: false };
@@ -28,13 +35,22 @@ export function storeFor(
 /** The Worker's seeder (packages/ledger-worker/src/testing/seed-config.ts): `fixtureObjects` makes the five config objects
  * of a fixture school from the UI's own fixtures. Imported by a computed specifier, because the file's type-only import of
  * `tfd` is not installed in this package. */
-const workerSeeds = new URL("../../../ledger-worker/src/testing/seed-config.ts", import.meta.url).href;
+const workerSeeds = new URL(
+	"../../../ledger-worker/src/testing/seed-config.ts",
+	import.meta.url,
+).href;
 type Seeds = { fixtureObjects: (id: string, fixture: string) => ConfigValues };
-export const fixtureObjects = async (id: string, fixture: string): Promise<ConfigValues> =>
+export const fixtureObjects = async (
+	id: string,
+	fixture: string,
+): Promise<ConfigValues> =>
 	((await import(workerSeeds)) as Seeds).fixtureObjects(id, fixture);
 
 /** The Worker's own seeds for the school, written into the store. */
-export async function seed(store: FixtureConfig, school = "vol"): Promise<ConfigValues> {
+export async function seed(
+	store: FixtureConfig,
+	school = "vol",
+): Promise<ConfigValues> {
 	const objects = await fixtureObjects(school, "vol");
 	for (const name of Object.keys(objects) as ConfigName[])
 		await store.writeBehind(school, name, objects[name]);
@@ -51,7 +67,8 @@ export async function settle<A>(
 	const exit = await Effect.runPromiseExit(effect);
 	if (Exit.isSuccess(exit)) return { ok: true, value: exit.value };
 	const failure = Cause.squash(exit.cause);
-	if (!(failure instanceof UiError)) throw new Error(`defect: ${String(failure)}`);
+	if (!(failure instanceof UiError))
+		throw new Error(`defect: ${String(failure)}`);
 	return { ok: false, error: failure };
 }
 
@@ -83,10 +100,18 @@ const tokenSource = (): LedgerTokenSource & { refreshes: number } => {
 export function workerWire(
 	store: ConfigApi,
 	options: {
-		script?: (request: { method: string; url: string }, attempt: number) => Response | undefined;
+		script?: (
+			request: { method: string; url: string },
+			attempt: number,
+		) => Response | undefined;
 	} = {},
 ) {
-	const seen: Array<{ method: string; url: string; headers: Record<string, string>; body: unknown }> = [];
+	const seen: Array<{
+		method: string;
+		url: string;
+		headers: Record<string, string>;
+		body: unknown;
+	}> = [];
 	const tokens = tokenSource();
 	let attempts = 0;
 	const errorBody = (
@@ -106,7 +131,10 @@ export function workerWire(
 		const body = init.body ? JSON.parse(String(init.body)) : undefined;
 		seen.push({ method: String(init.method), url, headers, body });
 		attempts += 1;
-		const scripted = options.script?.({ method: String(init.method), url }, attempts);
+		const scripted = options.script?.(
+			{ method: String(init.method), url },
+			attempts,
+		);
 		if (scripted) return scripted;
 		const match = /\/schools\/([^/]+)\/config\/([^/]+?)(\/verify)?$/.exec(url);
 		if (!match) return errorBody(404, "not_found", "No such route.");
@@ -123,26 +151,50 @@ export function workerWire(
 			const done = await run(store.get(school, name as ConfigName));
 			if (!done.ok) return refusal(done.error);
 			return new Response(
-				JSON.stringify({ asOf: done.value.asOf, lagMinutes: done.value.lagMinutes, data: done.value.value }),
-				{ status: 200, headers: { etag: `"${done.value.etag}"`, "content-type": "application/json" } },
+				JSON.stringify({
+					asOf: done.value.asOf,
+					lagMinutes: done.value.lagMinutes,
+					data: done.value.value,
+				}),
+				{
+					status: 200,
+					headers: {
+						etag: `"${done.value.etag}"`,
+						"content-type": "application/json",
+					},
+				},
 			);
 		}
 		if (verify) {
-			const done = await run(store.verify(school, name as ConfigName, body.value));
+			const done = await run(
+				store.verify(school, name as ConfigName, body.value),
+			);
 			return done.ok
-				? new Response(JSON.stringify({ asOf: null, lagMinutes: null, data: done.value }), { status: 200 })
+				? new Response(
+						JSON.stringify({ asOf: null, lagMinutes: null, data: done.value }),
+						{ status: 200 },
+					)
 				: refusal(done.error);
 		}
 		const ifMatch = headers["if-match"];
 		const base = ifMatch ? ifMatch.replace(/"/g, "") : null;
 		const done = await run(
-			store.put(school, name as ConfigName, body.value, body.verifiedHash, base),
+			store.put(
+				school,
+				name as ConfigName,
+				body.value,
+				body.verifiedHash,
+				base,
+			),
 		);
 		if (!done.ok) return refusal(done.error);
-		return new Response(JSON.stringify({ asOf: null, lagMinutes: null, data: done.value }), {
-			status: 200,
-			headers: { etag: `"${done.value.sha256}"` },
-		});
+		return new Response(
+			JSON.stringify({ asOf: null, lagMinutes: null, data: done.value }),
+			{
+				status: 200,
+				headers: { etag: `"${done.value.sha256}"` },
+			},
+		);
 	};
 	return { fetch, seen, tokens };
 }

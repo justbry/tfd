@@ -1,6 +1,6 @@
 import { type Period, periodWord } from "$contract/app/period.ts";
-import type { SaveStatus } from "./plans-menu.ts";
 import { exitPreviewTitle } from "./notify.ts";
+import type { SaveStatus } from "./plans-menu.ts";
 
 export type SetupStepKey = "stripe" | "plan" | "publish" | "link";
 export type SetupStep = {
@@ -55,11 +55,16 @@ export function viewedMonthOf(period: Period, today: string): string {
 	const wholeMonths =
 		period.from.endsWith("-01") &&
 		Number(period.to.slice(8, 10)) ===
-			lastDayOfMonth(Number(period.to.slice(0, 4)), Number(period.to.slice(5, 7)));
+			lastDayOfMonth(
+				Number(period.to.slice(0, 4)),
+				Number(period.to.slice(5, 7)),
+			);
 	const word = periodWord(period);
 	const monthly = word === "Month" || (word === "Custom" && wholeMonths);
 	return `${
-		period.to.slice(0, 4) === today.slice(0, 4) && !monthly && ending > today.slice(0, 7)
+		period.to.slice(0, 4) === today.slice(0, 4) &&
+		!monthly &&
+		ending > today.slice(0, 7)
 			? today.slice(0, 7)
 			: ending
 	}-01`;

@@ -1,18 +1,14 @@
 import { Effect } from "effect";
-import {
-	bytesOf,
-	canonicalJson,
-	sha256Hex,
-} from "$worker-config/canonical.ts";
+import { bytesOf, canonicalJson, sha256Hex } from "$worker-config/canonical.ts";
 import { definitions } from "$worker-config/definitions.ts";
 import { diffOf } from "$worker-config/diff.ts";
 import { CONFIG_NAMES, type Problem } from "$worker-config/types.ts";
-import {
-	type ConfigApi,
-	type ConfigName,
-	type ConfigRead,
-	type ConfigValues,
-	type ConfigVerify,
+import type {
+	ConfigApi,
+	ConfigName,
+	ConfigRead,
+	ConfigValues,
+	ConfigVerify,
 } from "./config-client.ts";
 import { liftConfig } from "./config-lift.ts";
 import { UiError, type UiErrorKind } from "./ui-error.ts";
@@ -172,13 +168,21 @@ export function createFixtureConfig(
 				ok,
 				problems,
 				diff: ok ? diffOf(stored ? stored.value : null, value) : [],
-				verifiedHash: ok ? await sha256Hex(bytesOf(canonicalJson(value))) : null,
+				verifiedHash: ok
+					? await sha256Hex(bytesOf(canonicalJson(value)))
+					: null,
 				baseEtag: stored?.etag ?? null,
 			};
 		});
 	};
 
-	const put: ConfigApi["put"] = (school, name, value, verifiedHash, baseEtag) => {
+	const put: ConfigApi["put"] = (
+		school,
+		name,
+		value,
+		verifiedHash,
+		baseEtag,
+	) => {
 		record("put", school, name, value, verifiedHash, baseEtag);
 		return liftConfig(async () => {
 			const known = nameOf(name);
@@ -229,7 +233,9 @@ export function createFixtureConfig(
 				);
 			const key = keyOf(school, known);
 			const current = store.get(key);
-			if (baseEtag === null ? current !== undefined : current?.etag !== baseEtag)
+			if (
+				baseEtag === null ? current !== undefined : current?.etag !== baseEtag
+			)
 				throw refusal(
 					"conflict",
 					412,
@@ -237,7 +243,12 @@ export function createFixtureConfig(
 					"Someone changed this since you read it. Review their change, then save again.",
 				);
 			if (current?.etag === sha256)
-				return { name: known, sha256, bytes: current.text.length, changed: false };
+				return {
+					name: known,
+					sha256,
+					bytes: current.text.length,
+					changed: false,
+				};
 			const stored = await write(key, value);
 			return {
 				name: known,

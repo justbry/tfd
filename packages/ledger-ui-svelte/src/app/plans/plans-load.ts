@@ -18,12 +18,16 @@ const noStripe: MenuVersionBody["stripe"] = {
  * toasts on its own. */
 export const loadMenu = (school: School) =>
 	Effect.gen(function* () {
-		const { versions } = yield* read((reader) => reader.menuVersions(school.id));
+		const { versions } = yield* read((reader) =>
+			reader.menuVersions(school.id),
+		);
 		const published = versions.find(({ publishedAt }) => publishedAt !== null);
 		const newest = versions[0];
 		const saved = newest && newest.publishedAt === null ? newest : undefined;
 		const liveBody = published
-			? yield* read((reader) => reader.menuVersion(school.id, published.version))
+			? yield* read((reader) =>
+					reader.menuVersion(school.id, published.version),
+				)
 			: undefined;
 		const draftBody = saved
 			? yield* read((reader) => reader.menuVersion(school.id, saved.version))
@@ -64,17 +68,16 @@ export function sessionOf(
 /** The re-read of a version after a publish: its Stripe facts when it can be read; when it cannot, the pane works the
  * facts out from the draft, and the log keeps why. */
 export const readPublished = (school: string, version: number) =>
-	read((reader) => reader.menuVersion(school, version)).pipe(
-		(effect) =>
-			recoverFrom(
-				effect,
-				() => true,
-				(error) =>
-					Log.use((log) =>
-						log.write({
-							level: "warning",
-							message: `the published version ${version} could not be re-read: ${error.reason}`,
-						}),
-					).pipe(Effect.map(() => undefined)),
-			),
+	read((reader) => reader.menuVersion(school, version)).pipe((effect) =>
+		recoverFrom(
+			effect,
+			() => true,
+			(error) =>
+				Log.use((log) =>
+					log.write({
+						level: "warning",
+						message: `the published version ${version} could not be re-read: ${error.reason}`,
+					}),
+				).pipe(Effect.map(() => undefined)),
+		),
 	);

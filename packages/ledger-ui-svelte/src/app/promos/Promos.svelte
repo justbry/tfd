@@ -17,7 +17,7 @@
 	import { messageFor } from "../../effect/messages.ts";
 	import { withRetry } from "../../effect/retry.ts";
 	import { read, write } from "../../effect/run.ts";
-	import type { UiError } from "../../effect/ui-error.ts";
+	import { toUiError, type UiError } from "../../effect/ui-error.ts";
 	import { perform, useApp } from "../context.ts";
 	import Icon from "../Icon.svelte";
 	import LoadFailed from "../LoadFailed.svelte";
@@ -27,6 +27,7 @@
 	import { retryingRead, type RetryingRead } from "../retrying-read.ts";
 	import { badgeTones, mockBadge } from "../styles.ts";
 	import type { Viewing } from "../viewing.ts";
+	import NotAvailable from "../plans/NotAvailable.svelte";
 	import PromoCreated from "./PromoCreated.svelte";
 	import PromoForm from "./PromoForm.svelte";
 	import {
@@ -177,7 +178,7 @@
 					: "Creating promos needs the owner role in this school",
 	);
 	const statusTone = (status: Promo["status"]): string =>
-		status === "active" ? "border-success text-success" : status === "disabled" ? badgeTones.bad : "";
+		status === "active" ? "border-success text-success" : status === "disabled" ? badgeTones.bad : "text-muted-foreground";
 </script>
 
 {#if shown || unavailable}
@@ -195,18 +196,14 @@
 	</div>
 {/if}
 {#if failed && unavailable}
-	<div
-		class="mt-2 flex items-start gap-2 rounded-xl border border-dashed border-border bg-card p-3 text-foreground"
-		data-test="promo-unavailable"
-		data-kind={failed.kind}
-	>
-		<Icon name="info" class="mt-px text-muted-foreground" />
-		<div class="flex flex-col gap-0.5">
-			<b>Promos are not available yet</b>
-			<span>{unavailable.what}</span>
-			<span class={muted}>Creating and disabling promos stays off until they are: {unavailable.doThis}</span>
-		</div>
-	</div>
+	<NotAvailable
+		test="promo-unavailable"
+		title="Promos are not available yet"
+		what="No promo route exists yet, so no code is listed here: never an empty table that looks like none, and never a sample."
+		doThis="Create promo and Disable stay off until it does. Codes already made in Stripe are untouched. Check again once the route ships."
+		onCheck={() => reading?.run()}
+		{busy}
+	/>
 {:else if failed}
 	<LoadFailed error={failed} onRetry={() => reading?.run()} {busy} />
 {:else if shown}
@@ -308,21 +305,21 @@
 		<p class={[muted, "py-6 text-center"]} data-test="promo-empty">No promos yet.</p>
 	{/if}
 	{#if dialog?.step === "form"}
-		<PromoForm
-			schoolName={school.name}
-			{unit}
-			{currency}
-			defaultExpires={`${clock.today.slice(0, 4)}-12-31`}
-			{create}
-			onCancel={() => (dialog = null)}
-		/>
+					<PromoForm
+				schoolName={school.name}
+				{unit}
+				{currency}
+				defaultExpires={`${clock.today.slice(0, 4)}-12-31`}
+				{create}
+				onCancel={() => (dialog = null)}
+			/>
 	{:else if dialog?.step === "created"}
-		<PromoCreated
-			schoolName={school.name}
-			promo={dialog.promo}
-			summary={`${typeLabel(dialog.promo.type, unit)} · ${valueText(dialog.promo, currency, unit)} · expires ${dialog.promo.expiresOn}`}
-			{copy}
-			onDone={() => (dialog = null)}
-		/>
+					<PromoCreated
+				schoolName={school.name}
+				promo={dialog.promo}
+				summary={`${typeLabel(dialog.promo.type, unit)} · ${valueText(dialog.promo, currency, unit)} · expires ${dialog.promo.expiresOn}`}
+				{copy}
+				onDone={() => (dialog = null)}
+			/>
 	{/if}
 {/if}

@@ -1,6 +1,11 @@
 import { Cause, Effect } from "effect";
+import type {
+	ConfigApi,
+	ConfigName,
+	ConfigPut,
+	ConfigValues,
+} from "./config-client.ts";
 import { UiError } from "./ui-error.ts";
-import type { ConfigApi, ConfigName, ConfigPut, ConfigValues } from "./config-client.ts";
 
 /** Recovers from a `UiError` that `when` accepts, the way `catchIf` would, with the operators the first page load
  * already carries (a lazy pane's use of another one would move that operator's code into the first load's chunk). */

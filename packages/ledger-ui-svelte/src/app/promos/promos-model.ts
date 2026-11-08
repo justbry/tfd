@@ -1,12 +1,9 @@
-import {
-	type CreditUnit,
-	type Promo,
-	type PromoType,
-} from "$contract/data/ledger.ts";
+import type { CreditUnit, Promo, PromoType } from "$contract/data/ledger.ts";
 import { formatMoney } from "../money.ts";
 
 export const previewTitle = "Exit preview to act";
-export const copyFailedToast = "Could not copy the code: the browser blocked the clipboard.";
+export const copyFailedToast =
+	"Could not copy the code: the browser blocked the clipboard.";
 export const minimumNoteLength = 3;
 export const defaultValue = "10";
 /** cell-rules `minContributors` for redemptions: under this many redeemers a count shows as <10. */
@@ -25,7 +22,11 @@ export const typeLabel = (type: PromoType, unit: CreditUnit): string =>
 		session: `${capitalise(unit.one)} gift`,
 	})[type];
 
-export const valueText = (promo: Promo, currency: string, unit: CreditUnit): string =>
+export const valueText = (
+	promo: Promo,
+	currency: string,
+	unit: CreditUnit,
+): string =>
 	promo.type === "member"
 		? `${promo.value}% off tiers`
 		: promo.type === "dollar"
@@ -50,9 +51,19 @@ export function previewLine(
 ): PreviewLine {
 	const amount = Number(value);
 	if (!(amount > 0))
-		return { error: true, before: "", strong: "Enter a value above 0.", after: "" };
+		return {
+			error: true,
+			before: "",
+			strong: "Enter a value above 0.",
+			after: "",
+		};
 	if (type === "member" && amount > 100)
-		return { error: true, before: "", strong: "A percentage can't exceed 100.", after: "" };
+		return {
+			error: true,
+			before: "",
+			strong: "A percentage can't exceed 100.",
+			after: "",
+		};
 	if (type === "member")
 		return {
 			error: false,

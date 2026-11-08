@@ -9,25 +9,25 @@
 	import { Button } from "$lib/components/ui/button/index.ts";
 	import { withRetry } from "../../effect/retry.ts";
 	import { write } from "../../effect/run.ts";
-	import type { UiError } from "../../effect/ui-error.ts";
+	import { toUiError, type UiError } from "../../effect/ui-error.ts";
 	import { useApp } from "../context.ts";
 	import { perform } from "../context.ts";
 	import Icon from "../Icon.svelte";
+	import LedgerCopySheet from "./LedgerCopy.svelte";
 	import LoadFailed from "../LoadFailed.svelte";
+	import PlanDrawer from "./PlanDrawer.svelte";
+	import PlanPublishDialog from "./PlanPublishDialog.svelte";
+	import NotAvailable from "./NotAvailable.svelte";
 	import PaneIcon from "../PaneIcon.svelte";
 	import { type RetryingRead, retryingRead } from "../retrying-read.ts";
 	import { badgeTones, mockBadge } from "../styles.ts";
-	import { segment, segmentButton } from "../dashboard/styles.ts";
-	import type { Viewing } from "../viewing.ts";
+		import type { Viewing } from "../viewing.ts";
 	import { LedgerCopy } from "./ledger-copy.svelte.ts";
-	import LedgerCopySheet from "./LedgerCopy.svelte";
 	import { seedFromMenu } from "./ledger-seed.ts";
 	import { exitPreviewTitle, notify } from "./notify.ts";
 	import { reviewReason, setupSteps, type SetupStepKey, viewedMonthOf } from "./overview-model.ts";
 	import PlanCode from "./PlanCode.svelte";
-	import PlanDrawer from "./PlanDrawer.svelte";
 	import PlanPreview from "./PlanPreview.svelte";
-	import PlanPublishDialog from "./PlanPublishDialog.svelte";
 	import PlanSetup from "./PlanSetup.svelte";
 	import PlanStrip from "./PlanStrip.svelte";
 	import PlanTables from "./PlanTables.svelte";
@@ -49,7 +49,7 @@
 	import { plansStoreOf } from "./plans-store.svelte.ts";
 	import { parseMenu } from "./plans-yaml.ts";
 	import type { PreviewSource } from "./preview-model.ts";
-	import { muted, note, tools } from "./styles.ts";
+	import { muted, note, segment, segmentButton, tools } from "./styles.ts";
 
 	type Mode = "edit" | "preview" | "code";
 	const savedToast = "Saved to the draft. Nothing is live until you publish.";
@@ -432,7 +432,20 @@
 
 {#if failures.length > 0}
 	{#each failures as failure (failure.which)}
-		<LoadFailed error={failure.error} onRetry={failure.retry} busy={failure.busy} />
+		{#if failure.error.kind === "not_available"}
+			<NotAvailable
+				test="plans-unavailable"
+				title="Plans are not available yet"
+				what={failure.which === "summary"
+					? "The counts, the month's gross and the Get started facts behind this tab have no source yet: buzz-school's members route is not built. Nothing is shown in their place, never a 0 or a sample."
+					: "The menu versions have no source yet, so nothing is shown here, never a 0 or a sample."}
+				doThis="Your plans are safe in buzz-school and nothing here was changed. Check again once the route ships."
+				onCheck={failure.retry}
+				busy={failure.busy}
+			/>
+		{:else}
+			<LoadFailed error={failure.error} onRetry={failure.retry} busy={failure.busy} />
+		{/if}
 	{/each}
 {:else if session}
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -506,14 +519,6 @@
 					>
 				{/if}
 				<Button
-					variant="tool"
-					size="tool"
-					data-test="plan-ledger-copy"
-					title={ledgerCopyTitle}
-					disabled={!owner || view.preview}
-					onclick={openLedgerCopy}><PaneIcon name="layers" />Ledger copy</Button
-				>
-				<Button
 					variant="primary"
 					size="tool"
 					data-test="plan-review"
@@ -555,6 +560,20 @@
 					onOpen={open}
 					onMembers={(tierId) => leave("members", ["plan", tierId])}
 				/>
+				{#if view.admin}
+					<div class={[muted, "mt-2 flex flex-wrap items-center gap-1.5"]} data-test="plan-ledger-copy-row">
+						<PaneIcon name="layers" />
+						<span>The copy kept in the ledger: names, descriptions, order and audiences, never prices.</span>
+						<Button
+							variant="tool"
+							size="tool-small"
+							data-test="plan-ledger-copy"
+							title={ledgerCopyTitle}
+							disabled={!owner || view.preview}
+							onclick={openLedgerCopy}><PaneIcon name="edit" />Edit ledger copy</Button
+						>
+					</div>
+				{/if}
 			{:else if mode === "preview"}
 				<PlanPreview
 					schoolId={school.id}
@@ -593,38 +612,38 @@
 		</div>
 		{#if editing && (editing.id === null || editedItem)}
 			{#key `${editing.kind}:${editing.id ?? "new"}`}
-				<PlanDrawer
-					{school}
-					root={app.root}
-					menu={session.draft}
-					kind={editing.kind}
-					item={editedItem}
-					activeMembers={editing.kind === "tiers" && editedItem ? tierCount(session.summary, editedItem.id).active : null}
-					{viewing}
-					onSave={(menu) => {
-						changeDraft(menu);
-						editing = null;
-						notify(app, savedToast);
-					}}
-					onClose={() => (editing = null)}
-				/>
+									<PlanDrawer
+						{school}
+						root={app.root}
+						menu={session.draft}
+						kind={editing.kind}
+						item={editedItem}
+						activeMembers={editing.kind === "tiers" && editedItem ? tierCount(session.summary, editedItem.id).active : null}
+						{viewing}
+						onSave={(menu) => {
+							changeDraft(menu);
+							editing = null;
+							notify(app, savedToast);
+						}}
+						onClose={() => (editing = null)}
+					/>
 			{/key}
 		{/if}
 		{#if reviewing}
-			<PlanPublishDialog
-				schoolName={school.name}
-				fromVersion={session.version}
-				{changes}
-				{affectedMembers}
-				{owner}
-				pending={publishing}
-				onPublish={publish}
-				onCancel={() => (reviewing = false)}
-				bind:pinField
-			/>
+							<PlanPublishDialog
+					schoolName={school.name}
+					fromVersion={session.version}
+					{changes}
+					{affectedMembers}
+					{owner}
+					pending={publishing}
+					onPublish={publish}
+					onCancel={() => (reviewing = false)}
+					bind:pinField
+				/>
 		{/if}
 		{#if ledgerCopy}
-			<LedgerCopySheet {school} root={app.root} copy={ledgerCopy} onClose={closeLedgerCopy} />
+							<LedgerCopySheet {school} root={app.root} copy={ledgerCopy} onClose={closeLedgerCopy} />
 		{/if}
 	</div>
 {/if}

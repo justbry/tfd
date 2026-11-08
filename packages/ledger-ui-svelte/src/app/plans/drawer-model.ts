@@ -1,12 +1,12 @@
-import {
-	type Menu,
-	type MenuAddon,
-	type MenuAudience,
-	type MenuGrant,
-	type MenuInterval,
-	type MenuTier,
-} from "$contract/data/plans.ts";
 import type { DisclosureGrain } from "$contract/data/disclosure.ts";
+import type {
+	Menu,
+	MenuAddon,
+	MenuAudience,
+	MenuGrant,
+	MenuInterval,
+	MenuTier,
+} from "$contract/data/plans.ts";
 import {
 	audienceName,
 	monthlyAmount,

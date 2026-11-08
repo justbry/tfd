@@ -6,7 +6,8 @@
  * served (`bun run dev`, or `vite preview` after a build):
  *   bun scripts/shots.ts [--out shots] [--side app|mock|both] [--app http://localhost:5191] [--nonce K7QX]
  *     [--only dash-]
- * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`).
+ * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`, Plans' with `plans-`, Promos'
+ * with `promos-`).
  * Needs playwright-core in /tmp/ledger-shots and the cached Chromium headless shell, as shoot.mjs does.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -74,6 +75,11 @@ const executablePath = join(
 );
 const widths = [1100, 728, 390];
 const dashboardTab = "document.querySelector('.tab[data-p=dash]').click()";
+/** The mockup's Vibes of Light opens with the saved draft the fixtures have (Glow $65 to $70 a month): its Plans shots
+ * first run the same change (the S3 golden file's `mockupSteps`). */
+const glowDraft =
+	"SC.vol.pl.draft.tiers.find(t=>t.id==='glow').month=70;render()";
+const promosTab = "document.querySelector('.tab[data-p=cod]').click()";
 const themes = ["light", "dark"] as const;
 
 /** The shell's entries: the S0 golden file's three shots, then the stale banner, All schools, a toast and the
@@ -169,6 +175,49 @@ const entries: Array<{
 		route: "#/b4u/dashboard",
 		clicks: ["[data-test=view-as]"],
 		mockupSteps: `setSchool('b4u');${dashboardTab};document.querySelector('#kview').click()`,
+	},
+	// S9.3: the Plans tab (Edit, Preview, Code, the editor and the review) and Promos.
+	{
+		id: "plans-edit",
+		route: "#/vol/plans",
+		clicks: [],
+		mockupSteps: glowDraft,
+	},
+	{
+		id: "plans-preview",
+		route: "#/vol/plans?mode=preview",
+		clicks: [],
+		mockupSteps: `${glowDraft};document.querySelector('#pl [data-pmode=preview]').click()`,
+	},
+	{
+		id: "plans-code",
+		route: "#/vol/plans?mode=code",
+		clicks: [],
+		mockupSteps: `${glowDraft};document.querySelector('#pl [data-pmode=code]').click()`,
+	},
+	{
+		id: "plans-drawer",
+		route: "#/vol/plans",
+		clicks: ["[data-test=plan-row][data-plan=glow] [data-test=plan-edit]"],
+		mockupSteps: `${glowDraft};document.querySelector('[data-pe="tiers:glow"]').click()`,
+	},
+	{
+		id: "plans-review",
+		route: "#/vol/plans",
+		clicks: ["[data-test=plan-review]"],
+		mockupSteps: `${glowDraft};document.querySelector('#prev').click()`,
+	},
+	{
+		id: "promos-list",
+		route: "#/vol/promos",
+		clicks: [],
+		mockupSteps: promosTab,
+	},
+	{
+		id: "promos-create",
+		route: "#/vol/promos",
+		clicks: ["[data-test=promo-new]"],
+		mockupSteps: `${promosTab};document.querySelector('#newcode').click()`,
 	},
 ].filter((entry) => entry.id.startsWith(only));
 

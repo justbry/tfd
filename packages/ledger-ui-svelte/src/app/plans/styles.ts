@@ -17,7 +17,7 @@ export const heading =
 export const card = "rounded-[10px] border border-border bg-card p-2.5";
 /** Table: `th`, `td`. */
 export const headCell =
-	"h-auto border-b border-border px-2 py-1.5 text-left text-[10.5px] font-medium text-muted-foreground";
+	"h-auto border-b border-border px-2 py-1.5 text-left text-[10.5px] font-medium whitespace-normal text-muted-foreground";
 export const bodyCell =
 	"whitespace-normal border-b border-border px-2 py-[7px] align-middle";
 export const rowStart = "border-0 hover:bg-transparent";
@@ -25,11 +25,19 @@ export const figureCell = "text-right tabular-nums";
 /** `.link`. */
 export const link =
 	"inline-flex cursor-pointer items-center border-0 bg-transparent p-0 text-[11px] text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-45";
+/** The mockup's segmented control (`.seg`: joined buttons, the pressed one filled) and chip (`.chip`), as the Dashboard's
+ * (dashboard/styles.ts), which sits in the Dashboard's own chunk. */
+export const segment =
+	"inline-flex overflow-hidden rounded-lg border border-border max-[640px]:flex max-[640px]:max-w-full max-[640px]:flex-wrap max-[640px]:gap-px max-[640px]:bg-border";
+export const segmentButton =
+	"inline-flex items-center gap-[5px] border-0 bg-card px-3 py-[5px] text-[12px] text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground max-[640px]:flex-auto max-[640px]:justify-center max-[640px]:whitespace-nowrap [&_svg]:size-[13px]";
+export const chip =
+	"inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-[3px] text-[11px] text-foreground aria-pressed:border-primary aria-pressed:text-primary";
 /** `.fld`, its label, and the mockup's bare form controls (card fill, 1px border, 6px corner). */
 export const field = "mt-2.5";
 export const fieldLabel = "mb-[3px] block text-[10.5px] text-muted-foreground";
 export const control =
-	"h-auto w-full rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground md:text-[12px]";
+	"h-auto w-full rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground disabled:bg-card disabled:opacity-100 md:text-[12px]";
 export const selectControl =
 	"w-full rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground";
 /** `.mf`: a dialog's or drawer's buttons. */

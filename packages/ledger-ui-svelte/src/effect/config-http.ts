@@ -1,13 +1,12 @@
-import { Effect } from "effect";
 import type { LedgerTokenSource } from "$contract/http/ledger-token.ts";
 import type { Fetch } from "$contract/http/transport.ts";
 import type { Problem } from "$worker-config/types.ts";
-import {
-	type ConfigApi,
-	type ConfigName,
-	type ConfigPut,
-	type ConfigRead,
-	type ConfigVerify,
+import type {
+	ConfigApi,
+	ConfigName,
+	ConfigPut,
+	ConfigRead,
+	ConfigVerify,
 } from "./config-client.ts";
 import { liftConfig } from "./config-lift.ts";
 import { UiError, type UiErrorKind } from "./ui-error.ts";
@@ -31,10 +30,14 @@ const retryableKinds: ReadonlySet<UiErrorKind> = new Set([
 /** The status and code of a Worker refusal as the kind the UI contract knows (the same table as the Worker source's,
  * with the config codes: 412 `stale_etag` is a conflict, 422 `invalid_config` a bad request that carries
  * `problems[]`, 403 `step_up_required` the step-up). */
-export const kindOfConfigError = (status: number, code: string): UiErrorKind => {
+export const kindOfConfigError = (
+	status: number,
+	code: string,
+): UiErrorKind => {
 	if (status === 400 || status === 422) return "bad_request";
 	if (status === 401) return "unauthenticated";
-	if (status === 403) return code === "step_up_required" ? "step_up" : "forbidden";
+	if (status === 403)
+		return code === "step_up_required" ? "step_up" : "forbidden";
 	if (status === 404) return code === "no_data" ? "no_data" : "not_found";
 	if (status === 405) return "bad_request";
 	if (status === 409 || status === 412) return "conflict";
@@ -99,7 +102,8 @@ const mismatch = (path: string, problem: string): UiError =>
 	});
 
 const quoted = (etag: string): string => `"${etag}"`;
-const unquoted = (header: string): string => header.replace(/^W\//, "").replace(/^"|"$/g, "");
+const unquoted = (header: string): string =>
+	header.replace(/^W\//, "").replace(/^"|"$/g, "");
 
 export function createHttpConfig(options: {
 	fetch: Fetch;
@@ -195,19 +199,29 @@ export function createHttpConfig(options: {
 				value: body.data,
 				etag: unquoted(etag),
 				asOf: typeof body.asOf === "string" ? body.asOf : null,
-				lagMinutes: typeof body.lagMinutes === "number" ? body.lagMinutes : null,
+				lagMinutes:
+					typeof body.lagMinutes === "number" ? body.lagMinutes : null,
 			} as ConfigRead<typeof name>;
 		});
 
 	const verify: ConfigApi["verify"] = (school, name, value) =>
 		liftConfig(async (): Promise<ConfigVerify> => {
 			const path = `POST .../config/${name}/verify`;
-			const { body } = await send("POST", urlOf(school, name, "/verify"), path, {
-				body: { value },
-			});
+			const { body } = await send(
+				"POST",
+				urlOf(school, name, "/verify"),
+				path,
+				{
+					body: { value },
+				},
+			);
 			const data = dataOf(path, body);
 			const problems = problemsOf(data.problems);
-			if (typeof data.ok !== "boolean" || !problems || !Array.isArray(data.diff))
+			if (
+				typeof data.ok !== "boolean" ||
+				!problems ||
+				!Array.isArray(data.diff)
+			)
 				throw mismatch(path, "the verdict is not {ok, problems, diff}");
 			return {
 				ok: data.ok,
@@ -235,7 +249,10 @@ export function createHttpConfig(options: {
 				typeof data.bytes !== "number" ||
 				typeof data.changed !== "boolean"
 			)
-				throw mismatch(path, "the answer is not {name, sha256, bytes, changed}");
+				throw mismatch(
+					path,
+					"the answer is not {name, sha256, bytes, changed}",
+				);
 			return {
 				name,
 				sha256: data.sha256,

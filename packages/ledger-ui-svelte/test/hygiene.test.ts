@@ -75,7 +75,9 @@ const allowedContract = [
 ];
 /** The ledger Worker's config modules the ConfigClient takes read-only (`$worker-config`): its types, validators,
  * canonical JSON and diff, which carry no Worker runtime. */
-const allowedWorkerConfig = [/^(canonical|definitions|diff|types|validate)\.ts$/];
+const allowedWorkerConfig = [
+	/^(canonical|definitions|diff|types|validate)\.ts$/,
+];
 /** Only the fixture layer reads the fixtures. */
 const fixtureImporters = new Set(["src/effect/layers.ts"]);
 

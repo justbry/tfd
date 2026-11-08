@@ -40,7 +40,7 @@
 				<h3 {...props} class="m-0 text-[14px] font-semibold" data-test="dialog-title">Promo created · {schoolName}</h3>
 			{/snippet}
 		</Dialog.Title>
-		<Dialog.Description class={muted} data-test="promo-created-summary">{summary}</Dialog.Description>
+		<Dialog.Description class={[muted, "text-[12px]"]} data-test="promo-created-summary">{summary}</Dialog.Description>
 		<div
 			class="my-3 mb-2 rounded-[10px] border border-border bg-secondary p-3.5 text-center font-mono text-[16px] tracking-[0.05em] break-all select-all"
 			data-test="promo-created-code"

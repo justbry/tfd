@@ -13,8 +13,7 @@
 	import PaneIcon from "../PaneIcon.svelte";
 	import { retryingRead } from "../retrying-read.ts";
 	import { mockBadge, badgeTones } from "../styles.ts";
-	import { segment, segmentButton, chip } from "../dashboard/styles.ts";
-	import {
+		import {
 		grantText,
 		type PlanChange,
 		type PlanKind,
@@ -29,7 +28,7 @@
 		liveEmpty,
 		type PreviewSource,
 	} from "./preview-model.ts";
-	import { heading, muted, note } from "./styles.ts";
+	import { chip, heading, muted, note, segment, segmentButton } from "./styles.ts";
 	import type { Audience } from "$contract/data/disclosure.ts";
 	import { untrack } from "svelte";
 
@@ -152,7 +151,7 @@
 			<PaneIcon name="edit" />
 		</button>
 		<div class="pr-5 text-[13px] font-semibold">{model.name}</div>
-		<div>
+		<div class="flex min-h-[18px] flex-wrap items-center gap-1.5">
 			{#if changed}
 				<Badge class={[mockBadge, badgeTones.warning]} data-test="plan-card-flag">{model.inLive ? "Draft change" : "New"}</Badge>
 			{/if}{" "}
@@ -239,7 +238,7 @@
 		type="text"
 		placeholder="Promo code"
 		aria-label="Promo code"
-		class="h-auto w-[150px] rounded-md border-border bg-card px-2 py-1 text-[12px] md:text-[12px]"
+		class="h-auto w-[120px] rounded-md border-border bg-card px-2 py-1 text-[12px] md:text-[12px]"
 		bind:value={typedCode}
 		onkeydown={(event) => {
 			if (event.key !== "Enter") return;

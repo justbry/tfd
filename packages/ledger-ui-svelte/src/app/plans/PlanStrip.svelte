@@ -50,7 +50,7 @@
 	]);
 </script>
 
-<div class="mb-3 grid grid-cols-4 gap-2 max-[640px]:grid-cols-2">
+<div class="mb-3 grid grid-cols-4 gap-2">
 	{#each stats as stat (stat.stat)}
 		<button
 			type="button"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "./late-icons.ts"; // the icons this pane draws that the first page load does not carry
 	import type { Theme } from "$contract/app/route.ts";
 	import * as Sheet from "$lib/components/ui/sheet/index.ts";
 	import Icon from "./Icon.svelte";

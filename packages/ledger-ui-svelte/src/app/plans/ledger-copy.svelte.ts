@@ -7,12 +7,12 @@ import {
 } from "../../effect/config-client.ts";
 import { putOnce, recoverFrom } from "../../effect/config-save.ts";
 import { messageFor } from "../../effect/messages.ts";
-import { write } from "../../effect/run.ts";
 import { reportFailure } from "../../effect/report.ts";
 import { withRetry } from "../../effect/retry.ts";
-import { UiError, type FieldProblem } from "../../effect/ui-error.ts";
+import { write } from "../../effect/run.ts";
+import { type FieldProblem, UiError } from "../../effect/ui-error.ts";
 import { type AppContext, perform } from "../context.ts";
-import { retryingRead, type RetryingRead } from "../retrying-read.ts";
+import { type RetryingRead, retryingRead } from "../retrying-read.ts";
 
 const verifyPauseMilliseconds = 400;
 export const objectName = "plans-draft" as const;
@@ -44,7 +44,8 @@ export class LedgerCopy {
 	/** The copy as edited. */
 	value: PlansDraftConfig | null = $state.raw(null);
 	/** The stored copy this one was read at (`etag` null: nothing stored yet, so the first Save is a create). */
-	base: { value: PlansDraftConfig; etag: string | null } | null = $state.raw(null);
+	base: { value: PlansDraftConfig; etag: string | null } | null =
+		$state.raw(null);
 	/** The verdict for exactly the value on screen; null while it is edited, unverified or has problems. */
 	verified: { hash: string; baseEtag: string | null } | null = $state.raw(null);
 	verifying = $state(false);
@@ -67,7 +68,6 @@ export class LedgerCopy {
 	#verifyRun: AbortController | null = null;
 	#problemsToast: string | null = null;
 	#verifyNumber = 0;
-	#actions = 0;
 	#focusFirstProblem: () => void = () => undefined;
 
 	constructor(options: {
@@ -96,7 +96,11 @@ export class LedgerCopy {
 			recoverFrom(
 				this.#client.get(this.#school, objectName).pipe(
 					Effect.map(
-						(read): Loaded => ({ found: true, value: read.value, etag: read.etag }),
+						(read): Loaded => ({
+							found: true,
+							value: read.value,
+							etag: read.etag,
+						}),
 					),
 				),
 				// Nothing stored yet is not a failure: the copy starts from the draft menu.
@@ -148,6 +152,9 @@ export class LedgerCopy {
 	/** An edit: the value is now unverified, and a verify follows the pause. */
 	edit(update: (value: PlansDraftConfig) => PlansDraftConfig): void {
 		if (!this.value) return;
+		// A verify on its way is for the value before this edit: its answer is of no use, and nobody hears of it.
+		this.#abortVerify();
+		this.#verifyNumber += 1;
 		this.value = update(copyOf(this.value));
 		this.verified = null;
 		this.saved = false;
@@ -162,7 +169,8 @@ export class LedgerCopy {
 		if (this.verifying || this.#timer !== null) return "Checking the copy…";
 		if (this.problems.length > 0) return "Fix the fields marked first";
 		if (this.conflict) return "Someone changed this: reload first";
-		if (!this.verified) return this.changed ? "Checking the copy…" : "Nothing to save";
+		if (!this.verified)
+			return this.changed ? "Checking the copy…" : "Nothing to save";
 		return null;
 	}
 
@@ -178,7 +186,8 @@ export class LedgerCopy {
 	}
 
 	#dismissProblems(): void {
-		if (this.#problemsToast !== null) this.#app.toasts.dismiss(this.#problemsToast);
+		if (this.#problemsToast !== null)
+			this.#app.toasts.dismiss(this.#problemsToast);
 		this.#problemsToast = null;
 	}
 
@@ -220,7 +229,10 @@ export class LedgerCopy {
 			}
 			this.problems = [];
 			this.#dismissProblems();
-			this.verified = { hash: verdict.verifiedHash, baseEtag: verdict.baseEtag };
+			this.verified = {
+				hash: verdict.verifiedHash,
+				baseEtag: verdict.baseEtag,
+			};
 			this.conflict =
 				verdict.baseEtag === base.etag
 					? null
@@ -253,7 +265,6 @@ export class LedgerCopy {
 		if (this.saving || !value || !base || !verified || this.saveReason !== null)
 			return;
 		this.saving = true;
-		this.#actions += 1;
 		const owner = `${this.#owner}-save`;
 		const outcome = await perform(
 			this.#app,

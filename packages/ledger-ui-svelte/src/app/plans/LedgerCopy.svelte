@@ -87,13 +87,14 @@
 		showCloseButton={false}
 		portalProps={{ to: root }}
 		bind:ref={content}
-		class="absolute top-[53px] z-(--layer-sheet) gap-0 overflow-auto border-t border-l border-border bg-card p-3.5 text-[12px] text-foreground shadow-[-12px_0_30px_rgba(0,0,0,0.25)] data-[side=right]:h-auto data-[side=right]:w-[68%] max-[600px]:data-[side=right]:w-[94%] data-[side=right]:sm:max-w-none"
+		class="absolute z-(--layer-sheet) gap-0 overflow-auto border-t border-l border-border bg-card p-3.5 text-[12px] text-foreground shadow-[-12px_0_30px_rgba(0,0,0,0.25)] data-[side=right]:h-auto data-[side=right]:w-[68%] max-[600px]:data-[side=right]:w-[94%] data-[side=right]:sm:max-w-none"
+		style="top: 53px"
 		overlayClass="absolute z-(--layer-sheet) bg-transparent supports-backdrop-filter:backdrop-blur-none"
 		data-test="ledger-copy"
 	>
 		<button
 			type="button"
-			class="float-right cursor-pointer border-0 bg-transparent text-[18px] text-muted-foreground"
+			class="absolute top-2.5 right-3.5 cursor-pointer border-0 bg-transparent text-[18px] leading-none text-muted-foreground"
 			aria-label="Close"
 			data-test="ledger-copy-close"
 			onclick={onClose}>×</button
@@ -101,7 +102,7 @@
 		<Sheet.Title class="m-0 text-[14px] font-semibold"
 			><PaneIcon name="layers" class="mr-1 inline align-[-2px]" /> Draft copy in the ledger</Sheet.Title
 		>
-		<Sheet.Description class={muted}
+		<Sheet.Description class={[muted, "text-[12px]"]}
 			>{school.name} · saved as plans-draft: names, descriptions, order and audiences, never prices</Sheet.Description
 		>
 		{#if copy.phase === "loading"}

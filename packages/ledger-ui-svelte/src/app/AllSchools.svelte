@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "./late-icons.ts"; // the icons this pane draws that the first page load does not carry
 	import { type Period, periodLabel } from "$contract/app/period.ts";
 	import type { School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import "./dashboard.css";
+	import "../late-icons.ts"; // the icons this pane draws that the first page load does not carry
 	import { Effect } from "effect";
 	import { onDestroy, untrack } from "svelte";
 	import { parsePeriod } from "$contract/app/period.ts";

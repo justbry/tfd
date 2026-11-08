@@ -38,7 +38,7 @@
 	import EmptyPane from "./EmptyPane.svelte";
 	import Icon from "./Icon.svelte";
 	import LoadFailed from "./LoadFailed.svelte";
-	import { type PaneProps, lazyPane } from "./lazy-pane.svelte.ts";
+	import type { PaneProps } from "./pane-props.ts";
 	import { type RetryingRead, retryingRead } from "./retrying-read.ts";
 	import { shownPeriod, staleText, tabBadge, tabNames } from "./shell-model.ts";
 	import { badgeTones, mockBadge } from "./styles.ts";
@@ -165,24 +165,28 @@
 
 	/** The tabs' panes and All schools, each its own chunk, loaded the first time it is shown, so that the first page load
 	 * carries none of them. A chunk that fails to load is the pane's message, with Retry loading it again. */
-	const allSchoolsPane = lazyPane(() => chunks.allSchools());
-	const panes: Record<string, ReturnType<typeof lazyPane<{ default: Component<PaneProps> }>>> = {
-		dashboard: lazyPane(() => chunks.dashboard()),
-		plans: lazyPane(() => chunks.plans()),
-		promos: lazyPane(() => chunks.promos()),
+	let loaded = $state.raw<
+		Record<string, { module: Promise<unknown>; error?: UiError }>
+	>({});
+	const chunkOf = (tab: string): keyof typeof chunks | undefined =>
+		tab === allSchools ? "allSchools" : tab in chunks ? (tab as keyof typeof chunks) : undefined;
+	const loadChunk = (name: string): void => {
+		const loading = chunks[name as keyof typeof chunks]();
+		loaded = { ...loaded, [name]: { module: loading } };
+		loading.catch((failure: unknown) => {
+			if (loaded[name]?.module === loading)
+				loaded = { ...loaded, [name]: { module: loading, error: toUiError(failure) } };
+		});
 	};
-	/** The route's pane, whichever kind it is. */
-	const paneOf = (tab: string): Pick<ReturnType<typeof lazyPane>, "state" | "start"> | undefined =>
-		tab === allSchools ? allSchoolsPane : panes[tab];
 	$effect(() => {
-		const pane = paneOf(route.tab);
-		if (pane && !pane.state.module) pane.start();
+		const name = chunkOf(route.tab);
+		if (name && !loaded[name]) loadChunk(name);
 	});
 	/** A chunk that did not load is the pane's message, and so is a disclosure the school's panes cannot show without: the
 	 * route is on screen. */
 	$effect(() => {
-		const pane = paneOf(route.tab);
-		if (pane && (pane.state.error || (school && disclosureError)))
+		const name = chunkOf(route.tab);
+		if (name && (loaded[name]?.error || (school && disclosureError)))
 			onPaneRendered(formatRoute(route));
 	});
 
@@ -213,7 +217,7 @@
 	};
 
 	const tabClass =
-		"h-auto flex-none gap-0.5 rounded-none border-0 border-b-2 border-transparent px-2.5 py-2 text-[12px] font-normal text-muted-foreground shadow-none after:hidden hover:text-foreground data-active:border-primary data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:border-primary dark:data-active:bg-transparent [&_svg:not([class*='size-'])]:size-3.5 [&>svg]:mr-1";
+		"h-auto flex-none gap-0.5 rounded-none border-x-0! border-t-0! border-b-2! border-transparent px-2.5 py-2 text-[12px] font-normal text-muted-foreground shadow-none after:hidden hover:text-foreground data-active:border-primary data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:border-primary dark:data-active:bg-transparent [&_svg:not([class*='size-'])]:size-3.5 [&>svg]:mr-1";
 </script>
 
 <div bind:this={topBar} bind:clientHeight={topBarHeight}>
@@ -291,11 +295,10 @@
 				class="overflow-x-auto p-3.5"
 				data-test={tab === route.tab ? "pane" : undefined}
 			>
-				{#if tab === route.tab && panes[tab]}
-					{@const pane = panes[tab]!}
+				{#if tab === route.tab && tab in chunks}
 					<div class="text-[12px]" data-pane={tab}>
-						{#if viewing && pane.state.module}
-							{#await pane.state.module then { default: Pane }}
+						{#if viewing && loaded[tab]}
+							{#await loaded[tab].module as Promise<{ default: Component<PaneProps> }> then { default: Pane }}
 								<Pane
 									{route}
 									{school}
@@ -306,7 +309,7 @@
 									onDraftChange={(schoolId: string, changed: boolean) => (draftChanges[schoolId] = changed)}
 								/>
 							{:catch failure}
-								<LoadFailed error={toUiError(failure)} onRetry={pane.start} />
+								<LoadFailed error={toUiError(failure)} onRetry={() => loadChunk(tab)} />
 							{/await}
 						{:else if disclosureError}
 							<LoadFailed
@@ -324,8 +327,8 @@
 	</Tabs.Root>
 {:else}
 	<section class="overflow-x-auto p-3.5" aria-label="All schools" data-test="pane">
-		{#if allSchoolsPane.state.module}
-			{#await allSchoolsPane.state.module then { default: AllSchools }}
+		{#if loaded.allSchools}
+			{#await loaded.allSchools.module as Promise<typeof import("./AllSchools.svelte")> then { default: AllSchools }}
 				<AllSchools
 					{schools}
 					{period}
@@ -333,7 +336,7 @@
 					onRendered={() => onPaneRendered(formatRoute(route))}
 				/>
 			{:catch failure}
-				<LoadFailed error={toUiError(failure)} onRetry={allSchoolsPane.start} />
+				<LoadFailed error={toUiError(failure)} onRetry={() => loadChunk("allSchools")} />
 			{/await}
 		{/if}
 	</section>

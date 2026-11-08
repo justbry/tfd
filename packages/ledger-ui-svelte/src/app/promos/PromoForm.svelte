@@ -57,7 +57,7 @@
 				<h3 {...props} class="m-0 text-[14px] font-semibold" data-test="dialog-title">Create promo · {schoolName}</h3>
 			{/snippet}
 		</Dialog.Title>
-		<Dialog.Description class={muted}>New promo</Dialog.Description>
+		<Dialog.Description class={[muted, "text-[12px]"]}>New promo</Dialog.Description>
 		<div class={field}>
 			<label class={fieldLabel} for={`${ids}-type`}>Type</label>
 			<select

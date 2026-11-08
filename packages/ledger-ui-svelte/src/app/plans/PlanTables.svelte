@@ -74,7 +74,7 @@
 
 	const them = $derived(removedNames.length === 1 ? "it" : "them");
 	const rowClass = (changed: boolean): string =>
-		`cursor-pointer border-0 hover:bg-secondary/60 ${changed ? "outline outline-1 -outline-offset-1 outline-warning/60" : ""}`;
+		`cursor-pointer border-0 hover:bg-secondary/60 ${changed ? "[&>td:first-child]:shadow-[inset_2px_0_0_var(--warning)]" : ""}`;
 	const monthlyOf = (monthlyMinor: number | null): string =>
 		monthlyMinor === null ? noMonthlyText : formatMoney(monthlyMinor, menu.currency);
 	const addTitle = (kind: PlanKind): string | undefined =>
@@ -119,7 +119,7 @@
 {/if}
 <h5 class={heading}>
 	<PaneIcon name="layers" /> Memberships{" "}
-	<span class={muted} data-test="plan-count" data-kind="tiers">{menu.tiers.length} of {planLimits.tiers}</span>
+	<span class={[muted, "font-normal normal-case"]} data-test="plan-count" data-kind="tiers">{menu.tiers.length} of {planLimits.tiers}</span>
 </h5>
 <Table.Root class="text-[12px]">
 	<Table.Header>
@@ -248,7 +248,7 @@
 </div>
 <h5 class={heading}>
 	<PaneIcon name="gift" /> Packs and add-ons{" "}
-	<span class={muted} data-test="plan-count" data-kind="addons">{menu.addons.length} of {planLimits.addons}</span>
+	<span class={[muted, "font-normal normal-case"]} data-test="plan-count" data-kind="addons">{menu.addons.length} of {planLimits.addons}</span>
 </h5>
 <Table.Root class="text-[12px]">
 	<Table.Header>

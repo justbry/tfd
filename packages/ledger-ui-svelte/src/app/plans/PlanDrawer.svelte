@@ -101,13 +101,14 @@
 			event.preventDefault();
 			nameField?.focus();
 		}}
-		class="absolute top-[53px] z-(--layer-sheet) gap-0 overflow-auto border-t border-l border-border bg-card p-3.5 text-[12px] text-foreground shadow-[-12px_0_30px_rgba(0,0,0,0.25)] data-[side=right]:h-auto data-[side=right]:w-[68%] max-[600px]:data-[side=right]:w-[94%] data-[side=right]:sm:max-w-none"
+		class="absolute z-(--layer-sheet) gap-0 overflow-auto border-t border-l border-border bg-card p-3.5 text-[12px] text-foreground shadow-[-12px_0_30px_rgba(0,0,0,0.25)] data-[side=right]:h-auto data-[side=right]:w-[68%] max-[600px]:data-[side=right]:w-[94%] data-[side=right]:sm:max-w-none"
+		style="top: 53px"
 		overlayClass="absolute z-(--layer-sheet) bg-transparent supports-backdrop-filter:backdrop-blur-none"
 		data-test="plan-drawer"
 	>
 		<button
 			type="button"
-			class="float-right cursor-pointer border-0 bg-transparent text-[18px] text-muted-foreground"
+			class="absolute top-2.5 right-3.5 cursor-pointer border-0 bg-transparent text-[18px] leading-none text-muted-foreground"
 			aria-label="Close"
 			data-test="plan-drawer-close"
 			onclick={onClose}>×</button
@@ -115,7 +116,7 @@
 		<Sheet.Title class="m-0 text-[14px] font-semibold" data-test="plan-drawer-title"
 			><PaneIcon name={tier ? "layers" : "gift"} class="mr-1 inline align-[-2px]" /> {heading_}</Sheet.Title
 		>
-		<Sheet.Description class={muted} data-test="plan-drawer-sub"
+		<Sheet.Description class={[muted, "text-[12px]"]} data-test="plan-drawer-sub"
 			>{school.name} · editing the draft{activeMembers !== null
 				? ` · ${activeMembers} active member${activeMembers === 1 ? "" : "s"}`
 				: ""}</Sheet.Description

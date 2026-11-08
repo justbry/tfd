@@ -13,13 +13,7 @@ import {
 } from "./services.ts";
 import { toastsLayer } from "./toasts.ts";
 
-export type AppServices =
-	| Reader
-	| Writer
-	| ConfigClient
-	| Clock
-	| Toasts
-	| Log;
+export type AppServices = Reader | Writer | ConfigClient | Clock | Toasts | Log;
 
 /** The one composition of the app's services: a Reader and a Writer, the toasts and the log over a clock (the
  * browser's unless a test passes one moved by hand). The fixture and HTTP layers (layers.ts) and the size gate's

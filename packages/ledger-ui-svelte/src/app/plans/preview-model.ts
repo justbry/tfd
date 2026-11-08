@@ -34,7 +34,8 @@ const percentBase = 100;
 export const discounted = (cents: number, percent: number): number =>
 	Math.round((cents * (percentBase - percent)) / percentBase);
 
-export const chooseToast = "Preview only. Members would continue to Stripe Checkout.";
+export const chooseToast =
+	"Preview only. Members would continue to Stripe Checkout.";
 export const liveEmpty =
 	"Nothing is published yet. Switch to Draft to see what you've set up, or add a plan in Edit.";
 export const draftEmpty = "No plans yet. Switch to Edit to add a membership.";
