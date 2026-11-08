@@ -10,6 +10,7 @@ import { PUBLISHED } from "../src/billing/plans";
 const fakeStripe = (livemode = false) => {
 	const products: Record<string, unknown>[] = [];
 	const prices: Record<string, unknown>[] = [];
+	const portals: Record<string, unknown>[] = [];
 	const writes: string[] = [];
 	const call: StripeCall = async (method, path, params) => {
 		const field = (name: string) =>
@@ -35,7 +36,26 @@ const fakeStripe = (livemode = false) => {
 					(price) => price.lookup_key === field("lookup_keys[]"),
 				),
 			};
+		if (method === "GET" && path === "/v1/billing_portal/configurations")
+			return { data: portals };
 		writes.push(`${method} ${path}`);
+		if (path.startsWith("/v1/billing_portal/configurations")) {
+			const form = Object.fromEntries(params);
+			const existing = portals.find((portal) => path.endsWith(`/${portal.id}`));
+			if (existing) {
+				Object.assign(existing, { form, metadata });
+				return existing;
+			}
+			const portal = {
+				id: `bpc_${portals.length + 1}`,
+				livemode,
+				active: true,
+				form,
+				metadata,
+			};
+			portals.push(portal);
+			return portal;
+		}
 		if (path === "/v1/products") {
 			const product = {
 				id: `prod_${products.length + 1}`,
@@ -60,7 +80,7 @@ const fakeStripe = (livemode = false) => {
 		}
 		throw new Error(`unexpected ${method} ${path}`);
 	};
-	return { call, products, prices, writes };
+	return { call, products, prices, portals, writes };
 };
 
 describe("publishing Trifold's menus to Stripe test mode", () => {
@@ -86,6 +106,21 @@ describe("publishing Trifold's menus to Stripe test mode", () => {
 		]);
 		// No Pro (a draft) and no coupon (no member code).
 		expect(JSON.stringify(stripe.prices)).not.toContain("_pro_");
+		// One portal per school: invoices, the payment method, cancel at the period end; no tier or quantity change
+		// (`portalConfigOf` is null: no Trifold tier is sold in quantities).
+		expect(stripe.portals.length).toBe(2);
+		expect(first.schools["tf-std"]?.portalConfiguration).toBe("bpc_1");
+		expect(first.schools["tf-np"]?.portalConfiguration).toBe("bpc_2");
+		const form = stripe.portals[0]?.form as Record<string, string>;
+		expect(form).toMatchObject({
+			"features[invoice_history][enabled]": "true",
+			"features[payment_method_update][enabled]": "true",
+			"features[subscription_cancel][enabled]": "true",
+			"features[subscription_cancel][mode]": "at_period_end",
+			"metadata[b4u_key]": "portal",
+			"metadata[b4u_school]": "tf-std",
+		});
+		expect(Object.keys(form).join()).not.toContain("subscription_update");
 		const writes = stripe.writes.length;
 
 		const again = await publishPlans({
@@ -104,6 +139,19 @@ describe("publishing Trifold's menus to Stripe test mode", () => {
 		});
 		expect(stripe.writes.length).toBe(writes);
 		expect(lost).toEqual(first);
+
+		// A portal whose version is not the form's is updated in place, not made again.
+		(stripe.portals[0]?.metadata as Record<string, string>).b4u_portal_version =
+			"old";
+		const updated = await publishPlans({
+			stripe: stripe.call,
+			previous: first,
+			stripeAccount: "acct_test",
+		});
+		expect(stripe.writes.slice(writes)).toEqual([
+			"POST /v1/billing_portal/configurations/bpc_1",
+		]);
+		expect(updated).toEqual(first);
 	});
 
 	test("a live-mode answer stops the publish", async () => {
@@ -133,6 +181,7 @@ describe("publishing Trifold's menus to Stripe test mode", () => {
 			expect(Object.keys(committed?.priceIds ?? {})).toEqual(
 				Object.keys(school.priceIds),
 			);
+			expect(committed?.portalConfiguration).toMatch(/^bpc_/);
 		}
 	});
 });

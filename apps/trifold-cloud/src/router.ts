@@ -1,5 +1,6 @@
 import { checkoutRoute } from "./billing/checkout";
 import { billingPage } from "./billing/pages";
+import { portalRoute } from "./billing/portal";
 import { billingWebhookRoute } from "./billing/webhook";
 import type { CloudEnv } from "./env";
 import { health } from "./health";
@@ -42,6 +43,8 @@ export const route = async (
 		return billingWebhookRoute(request, env);
 	if (surface === "api" && url.pathname === "/v1/billing/checkout")
 		return checkoutRoute(request, env);
+	if (surface === "api" && url.pathname === "/v1/billing/portal")
+		return portalRoute(request, env);
 	if (
 		surface === "api" &&
 		url.pathname === "/v1/billing/books" &&
@@ -54,7 +57,7 @@ export const route = async (
 		surface === "ledger" &&
 		(request.method === "GET" || request.method === "HEAD")
 	) {
-		const response = billingPage(url.pathname, env);
+		const response = billingPage(url, env);
 		if (response)
 			return request.method === "HEAD"
 				? new Response(null, response)

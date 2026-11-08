@@ -1,7 +1,7 @@
 /**
  * Publishes Trifold's two menus (`catalog/trifold`) to Stripe TEST mode with tfd's `menuToStripe`, then writes
- * `src/published-plans.json`: per school id, the validated menu, the resolved policy, a menu version and the Stripe
- * product and price ids. The Worker bundles that file, so checkout and the webhook handler read the ids without a
+ * `src/published-plans.json`: per school id, the validated menu, the resolved policy, a menu version, the Stripe
+ * product and price ids, and the billing portal configuration its portal sessions use (tfd's `portalConfigOf`). The Worker bundles that file, so checkout and the webhook handler read the ids without a
  * Stripe or D1 round trip, a deploy carries a publish, and git shows what was published. Nothing in it is secret.
  *
  *   bun scripts/publish-plans.ts            publish (test mode), write the file
@@ -23,9 +23,15 @@ import {
 	TRIFOLD_SCHOOL_IDS,
 	type TrifoldOrg,
 } from "../../../catalog/trifold/index.ts";
-import { menuToStripe } from "../../../packages/atm/src/billing/stripe-menu.ts";
+import {
+	menuToStripe,
+	portalConfigOf,
+	tierPriceKey,
+	toStripeForm,
+} from "../../../packages/atm/src/billing/stripe-menu.ts";
 import type {
 	BillingPolicy,
+	Interval,
 	Menu,
 	StripeOp,
 } from "../../../packages/atm/src/types.ts";
@@ -50,6 +56,8 @@ export type PublishedSchool = {
 	products: Record<string, string>;
 	/** Stripe price ids by lookup key: what checkout and the handler's `priceIds` take. */
 	priceIds: Record<string, string>;
+	/** The billing portal configuration (`bpc_…`) of this school's portal sessions. */
+	portalConfiguration: string;
 };
 
 export type PublishedPlans = {
@@ -207,6 +215,85 @@ const runOps = async (
 	return products;
 };
 
+/**
+ * The portal configuration's form for one school: tfd's `portalConfigOf`, which offers a quantity change only for tiers
+ * sold in quantities. Trifold sells none, so it answers null, and the portal is tfd's base without `subscription_update`:
+ * invoice history, the payment method, and cancel at the period end (no tier switch, as with `portalConfigOf`). Marked
+ * with the school and a version (a hash of the form), so a rerun finds it and changes it only when the form changes.
+ */
+export const portalFormOf = (input: {
+	schoolId: string;
+	menu: Menu;
+	products: Record<string, string>;
+	priceIdOf: (tierId: string, interval: Interval) => string | undefined;
+}): Record<string, string> => {
+	const prices: Record<string, string> = {};
+	for (const tier of input.menu.tiers)
+		for (const price of tier.prices) {
+			const id = input.priceIdOf(tier.id, price.interval);
+			if (id) prices[tierPriceKey(tier.id, price.interval)] = id;
+		}
+	const form =
+		portalConfigOf(input.menu, { products: input.products, prices }) ??
+		toStripeForm({
+			features: {
+				invoice_history: { enabled: true },
+				payment_method_update: { enabled: true },
+				subscription_cancel: { enabled: true, mode: "at_period_end" },
+			},
+			metadata: { b4u_key: "portal" },
+		});
+	const version = createHash("sha256")
+		.update(canonical(form))
+		.digest("hex")
+		.slice(0, 12);
+	return {
+		...form,
+		"metadata[b4u_school]": input.schoolId,
+		"metadata[b4u_portal_version]": version,
+	};
+};
+
+/** Finds the school's portal configuration by its metadata; makes it, or updates it when its version is not the form's. */
+const publishPortal = async (
+	stripe: StripeCall,
+	schoolId: string,
+	form: Record<string, string>,
+	log: (line: string) => void,
+): Promise<string> => {
+	const version = form["metadata[b4u_portal_version]"] as string;
+	const answer = await stripe("GET", "/v1/billing_portal/configurations", [
+		["limit", "100"],
+	]);
+	const found = listData(answer).find((configuration) => {
+		const metadata = (configuration.metadata ?? {}) as Record<string, string>;
+		return (
+			metadata.b4u_key === "portal" &&
+			metadata.b4u_school === schoolId &&
+			configuration.active === true
+		);
+	});
+	const current = (found?.metadata as Record<string, string> | undefined)
+		?.b4u_portal_version;
+	if (found && current === version) return found.id as string;
+	log(
+		`${schoolId}: portal ${found ? `update ${String(found.id)}` : "create"} (version ${version})`,
+	);
+	const written = await stripe(
+		"POST",
+		found
+			? `/v1/billing_portal/configurations/${String(found.id)}`
+			: "/v1/billing_portal/configurations",
+		Object.entries(form),
+		`portal:${schoolId}:${version}`,
+	);
+	if (typeof written.id !== "string")
+		throw new Error(
+			`Stripe answered no portal configuration id for ${schoolId}`,
+		);
+	return written.id;
+};
+
 export const publishPlans = async (input: {
 	stripe: StripeCall;
 	previous: PublishedPlans | null;
@@ -266,6 +353,18 @@ export const publishPlans = async (input: {
 			if (!products[key])
 				throw new Error(`no Stripe product id for ${schoolId} ${key}`);
 		}
+		const portalConfiguration = await publishPortal(
+			stripe,
+			schoolId,
+			portalFormOf({
+				schoolId,
+				menu,
+				products,
+				priceIdOf: (tierId, interval) =>
+					priceIds[trifoldLookupKey(org, tierId, interval)],
+			}),
+			log,
+		);
 		schools[schoolId] = {
 			org,
 			menuVersion: menuVersionOf(menu, policy),
@@ -275,6 +374,7 @@ export const publishPlans = async (input: {
 				Object.entries(products).sort(([a], [b]) => a.localeCompare(b)),
 			),
 			priceIds,
+			portalConfiguration,
 		};
 	}
 	return {

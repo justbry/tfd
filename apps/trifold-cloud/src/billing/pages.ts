@@ -1,9 +1,11 @@
 import type { CloudEnv } from "../env";
 import { type Org, publishedSchool, SCHOOL_OF } from "./plans";
+import { SESSION_ID } from "./portal";
 
 /**
  * The staging billing pages on the ledger host: `/billing/plans` (Starter and Audited, std/np, month/year, calling
- * `POST /v1/billing/checkout`), and Checkout's return pages `/billing/success` and `/billing/cancel`. Colors and type
+ * `POST /v1/billing/checkout`), and Checkout's return pages `/billing/success` (with "Manage your plan", which calls
+ * `POST /v1/billing/portal` with the Checkout Session id on its URL) and `/billing/cancel`. Colors and type
  * follow docs/website/brand-guide.md (ink, paper text, saffron for the act); the fonts fall back to system faces, as
  * the Worker serves no font files. Staging only: the router serves them only when ENVIRONMENT is staging.
  */
@@ -72,6 +74,28 @@ form.addEventListener("submit", async (event) => {
 });
 `;
 
+const SUCCESS_SCRIPT = `
+const manage = document.querySelector("#manage");
+const error = document.querySelector("#error");
+manage?.addEventListener("click", async () => {
+	error.textContent = "";
+	manage.disabled = true;
+	try {
+		const response = await fetch(manage.dataset.endpoint, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ session_id: manage.dataset.session }),
+		});
+		const body = await response.json();
+		if (!response.ok || !body.url) throw new Error(body.error?.message ?? "The billing portal is not available right now.");
+		location.assign(body.url);
+	} catch (failure) {
+		error.textContent = failure.message;
+		manage.disabled = false;
+	}
+});
+`;
+
 const HTML_SPECIAL = /[&<>"']/g;
 
 const escapeHtml = (text: string): string =>
@@ -90,7 +114,7 @@ const page = (
 	title: string,
 	body: string,
 	env: CloudEnv,
-	withScript = false,
+	script: string | null = null,
 ): Response =>
 	new Response(
 		`<!doctype html>
@@ -107,7 +131,7 @@ const page = (
 <p class="banner"><span class="label">Staging · Stripe test mode</span><br>Nothing here charges a real card. Use the test card 4242 4242 4242 4242, any future date and any CVC.</p>
 ${body}
 </main>
-${withScript ? '<script src="/billing/plans.js" type="module"></script>' : ""}
+${script ? `<script src="${script}" type="module"></script>` : ""}
 </body>
 </html>
 `,
@@ -170,19 +194,27 @@ ${cards}
 <p class="error" id="error" role="alert"></p>
 </form>`,
 		env,
-		true,
+		"/billing/plans.js",
 	);
 };
 
-const successPage = (env: CloudEnv): Response =>
-	page(
+const successPage = (env: CloudEnv, sessionId: string | null): Response => {
+	const manage =
+		sessionId && SESSION_ID.test(sessionId)
+			? `<p><button type="button" id="manage" data-endpoint="https://${escapeHtml(env.API_HOST)}/v1/billing/portal" data-session="${escapeHtml(sessionId)}">Manage your plan</button></p>
+<p class="error" id="error" role="alert"></p>`
+			: "";
+	return page(
 		"Thank you",
 		`<p class="label ok">✓ Checkout complete</p>
 <h1>Thank you</h1>
 <p>Stripe confirmed your test checkout. When Stripe sends the paid invoice, Trifold records it in its own books.</p>
+${manage}
 <p><a href="/billing/plans">Back to plans</a></p>`,
 		env,
+		manage ? "/billing/success.js" : null,
 	);
+};
 
 const cancelPage = (env: CloudEnv): Response =>
 	page(
@@ -200,18 +232,20 @@ const asset = (body: string, type: string): Response =>
 	});
 
 /** The ledger host's billing pages, or null when the path is not one of them. */
-export const billingPage = (path: string, env: CloudEnv): Response | null => {
-	switch (path) {
+export const billingPage = (url: URL, env: CloudEnv): Response | null => {
+	switch (url.pathname) {
 		case "/billing/plans":
 			return plansPage(env);
 		case "/billing/success":
-			return successPage(env);
+			return successPage(env, url.searchParams.get("session_id"));
 		case "/billing/cancel":
 			return cancelPage(env);
 		case "/billing/billing.css":
 			return asset(STYLE, "text/css; charset=utf-8");
 		case "/billing/plans.js":
 			return asset(SCRIPT, "text/javascript; charset=utf-8");
+		case "/billing/success.js":
+			return asset(SUCCESS_SCRIPT, "text/javascript; charset=utf-8");
 		default:
 			return null;
 	}

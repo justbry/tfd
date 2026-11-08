@@ -5,16 +5,14 @@ import {
 	withPriceIds,
 } from "../../../../packages/atm/src/cloud.ts";
 import type { CloudEnv } from "../env";
-import { type Org, PUBLISHED, SCHOOL_OF, soldTier } from "./plans";
+import { type Org, SCHOOL_OF, soldTier } from "./plans";
+import { stripeApi } from "./stripe";
 
-const STRIPE_CHECKOUT = "https://api.stripe.com/v1/checkout/sessions";
 const MAX_BODY_BYTES = 2048;
 const MAX_EMAIL_LENGTH = 254;
 const EMAIL =
 	/^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]+$/;
 const TIER_ID = /^[a-z0-9-]{1,40}$/;
-/** A test-mode key: staging never holds a live one. */
-const TEST_KEY = /^(sk|rk)_test_/;
 const encoder = new TextEncoder();
 
 export type CheckoutRequest = {
@@ -115,32 +113,17 @@ export const createCheckoutSession = async (
 	request: CheckoutRequest,
 	fetcher: typeof fetch = fetch,
 ): Promise<{ id: string; url: string }> => {
-	const key = env.STRIPE_SECRET_KEY;
-	if (!key || !TEST_KEY.test(key))
-		throw new Error("STRIPE_SECRET_KEY is missing or not a test-mode key");
 	const accountId = newAccountId();
-	const response = await fetcher(STRIPE_CHECKOUT, {
+	const session = await stripeApi({
+		key: env.STRIPE_SECRET_KEY,
+		fetcher,
 		method: "POST",
-		headers: {
-			Authorization: `Bearer ${key}`,
-			"Content-Type": "application/x-www-form-urlencoded",
-			"Stripe-Version": PUBLISHED.apiVersion,
-			"Idempotency-Key": `checkout:${accountId}`,
-		},
-		body: new URLSearchParams(
-			checkoutForm(request, { accountId, ledgerHost: env.LEDGER_HOST }),
-		),
+		path: "/v1/checkout/sessions",
+		params: checkoutForm(request, { accountId, ledgerHost: env.LEDGER_HOST }),
+		idempotencyKey: `checkout:${accountId}`,
 	});
-	const session = (await response.json()) as {
-		id?: string;
-		url?: string;
-		livemode?: boolean;
-		error?: { type?: string; code?: string };
-	};
-	if (!response.ok || !session.id || !session.url)
-		throw new Error(
-			`Stripe refused the session: ${response.status} ${session.error?.type ?? ""} ${session.error?.code ?? ""}`,
-		);
+	if (typeof session.id !== "string" || typeof session.url !== "string")
+		throw new Error("Stripe answered a session with no id or URL");
 	if (session.livemode !== false)
 		throw new Error("Stripe answered a live-mode session on staging");
 	return { id: session.id, url: session.url };
@@ -198,11 +181,19 @@ const answer = (
 		},
 	});
 
-/** `POST /v1/billing/checkout` (and its preflight) on the API host. Only the ledger host's pages may call it from a browser. */
-export const checkoutRoute = async (
+/** A browser API's answer: the status and the JSON body. */
+export type ApiAnswer = { status: number; body: unknown };
+
+/**
+ * The shared shell of the billing APIs the ledger pages call (`POST /v1/billing/checkout`, `/v1/billing/portal`) and
+ * their preflights: only the ledger host may call from a browser, POST only, a per-address limit (`limitKey` keeps the
+ * APIs' counts apart), a 2 KB JSON body, then `run` with the parsed body.
+ */
+export const browserApiRoute = async (
 	request: Request,
 	env: CloudEnv,
-	fetcher: typeof fetch = fetch,
+	limitKey: string,
+	run: (body: unknown) => Promise<ApiAnswer>,
 ): Promise<Response> => {
 	const origin = request.headers.get("Origin");
 	const allowedOrigin = `https://${env.LEDGER_HOST}`;
@@ -224,7 +215,7 @@ export const checkoutRoute = async (
 			cors,
 		);
 	const client = request.headers.get("CF-Connecting-IP") ?? "unknown";
-	if (!allowCheckout(client, Date.now()))
+	if (!allowCheckout(`${limitKey}:${client}`, Date.now()))
 		return answer(
 			env,
 			429,
@@ -248,31 +239,40 @@ export const checkoutRoute = async (
 	} catch {
 		body = null;
 	}
-	const parsed = parseCheckoutRequest(body);
-	if (!parsed.ok)
-		return answer(
-			env,
-			parsed.status,
-			{ error: { code: parsed.code, message: parsed.message } },
-			cors,
-		);
-	try {
-		const session = await createCheckoutSession(env, parsed.request, fetcher);
-		return answer(env, 200, session, cors);
-	} catch (error) {
-		console.error(
-			`checkout: ${error instanceof Error ? error.message : String(error)}`,
-		);
-		return answer(
-			env,
-			503,
-			{
-				error: {
-					code: "unavailable",
-					message: "Checkout is not available right now.",
-				},
-			},
-			cors,
-		);
-	}
+	const result = await run(body);
+	return answer(env, result.status, result.body, cors);
 };
+
+/** `POST /v1/billing/checkout` (and its preflight) on the API host. Only the ledger host's pages may call it from a browser. */
+export const checkoutRoute = (
+	request: Request,
+	env: CloudEnv,
+	fetcher: typeof fetch = fetch,
+): Promise<Response> =>
+	browserApiRoute(request, env, "checkout", async (body) => {
+		const parsed = parseCheckoutRequest(body);
+		if (!parsed.ok)
+			return {
+				status: parsed.status,
+				body: { error: { code: parsed.code, message: parsed.message } },
+			};
+		try {
+			return {
+				status: 200,
+				body: await createCheckoutSession(env, parsed.request, fetcher),
+			};
+		} catch (error) {
+			console.error(
+				`checkout: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			return {
+				status: 503,
+				body: {
+					error: {
+						code: "unavailable",
+						message: "Checkout is not available right now.",
+					},
+				},
+			};
+		}
+	});

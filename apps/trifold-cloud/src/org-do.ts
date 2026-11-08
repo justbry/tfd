@@ -14,6 +14,7 @@ import {
 	signStripePayload,
 	type WebhookResponse,
 } from "../../../packages/atm/src/cloud.ts";
+import { invoicePaidFee } from "./billing/fees";
 import { SCHOOL_IDS, webhookContext } from "./billing/plans";
 import { type DurableSqlStorage, durableSqlDatabase } from "./do-sql";
 import type { CloudEnv } from "./env";
@@ -74,7 +75,9 @@ export type BillingApplied = {
  * Runs one verified Stripe event through tfd's handler. The Worker checked Stripe's signature; the event is re-signed
  * here with a one-off secret, so the handler's own check (and its 300 s window) passes for exactly this body. An event
  * that names its school (`b4u_school`) goes to that school; one that does not (an `invoice_payment.paid`, a refund) is
- * tried against each Trifold school until one does not answer `school_mismatch`.
+ * tried against each Trifold school until one does not answer `school_mismatch`. `fee` is the Stripe fee the caller read
+ * for an `invoice.paid` (`invoicePaidFee`), handed to the handler as its `paymentFee`; the handler stores it with the
+ * input and books it as `expenses:billing:stripe-fees`.
  */
 export const applyBillingEvent = (input: {
 	db: SqlDatabase;
@@ -82,6 +85,7 @@ export const applyBillingEvent = (input: {
 	schoolHint: string | null;
 	env: "test" | "live";
 	nowMs: () => number;
+	fee?: number;
 }): { school: string | null; handler: WebhookResponse } => {
 	const schools =
 		input.schoolHint && SCHOOL_IDS.includes(input.schoolHint)
@@ -100,6 +104,7 @@ export const applyBillingEvent = (input: {
 				workerId: "trifold-cloud",
 				context: webhookContext,
 				warn: (line) => console.warn(line),
+				...(input.fee === undefined ? {} : { paymentFee: () => input.fee }),
 			},
 			{
 				payload: input.payload,
@@ -162,6 +167,8 @@ export class OrgDO {
 	constructor(
 		private readonly state: DurableObjectState,
 		private readonly env: CloudEnv,
+		/** Stripe's API, for the fee lookup; tests pass a fake. */
+		private readonly fetcher: typeof fetch = fetch,
 	) {
 		this.db = durableSqlDatabase(state.storage);
 		void state.blockConcurrencyWhile(async () => {
@@ -178,15 +185,38 @@ export class OrgDO {
 		return Response.json({ schemaVersion: this.version });
 	}
 
-	/** Applies the event, then ships. Answers once the handler's transaction is committed; a failed ship retries by alarm. */
+	/**
+	 * Reads the Stripe fee of an `invoice.paid`, applies the event, then ships. Answers once the handler's transaction is
+	 * committed; a failed ship retries by alarm. A fee not known yet is a 503 before the handler runs, so Stripe sends the
+	 * event again and the payment is booked once, with its fee (the handler never books a fee later).
+	 */
 	private async billing(request: Request): Promise<Response> {
 		const payload = await request.text();
+		const fee = await invoicePaidFee(JSON.parse(payload), {
+			key: this.env.STRIPE_SECRET_KEY,
+			fetcher: this.fetcher,
+		});
+		if (fee && !fee.ok) {
+			console.error(`billing: fee ${fee.reason}: ${fee.message}`);
+			return Response.json(
+				{
+					school: null,
+					handler: {
+						status: 503,
+						body: { outcome: "fee_pending", reason: fee.reason },
+					},
+					shipped: null,
+				},
+				{ status: 503 },
+			);
+		}
 		const applied = applyBillingEvent({
 			db: this.db,
 			payload,
 			schoolHint: request.headers.get("X-School-Hint"),
 			env: this.env.ENVIRONMENT === "production" ? "live" : "test",
 			nowMs: Date.now,
+			...(fee ? { fee: fee.fee } : {}),
 		});
 		let shipped: BillingApplied["shipped"] = null;
 		if (applied.handler.status === 200) shipped = await this.ship();

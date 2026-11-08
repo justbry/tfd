@@ -302,3 +302,75 @@ export const durableState = (db: Database) => {
 		blockConcurrencyWhile: async <T>(work: () => Promise<T>) => work(),
 	};
 };
+
+/** What a fake Stripe answers for a path (without the query): a body, or a status and body. */
+export type StripeRoute = (request: {
+	method: string;
+	url: URL;
+	form: URLSearchParams;
+}) => { status?: number; body: Record<string, unknown> } | null;
+
+/**
+ * A Stripe API in memory for the Worker's `fetch`: each request goes to the first route that answers, and is recorded
+ * (method, path, query or form). No route: a 404 like Stripe's.
+ */
+export const fakeStripeApi = (...routes: StripeRoute[]) => {
+	const calls: { method: string; path: string; params: URLSearchParams }[] = [];
+	const fetcher = (async (input: string, init: RequestInit = {}) => {
+		const url = new URL(input);
+		const method = init.method ?? "GET";
+		const form = new URLSearchParams(
+			method === "GET" ? url.search : (init.body as URLSearchParams),
+		);
+		calls.push({ method, path: url.pathname, params: form });
+		for (const route of routes) {
+			const answer = route({ method, url, form });
+			if (answer)
+				return Response.json(answer.body, { status: answer.status ?? 200 });
+		}
+		return Response.json(
+			{ error: { type: "invalid_request_error", code: "resource_missing" } },
+			{ status: 404 },
+		);
+	}) as unknown as typeof fetch;
+	return { fetcher, calls };
+};
+
+/**
+ * Stripe's answers for the fee of a paid invoice: one paid invoice payment by payment intent, whose latest charge has a
+ * balance transaction with `fee` (null: the transaction is not made yet).
+ */
+export const feeRoutes =
+	(fee: number | null): StripeRoute =>
+	({ url }) => {
+		if (url.pathname === "/v1/invoice_payments")
+			return {
+				body: {
+					object: "list",
+					data: [
+						{
+							id: "inpay_1",
+							object: "invoice_payment",
+							livemode: false,
+							invoice: url.searchParams.get("invoice"),
+							status: "paid",
+							payment: { type: "payment_intent", payment_intent: "pi_fee_1" },
+						},
+					],
+				},
+			};
+		if (url.pathname === "/v1/payment_intents/pi_fee_1")
+			return {
+				body: {
+					id: "pi_fee_1",
+					livemode: false,
+					latest_charge: {
+						id: "ch_fee_1",
+						livemode: false,
+						balance_transaction:
+							fee === null ? null : { id: "txn_fee_1", fee, currency: "usd" },
+					},
+				},
+			};
+		return null;
+	};

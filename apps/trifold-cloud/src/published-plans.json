@@ -140,7 +140,8 @@
 				"b4u_tf-std_t_starter_year_29000_usd": "price_1UZSceDsfMqSNUOElC85T0bi",
 				"b4u_tf-std_t_audited_month_14900_usd": "price_1UZScfDsfMqSNUOEiKh6uPzI",
 				"b4u_tf-std_t_audited_year_149000_usd": "price_1UZSchDsfMqSNUOEHgTZkjRR"
-			}
+			},
+			"portalConfiguration": "bpc_1UZUwlDsfMqSNUOEgVNxiHbT"
 		},
 		"tf-np": {
 			"org": "np",
@@ -279,7 +280,8 @@
 				"b4u_tf-np_t_starter_year_15000_usd": "price_1UZScmDsfMqSNUOEuqkgCkyC",
 				"b4u_tf-np_t_audited_month_7900_usd": "price_1UZScnDsfMqSNUOEJ4wZsmWx",
 				"b4u_tf-np_t_audited_year_79000_usd": "price_1UZScoDsfMqSNUOEdqPqKaNg"
-			}
+			},
+			"portalConfiguration": "bpc_1UZUwwDsfMqSNUOErcZjVLSA"
 		}
 	}
 }
