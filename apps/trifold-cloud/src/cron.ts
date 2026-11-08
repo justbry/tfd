@@ -1,4 +1,8 @@
-import { DEFAULT_SUBREQUEST_BUDGET, runBackup } from "./backup";
+import {
+	DEFAULT_SUBREQUEST_BUDGET,
+	MIN_SUBREQUEST_BUDGET,
+	runBackup,
+} from "./backup";
 import type { CloudEnv } from "./env";
 import { pruneSuperseded, readPruneState, writePruneState } from "./prune";
 
@@ -14,8 +18,11 @@ export const runCron = async (
 	const configured = Number(
 		env.BACKUP_SUBREQUEST_BUDGET ?? DEFAULT_SUBREQUEST_BUDGET,
 	);
-	if (!Number.isFinite(configured))
-		throw new Error("BACKUP_SUBREQUEST_BUDGET is not a number");
+	if (!Number.isFinite(configured) || configured < MIN_SUBREQUEST_BUDGET) {
+		throw new Error(
+			`BACKUP_SUBREQUEST_BUDGET must be a number of at least ${MIN_SUBREQUEST_BUDGET}`,
+		);
+	}
 	const budget = configured;
 	const backup = await runBackup(
 		{ db: env.DB, source: env.BOOKS, backup: env.BACKUPS },

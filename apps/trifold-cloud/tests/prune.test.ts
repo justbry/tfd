@@ -120,4 +120,28 @@ describe("pruning superseded copies", () => {
 		expect(second.deleted).toBe(300);
 		expect(second.runs).toBeGreaterThan(1);
 	});
+
+	test("restoring an object clears its supersession, so a later mistake gets the full 30 days", async () => {
+		const { source, backup, put, copy, prune } = setup();
+		const etag = put("a", "one", OLD);
+		copy("a", etag, OLD);
+		source.objects.delete("a");
+		await prune(NOW);
+		// Restored three days later with the original bytes: the fake gives a new ETag on every write, so pin it back.
+		const restoredAt = new Date(NOW.getTime() + 3 * DAY);
+		put("a", "one", restoredAt);
+		(source.objects.get("a") as { etag: string }).etag = etag;
+		await prune(restoredAt);
+		// Deleted again 200 days later: the copy must survive the next 30 days.
+		const secondMistake = new Date(NOW.getTime() + 200 * DAY);
+		source.objects.delete("a");
+		expect(await prune(secondMistake)).toMatchObject({ deleted: 0 });
+		expect(
+			await prune(new Date(secondMistake.getTime() + 10 * DAY)),
+		).toMatchObject({ deleted: 0 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(true);
+		expect(
+			await prune(new Date(secondMistake.getTime() + 31 * DAY)),
+		).toMatchObject({ deleted: 1 });
+	});
 });

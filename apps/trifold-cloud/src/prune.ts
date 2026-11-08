@@ -102,6 +102,13 @@ export const pruneSuperseded = async ({
 				subrequests += 1;
 				const current = await source.head(sourceKey);
 				if (current?.etag === etag) {
+					// Current again (never superseded, or restored from this copy with its original bytes): forget any
+					// earlier supersession, so a later mistake gets its full 30 days.
+					subrequests += 1;
+					await db
+						.prepare("DELETE FROM backup_superseded WHERE copy_key = ?")
+						.bind(copy.key)
+						.run();
 					counts.kept += 1;
 					continue;
 				}
