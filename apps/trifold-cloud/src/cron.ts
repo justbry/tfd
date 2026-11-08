@@ -15,15 +15,14 @@ export const runCron = async (
 	now: Date,
 	log: Pick<Console, "log" | "error"> = console,
 ) => {
-	const configured = Number(
+	const budget = Number(
 		env.BACKUP_SUBREQUEST_BUDGET ?? DEFAULT_SUBREQUEST_BUDGET,
 	);
-	if (!Number.isFinite(configured) || configured < MIN_SUBREQUEST_BUDGET) {
+	if (!Number.isFinite(budget) || budget < MIN_SUBREQUEST_BUDGET) {
 		throw new Error(
 			`BACKUP_SUBREQUEST_BUDGET must be a number of at least ${MIN_SUBREQUEST_BUDGET}`,
 		);
 	}
-	const budget = configured;
 	const backup = await runBackup(
 		{ db: env.DB, source: env.BOOKS, backup: env.BACKUPS },
 		now,
