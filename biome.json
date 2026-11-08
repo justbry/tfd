@@ -13,7 +13,9 @@
 			"!**/packages/atm/fixtures/vibes-year",
 			"!**/packages/atm/fixtures/vibes-multi",
 			"!**/packages/atm/fixtures/scenarios",
-			"!**/packages/atm/tests/golden"
+			"!**/packages/atm/tests/golden",
+			"!**/packages/tfd-credentials/src/rdfc/contexts",
+			"!**/packages/tfd-credentials/tests/vectors"
 		]
 	},
 	"formatter": {
