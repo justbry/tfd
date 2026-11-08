@@ -82,7 +82,8 @@ only this origin frame them. They are static files, not pages: no .md mirror, no
 `src/lib/compare/competitors.ts` holds every comparison. Add an entry to `COMPETITORS` and `/compare`,
 `/compare/trifold-vs-<slug>`, the footer's Compare column, `sitemap.xml` and `llms.txt` all follow (restart `bun run
 dev` to see the footer change: its links are inlined by `vite.config.ts`). Every claim about a competitor needs a page
-in its `sources`; "Not stated" means its public pages don't say. Trifold's prices come from `src/lib/pricing/data.ts`.
+in its `sources`; "Not stated" means its public pages don't say. Trifold's prices come from `src/lib/pricing/data.ts`,
+which reads the plans, prices and limits from Trifold's tfd catalog in `catalog/trifold/` (see its README).
 
 ## Placeholders to replace before launch
 
