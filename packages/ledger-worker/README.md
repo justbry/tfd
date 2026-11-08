@@ -11,6 +11,8 @@ file says how the package is put together and how to run it.
   refetch on an unknown `kid`, at most every 30 s), the token's `schools[]`.
 - `src/routes/` — one file per endpoint; `src/data/snapshot.ts` opens a school's views generation (manifest `asOf`, the
   verified readers, the events up to `asOf`, the menu, the KPI rows), kept in the isolate while the manifest is unchanged.
+- `src/data/answers.ts`, `src/routes/stored.ts` — the stored answers and log of a generation (below);
+  `src/data/demo-index.ts` — the demo schools' index.
 - `src/views-job.ts` — the cron job.
 - `src/testing/` — the test harness (below).
 
@@ -21,7 +23,7 @@ The Worker is built on `atm/worker` (`readViewsFromStore`, `readEventsFromStore`
 
 Token (401; none needed for `GET /v1/schools` and the demo schools, below) → route → the school is in the token's `schools[]` (404 `not_found`, the same body as an unknown school) → the
 endpoint's gate (403 `finance_required`, 403 `audience_not_allowed`) → the query (400) → the data (404 `no_data`, 409
-`view_mismatch`, 501, 503). Every `/v1` answer is `Cache-Control: private, no-store`.
+`view_mismatch`, 501, 503). Every `/v1` answer is `Cache-Control: private, no-store`, but a stored answer (below).
 
 The token's `sub` is not stored, logged or returned. It is held for the one request only, and a config write turns it into an opaque writer id (`u_` and the first 16 hex characters of the sha256 of `<school>:<sub>`) for the audit line and the manifest. A failure in the views job is
 logged as `views job failed for school <id>` and nothing else (a job message can carry an event id or a `family:<id>` key).
@@ -121,6 +123,62 @@ whose views are oldest, once they are an hour old), so fifteen logs of a year of
 reads; each rebuild writes that school's route answers again, as of its views. The harness seeds them with
 `startLedgerWorker({ presets, demoPresets })`.
 
+## Stored answers: a cold isolate answers without the log
+
+Measured on staging before this (2026-11-08, real Chrome, `#/demo-monthly-members/dashboard`): the first figure after 8.8 s
+cold, 2.4 s on a reload. A cold isolate read the school's whole log (a year of daily batch files) to answer `disclosure`,
+`kpi` or the ledger: 5 to 6.3 s each, against 0.2 to 0.5 s warm. `GET /v1/schools` listed the bucket and read two objects per
+demo school: 1 to 1.7 s every time.
+
+After each school's views the job stores, under `schools/<id>/views/answers/` (`src/data/answers.ts`):
+
+| Object | What | Written |
+| --- | --- | --- |
+| `log.jsonl` | The events up to the generation's `asOf`, one object; a header line names the SHA-256 of the event lines. | When those lines change. |
+| `answers.jsonl` | A header line (`v`, `generation`, `day`), then `<name>\t<data JSON>` per answer: `disclosure/<adminAudience>` for each audience, `kpi/<audience>-open` for each, `kpi/<audience>-locked` from governance up. The data is the endpoint's `data`, `JSON.stringify`'d by the same functions. | Each new generation, or a new local day. |
+| `current.json` | The pointer: `v`, `generation`, `asOf`, `zone`, `day`, `log` (the hash). Written last. | With `answers.jsonl`. |
+
+`generation` is the first 20 hex of the SHA-256 of the manifest's `asOf`, `generatedFrom.lastEventId` and `eventCount`.
+The answers depend on the request's time only through the school's local day (`clockOf`), so they hold for every request on
+`day` in `zone`. One object for all the answers keeps a generation at two writes (fourteen otherwise; a real school gets a
+new generation every five minutes). The keys are fixed, so nothing piles up; every reader checks what it reads instead:
+
+- `kpi`, `disclosure` and `audience-report` read the manifest and the pointer at once (one round trip). The pointer counts
+  only when it names the manifest's generation and the request's local day is its `day`. The answer is then read from the
+  isolate, else the data centre's cache (`caches.default`), else `answers.jsonl` (once per generation per isolate; its
+  header must name the same generation and day; every answer of it then goes in the cache). `audience-report` is
+  `audienceReportOf` over the stored `kpi/<audience>-open`. The snapshot is not opened.
+- Anything else, or no usable stored answer (a generation written before this, another day, a run in flight), computes as
+  before; the snapshot then takes its events from `log.jsonl` when the pointer names it, else from the day files. So the
+  ledger, income statement, fundraising and member money also skip the day files.
+- Bump `ANSWERS_VERSION` when an answer's shape or computation changes: older stored answers are then misses until the job
+  writes them again (each new generation, at most an hour for a demo school).
+
+**Cache.** The key is `<origin>/v1/__stored-answers/v<version>/<school>/<generation>/<day>/<name>`: no token, no `sub`, no
+grant. Safety: every check (token, the school in the token, the finance gate, the audience gate, the query) runs before the
+key is built, and the name is picked by the server from the checked audience (`kpi`, `audience-report`) or the caller's grant
+(`disclosure`), so a caller only reaches an answer of an audience they may see, of a school their token lists. An answer
+holds what its audience may see and nothing about the caller, so callers of one audience can share it. The key names the
+generation, so an entry is never stale (kept a day). The envelope is not cached: `asOf` comes from the pointer and
+`lagMinutes` is worked out at request time, written around the stored data text, so the bytes are what `okResponse` writes.
+
+**Browser.** A stored answer has `ETag: "v<version>-<generation>-<day>-<endpoint>-<audience>[-<pin or from>]"` and an `If-None-Match`
+naming it answers `304` (after the checks). Real schools: `Cache-Control: private, max-age=0, must-revalidate` (the browser
+asks each time; the 304 costs two small reads, no body). Demo schools: `public, max-age=60` (fictional, the same for every
+caller; `lagMinutes` may then be up to a minute old). The disclosure's ETag names the caller's admin audience, so a
+browser that changes token reads it again. A computed answer stays `private, no-store`.
+
+**Demo index.** `schools/_demo-index.json` (`src/data/demo-index.ts`): each demo school's `asOf` and its facts, so
+`GET /v1/schools` reads it once instead of listing the bucket and reading two objects per demo school. `seed:demo` writes it
+last; the views job writes it again on each run when it changed. It names demo schools only (it is built from a listing of
+`schools/demo-`): the token's own schools are still read from their manifests, at once, and a real school never appears in
+the index. Without it the list is worked out from the bucket, the same rows.
+
+**After a deploy.** A generation written before this has no stored answers: those requests compute as before. The views job
+stores them on its next run for each real school with a new generation (every five minutes while events ship; a school
+whose `asOf` does not move gets them on the first run, since it has no pointer). Demo schools get them only when the job
+rebuilds them (one per run, hourly), so run `seed:demo` again to store all fifteen and the index at once.
+
 ## The views job and `asOf`
 
 Every 5 minutes the job runs `runViews` for each school prefix in the bucket, with `asOf` set to the earlier of the scheduled
@@ -160,7 +218,8 @@ await harness.stop();
 ```
 
 Each preset is generated by the scenario generator, given a `catalog.published` event for its menu, written as
-`schools/<id>/events/date=*/day.jsonl`, and run through `runViews` as of its last event. `mintToken` is async.
+`schools/<id>/events/date=*/day.jsonl`, and run through `runViews` as of its last event; its answers are then stored as
+the views job stores them, for the harness clock's day. `mintToken` is async.
 
 Also on the harness: `seeded` (id → `{ preset, asOf, events }`), `seedEvents(id, events, { views? })` for a custom log,
 `runCron()`, `clock` (`now()`, `set(iso)`, `advance(ms)`: the clock the Worker and the tokens use; it starts one minute after
@@ -171,7 +230,9 @@ these claims, `extraSigner(fill)`, `signer`, `issuer`, `bucket` (the Worker's R2
 
 `bun test` (or `bun run test`); `bun run ts` for the types. `endpoints.test.ts` compares every endpoint with the same
 `atm/worker` function called directly, on four presets; `errors.test.ts` covers the error table; `gating.test.ts` the
-finance-false guarantees; `cron.test.ts` the views job; `consumer.test.ts` uses the harness as another package would.
+finance-false guarantees; `cron.test.ts` the views job; `consumer.test.ts` uses the harness as another package would;
+`stored-answers.test.ts` the stored answers, the cache, the ETag and the demo index. The harness stores each school's
+answers as the job would, so the endpoint tests go through them; a test removes `current.json` to compute.
 
 ## Staging end-to-end (S8f)
 

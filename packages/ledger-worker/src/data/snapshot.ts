@@ -1,7 +1,8 @@
 /**
  * One school's views generation, opened for a request: the manifest (so `asOf`), the verified view readers, and the
  * things worked out from the event log (the events up to `asOf`, the menu, the KPI rows), each once per generation and
- * kept in the isolate while the manifest stays the same.
+ * kept in the isolate while the manifest stays the same. The events come from the generation's stored log (`answers.ts`)
+ * when it has one, one object, and else from the shipper's day files.
  */
 
 import type { AtmEvent } from "tfd";
@@ -13,12 +14,17 @@ import {
 	type KpiDocumentRow,
 	periodsFrom,
 	readEventsFromStore,
-	readViewsFromStore,
 	SCHOOL_KPI_SPEC,
 	type ViewRead,
+	type ViewsReader,
 } from "tfd/worker";
 import { ApiError } from "../http.js";
 import { localWallTime } from "../time.js";
+import {
+	type OpenedGeneration,
+	openGeneration,
+	readStoredLog,
+} from "./answers.js";
 import { readJobProblem } from "./job-status.js";
 import { latestMenu, type SchoolMenu } from "./menu.js";
 import type { Store } from "./store-io.js";
@@ -106,7 +112,7 @@ const generations = new Map<string, Derived>();
 
 export type SchoolSnapshot = {
 	school: string;
-	reader: Extract<Awaited<ReturnType<typeof readViewsFromStore>>, { ok: true }>;
+	reader: ViewsReader;
 	/** The manifest's `asOf`. */
 	asOf: string;
 	events: () => Promise<AtmEvent[]>;
@@ -134,6 +140,27 @@ const eventsUpTo = (events: AtmEvent[], asOf: string): AtmEvent[] => {
 	return events.filter((event) => Date.parse(event.event_time) <= limit);
 };
 
+/** The events up to `asOf`: the stored log when the pointer names one that is there, else the day files. */
+const eventsOf = async (
+	store: Store,
+	school: string,
+	opened: OpenedGeneration,
+	asOf: string,
+): Promise<AtmEvent[]> => {
+	if (opened.pointer !== null) {
+		const stored = await readStoredLog(store, school, opened.pointer);
+		if (stored !== null) return stored;
+	}
+	return eventsUpTo(await readEventsFromStore(store, school), asOf);
+};
+
+export type OpenSnapshotOptions = {
+	/** The manifest and pointer, when the caller has read them already. */
+	opened?: OpenedGeneration;
+	/** The whole log, when the caller has just read it (the views job): nothing is read again. */
+	events?: readonly AtmEvent[];
+};
+
 /**
  * Opens the school's views, or throws the `ApiError` that answers for it: `no_data` (404) before a first run,
  * `views_unavailable` (503) when the job has left a note that the log cannot be replayed or the manifest is unreadable.
@@ -141,8 +168,10 @@ const eventsUpTo = (events: AtmEvent[], asOf: string): AtmEvent[] => {
 export const openSnapshot = async (
 	store: Store,
 	school: string,
+	options: OpenSnapshotOptions = {},
 ): Promise<SchoolSnapshot> => {
-	const reader = await readViewsFromStore(store, school);
+	const opened = options.opened ?? (await openGeneration(store, school));
+	const { reader } = opened;
 	if (!reader.ok) {
 		if (reader.error === "bad-manifest")
 			throw new ApiError(
@@ -161,9 +190,11 @@ export const openSnapshot = async (
 	const key = `${school}|${asOf}|${generatedFrom.lastEventId}|${generatedFrom.eventCount}`;
 	let derived = generations.get(key);
 	if (derived === undefined) {
-		const events = readEventsFromStore(store, school).then((all) =>
-			eventsUpTo(all, asOf),
-		);
+		const given = options.events;
+		const events =
+			given === undefined
+				? eventsOf(store, school, opened, asOf)
+				: Promise.resolve(eventsUpTo([...given], asOf));
 		const menu = events.then(latestMenu);
 		const rows = Promise.all([events, menu]).then(([list, found]) => {
 			const zone = found?.timeZone ?? list.at(-1)?.tz ?? "UTC";

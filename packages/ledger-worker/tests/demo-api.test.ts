@@ -505,7 +505,8 @@ describe("GET /v1/schools/:id/demo-api/<route>", () => {
 		expect((await call(harness, null, `${base}/finance-grants`)).status).toBe(
 			200,
 		);
-	});
+		// two runs, each building a school's views and storing their answers
+	}, 30_000);
 });
 
 const sha256 = async (body: Uint8Array): Promise<string> =>
