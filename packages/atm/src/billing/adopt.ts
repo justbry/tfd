@@ -34,6 +34,7 @@ import {
 	addZonedMonths,
 	customerRow,
 	EMPTY_GRANTS_STATE,
+	expiryZoneOf,
 	giftEntId,
 	onceEntId,
 	productOp,
@@ -86,6 +87,7 @@ export const grantsStateFromCallerRows = (
 	input: CallerRowsInput,
 ): CallerRowsImport => {
 	const { membership, lots, menu, now } = input;
+	const expiryZone = expiryZoneOf(input.policy, menu);
 	const problems: string[] = [];
 	const problem = (message: string) => problems.push(message);
 	const label = `membership ${membership.id}`;
@@ -451,6 +453,7 @@ export const grantsStateFromCallerRows = (
 					newest,
 					rollover: spec.rollover,
 					boundary,
+					zone: expiryZone,
 				}),
 			});
 		}
@@ -506,19 +509,24 @@ export const grantsStateFromCallerRows = (
 	return { state, rows: sortRows([...engineRows, grantsRow(state)]) };
 };
 
-/** The newest lot's leftovers roll over at `boundary`; an older lot's already are a rollover, expiring where the lot does. */
+/**
+ * The newest lot's leftovers roll over at `boundary`, lapsing as the policy's rules count the months (`zone`); an older
+ * lot's already are a rollover, expiring where the lot does.
+ */
 const rolloverExpiresAtOf = ({
 	lot,
 	newest,
 	rollover,
 	boundary,
+	zone,
 }: {
 	lot: Lot;
 	newest: Lot;
 	rollover: RowSpec["rollover"];
 	boundary: number;
+	zone: string | null;
 }): number | null => {
-	if (lot === newest) return rolloverExpiry(rollover, boundary);
+	if (lot === newest) return rolloverExpiry(rollover, boundary, zone);
 	return rollover ? lot.expires_at : null;
 };
 

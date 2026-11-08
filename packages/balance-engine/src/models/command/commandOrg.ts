@@ -1,4 +1,4 @@
-// Modified by justbry/atm: opt-in expiry-first draw order (org.config.deduction_order).
+// Modified by justbry/atm: opt-in expiry-first draw order (org.config.deduction_order); rollover expiry in a time zone (org.config.rollover_time_zone).
 import { OrgConfigSchema } from "@autumn/shared";
 import { z } from "zod/v4";
 import { openSchema } from "../common/openSchema.js";
@@ -34,6 +34,12 @@ export const commandOrgSchema = openSchema({
 				 * Set by the caller on the command (atm's `commandOrg`); `orgToCommandOrg` does not copy it, the server's org has none.
 				 */
 				deduction_order: z.enum(["expiry", "engine"]).nullish(),
+				/**
+				 * An IANA zone: a reset counts a new rollover's expiry months on that zone's calendar (same wall-clock time, day
+				 * clamped). Absent and null keep the shared `calculateNextExpiry`, which counts on the process's calendar.
+				 * Set by the caller on a reset (atm's grants under policy rules version 2); `orgToCommandOrg` does not copy it.
+				 */
+				rollover_time_zone: nonEmptyStringSchema.nullish(),
 			})
 			.loose(),
 		/** The Svix apps the org's webhooks deliver through, one per env; absent where none is set up. */

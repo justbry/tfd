@@ -10,7 +10,13 @@
 		"upgradeGrant": { "enum": ["prorated", "full", "none"] },
 		"removeOnFullRefund": { "type": "boolean" },
 		"removeOnLostDispute": { "type": "boolean" },
-		"giftSessionMonths": { "type": "integer", "minimum": 1, "maximum": 120 },
+		"giftSessionMonths": {
+			"description": "Months a session gift certificate lasts. null: a gift add-on follows its grant's rollover months, or never lapses when it has none, and a gift code's credits never lapse.",
+			"oneOf": [
+				{ "type": "null" },
+				{ "type": "integer", "minimum": 1, "maximum": 120 }
+			]
+		},
 		"giftDollarMinimum": {
 			"type": "integer",
 			"minimum": 50,
@@ -22,6 +28,10 @@
 		"cancelCutoffHours": { "type": "integer", "minimum": 0, "maximum": 720 },
 		"noShow": { "enum": ["spend", "release"] },
 		"lateCancel": { "enum": ["spend", "release"] },
+		"rulesVersion": {
+			"description": "The grants' date rules. 1 (the default, and every policy stored without it): rollovers and one-time add-ons lapse on the UTC calendar. 2: on the menu's calendar (its timeZone).",
+			"enum": [1, 2]
+		},
 		"revenueShare": {
 			"description": "B4 Uni's revenue share, negotiated per school: null (the default) for none, or a percentage of each payment collected, before Stripe's fee. 0 is no share.",
 			"oneOf": [

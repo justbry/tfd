@@ -18,6 +18,7 @@ import {
 	HANDLER_DDL as handlerDdl,
 	migrateHandlerSchema as migrateHandlerSchemaImpl,
 } from "./handler/schema.js";
+import * as stripeEndpoint from "./handler/stripe-endpoint.js";
 import * as signature from "./handler/stripe-signature.js";
 import * as webhook from "./handler/stripe-webhook.js";
 import { catalogPublishedEvent as catalogPublishedEventImpl } from "./ledger/catalog.js";
@@ -143,6 +144,9 @@ import type {
 	Checkpoint,
 	CheckpointKpiRow,
 	CheckpointStep,
+	CloverEndpointCheck,
+	CreateCloverEndpointInput,
+	CreatedWebhookEndpoint,
 	CreateSessionGiftCodeInput,
 	CreateSessionGiftCodeResult,
 	DollarGiftInput,
@@ -230,6 +234,7 @@ import type {
 	StaleRevisionConstructor,
 	Store,
 	StoredInput,
+	StripeAccountAccess,
 	StripeEventInput,
 	StripeEventResult,
 	StripeOp,
@@ -240,6 +245,7 @@ import type {
 	SubscriptionStatus,
 	VerifySignatureInput,
 	WebhookDeps,
+	WebhookEndpointInfo,
 	WebhookRequest,
 	WebhookResponse,
 } from "./types.js";
@@ -863,6 +869,62 @@ export const handleStripeWebhook = (
 	deps: WebhookDeps,
 	request: WebhookRequest,
 ): WebhookResponse => webhook.handleStripeWebhook(deps, request);
+
+// ---- The school's Stripe webhook endpoint (D12 decision 10: tfd owns the clover version) ----
+
+/** The Stripe API version the handler reads, `2025-10-29.clover`: a school's endpoint must be created at it. */
+export const STRIPE_WEBHOOK_API_VERSION: string =
+	stripeEndpoint.STRIPE_WEBHOOK_API_VERSION;
+
+/** Every event type the handler takes (10), and so every type a school's endpoint must send. */
+export const STRIPE_WEBHOOK_EVENTS: readonly string[] =
+	stripeEndpoint.STRIPE_WEBHOOK_EVENTS;
+
+/** The query parameter (`v=clover`) the endpoint's URL carries, so the route can tell it from an older endpoint. */
+export const CLOVER_ENDPOINT_PARAM: {
+	readonly name: string;
+	readonly value: string;
+} = stripeEndpoint.CLOVER_ENDPOINT_PARAM;
+
+/** Thrown when Stripe refuses an endpoint call: `status` is the HTTP status, `code` Stripe's error code (or type). */
+export const StripeEndpointError: new (
+	message: string,
+	status: number,
+	code: string | null,
+) => Error & { readonly status: number; readonly code: string | null } =
+	stripeEndpoint.StripeEndpointError;
+
+/** The caller's endpoint URL with `v=clover` set; refuses a URL that is not https. */
+export const cloverEndpointUrl = (url: string): string =>
+	stripeEndpoint.cloverEndpointUrl(url);
+
+/**
+ * Creates the school's webhook endpoint on its own Stripe account (its key, through the `fetch` passed), at clover,
+ * with every handled event and `v=clover` on the URL. Returns the endpoint id and its signing secret (shown once).
+ */
+export const createCloverEndpoint = (
+	input: CreateCloverEndpointInput,
+): Promise<CreatedWebhookEndpoint> =>
+	stripeEndpoint.createCloverEndpoint(input);
+
+/** The endpoint as Stripe has it now: URL, API version, status and events. */
+export const retrieveWebhookEndpoint = (
+	input: StripeAccountAccess & { id: string },
+): Promise<WebhookEndpointInfo> =>
+	stripeEndpoint.retrieveWebhookEndpoint(input);
+
+/** Whether an endpoint can serve the handler: at clover, enabled, sending every handled event, `v=clover` on its URL. */
+export const checkCloverEndpoint = (
+	endpoint: WebhookEndpointInfo,
+): CloverEndpointCheck => stripeEndpoint.checkCloverEndpoint(endpoint);
+
+/**
+ * The last step of the two-endpoint handover: disables or deletes the school's old endpoint. Refuses an endpoint at
+ * clover, so the live one is never retired by mistake. Returns the endpoint as it was.
+ */
+export const retireWebhookEndpoint = (
+	input: StripeAccountAccess & { id: string; action: "disable" | "delete" },
+): Promise<WebhookEndpointInfo> => stripeEndpoint.retireWebhookEndpoint(input);
 
 // ---- Stored inputs: what the handler keeps to decide an event again ----
 

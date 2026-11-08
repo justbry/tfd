@@ -402,6 +402,7 @@ Details and reasons in [`decisions.md`](decisions.md). Recommended defaults:
 | 4 | What replaces the admin-invoice grant (`adminInvoicePaid`, bs `webhook.ts:147`; `invoice.ts:104`)? No tfd handler for it was found. Lead: the admin invoice holds the add-on's published one-time price (`invoice.ts:48`), so tfd's one-time add-on path (`ce_once_*`) may already grant it if the handler can locate the member from the invoice's metadata | a golden bundle with a real admin invoice | B16 |
 | 5 | Do schools' restricted keys allow payout reads and balance-transaction reads? Today's key has no payout permission; balance transactions are unverified | the connect flow's permission list; a test-mode key | `payout.*` events, `prefetchFee` |
 | 6 | Production member and school counts | O2 | sizing stage 3 and 4 |
+| 7 | Decision 4 needs more than `recordLapse`. It books `credit.expired` only for rows and rollovers whose `expires_at` has passed; a tier row whose cycle ended unpaid has no `expires_at` (it waits for its next invoice), so it keeps its balance and nothing is booked. A bs lot of that cycle lapses at the cycle's end plus the grant's rollover months (no rollover: at the cycle's end). Matching it needs a tfd command that dates the unpaid cycle's refilling rows as `subscriptionEndedToCommands` does at a cancel, and that a late payment's invoice undoes (found in T8, 2026-11-08) | tfd design, then a golden bundle: renewal unpaid, lapse, late payment | B17, stage 4 |
 
 ## 14. Rough timeline
 

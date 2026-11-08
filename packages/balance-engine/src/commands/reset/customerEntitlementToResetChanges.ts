@@ -1,3 +1,4 @@
+// Modified by justbry/atm: a reset counts rollover expiry on org.config.rollover_time_zone's calendar when it is set.
 import {
 	cusEntToStartingBalance,
 	customerEntitlementToNextResetAt,
@@ -10,6 +11,7 @@ import type { DueRow } from "../../utils/subjectUtils/fullSubjectToDueRows.js";
 import { addRolloversWithinMax } from "../common/addRolloversWithinMax.js";
 import type { ResetCommand } from "./types/resetCommand.js";
 import type { ResetRow } from "./types/resetResult.js";
+import { zonedRolloverExpiry } from "./zonedRolloverExpiry.js";
 
 /** A row the reset refills: the changes replay applies and the row the result reports. */
 export type CustomerEntitlementReset = {
@@ -20,27 +22,45 @@ export type CustomerEntitlementReset = {
 /**
  * What is left on the row carries over, then the cap trims the oldest rollovers first. A rollover that has
  * expired by the reset is not counted or trimmed: the Postgres read never loads it, and the cron books its
- * lapse at its own expiry, which a trim stamped after that expiry would rewrite.
+ * lapse at its own expiry, which a trim stamped after that expiry would rewrite. With `rolloverTimeZone` the new
+ * rollover's expiry months are counted on that zone's calendar instead of the process's.
  */
 const customerEntitlementToRolloverChanges = ({
 	row,
 	cycleEndedAt,
 	now,
+	rolloverTimeZone,
 }: {
 	row: DueRow;
 	cycleEndedAt: number;
 	now: number;
-}): RowChange[] =>
-	addRolloversWithinMax({
+	rolloverTimeZone: string | null | undefined;
+}): RowChange[] => {
+	const newRollovers = getRolloverUpdates({
+		cusEnt: row,
+		nextResetAt: cycleEndedAt,
+	}).toInsert;
+	const config = row.entitlement.rollover;
+	return addRolloversWithinMax({
 		row: {
 			...row,
 			rollovers: row.rollovers.filter(
 				(rollover) => rollover.expires_at === null || rollover.expires_at > now,
 			),
 		},
-		newRollovers: getRolloverUpdates({ cusEnt: row, nextResetAt: cycleEndedAt })
-			.toInsert,
+		newRollovers:
+			rolloverTimeZone && config
+				? newRollovers.map((rollover) => ({
+						...rollover,
+						expires_at: zonedRolloverExpiry({
+							cycleEndedAt,
+							config,
+							timeZone: rolloverTimeZone,
+						}),
+					}))
+				: newRollovers,
 	});
+};
 
 /**
  * Runs for every due row that is a pool's own row. Before the row refills like any other, its pool
@@ -149,6 +169,7 @@ export const customerEntitlementToResetChanges = ({
 				row,
 				cycleEndedAt,
 				now: command.occurredAt,
+				rolloverTimeZone: command.org.config.rollover_time_zone,
 			}),
 		],
 		row: {
