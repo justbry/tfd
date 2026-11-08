@@ -28,6 +28,7 @@ import {
 	subscriptionEvent,
 } from "../src/scenario/stripe-events.js";
 import type { AtmEvent } from "../src/types.js";
+import { hasDuckdb } from "./helpers.js";
 
 const { menu, id: SCHOOL } = ORGS.saas;
 const DAY = 86_400_000;
@@ -564,5 +565,6 @@ test("the atm fold, hledger and DuckDB reach the same MRR from the postings alon
 		atm.filter((row) => row.kpiId === "net_new_mrr").map((row) => row.value),
 	).toEqual([5100, -4100]);
 	expect(await rowsOf(hledgerChannel)).toEqual(atm);
-	expect(await rowsOf(duckdbChannel)).toEqual(atm);
+	// DuckDB is optional, as in scenario-channel-duckdb.test.ts.
+	if (hasDuckdb) expect(await rowsOf(duckdbChannel)).toEqual(atm);
 });
