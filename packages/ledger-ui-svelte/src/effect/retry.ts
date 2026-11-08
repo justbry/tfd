@@ -25,33 +25,54 @@ const retrySchedule = (baseMilliseconds: number) =>
 export const retryingText = (attempt: number): string =>
 	`Retrying (${attempt} of ${maximumTries})`;
 
+export type RetryOptions = {
+	baseMilliseconds?: number;
+	/** Whose retry toast it is (`ToastInput.owner`): another read's identical retry never merges into it. */
+	owner?: string;
+	/** A toast already up for this failure (a failure toast whose Retry started this run): the progress shows in its
+	 * second line instead of in a second toast, and its own line comes back when the run ends. */
+	progressIn?: { id: string; detail: string };
+};
+
 /** Runs `effect`, trying again while `mayRetry` allows and fewer than three tries have run. While it retries, one
- * toast says so ("Retrying (2 of 3)", then "(3 of 3)"); it leaves when the effect ends either way, and the caller
- * reports a final failure. */
+ * toast says so ("Retrying (2 of 3)", then "(3 of 3)"): its own, or the failure toast given in `progressIn`. It leaves
+ * (or `progressIn` gets its line back) when the effect ends either way, interrupted included, and the caller reports
+ * a final failure. */
 export const withRetry = <A, R>(
 	effect: Effect.Effect<A, UiError, R>,
 	attempted: Attempted,
-	options: { baseMilliseconds?: number } = {},
+	options: RetryOptions = {},
 ): Effect.Effect<A, UiError, R | Toasts> =>
 	Effect.gen(function* () {
 		const toasts = yield* Toasts;
 		let tries = 1;
 		let toastId: string | null = null;
+		let progressShown = false;
+		const { progressIn, owner } = options;
 		const tryAgain = (error: UiError): Effect.Effect<boolean> =>
 			Effect.gen(function* () {
 				if (!mayRetry(error, attempted) || tries >= maximumTries) return false;
 				tries += 1;
 				const detail = retryingText(tries);
-				if (toastId === null)
+				if (progressIn) {
+					progressShown = true;
+					yield* toasts.update(progressIn.id, { detail });
+				} else if (toastId === null)
 					toastId = yield* toasts.show({
 						tone: "info",
 						sticky: true,
 						title: messageFor(error).title,
 						detail,
+						...(owner === undefined ? {} : { owner }),
 					});
 				else yield* toasts.update(toastId, { detail });
 				return true;
 			});
+		const tidy = Effect.suspend(() => {
+			if (progressIn && progressShown)
+				return toasts.update(progressIn.id, { detail: progressIn.detail });
+			return toastId === null ? Effect.void : toasts.dismiss(toastId);
+		});
 		return yield* effect.pipe(
 			Effect.retry({
 				schedule: retrySchedule(
@@ -59,10 +80,6 @@ export const withRetry = <A, R>(
 				),
 				while: tryAgain,
 			}),
-			Effect.ensuring(
-				Effect.suspend(() =>
-					toastId === null ? Effect.void : toasts.dismiss(toastId),
-				),
-			),
+			Effect.ensuring(tidy),
 		);
 	});

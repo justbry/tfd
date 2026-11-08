@@ -21,6 +21,9 @@ export type ToastInput = {
 	action?: ToastAction;
 	/** Stays until dismissed or updated whatever its tone (a retry in progress). */
 	sticky?: boolean;
+	/** Who the toast speaks for (one read of a screen): identical messages merge only within one owner, so that one
+	 * read's recovery never takes down another read's still-valid failure. None: merges with any unowned toast. */
+	owner?: string;
 };
 
 export type ToastPatch = Partial<ToastInput>;
@@ -52,6 +55,7 @@ export const staysUntilDismissed = (toast: ToastInput): boolean =>
 	toast.sticky === true || toast.tone === "error" || toast.tone === "warning";
 
 const sameMessage = (toast: Toast, input: ToastInput): boolean =>
+	toast.owner === input.owner &&
 	toast.title === input.title &&
 	(toast.detail ?? "") === (input.detail ?? "") &&
 	toast.tone === input.tone;
@@ -63,8 +67,8 @@ export type Added = {
 	shown: boolean;
 };
 
-/** Adds a toast: merges it into an identical one (visible or waiting) with a count, else shows it, or queues it when
- * four are on screen. A merged toast takes the newer action. */
+/** Adds a toast: merges it into an identical one of the same owner (visible or waiting) with a count, else shows it,
+ * or queues it when four are on screen. A merged toast takes the newer action. */
 export function addToast(state: ToastState, input: ToastInput): Added {
 	const bump = (toast: Toast): Toast =>
 		sameMessage(toast, input)

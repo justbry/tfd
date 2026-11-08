@@ -12,13 +12,14 @@ afterEach(() => {
 	cleanup = undefined;
 });
 
-function renderToaster() {
+function renderToaster(options: { frame?: HTMLElement } = {}) {
 	document.body.innerHTML = '<div id="target"></div>';
+	if (options.frame) document.body.append(options.frame);
 	const { runtime, toasts, clock } = toastRuntime();
 	const store = new ToastStore(toasts);
 	const component = mount(Toaster, {
 		target: document.getElementById("target") as HTMLElement,
-		props: { store, anchor: null, frame: null },
+		props: { store, anchor: null, frame: options.frame ?? null },
 	});
 	// Runs the toaster's mount effects (its focus listeners) before the test moves focus.
 	flushSync();
@@ -195,9 +196,17 @@ describe("the toaster and focus", () => {
 		const dismiss = document.querySelector<HTMLButtonElement>(
 			"[data-test=toast-dismiss]",
 		);
+		// Another control in between, so that happy-dom's own refocus (to whatever had focus last) is not `before`.
+		const between = document.createElement("button");
+		document.querySelector("[data-test=toasts]")?.append(between);
+		between.focus();
 		dismiss?.focus();
 		expect(document.activeElement).toBe(dismiss);
 		dismiss?.click();
+		await until(
+			() => queryAll("[data-test=toast]").length === 0,
+			"the toast to leave",
+		);
 		expect(document.activeElement).toBe(before);
 	});
 	test("with nothing to go back to, focus goes to the next toast's Dismiss", async () => {
@@ -208,6 +217,10 @@ describe("the toaster and focus", () => {
 		const [first, second] = queryAll("[data-test=toast-dismiss]");
 		first?.focus();
 		first?.click();
+		await until(
+			() => queryAll("[data-test=toast]").length === 1,
+			"the first toast to leave",
+		);
 		expect(document.activeElement === second).toBe(true);
 	});
 	test("an action that keeps its toast leaves it on screen", async () => {
@@ -234,6 +247,73 @@ describe("the toaster and focus", () => {
 		flushSync();
 		expect(runs).toBe(1);
 		expect(queryAll("[data-test=toast]")).toHaveLength(1);
+	});
+});
+
+describe("focus when a toast leaves without a click", () => {
+	/** Focus on a toast's Dismiss after `before` had it, and after another toast's Dismiss had it in between: happy-dom
+	 * gives a removed element's focus back to whatever had it last (that other Dismiss), where a browser drops it on
+	 * the body, so the test passes only when the toaster itself sends focus to `before`. Returns the toast's id. */
+	async function focusIntoToast(
+		rendered: ReturnType<typeof renderToaster>,
+		tone: "error" | "success",
+		before?: HTMLElement,
+	): Promise<string> {
+		await rendered.runtime.runPromise(
+			rendered.toasts.show({ tone: "error", title: "Other" }),
+		);
+		const id = await rendered.runtime.runPromise(
+			rendered.toasts.show({
+				tone,
+				title: tone === "error" ? "Server failed" : "Saved",
+			}),
+		);
+		flushSync();
+		before?.focus();
+		const [other, dismiss] = queryAll("[data-test=toast-dismiss]");
+		other?.focus();
+		dismiss?.focus();
+		expect(document.activeElement === dismiss).toBe(true);
+		return id;
+	}
+	const outsideButton = (): HTMLButtonElement => {
+		const button = document.createElement("button");
+		button.textContent = "Save";
+		document.body.append(button);
+		return button;
+	};
+
+	test("taken down by the read it reported (settle): focus goes back to the control that had it", async () => {
+		const rendered = renderToaster();
+		const before = outsideButton();
+		const id = await focusIntoToast(rendered, "error", before);
+		await rendered.runtime.runPromise(rendered.toasts.dismiss(id));
+		flushSync();
+		expect(document.activeElement).toBe(before);
+	});
+	test("taken down by its timer: focus goes back to the control that had it", async () => {
+		const rendered = renderToaster();
+		const before = outsideButton();
+		await focusIntoToast(rendered, "success", before);
+		await rendered.clock.advance(5000);
+		flushSync();
+		expect(queryAll("[data-test=toast]")).toHaveLength(1);
+		expect(document.activeElement).toBe(before);
+	});
+	test("with nothing before and no other toast, focus goes to the app's frame", async () => {
+		const frame = document.createElement("div");
+		const rendered = renderToaster({ frame });
+		const id = await rendered.runtime.runPromise(
+			rendered.toasts.show({ tone: "error", title: "Server failed" }),
+		);
+		flushSync();
+		document
+			.querySelector<HTMLButtonElement>("[data-test=toast-dismiss]")
+			?.focus();
+		await rendered.runtime.runPromise(rendered.toasts.dismiss(id));
+		flushSync();
+		expect(document.activeElement).toBe(frame);
+		expect(frame.getAttribute("tabindex")).toBe("-1");
 	});
 });
 

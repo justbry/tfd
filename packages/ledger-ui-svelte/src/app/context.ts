@@ -1,4 +1,4 @@
-import { Cause, Effect, type ManagedRuntime } from "effect";
+import { Cause, Effect, Exit, type ManagedRuntime } from "effect";
 import { getContext, setContext } from "svelte";
 import type { Clock as CalendarClock } from "$contract/data/types.ts";
 import type { AppServices } from "../effect/app-layer.ts";
@@ -28,14 +28,18 @@ export function useApp(): AppContext {
 	return context;
 }
 
-/** A run's end: its value, or its error and the toast that reported it (so that a later success can take the toast
- * down: errors stay until dismissed or fixed); no toast when the screen no longer wanted the run. */
+/** A run's end: its value; or its error and the toast that reported it (so that a later success can take the toast
+ * down: errors stay until dismissed or fixed); or `interrupted`, when the screen stopped it (no toast, nothing
+ * logged: nobody wants that answer any more). */
 export type Outcome<A> =
 	| { ok: true; value: A }
-	| { ok: false; error: UiError; toastId: string | null };
+	| { ok: false; interrupted: false; error: UiError; toastId: string }
+	| { ok: false; interrupted: true };
 
-/** The `UiError` a failed run ends with: its typed failure, or for a defect (a bug in an adapter, an interrupted
- * fiber) an `unexpected` one, written to the log since nothing upstream did. */
+const interrupted = { ok: false, interrupted: true } as const;
+
+/** The `UiError` a failed run ends with: its typed failure, or for a defect (a bug in an adapter) an `unexpected`
+ * one, written to the log since nothing upstream did. */
 const uiErrorOf = (
 	cause: Cause.Cause<UiError>,
 ): Effect.Effect<UiError, never, Log> => {
@@ -50,27 +54,53 @@ const uiErrorOf = (
 	);
 };
 
+export type PerformOptions = {
+	/** What the screen offers for the toast's action. */
+	handlers?: ActionHandlers;
+	/** Whose failure toast it is (`ToastInput.owner`). */
+	owner?: string;
+	/** Aborting it interrupts the run: retries and their waits stop, a call on its way is let go, the run's retry
+	 * toast leaves, and the outcome is `interrupted`. */
+	signal?: AbortSignal;
+};
+
 /** Runs an effect of the app; any failure, typed or a defect, is shown as a toast (with the handlers the screen
  * offers) and returned, so the screen can show the same message in place. The promise never rejects: nothing fails
- * silently. `wanted` false at the failure (the screen moved on) returns it without a toast. */
-export const perform = <A>(
+ * silently. An interruption alone (the signal, or the effect stopping itself) is no failure: no toast, no log. The
+ * report is not interruptible, so a toast it shows always comes back as `toastId`. */
+export const perform = async <A>(
 	{ runtime }: Pick<AppContext, "runtime">,
 	effect: Effect.Effect<A, UiError, AppServices>,
-	handlers: ActionHandlers = {},
-	wanted: () => boolean = () => true,
-): Promise<Outcome<A>> =>
-	runtime.runPromise(
+	options: PerformOptions = {},
+): Promise<Outcome<A>> => {
+	/** The failure as reported, kept outside the fiber: an abort landing just after the toast showed still hands the
+	 * toast back, so that the caller can take it down. */
+	let reported: Outcome<A> | null = null;
+	const exit = await runtime.runPromiseExit(
 		effect.pipe(
 			Effect.map((value): Outcome<A> => ({ ok: true, value })),
 			Effect.catchCause((cause) =>
-				Effect.flatMap(uiErrorOf(cause), (error) =>
-					wanted()
-						? Effect.map(
-								reportFailure(error, handlers),
-								(toastId): Outcome<A> => ({ ok: false, error, toastId }),
-							)
-						: Effect.succeed<Outcome<A>>({ ok: false, error, toastId: null }),
-				),
+				Cause.hasInterruptsOnly(cause)
+					? Effect.succeed<Outcome<A>>(interrupted)
+					: Effect.uninterruptible(
+							Effect.flatMap(uiErrorOf(cause), (error) =>
+								Effect.map(
+									reportFailure(error, options.handlers, options.owner),
+									(toastId): Outcome<A> => {
+										reported = {
+											ok: false,
+											interrupted: false,
+											error,
+											toastId,
+										};
+										return reported;
+									},
+								),
+							),
+						),
 			),
 		),
+		options.signal ? { signal: options.signal } : undefined,
 	);
+	return Exit.isSuccess(exit) ? exit.value : (reported ?? interrupted);
+};

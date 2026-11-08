@@ -101,21 +101,32 @@
 		untrack(measure);
 	});
 
-	/** Takes a toast down from its own button. When that button still has focus (the action moved it nowhere),
-	 * focus goes back to the control that had it before, else to the next toast's Dismiss, so that a keyboard user is
-	 * never dropped on the page's body. */
-	const leave = (id: string, event: MouseEvent): void => {
-		// Svelte delegates clicks, so the button is found from the target rather than `currentTarget`.
-		const button = event.target instanceof Element ? event.target.closest("button") : null;
-		if (button && document.activeElement === button) {
-			const neighbours = [
-				...(region?.querySelectorAll<HTMLElement>("[data-test=toast-dismiss]") ?? []),
-			].filter((candidate) => !button.closest("[data-test=toast]")?.contains(candidate));
-			const target = focusBefore?.isConnected ? focusBefore : neighbours[0];
-			target?.focus();
-		}
-		store.dismiss(id);
+	/** Focus never falls to the page's body when a toast leaves, whatever takes it down (its own button, the read it
+	 * reported recovering, its timer): before the stack redraws, if focus is inside a toast that is leaving, it goes
+	 * back to the control that had it before the stack, else to the Dismiss of a toast that stays, else to the app's
+	 * frame. */
+	const focusTarget = (staying: ReadonlySet<string>): HTMLElement | null => {
+		if (focusBefore?.isConnected) return focusBefore;
+		const neighbour = [
+			...(region?.querySelectorAll<HTMLElement>("[data-toast-id]") ?? []),
+		].find((element) => staying.has(element.dataset.toastId ?? ""));
+		const dismiss = neighbour?.querySelector<HTMLElement>("[data-test=toast-dismiss]");
+		if (dismiss) return dismiss;
+		if (frame && !frame.hasAttribute("tabindex")) frame.tabIndex = -1;
+		return frame;
 	};
+	$effect.pre(() => {
+		const staying = new Set(visible.map((toast) => toast.id));
+		untrack(() => {
+			const active = document.activeElement;
+			const holder =
+				active instanceof HTMLElement && region?.contains(active)
+					? active.closest<HTMLElement>("[data-toast-id]")
+					: null;
+			if (holder && !staying.has(holder.dataset.toastId ?? ""))
+				focusTarget(staying)?.focus();
+		});
+	});
 
 	onMount(() => {
 		const onFocusIn = (event: FocusEvent): void => {
@@ -162,6 +173,7 @@
 	{#each visible as toast (toast.id)}
 		<div
 			data-test="toast"
+			data-toast-id={toast.id}
 			data-tone={toast.tone}
 			class={[
 				"pointer-events-auto flex items-start gap-2 rounded-lg border-l-[3px] bg-foreground px-3 py-2 text-background shadow-toast",
@@ -192,9 +204,9 @@
 						type="button"
 						class="mt-1 rounded-md border border-background/40 px-2 py-0.5 font-semibold hover:bg-background/10 focus-visible:outline-2 focus-visible:outline-background"
 						data-test="toast-action"
-						onclick={(event) => {
+						onclick={() => {
 							toast.action?.run();
-							if (!toast.action?.keep) leave(toast.id, event);
+							if (!toast.action?.keep) store.dismiss(toast.id);
 						}}>{toast.action.label}</button
 					>
 				{/if}
@@ -204,7 +216,7 @@
 				class="-mr-1 grid size-6 place-items-center rounded-md opacity-75 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-background"
 				aria-label={`Dismiss: ${toast.title}`}
 				data-test="toast-dismiss"
-				onclick={(event) => leave(toast.id, event)}
+				onclick={() => store.dismiss(toast.id)}
 			>
 				<Icon name="x" />
 			</button>

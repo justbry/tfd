@@ -17,11 +17,13 @@ const toneOf = (error: UiError): ToastTone =>
 /** What the screen can do for each action; a toast shows the message's action only when the screen gave it. */
 export type ActionHandlers = Partial<Record<MessageAction, () => void>>;
 
-/** Shows a failure as a toast from the message table: title, what happened, what to do, and its action. A field
- * problem also shows at the field (`InlineError`); the toast carries the summary. */
+/** Shows a failure as a toast from the message table: title, what happened, what to do, and its action, on behalf
+ * of `owner` (see `ToastInput.owner`). A field problem also shows at the field (`InlineError`); the toast carries the
+ * summary. */
 export const reportFailure = (
 	error: UiError,
 	handlers: ActionHandlers = {},
+	owner?: string,
 ): Effect.Effect<string, never, Toasts> => {
 	const message = messageFor(error);
 	const handler = message.action ? handlers[message.action] : undefined;
@@ -31,6 +33,7 @@ export const reportFailure = (
 			title: message.title,
 			detail: message.what,
 			doThis: message.doThis,
+			...(owner === undefined ? {} : { owner }),
 			...(message.action && handler
 				? {
 						action: {
