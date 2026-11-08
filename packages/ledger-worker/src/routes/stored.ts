@@ -92,7 +92,9 @@ export const pointerFor = (
 		: null;
 };
 
-const bundles = new Map<string, Promise<Map<string, string> | null>>();
+/** The answers objects read, by school, generation and day: only once read, as a read belongs to its request
+ * (`data/snapshot.ts`), and one kept while in flight would never settle for a later request if its own were cancelled. */
+const bundles = new Map<string, Map<string, string>>();
 
 /** Forgets the isolate's stored answers (tests). */
 export const forgetStoredAnswers = (): void => bundles.clear();
@@ -134,7 +136,7 @@ export const storedAnswer = async (input: {
 	const kept = bundles.get(memoKey);
 	if (kept !== undefined) {
 		input.timing?.note("cache", "isolate");
-		return (await kept)?.get(name) ?? null;
+		return kept.get(name) ?? null;
 	}
 	if (cache !== null) {
 		const hit = await cache
@@ -142,38 +144,31 @@ export const storedAnswer = async (input: {
 			.catch(() => undefined);
 		if (hit !== undefined) return hit.text();
 	}
-	let read = bundles.get(memoKey);
-	if (read === undefined) {
-		read = readStoredAnswers(store, school, pointer);
-		bundles.set(memoKey, read);
-		// a failed or missing read is not kept: the next request reads again
-		read.then(
-			(answers) => {
-				if (answers === null) bundles.delete(memoKey);
-				else if (cache !== null)
-					waitUntil(
-						Promise.all(
-							[...answers].map(([each, data]) =>
-								cache.put(
-									cacheKeyOf(origin, school, pointer, each),
-									cachedCopy(data),
-								),
-							),
-						).catch(() => undefined),
-					);
-			},
-			() => bundles.delete(memoKey),
-		);
-		while (bundles.size > KEPT_BUNDLES) {
-			const oldest = bundles.keys().next().value;
-			if (oldest === undefined) break;
-			bundles.delete(oldest);
-		}
-	}
+	let answers: Map<string, string> | null;
 	try {
-		return (await read)?.get(name) ?? null;
+		answers = await readStoredAnswers(store, school, pointer);
 	} catch {
 		// R2 failed on the answers: the endpoint computes, and says so if R2 fails it too
 		return null;
 	}
+	// a missing read is not kept: the next request reads again
+	if (answers === null) return null;
+	bundles.set(memoKey, answers);
+	while (bundles.size > KEPT_BUNDLES) {
+		const oldest = bundles.keys().next().value;
+		if (oldest === undefined) break;
+		bundles.delete(oldest);
+	}
+	if (cache !== null)
+		waitUntil(
+			Promise.all(
+				[...answers].map(([each, data]) =>
+					cache.put(
+						cacheKeyOf(origin, school, pointer, each),
+						cachedCopy(data),
+					),
+				),
+			).catch(() => undefined),
+		);
+	return answers.get(name) ?? null;
 };
