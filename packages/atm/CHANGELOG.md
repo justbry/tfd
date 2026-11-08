@@ -10,9 +10,9 @@ Newest first. The version history before 0.3.0 and what a caller has to change f
 
   **How each was checked:** every PR above was merged on local gates (tests with `--timeout 60000`, `tsc`, Biome, the build, `knip`), run on the head and again on the tree with `dev` merged in; the inherited Autumn workflows never ran. The atm workflow ran on #43's head (`ea198874c`, run 42067266463, ubuntu-latest): hledger 1.52.1 installed with a matching sha256, 1061 pass, 51 skip, 0 fail, and the three `hledger agrees` tests passed (none skipped). Locally, on the merged tree of each: #41 1090 pass, #42 1094, #49 1124, #46 1138, #47 1166, #48 1223 (50 skipped, 0 failed in each). #41 to #49 had not run in CI when merged; `dev`'s own runs are the first. The skips are the staging R2 and SeaweedFS contract suites and the DuckDB DDL test (no credentials, no `weed`, no `duckdb`). Four of them (#46 to #49) were each reviewed with a high-effort pass that found and fixed real bugs before the merge.
 
-## Unreleased
+## 0.11.0
 
-Merged on `dev` after the 0.10.0 release PR.
+**Release 0.11.0**: the credits engine for buzz-school's move onto tfd's grants (D12, `plans/credits-engine/`), receipt v2 and the rename window, with everything else merged on `dev` since `atm-v0.10.0`. The first release named `tfd`: tag `tfd-v0.11.0` and tarball `https://github.com/justbry/atm/releases/download/tfd-v0.11.0/tfd-0.11.0.tgz` (the release script still publishes to `justbry/atm`; the repository is `justbry/tfd`). Its sha256 and sha512 are printed by `release.ts` and recorded in the GitHub release; what a caller changes is in `UPGRADING.md`, "Moving to 0.11.0 from 0.10.0".
 
 | PR | Merge commit | What |
 |---|---|---|
