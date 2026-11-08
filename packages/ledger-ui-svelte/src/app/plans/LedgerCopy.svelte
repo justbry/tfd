@@ -41,7 +41,7 @@
 
 	// svelte-ignore state_referenced_locally
 	copy.onFirstProblem(() => {
-		const first = content?.querySelector<HTMLElement>("[aria-invalid=true]");
+		const first = content?.querySelector<HTMLElement>("[aria-invalid=true]") ?? content?.querySelector<HTMLElement>("[data-test=ledger-copy-other-problems]");
 		first?.focus();
 	});
 	onDestroy(() => copy.dispose());
@@ -69,15 +69,13 @@
 		confirming = false;
 		if (pinProblem === null) pin = "";
 	};
-	const status = $derived.by(() => {
-		if (copy.saving) return "Saving…";
-		if (copy.verifying) return "Checking the copy…";
-		if (copy.problems.length > 0)
-			return `${copy.problems.length} problem${copy.problems.length === 1 ? "" : "s"}: fix the fields marked`;
-		if (copy.conflict) return "Someone changed this since you opened it";
-		if (copy.saved) return "Saved to the ledger";
-		if (copy.verified) return "Verified: ready to save";
-		return copy.changed ? "Checking the copy…" : "No changes yet";
+	/** Where each problem is drawn: at its field, or in the list below for a path no field here carries (an id, the
+	 * tiers list, the features), so that every problem the toast counts is on screen. */
+	const atAField = /^(tiers\[\d+\]\.(name|blurb|audience|public)|tierOrder.*|purchaseLinkShared)$/;
+	const elsewhere = $derived(copy.problems.filter((problem) => !atAField.test(problem.path)));
+	let pinField = $state<HTMLInputElement | null>(null);
+	$effect(() => {
+		if (copy.stepUp) pinField?.focus();
 	});
 </script>
 
@@ -118,10 +116,10 @@
 					<div class="mt-2 rounded-[10px] border border-border bg-background p-2" data-test="ledger-copy-tier" data-tier={tier.id}>
 						<div class="flex items-center gap-1.5">
 							<b class="flex-1">{tier.id}</b>
-							<Button variant="tool" size="tool-small" class="px-1.5 py-1" aria-label={`Move ${tier.name || tier.id} up`} disabled={position === 0} data-test="ledger-copy-up" onclick={() => move(position, -1)}
+							<Button variant="tool" size="tool-small" class="px-1.5 py-1" aria-label={`Move ${tier.name || tier.id} up`} disabled={position === 0 || copy.saving} data-test="ledger-copy-up" onclick={() => move(position, -1)}
 								><Icon name="chevronLeft" class="-rotate-90" /></Button
 							>
-							<Button variant="tool" size="tool-small" class="px-1.5 py-1" aria-label={`Move ${tier.name || tier.id} down`} disabled={position === order.length - 1} data-test="ledger-copy-down" onclick={() => move(position, 1)}
+							<Button variant="tool" size="tool-small" class="px-1.5 py-1" aria-label={`Move ${tier.name || tier.id} down`} disabled={position === order.length - 1 || copy.saving} data-test="ledger-copy-down" onclick={() => move(position, 1)}
 								><Icon name="chevronRight" class="rotate-90" /></Button
 							>
 						</div>
@@ -133,6 +131,7 @@
 							bind:value={() => tier.name, (name) => editTier(index, (before) => ({ ...before, name }))}
 							aria-invalid={problemsAt(`${base}.name`).length > 0}
 							aria-describedby={fieldId(`${base}.name-problem`)}
+							disabled={copy.saving}
 							data-test="ledger-copy-field"
 							data-field="name"
 						/>
@@ -145,6 +144,7 @@
 							bind:value={() => tier.blurb, (blurb) => editTier(index, (before) => ({ ...before, blurb }))}
 							aria-invalid={problemsAt(`${base}.blurb`).length > 0}
 							aria-describedby={fieldId(`${base}.blurb-problem`)}
+							disabled={copy.saving}
 							data-test="ledger-copy-field"
 							data-field="blurb"
 						/>
@@ -154,7 +154,10 @@
 								<input
 									type="checkbox"
 									checked={tier.public}
-									data-test="ledger-copy-field"
+									aria-invalid={problemsAt(`${base}.public`).length > 0}
+									aria-describedby={fieldId(`${base}.public-problem`)}
+									disabled={copy.saving}
+							data-test="ledger-copy-field"
 									data-field="public"
 									onchange={(event) => editTier(index, (before) => ({ ...before, public: event.currentTarget.checked }))}
 								/> On sale (public)
@@ -165,7 +168,9 @@
 									id={fieldId(`${base}.audience`)}
 									class={[selectControl, "w-auto"]}
 									aria-invalid={problemsAt(`${base}.audience`).length > 0}
-									data-test="ledger-copy-field"
+									aria-describedby={fieldId(`${base}.audience-problem`)}
+									disabled={copy.saving}
+							data-test="ledger-copy-field"
 									data-field="audience"
 									oninput={(event) => {
 										const audience = audienceChoice(event.currentTarget.value);
@@ -181,6 +186,7 @@
 							</label>
 						</div>
 						<InlineError id={fieldId(`${base}.audience-problem`)} problems={problemsAt(`${base}.audience`)} />
+						<InlineError id={fieldId(`${base}.public-problem`)} problems={problemsAt(`${base}.public`)} />
 					</div>
 				{/if}
 			{/each}
@@ -189,7 +195,10 @@
 				<input
 					type="checkbox"
 					checked={copy.value.purchaseLinkShared}
-					data-test="ledger-copy-field"
+					aria-invalid={problemsAt("purchaseLinkShared").length > 0}
+					aria-describedby={fieldId("purchaseLinkShared-problem")}
+					disabled={copy.saving}
+							data-test="ledger-copy-field"
 					data-field="purchaseLinkShared"
 					onchange={(event) => {
 						const shared = event.currentTarget.checked;
@@ -197,8 +206,11 @@
 					}}
 				/> The purchase link has been shared
 			</label>
-			{#if copy.problems.some((problem) => !/^(tiers|tierOrder)/.test(problem.path))}
-				<InlineError id={fieldId("other-problems")} problems={copy.problems.filter((problem) => !/^(tiers|tierOrder)/.test(problem.path))} />
+			<InlineError id={fieldId("purchaseLinkShared-problem")} problems={problemsAt("purchaseLinkShared")} />
+			{#if elsewhere.length > 0}
+				<div class="mt-2" tabindex="-1" data-test="ledger-copy-other-problems">
+					<InlineError id={fieldId("other-problems")} problems={elsewhere.map((problem) => ({ ...problem, message: `${problem.path}: ${problem.message}` }))} />
+				</div>
 			{/if}
 			{#if copy.conflict}
 				<div class="mt-3 rounded-[10px] border border-warning p-2.5" role="alert" data-test="ledger-copy-conflict">
@@ -219,7 +231,7 @@
 				</div>
 			{/if}
 			{#if copy.stepUp}
-				<div class="mt-3 rounded-[10px] border border-warning p-2.5" data-test="ledger-copy-step-up">
+				<div class="mt-3 rounded-[10px] border border-warning p-2.5" role="alert" data-test="ledger-copy-step-up">
 					<b class="text-warning"><Icon name="lock" class="mr-1 inline align-[-2px]" />Confirm it is you</b>
 					<div class={muted}>Saving needs your family PIN from the last 10 minutes.</div>
 					<div class="mt-1.5 flex items-center gap-1.5">
@@ -232,6 +244,7 @@
 							aria-label="Your family PIN"
 							aria-invalid={pinProblem !== null}
 							data-test="ledger-copy-pin"
+							bind:this={pinField}
 							bind:value={pin}
 						/>
 						<Button variant="primary" size="tool" data-test="ledger-copy-confirm" disabled={pin.length < 4 || confirming} onclick={confirm}>Confirm it is you</Button>
@@ -239,7 +252,7 @@
 					{#if pinProblem}<div class={[errorText, "mt-1"]} role="alert">{pinProblem}</div>{/if}
 				</div>
 			{/if}
-			<div class={hint} aria-live="polite" data-test="ledger-copy-status">{status}</div>
+			<div class={hint} aria-live="polite" data-test="ledger-copy-status">{copy.state.status}</div>
 			<div class={footer}>
 				<Button variant="tool" size="tool" data-test="ledger-copy-cancel" onclick={onClose}>Close</Button>
 				<Button

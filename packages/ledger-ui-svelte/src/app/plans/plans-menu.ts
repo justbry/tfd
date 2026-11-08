@@ -291,12 +291,14 @@ function changedTierLines(
 		});
 	if (draft.blurb !== live.blurb)
 		lines.push({ title: "Description changed", detail: "No Stripe change" });
-	const liveMonth = monthlyAmount(live) ?? 0;
-	const draftMonth = monthlyAmount(draft) ?? 0;
-	if (draftMonth !== liveMonth)
+	const liveMonth = monthlyAmount(live);
+	const draftMonth = monthlyAmount(draft);
+	if ((draftMonth ?? 0) !== (liveMonth ?? 0))
 		lines.push({
-			title: `Monthly price ${formatMoney(liveMonth, currency)} → ${formatMoney(draftMonth, currency)}`,
-			detail: `Create a ${formatMoney(draftMonth, currency)}/month price and archive the ${formatMoney(liveMonth, currency)} one`,
+			title: `Monthly price ${liveMonth ? formatMoney(liveMonth, currency) : "none"} → ${draftMonth ? formatMoney(draftMonth, currency) : "none"}`,
+			detail: draftMonth
+				? `Create a ${formatMoney(draftMonth, currency)}/month price${liveMonth ? ` and archive the ${formatMoney(liveMonth, currency)} one` : ""}`
+				: "Archive the monthly price",
 		});
 	const liveYear = yearlyAmount(live) ?? 0;
 	const draftYear = yearlyAmount(draft) ?? 0;

@@ -67,6 +67,10 @@ export class LedgerCopy {
 	#timer: ReturnType<typeof setTimeout> | null = null;
 	#verifyRun: AbortController | null = null;
 	#problemsToast: string | null = null;
+	/** The toasts of a failed verify and of a failed save: a later success takes them down. */
+	#verifyToast: string | null = null;
+	#saveToast: string | null = null;
+	#saveRun: AbortController | null = null;
 	#verifyNumber = 0;
 	#focusFirstProblem: () => void = () => undefined;
 
@@ -157,21 +161,45 @@ export class LedgerCopy {
 		this.#verifyNumber += 1;
 		this.value = update(copyOf(this.value));
 		this.verified = null;
+		// The marks and the summary toast were for the value before this keystroke: they come back with the next verdict.
+		this.problems = [];
+		this.#dismissProblems();
 		this.saved = false;
 		this.changed = true;
 		this.#clearTimer();
 		this.#timer = setTimeout(() => this.#verify(), verifyPauseMilliseconds);
 	}
 
-	/** Whether Save is on, and if not why (for its title). */
+	/** Where the copy stands, in one ladder: the status line, and why Save is off (null: it is on). */
+	get state(): { status: string; reason: string | null } {
+		const { problems } = this;
+		if (this.saving) return { status: "Saving…", reason: "Saving…" };
+		if (
+			this.verifying ||
+			this.#timer !== null ||
+			(!this.verified && this.changed && problems.length === 0)
+		)
+			return { status: "Checking the copy…", reason: "Checking the copy…" };
+		if (problems.length > 0)
+			return {
+				status: `${problems.length} problem${problems.length === 1 ? "" : "s"}: fix the ones shown`,
+				reason: "Fix the problems shown first",
+			};
+		if (this.conflict)
+			return {
+				status: "Someone changed this since you opened it",
+				reason: "Someone changed this: reload first",
+			};
+		if (this.saved)
+			return { status: "Saved to the ledger", reason: "Nothing to save" };
+		if (this.verified)
+			return { status: "Verified: ready to save", reason: null };
+		return { status: "No changes yet", reason: "Nothing to save" };
+	}
+
+	/** Why Save is off, or null when it is on. */
 	get saveReason(): string | null {
-		if (this.saving) return "Saving…";
-		if (this.verifying || this.#timer !== null) return "Checking the copy…";
-		if (this.problems.length > 0) return "Fix the fields marked first";
-		if (this.conflict) return "Someone changed this: reload first";
-		if (!this.verified)
-			return this.changed ? "Checking the copy…" : "Nothing to save";
-		return null;
+		return this.state.reason;
 	}
 
 	#clearTimer(): void {
@@ -219,7 +247,13 @@ export class LedgerCopy {
 			if (mine !== this.#verifyNumber) return;
 			this.verifying = false;
 			this.#verifyRun = null;
-			if (!outcome.ok) return;
+			if (!outcome.ok) {
+				if (!outcome.interrupted) this.#verifyToast = outcome.toastId;
+				return;
+			}
+			if (this.#verifyToast !== null)
+				this.#app.toasts.dismiss(this.#verifyToast);
+			this.#verifyToast = null;
 			const verdict = outcome.value;
 			if (!verdict.ok || verdict.verifiedHash === null) {
 				this.verified = null;
@@ -259,13 +293,16 @@ export class LedgerCopy {
 		);
 	}
 
-	/** Save: the PUT of the verified value over the ETag it was read at. */
+	/** Save: the PUT of the verified value over the ETag it was read at. The value saved is the one on screen when Save
+	 * was clicked; an edit made while the PUT was on its way is a newer value that the saved hash says nothing about. */
 	async save(): Promise<void> {
 		const { value, base, verified } = this;
 		if (this.saving || !value || !base || !verified || this.saveReason !== null)
 			return;
 		this.saving = true;
 		const owner = `${this.#owner}-save`;
+		const controller = new AbortController();
+		this.#saveRun = controller;
 		const outcome = await perform(
 			this.#app,
 			withRetry(
@@ -283,6 +320,7 @@ export class LedgerCopy {
 			),
 			{
 				owner,
+				signal: controller.signal,
 				handlers: {
 					retry: () => void this.save(),
 					reload: () => this.reload(),
@@ -293,17 +331,31 @@ export class LedgerCopy {
 				},
 			},
 		);
+		if (this.#saveRun === controller) this.#saveRun = null;
 		this.saving = false;
 		if (outcome.ok) {
+			if (this.#saveToast !== null) this.#app.toasts.dismiss(this.#saveToast);
+			this.#saveToast = null;
 			this.base = { value: copyOf(value), etag: verified.hash };
-			this.verified = { hash: verified.hash, baseEtag: verified.hash };
-			this.changed = false;
-			this.saved = true;
 			this.stepUp = false;
 			this.conflict = null;
+			if (this.value === value) {
+				this.verified = { hash: verified.hash, baseEtag: verified.hash };
+				this.changed = false;
+				this.saved = true;
+			} else {
+				// Edited meanwhile: the stored copy is the one saved, the screen's is newer and wants its own verdict
+				// (an answer that came while the PUT was on its way was over the old base).
+				this.verified = null;
+				this.saved = false;
+				this.changed = true;
+				this.#clearTimer();
+				this.#verify();
+			}
 			return;
 		}
 		if (outcome.interrupted) return;
+		this.#saveToast = outcome.toastId;
 		const { code } = outcome.error.detail;
 		if (code === "stale_etag") this.#verify();
 		else if (code === "step_up_required") this.stepUp = true;
@@ -340,12 +392,19 @@ export class LedgerCopy {
 		return null;
 	}
 
-	/** Leaving the pane or the school: nothing in flight reports, and the problems toast goes. */
+	/** Leaving the pane or the school: nothing in flight reports (a verify, a load and a save on its way are let go),
+	 * and the toasts of this copy go. */
 	dispose(): void {
 		this.#loading?.cancel();
 		this.#abortVerify();
+		this.#saveRun?.abort();
+		this.#saveRun = null;
 		this.#clearTimer();
 		this.#verifyNumber += 1;
 		this.#dismissProblems();
+		for (const toast of [this.#verifyToast, this.#saveToast])
+			if (toast !== null) this.#app.toasts.dismiss(toast);
+		this.#verifyToast = null;
+		this.#saveToast = null;
 	}
 }

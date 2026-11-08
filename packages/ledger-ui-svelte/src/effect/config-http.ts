@@ -127,9 +127,10 @@ export function createHttpConfig(options: {
 				? await options.tokens.refresh()
 				: await options.tokens.current();
 			if (!token)
+				// No token is no session (or no school to administer), never "nothing stored": a 404 alone says that.
 				throw new UiError({
-					kind: "not_found",
-					detail: { code: "not_found" },
+					kind: "unauthenticated",
+					detail: { code: "token_missing" },
 					reason: "no ledger token: the person administers no school",
 					retryable: false,
 				});
@@ -244,19 +245,11 @@ export function createHttpConfig(options: {
 						: { "if-match": quoted(baseEtag) },
 			});
 			const data = dataOf(path, body);
-			if (
-				typeof data.sha256 !== "string" ||
-				typeof data.bytes !== "number" ||
-				typeof data.changed !== "boolean"
-			)
-				throw mismatch(
-					path,
-					"the answer is not {name, sha256, bytes, changed}",
-				);
+			if (typeof data.sha256 !== "string" || typeof data.changed !== "boolean")
+				throw mismatch(path, "the answer is not {name, sha256, changed}");
 			return {
 				name,
 				sha256: data.sha256,
-				bytes: data.bytes,
 				changed: data.changed,
 			};
 		});

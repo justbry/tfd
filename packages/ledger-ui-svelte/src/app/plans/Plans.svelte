@@ -176,14 +176,14 @@
 	let actions = 0;
 	/** One save: the whole menu through the Writer, retried (same request, so the same Idempotency-Key) while it may
 	 * be; a failure is a toast with Retry and the pane's "Retry save". Resolves to whether the server took it. */
-	const persist = async (menu: Menu): Promise<boolean> => {
+	const persist = async (schoolId: string, menu: Menu): Promise<boolean> => {
 		actions += 1;
-		const owner = `plans-save-${school.id}`;
+		const owner = `plans-save-${schoolId}`;
 		const outcome = await perform(
 			app,
 			withRetry(
-				write((writer) => writer.saveMenu(school.id, menu)),
-				{ kind: "write", idempotencyKey: `save-${school.id}-${actions}` },
+				write((writer) => writer.saveMenu(schoolId, menu)),
+				{ kind: "write", idempotencyKey: `save-${schoolId}-${actions}` },
 				{ owner },
 			),
 			{
@@ -196,13 +196,14 @@
 		return outcome.ok;
 	};
 	const saveDraft = (menu: Menu): void => {
-		const current = store.sessions[school.id];
+		const schoolId = school.id;
+		const current = store.sessions[schoolId];
 		if (!current) return;
 		const mine = current.savesStarted + 1;
-		const attempt = current.lastSave.then(() => persist(menu));
-		store.set(school.id, { ...current, saveStatus: "saving", savesStarted: mine, lastSave: attempt });
+		const attempt = current.lastSave.then(() => persist(schoolId, menu));
+		store.set(schoolId, { ...current, saveStatus: "saving", savesStarted: mine, lastSave: attempt });
 		void attempt.then((saved) => {
-			store.set(school.id, (before) =>
+			store.set(schoolId, (before) =>
 				before.savesStarted === mine ? { ...before, saveStatus: saved ? "saved" : "failed" } : before,
 			);
 		});
@@ -335,7 +336,8 @@
 	/** Publishes once the last save has settled, with the family PIN typed in the review: the Writer opens the PIN with
 	 * it (buzz-school checks it on the session) and keeps it nowhere. */
 	const publish = async (pin: string): Promise<void> => {
-		const current = store.sessions[school.id];
+		const schoolId = school.id;
+		const current = store.sessions[schoolId];
 		if (!current) return;
 		publishing = true;
 		if (!(await current.lastSave)) {
@@ -344,12 +346,12 @@
 			return;
 		}
 		actions += 1;
-		const owner = `plans-publish-${school.id}`;
+		const owner = `plans-publish-${schoolId}`;
 		const published = await perform(
 			app,
 			withRetry(
-				write((writer) => writer.publishMenu(school.id, pin)),
-				{ kind: "write", idempotencyKey: `publish-${school.id}-${actions}` },
+				write((writer) => writer.publishMenu(schoolId, pin)),
+				{ kind: "write", idempotencyKey: `publish-${schoolId}-${actions}` },
 				{ owner },
 			),
 			{ owner, handlers: { enter_pin: () => pinField?.focus() } },
@@ -358,13 +360,13 @@
 			publishing = false;
 			return;
 		}
-		const version = (store.sessions[school.id]?.version ?? 0) + 1;
-		const body = await app.runtime.runPromise(readPublished(school.id, version));
-		const after = store.sessions[school.id];
+		const version = (store.sessions[schoolId]?.version ?? 0) + 1;
+		const body = await app.runtime.runPromise(readPublished(schoolId, version));
+		const after = store.sessions[schoolId];
 		if (after) {
 			const moves = audienceMoves(after.live, after.draft, today);
-			if (Object.keys(moves).length > 0) store.move(school.id, moves);
-			store.set(school.id, {
+			if (Object.keys(moves).length > 0) store.move(schoolId, moves);
+			store.set(schoolId, {
 				...after,
 				version,
 				live: after.draft,
@@ -373,10 +375,14 @@
 			});
 			notify(app, `Published v${version}. The Stripe prices are being updated.`);
 		}
-		publishing = false;
-		reviewing = false;
+		// The review is the school's it was opened for: another school's is not this publish's to close.
+		if (school.id === schoolId) {
+			publishing = false;
+			reviewing = false;
+		}
 	};
 	const copyPurchaseLink = async (): Promise<void> => {
+		const schoolId = school.id;
 		const link = `https://b4uni.com/join/${slug(school.name)}`;
 		try {
 			await navigator.clipboard.writeText(link);
@@ -384,8 +390,8 @@
 			notify(app, "Could not copy the link: the browser blocked the clipboard.");
 			return;
 		}
-		const current = store.sessions[school.id];
-		if (current) store.set(school.id, { ...current, summary: { ...current.summary, purchaseLinkShared: true } });
+		const current = store.sessions[schoolId];
+		if (current) store.set(schoolId, { ...current, summary: { ...current.summary, purchaseLinkShared: true } });
 		notify(app, `Purchase link copied: ${link}`);
 	};
 	/** Mockup `doSetup`. */
@@ -425,6 +431,18 @@
 		ledgerCopy?.dispose();
 		ledgerCopy = null;
 	};
+	/** Another school (Back, Forward, a typed hash): what was open for the one before leaves with it, so that a sheet, a
+	 * dialog or a save never speaks for the school now on screen. The copy in the ledger is disposed: its verify, load and
+	 * save in flight are let go, with their toasts. */
+	$effect(() => {
+		void school.id;
+		return () => {
+			closeLedgerCopy();
+			editing = null;
+			reviewing = false;
+			publishing = false;
+		};
+	});
 	const ledgerCopyTitle = $derived(
 		view.preview ? exitPreviewTitle : owner ? undefined : "Owners write the copy in the ledger",
 	);

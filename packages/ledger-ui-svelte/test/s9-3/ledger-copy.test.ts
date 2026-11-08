@@ -203,7 +203,7 @@ describe("editing: verify on every pause, problems where they are", () => {
 			(one(nameField("glow")) as HTMLInputElement).getAttribute("aria-invalid"),
 		).toBe("true");
 		expect(save().disabled).toBe(true);
-		expect(save().title).toBe("Fix the fields marked first");
+		expect(save().title).toBe("Fix the problems shown first");
 		const summaries = toasts(app).filter(
 			(toast) => toast.title === "Some fields need a change",
 		);
@@ -366,6 +366,12 @@ describe("saving: stale, step-up, retry", () => {
 			(entry) => entry.title === "Confirm it is you",
 		);
 		expect(toast?.action?.label).toBe("Confirm it is you");
+		// The words match what the sheet asks for: the PIN (the Worker's step-up), not only a mailed link.
+		expect(toast?.doThis).toContain("PIN");
+		await until(
+			() => document.activeElement === one("[data-test=ledger-copy-pin]"),
+			"the PIN field to take focus",
+		);
 		expect(config.peek("vol", "plans-draft")).toBeNull();
 		await until(
 			() => one("[data-test=ledger-copy-step-up]") !== null,
@@ -509,5 +515,447 @@ describe("saving: stale, step-up, retry", () => {
 			toasts(opened.app).filter((toast) => toast.tone === "error"),
 		).toEqual([]);
 		expect(opened.log.entries()).toEqual([]);
+	});
+});
+
+/** A put that waits for `release()` before it reaches the store, so that a test can edit while the PUT is on its way. */
+function gatedPut(base: ReturnType<typeof fixtureConfigFor>) {
+	let release: () => void = () => undefined;
+	const gate = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let started = 0;
+	const put = ((...args: Parameters<typeof base.put>) =>
+		Effect.suspend(() => {
+			started += 1;
+			// Only the first put waits.
+			return started === 1
+				? Effect.promise(() => gate).pipe(
+						Effect.flatMap(() => base.put(...args)),
+					)
+				: base.put(...args);
+		})) as typeof base.put;
+	return { put, release: () => release(), started: () => started };
+}
+
+describe("an edit made while the PUT is on its way", () => {
+	const puts = (base: ReturnType<typeof fixtureConfigFor>) =>
+		base.calls.filter(({ method }) => method === "put");
+
+	test("its verdict settles first: Save is not on for the new text with the old hash, the status is not 'Saved', and the next Save sends the new hash", async () => {
+		const base = fixtureConfigFor();
+		const held = gatedPut(base);
+		const opened = await openCopy("#/vol/plans?theme=light", {
+			config: { ...base, put: held.put },
+		});
+		await until(() => !save().disabled, "the first verify");
+		const oldHash = await hashOf(seeded());
+		save().click();
+		await until(
+			() =>
+				held.started() === 1 &&
+				(one(nameField("glow")) as HTMLInputElement).disabled,
+			"the PUT on its way, the fields off",
+		);
+		type(nameField("glow"), "Glow Two");
+		// The verify of the new text answers (400 ms pause) before the PUT does.
+		await until(
+			() => base.calls.filter(({ method }) => method === "verify").length === 2,
+			"the verify of the new text",
+			1500,
+		);
+		await pause(50);
+		expect(save().disabled).toBe(true);
+		expect(save().title).toBe("Saving…");
+		held.release();
+		await until(
+			() =>
+				puts(base).length === 1 &&
+				text("[data-test=ledger-copy-status]") !== "Saving…",
+			"the PUT to answer",
+		);
+		await until(() => !save().disabled, "Save for the new text", 1500);
+		expect(text("[data-test=ledger-copy-status]")).toBe(
+			"Verified: ready to save",
+		);
+		expect(one("[data-test=ledger-copy-conflict]")).toBeNull();
+		save().click();
+		await until(
+			() => text("[data-test=ledger-copy-status]") === "Saved to the ledger",
+			"the second save",
+		);
+		const [first, second] = puts(base);
+		expect(first?.args[3]).toBe(oldHash);
+		const newValue = {
+			...seeded(),
+			tiers: seeded().tiers.map((tier) =>
+				tier.id === "glow" ? { ...tier, name: "Glow Two" } : tier,
+			),
+		};
+		expect(second?.args[3]).toBe(await hashOf(newValue));
+		expect(base.peek("vol", "plans-draft")?.etag).toBe(await hashOf(newValue));
+		expect(
+			opened.app.toasts.state.visible.filter((toast) => toast.tone === "error"),
+		).toEqual([]);
+	}, 15_000);
+
+	test("its verdict settles after: no false 'Someone changed this' from the old base, and Save then sends the right hash", async () => {
+		const base = fixtureConfigFor();
+		const held = gatedPut(base);
+		let verifies = 0;
+		let releaseVerify: () => void = () => undefined;
+		const slowVerify = new Promise<void>((resolve) => {
+			releaseVerify = resolve;
+		});
+		const config = {
+			...base,
+			put: held.put,
+			verify: ((...args: Parameters<typeof base.verify>) => {
+				verifies += 1;
+				// The verify of the edit made during the PUT is slow: it answers after the PUT has landed.
+				return verifies === 2
+					? Effect.promise(() => slowVerify).pipe(
+							Effect.flatMap(() => base.verify(...args)),
+						)
+					: base.verify(...args);
+			}) as typeof base.verify,
+		};
+		await openCopy("#/vol/plans?theme=light", { config });
+		await until(() => !save().disabled, "the first verify");
+		save().click();
+		await until(() => held.started() === 1, "the PUT on its way");
+		type(nameField("glow"), "Glow Two");
+		await until(() => verifies === 2, "the slow verify to start", 1500);
+		held.release();
+		await until(
+			() => puts(base).length === 1 && base.peek("vol", "plans-draft") !== null,
+			"the PUT to land",
+		);
+		releaseVerify();
+		await until(
+			() => verifies === 3 && !save().disabled,
+			"the verify made after the PUT",
+			1500,
+		);
+		expect(one("[data-test=ledger-copy-conflict]")).toBeNull();
+		expect(text("[data-test=ledger-copy-status]")).toBe(
+			"Verified: ready to save",
+		);
+		save().click();
+		await until(
+			() => text("[data-test=ledger-copy-status]") === "Saved to the ledger",
+			"the second save",
+		);
+		const newValue = {
+			...seeded(),
+			tiers: seeded().tiers.map((tier) =>
+				tier.id === "glow" ? { ...tier, name: "Glow Two" } : tier,
+			),
+		};
+		expect(puts(base)[1]?.args[3]).toBe(await hashOf(newValue));
+	}, 15_000);
+});
+
+describe("another school", () => {
+	test("changing the hash to another school closes the sheet, drops its save and its toasts: no PUT reaches the school left", async () => {
+		const base = fixtureConfigFor();
+		const held = gatedPut(base);
+		const opened = await openCopy("#/vol/plans?theme=light", {
+			config: { ...base, put: held.put },
+		});
+		await until(() => !save().disabled, "the first verify");
+		save().click();
+		await until(() => held.started() === 1, "the PUT on its way");
+		window.location.hash = "#/map/plans?theme=light";
+		await until(
+			() => one("[data-test=ledger-copy]") === null,
+			"the sheet to close",
+		);
+		await settle(opened.root);
+		held.release();
+		for (let turn = 0; turn < 30; turn += 1) {
+			flushSync();
+			await macrotask();
+		}
+		// The save was let go before it reached the store, and nothing speaks for it.
+		expect(base.peek("vol", "plans-draft")).toBeNull();
+		expect(
+			base.calls.filter(
+				({ method, args }) => method === "put" && args[0] !== "vol",
+			),
+		).toEqual([]);
+		expect(
+			toasts(opened.app).filter((toast) =>
+				toast.owner?.startsWith("ledger-copy-vol"),
+			),
+		).toEqual([]);
+		expect(opened.log.entries()).toEqual([]);
+		// And the other school's Plans is its own: opening its sheet reads its own object.
+		(one("[data-test=plan-ledger-copy]") as HTMLElement).click();
+		await until(
+			() => one("[data-test=ledger-copy-tier]") !== null,
+			"the other school's copy",
+		);
+		expect(
+			base.calls.some(
+				({ method, args }) => method === "get" && args[0] === "map",
+			),
+		).toBe(true);
+		expect(text("[data-test=ledger-copy]")).toContain("Maple Pilates");
+	}, 15_000);
+
+	test("a review dialog and a plan drawer left open do not follow to the next school", async () => {
+		const opened = await openPane("#/vol/plans?theme=light");
+		mounted = opened.app;
+		await settle(opened.root);
+		(
+			one(
+				"[data-test=plan-row][data-plan=glow] [data-test=plan-edit]",
+			) as HTMLElement
+		).click();
+		await until(() => one("[data-test=plan-drawer]") !== null, "the drawer");
+		window.location.hash = "#/map/plans?theme=light";
+		await until(
+			() => one("[data-test=plan-drawer]") === null,
+			"the drawer to close",
+		);
+		await settle(opened.root);
+		expect(one("[data-test=plan-publish-dialog]")).toBeNull();
+	});
+});
+
+describe("a failed save or verify, and the toasts of a copy", () => {
+	test("the toast of a failed verify and of a failed save go when a later one succeeds", async () => {
+		const base = fixtureConfigFor();
+		let verifies = 0;
+		let puts = 0;
+		const config = {
+			...base,
+			verify: ((...args: Parameters<typeof base.verify>) => {
+				verifies += 1;
+				return verifies === 2
+					? Effect.fail(
+							new UiError({
+								kind: "server",
+								detail: { status: 500 },
+								reason: "boom",
+								retryable: false,
+							}),
+						)
+					: base.verify(...args);
+			}) as typeof base.verify,
+			put: ((...args: Parameters<typeof base.put>) => {
+				puts += 1;
+				return puts === 1
+					? Effect.fail(
+							new UiError({
+								kind: "server",
+								detail: { status: 500 },
+								reason: "boom",
+								retryable: false,
+							}),
+						)
+					: base.put(...args);
+			}) as typeof base.put,
+		};
+		const opened = await openCopy("#/vol/plans?theme=light", { config });
+		await until(() => !save().disabled, "the first verify");
+		type(nameField("glow"), "Glow Two");
+		await until(
+			() =>
+				toasts(opened.app).some((toast) => toast.title === "The server failed"),
+			"the verify's toast",
+			1500,
+		);
+		type(nameField("glow"), "Glow Three");
+		await until(() => !save().disabled, "a good verify", 1500);
+		expect(
+			toasts(opened.app).filter((toast) => toast.title === "The server failed"),
+		).toEqual([]);
+		save().click();
+		await until(
+			() =>
+				toasts(opened.app).some((toast) => toast.title === "The server failed"),
+			"the save's toast",
+		);
+		await until(() => !save().disabled, "Save to be on again");
+		save().click();
+		await until(
+			() => text("[data-test=ledger-copy-status]") === "Saved to the ledger",
+			"the second save",
+		);
+		expect(
+			toasts(opened.app).filter((toast) => toast.title === "The server failed"),
+		).toEqual([]);
+	}, 15_000);
+
+	test("three lost answers where the first PUT landed: the person's own Retry finds its write already in, it is saved, not a conflict", async () => {
+		const base = fixtureConfigFor();
+		let attempts = 0;
+		const lost = () =>
+			new UiError({
+				kind: "network",
+				detail: {},
+				reason: "no answer",
+				retryable: true,
+			});
+		const config = {
+			...base,
+			put: ((...args: Parameters<typeof base.put>) =>
+				Effect.suspend(() => {
+					attempts += 1;
+					if (attempts === 1)
+						return base
+							.put(...args)
+							.pipe(Effect.flatMap(() => Effect.fail(lost())));
+					if (attempts <= 3) return Effect.fail(lost());
+					return base.put(...args);
+				})) as typeof base.put,
+		};
+		const opened = await openCopy("#/vol/plans?theme=light", { config });
+		await until(() => !save().disabled, "the first verify");
+		save().click();
+		await until(
+			() =>
+				toasts(opened.app).some(
+					(toast) =>
+						toast.title === "No connection" &&
+						toast.action?.label === "Retry" &&
+						toast.detail !== undefined,
+				),
+			"the third failure",
+			3000,
+		);
+		expect(attempts).toBe(3);
+		expect(base.peek("vol", "plans-draft")).not.toBeNull();
+		await until(
+			() =>
+				!toasts(opened.app).find((toast) => toast.title === "No connection")
+					?.busy,
+			"the toast to rest",
+		);
+		toasts(opened.app)
+			.find((toast) => toast.title === "No connection")
+			?.action?.run();
+		await until(
+			() => text("[data-test=ledger-copy-status]") === "Saved to the ledger",
+			"the manual retry",
+		);
+		expect(one("[data-test=ledger-copy-conflict]")).toBeNull();
+		expect(
+			toasts(opened.app).filter(
+				(toast) => toast.title === "Someone changed this. Review their change",
+			),
+		).toEqual([]);
+	}, 15_000);
+
+	test("no ledger token is signed out, not an empty store: the sheet shows the failure, never a seeded editor", async () => {
+		const base = fixtureConfigFor();
+		const config = {
+			...base,
+			get: (() =>
+				Effect.fail(
+					new UiError({
+						kind: "unauthenticated",
+						detail: { code: "token_missing" },
+						reason: "no ledger token",
+						retryable: false,
+					}),
+				)) as typeof base.get,
+		};
+		const opened = await openPane("#/vol/plans?theme=light", { config });
+		mounted = opened.app;
+		await settle(opened.root);
+		(one("[data-test=plan-ledger-copy]") as HTMLElement).click();
+		await until(
+			() => one("[data-test=ledger-copy] [data-test=load-failed]") !== null,
+			"the failure",
+		);
+		expect(one("[data-test=load-failed]")?.dataset.kind).toBe(
+			"unauthenticated",
+		);
+		expect(all("[data-test=ledger-copy-tier]").length).toBe(0);
+		expect(base.calls.some(({ method }) => method === "verify")).toBe(false);
+	});
+});
+
+describe("problems and the marks", () => {
+	test("an edit clears the marks and the summary toast of the value before it, until the next verdict", async () => {
+		const { app } = await openCopy();
+		await until(() => !save().disabled, "the first verify");
+		type(nameField("glow"), "");
+		await until(
+			() =>
+				toasts(app).some(
+					(toast) => toast.title === "Some fields need a change",
+				),
+			"the summary",
+		);
+		expect(all("[aria-invalid=true]").length).toBe(1);
+		type(nameField("glow"), "G");
+		expect(all("[aria-invalid=true]").length).toBe(0);
+		expect(
+			toasts(app).filter(
+				(toast) => toast.title === "Some fields need a change",
+			),
+		).toEqual([]);
+		await until(() => !save().disabled, "the verdict");
+	});
+
+	test("a problem at no field (an id, the tiers list) is listed under the fields, and the summary's action goes to it", async () => {
+		const base = fixtureConfigFor();
+		const config = {
+			...base,
+			verify: ((...args: Parameters<typeof base.verify>) =>
+				Effect.map(base.verify(...args), (verdict) =>
+					(args[2] as PlansDraftConfig).tiers[0]?.name === "Sparkle!"
+						? {
+								...verdict,
+								ok: false,
+								verifiedHash: null,
+								problems: [
+									{
+										path: "tiers[0].id",
+										message: "must be 1 to 40 letters",
+										hint: "Use letters.",
+									},
+								],
+							}
+						: verdict,
+				)) as typeof base.verify,
+		};
+		const opened = await openCopy("#/vol/plans?theme=light", { config });
+		await until(() => !save().disabled, "the first verify");
+		type(nameField("sparkle"), "Sparkle!");
+		await until(
+			() => one("[data-test=ledger-copy-other-problems]") !== null,
+			"the listed problem",
+		);
+		expect(text("[data-test=ledger-copy-other-problems]")).toContain(
+			"tiers[0].id: must be 1 to 40 letters",
+		);
+		expect(all("[aria-invalid=true]").length).toBe(0);
+		const summary = toasts(opened.app).find(
+			(toast) => toast.title === "Some fields need a change",
+		);
+		summary?.action?.run();
+		expect(document.activeElement).toBe(
+			one("[data-test=ledger-copy-other-problems]"),
+		);
+	});
+
+	test("the audience select and the on-sale box point at their problem line", async () => {
+		await openCopy();
+		const select = one(
+			"[data-test=ledger-copy-tier][data-tier=glow] [data-field=audience]",
+		) as HTMLSelectElement;
+		const box = one(
+			"[data-test=ledger-copy-tier][data-tier=glow] [data-field=public]",
+		) as HTMLInputElement;
+		for (const control of [select, box]) {
+			const id = control.getAttribute("aria-describedby");
+			expect(id).not.toBeNull();
+			expect(document.getElementById(id ?? "")).not.toBeNull();
+		}
 	});
 });

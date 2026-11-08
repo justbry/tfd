@@ -76,7 +76,7 @@ export const kindMessages: Record<UiErrorKind, MessageEntry> = {
 	step_up: {
 		title: "Confirm it is you",
 		what: "This change needs a fresh confirmation from the last 10 minutes.",
-		doThis: "Open the link we email you, then try the change again.",
+		doThis: "Confirm with your PIN or the link we email you, then try again.",
 		action: "confirm_identity",
 	},
 	pin_required: {

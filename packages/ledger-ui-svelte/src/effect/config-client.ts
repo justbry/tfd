@@ -43,7 +43,6 @@ export type ConfigVerify = {
 export type ConfigPut = {
 	name: ConfigName;
 	sha256: string;
-	bytes: number;
 	changed: boolean;
 };
 

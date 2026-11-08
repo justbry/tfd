@@ -6,7 +6,8 @@ export const copyFailedToast =
 	"Could not copy the code: the browser blocked the clipboard.";
 export const minimumNoteLength = 3;
 export const defaultValue = "10";
-/** cell-rules `minContributors` for redemptions: under this many redeemers a count shows as <10. */
+/** cell-rules `minContributors` for redemptions: fewer than this many redeemers and the count is shown rounded, as <10
+ * (the cell's title says "fewer than 5"). */
 export const smallCount = 5;
 
 export const capitalise = (word: string): string =>

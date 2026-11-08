@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
-import { canonicalJson } from "$worker-config/canonical.ts";
 import { definitions } from "$worker-config/definitions.ts";
 import { CONFIG_NAMES, type PlansDraftConfig } from "$worker-config/types.ts";
 import { createHttpConfig } from "../../src/effect/config-http.ts";
@@ -133,7 +132,6 @@ describe("the fixture store follows the Worker's route", () => {
 		expect(done.ok && done.value).toEqual({
 			name: "plans-draft",
 			sha256: hash,
-			bytes: new TextEncoder().encode(canonicalJson(edited)).length,
 			changed: true,
 		});
 		expect(store.peek("vol", "plans-draft")).toEqual({
@@ -586,6 +584,27 @@ describe("the HTTP client speaks the Worker's wire", () => {
 					: { kind: String(done.error.kind), retryable: done.error.retryable },
 			).toEqual({ kind, retryable });
 		}
+	});
+
+	test("no ledger token is unauthenticated (signed out), never not_found: a 404 alone says nothing is stored", async () => {
+		const wire = workerWire(storeFor(OWNER));
+		const client = createHttpConfig({
+			fetch: wire.fetch,
+			base: "/v1",
+			tokens: {
+				...wire.tokens,
+				current: async () => null,
+				refresh: async () => null,
+			},
+		});
+		const read = await settle(client.get("vol", "plans-draft"));
+		expect(read.ok ? null : [read.error.kind, read.error.detail.code]).toEqual([
+			"unauthenticated",
+			"token_missing",
+		]);
+		expect(wire.seen).toEqual([]);
+		const missing = await settle(clientOn().client.get("vol", "plans-draft"));
+		expect(missing.ok ? null : missing.error.kind).toBe("not_found");
 	});
 
 	test("refreshSession takes a new ledger token", async () => {

@@ -26,10 +26,10 @@ export const recoverFrom = <A, B, R, S>(
 
 /** The put of one user action, retried safely. A config PUT has no `Idempotency-Key`; it is idempotent by what it
  * carries: the same `verifiedHash` (the hash of the value) over the same `If-Match` either lands once or is refused
- * with 412. So a retry after a try whose answer was lost (network, 503, 5xx, 429: it may have landed) can meet that 412
- * for its own write; then the object is read, and when its ETag is the `verifiedHash` the write is already in: the
- * retry succeeds with `changed: false`. A 412 on a first try, or when the stored object is anything else, is the
- * person's real conflict and stays one. Build this once per action and retry that same effect (the flag lives in it). */
+ * with 412. So a try after one whose answer was lost (network, 503, 5xx, 429: it may have landed), by the automatic retry
+ * or by the person's own Retry later, can meet that 412 for its own write. On any 412 the object is read, and when its
+ * ETag is the `verifiedHash` the stored object IS the value this put carries: it is saved (whoever wrote it), the put
+ * ends as `changed: false`. A different stored ETag is the person's real conflict and stays one. */
 export const putOnce = <Name extends ConfigName>(
 	client: ConfigApi,
 	school: string,
@@ -37,18 +37,10 @@ export const putOnce = <Name extends ConfigName>(
 	value: ConfigValues[Name],
 	verifiedHash: string,
 	baseEtag: string | null,
-): Effect.Effect<ConfigPut, UiError> => {
-	let outcomeUnknown = false;
-	const attempt = client.put(school, name, value, verifiedHash, baseEtag).pipe(
-		Effect.tapError((error) =>
-			Effect.sync(() => {
-				if (error.retryable) outcomeUnknown = true;
-			}),
-		),
-	);
-	return recoverFrom(
-		attempt,
-		(error) => outcomeUnknown && error.detail.code === "stale_etag",
+): Effect.Effect<ConfigPut, UiError> =>
+	recoverFrom(
+		client.put(school, name, value, verifiedHash, baseEtag),
+		(error) => error.detail.code === "stale_etag",
 		(conflict) =>
 			recoverFrom(
 				client.get(school, name).pipe(
@@ -57,7 +49,6 @@ export const putOnce = <Name extends ConfigName>(
 							? Effect.succeed<ConfigPut>({
 									name,
 									sha256: verifiedHash,
-									bytes: 0,
 									changed: false,
 								})
 							: Effect.fail(conflict),
@@ -67,4 +58,3 @@ export const putOnce = <Name extends ConfigName>(
 				() => Effect.fail(conflict),
 			),
 	);
-};

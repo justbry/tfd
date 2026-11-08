@@ -246,14 +246,12 @@ export function createFixtureConfig(
 				return {
 					name: known,
 					sha256,
-					bytes: current.text.length,
 					changed: false,
 				};
-			const stored = await write(key, value);
+			await write(key, value);
 			return {
 				name: known,
 				sha256,
-				bytes: bytesOf(stored.text).length,
 				changed: true,
 			};
 		});
