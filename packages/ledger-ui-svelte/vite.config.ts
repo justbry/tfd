@@ -2,12 +2,13 @@ import { fileURLToPath } from "node:url";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { dedupeLazyCss } from "./build/dedupe-lazy-css.ts";
 
 /** The app build: static assets a Worker serves (no server code, no node: modules in the bundle). `$lib` is the
  * shadcn-svelte alias of components.json; `$contract` is the Preact package's `src`, imported read-only (D20: the
  * Reader/Writer contract, the fixtures, the HTTP adapters and the pure route and period modules). */
 export default defineConfig({
-	plugins: [tailwindcss(), svelte()],
+	plugins: [tailwindcss(), svelte(), dedupeLazyCss()],
 	resolve: {
 		alias: {
 			$lib: fileURLToPath(new URL("./src/lib", import.meta.url)),
