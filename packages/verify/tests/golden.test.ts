@@ -11,6 +11,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getPublicKeyAsync, signAsync } from "@noble/ed25519";
+import { checkReceipt } from "../src/check";
 import {
 	type BooksEvent,
 	canonicalize,
@@ -391,6 +392,31 @@ describe("verifySealChain", () => {
 		expect(await verifySealChain([first], [event], {})).toEqual([
 			"unknown_key",
 		]);
+	});
+
+	test("null or misshapen seals and events are verdicts, never an exception", async () => {
+		const first = await sealOver([event], null);
+		const junkEvents = [
+			null,
+			{},
+			{ date: 7 },
+			event,
+		] as unknown as BooksEvent[];
+		expect(await verifySealChain([first], junkEvents, keys)).toEqual(["ok"]);
+		expect(await checkReceiptAgainstEvents(pinned, junkEvents)).toBe("ok");
+
+		const month = event.date.slice(0, 7);
+		const junkSeals = [null, { seal: { month, event_ids: "not a list" } }];
+		const outcome = await checkReceipt(pinned, keys, async () => ({
+			school: event.school,
+			events: junkEvents,
+			seals: junkSeals,
+		}));
+		expect(outcome).toMatchObject({
+			kind: "signed",
+			books: "ok",
+			seal: { month, verdict: "malformed", covers: false },
+		});
 	});
 });
 

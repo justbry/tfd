@@ -71,14 +71,18 @@ export class VerifierSession {
 			value = source;
 		}
 		const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-		const { checkReceipt } = await preloadVerifier();
-		// The proof sweep runs once (1.2s) so the check reads as a step; the result itself is ready at once.
-		const [result] = await Promise.all([
-			checkReceipt(value, keys, loadBooks),
-			new Promise((resolve) => setTimeout(resolve, reduced ? 0 : SWEEP_MS)),
-		]);
-		this.outcome = result;
-		this.checking = false;
+		try {
+			const { checkReceipt } = await preloadVerifier();
+			// The proof sweep runs once (1.2s) so the check reads as a step; the result itself is ready at once.
+			const [result] = await Promise.all([
+				checkReceipt(value, keys, loadBooks),
+				new Promise((resolve) => setTimeout(resolve, reduced ? 0 : SWEEP_MS)),
+			]);
+			this.outcome = result;
+		} finally {
+			// A failed chunk load (e.g. after a deploy) must not leave the verifier stuck on "checking".
+			this.checking = false;
+		}
 	}
 
 	load(kind: "sample" | "tampered", run = true): void {

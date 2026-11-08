@@ -475,7 +475,7 @@
   function renderEstimator() {
     const events = state.families * EVENTS_PER_FAMILY;
     const fit = fittingPlanId();
-    const name = fit === "platform" ? "Pro with overage, or Platform" : PLANS.find((plan) => plan.id === fit).name;
+    const name = fit === "platform" ? "Platform" : PLANS.find((plan) => plan.id === fit).name;
     document.getElementById("families-out").textContent = state.families.toLocaleString("en-US");
     document.getElementById("fit").innerHTML = `≈ ${events.toLocaleString("en-US")} events a month · fits <b>${name}</b> and up. Pick by features.`;
   }

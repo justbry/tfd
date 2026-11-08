@@ -366,8 +366,10 @@ export const checkReceiptAgainstEvents = async (
 	signed: SignedReceipt,
 	events: readonly BooksEvent[],
 ): Promise<BooksVerdict> => {
+	// Untrusted: an event may be null or have any shape.
 	const event = events.find(
-		(candidate) => candidate.id === signed.receipt.event_id,
+		(candidate) =>
+			isObject(candidate) && candidate.id === signed.receipt.event_id,
 	);
 	if (!event) return "missing_event";
 	let again: Receipt | null;
@@ -399,6 +401,8 @@ export const verifySealChain = async (
 ): Promise<SealVerdict[]> => {
 	const byMonth = new Map<string, Map<string, BooksEvent>>();
 	for (const event of events) {
+		// Untrusted: an event may be null or have any shape; one without a dated month is in no seal's month.
+		if (!isObject(event) || typeof event.date !== "string") continue;
 		if (event.date[7] !== "-") continue;
 		const month = event.date.slice(0, 7);
 		const byId = byMonth.get(month) ?? new Map<string, BooksEvent>();
@@ -434,7 +438,7 @@ export const verifySealChain = async (
 		}
 		const present = covered as BooksEvent[];
 		const transactions = present.filter(
-			(event) => event.postings.length > 0,
+			(event) => Array.isArray(event.postings) && event.postings.length > 0,
 		).length;
 		const eventsHash = await sha256Hex(
 			present.map((event) => canonicalize(event)).join("\n"),
