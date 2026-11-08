@@ -61,7 +61,7 @@
 			{today}
 			view={viewing?.view ?? null}
 			previewing={viewing?.preview ?? false}
-			changed={route.query.has("month")}
+			changed={formatPeriod(period, today) !== null}
 			compare={route.query.get("compare") === "1"}
 			timeZoneNote={school ? `Times in ${school.timeZone}` : "Each school's own time zone"}
 			onChoose={(chosen) =>

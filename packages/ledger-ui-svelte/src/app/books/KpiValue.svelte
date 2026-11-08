@@ -36,7 +36,7 @@
 	title={shown.title ?? undefined}
 	class={[
 		shown.look === "withheld" &&
-			"inline-flex items-center gap-[3px] text-left text-[11px] font-medium whitespace-nowrap text-muted-foreground",
+			"inline-flex items-center gap-[3px] text-left text-[10.5px] font-medium whitespace-normal text-muted-foreground",
 		shown.look === "suppressed" && "text-muted-foreground",
 		shown.look === "rounded" && "cursor-help border-b border-dotted border-muted-foreground",
 	]}

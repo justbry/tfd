@@ -43,7 +43,7 @@
 	<small class="block text-[10.5px] text-muted-foreground" data-test="kpi-label">{label}</small>
 	<b
 		class={[
-			"my-px block text-[19px] leading-tight font-bold tabular-nums",
+			"my-px block text-[19px] leading-tight font-bold tabular-nums [&_[data-hid]]:text-[11px]",
 			withheld === null ? toneClass[tone] : "text-muted-foreground",
 		]}
 	>

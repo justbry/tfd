@@ -69,7 +69,7 @@
 			{#if yearTotal}
 				<div class={[row, "border-t border-dashed border-border pt-1"]} data-year={year}>
 					<span><b>{year} total</b></span>
-					<div></div>
+					<div class={track}></div>
 					<b class={figure}><KpiValue {document} kpi="gross_collected" period={year} /></b>
 				</div>
 				{#if yearNote}

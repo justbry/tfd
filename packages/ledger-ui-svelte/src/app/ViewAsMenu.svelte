@@ -87,7 +87,7 @@
 	</Popover.Trigger>
 	<Popover.Content
 		align="start"
-		class={[popoverPanel, "w-auto max-w-[min(390px,calc(100vw-16px))] min-w-[330px] max-[640px]:min-w-0"]}
+		class={[popoverPanel, "w-[330px] max-w-[calc(100vw-16px)] min-w-0"]}
 		data-test="view-as-panel"
 		onOpenAutoFocus={(event) => {
 			event.preventDefault();

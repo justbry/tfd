@@ -69,7 +69,7 @@
 		{levelName} opens the books with your family PIN. Nothing is shown until you unlock.
 	</div>
 	<form
-		class="mt-2.5 grid w-[180px] gap-1 text-left"
+		class="mt-2.5 grid w-[180px] text-left"
 		onsubmit={(event) => {
 			event.preventDefault();
 			if (!checking && pin.length >= pinDigits) submit();

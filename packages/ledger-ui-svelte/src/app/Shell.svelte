@@ -270,7 +270,7 @@
 				data-test={tab === route.tab ? "pane" : undefined}
 			>
 				{#if tab === route.tab && tab === "dashboard"}
-					<div data-pane="dashboard">
+					<div class="text-[12px]" data-pane="dashboard">
 						{#if viewing && dashboardModule}
 							{#await dashboardModule then { default: Dashboard }}
 								<Dashboard

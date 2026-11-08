@@ -9,14 +9,16 @@ export const row =
 	"my-[7px] grid grid-cols-[minmax(70px,max-content)_1fr_minmax(72px,max-content)] items-center gap-2";
 export const track = "h-2 overflow-hidden rounded bg-border";
 export const bar = "block h-full rounded";
-export const figure = "text-right font-medium tabular-nums";
+/** A withheld figure keeps to one line in a row (mockup `.krow .khid`). */
+export const figure =
+	"text-right font-medium tabular-nums [&_[data-hid]]:whitespace-nowrap";
 export const footnote = "mt-2 text-muted-foreground";
 export const muted = "text-muted-foreground";
 /** The mockup's segmented control (`.seg`): joined buttons, the pressed one filled. */
 export const segment =
 	"inline-flex overflow-hidden rounded-lg border border-border max-[640px]:flex max-[640px]:max-w-full max-[640px]:flex-wrap max-[640px]:gap-px max-[640px]:bg-border";
 export const segmentButton =
-	"inline-flex items-center gap-[5px] border-0 bg-card px-3 py-[5px] text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground max-[640px]:flex-auto max-[640px]:justify-center max-[640px]:whitespace-nowrap [&_svg]:size-[13px]";
+	"inline-flex items-center gap-[5px] border-0 bg-card px-3 py-[5px] text-[12px] text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground max-[640px]:flex-auto max-[640px]:justify-center max-[640px]:whitespace-nowrap [&_svg]:size-[13px]";
 export const chip =
 	"inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-[3px] text-[11px] text-foreground aria-pressed:border-primary aria-pressed:text-primary";
 export const caption =

@@ -5,6 +5,8 @@
  * a 4-character nonce is drawn into every shot (pixels only). Usage, from packages/ledger-ui-svelte, with the app
  * served (`bun run dev`, or `vite preview` after a build):
  *   bun scripts/shots.ts [--out shots] [--side app|mock|both] [--app http://localhost:5191] [--nonce K7QX]
+ *     [--only dash-]
+ * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`).
  * Needs playwright-core in /tmp/ledger-shots and the cached Chromium headless shell, as shoot.mjs does.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -50,6 +52,7 @@ const packageRoot = join(import.meta.dir, "..");
 const repositoryRoot = join(packageRoot, "..", "..");
 const out = join(packageRoot, argument("--out", "shots"));
 const side = argument("--side", "both");
+const only = argument("--only", "");
 const appOrigin = argument("--app", "http://localhost:5191");
 const nonce = argument(
 	"--nonce",
@@ -70,10 +73,11 @@ const executablePath = join(
 	"Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell",
 );
 const widths = [1100, 728, 390];
+const dashboardTab = "document.querySelector('.tab[data-p=dash]').click()";
 const themes = ["light", "dark"] as const;
 
 /** The shell's entries: the S0 golden file's three shots, then the stale banner, All schools, a toast and the
- * settings. */
+ * settings; then the Dashboard's (S9.1): each viewer state and grain, the PIN prompt and View as. */
 const entries: Array<{
 	id: string;
 	route: string;
@@ -124,7 +128,49 @@ const entries: Array<{
 		clicks: ["[data-test=settings-button]"],
 		mockupSteps: "document.querySelector('#gb').click()",
 	},
-];
+	{
+		id: "dash-finance-money",
+		route: "#/b4u/dashboard",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${dashboardTab}`,
+	},
+	{
+		id: "dash-owner-members",
+		route: "#/vol/dashboard?view=members",
+		clicks: [],
+		mockupSteps: `${dashboardTab};dv='members';dashboard()`,
+	},
+	{
+		id: "dash-governance-risk",
+		route: "#/b4u/dashboard?preset=disputes&as=governance&view=risk",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${dashboardTab};setVa('governance');dsc='disputes';dv='risk';dashboard()`,
+	},
+	{
+		id: "dash-public-year",
+		route: "#/b4u/dashboard?as=public&month=2024-01-01..2024-12-31",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${dashboardTab};setVa('public')`,
+	},
+	{
+		id: "dash-member-quarter",
+		route: "#/har/dashboard",
+		clicks: [],
+		mockupSteps: `setSchool('har');${dashboardTab}`,
+	},
+	{
+		id: "dash-pin-locked",
+		route: "#/b4u/dashboard?as=governance&pin=locked",
+		clicks: [],
+		mockupSteps: `setSchool('b4u');${dashboardTab};setVa('governance');bkPin=true;render()`,
+	},
+	{
+		id: "dash-view-as-open",
+		route: "#/b4u/dashboard",
+		clicks: ["[data-test=view-as]"],
+		mockupSteps: `setSchool('b4u');${dashboardTab};document.querySelector('#kview').click()`,
+	},
+].filter((entry) => entry.id.startsWith(only));
 
 const writeNonce = (value: string): void => {
 	const element = document.createElement("div");
@@ -146,7 +192,7 @@ for (const shotSide of sides)
 					viewport: { width, height: 900 },
 				});
 				if (shotSide === "app") {
-					const route = `${entry.route}?theme=${theme}`;
+					const route = `${entry.route}${entry.route.includes("?") ? "&" : "?"}theme=${theme}`;
 					await page.goto(`${appOrigin}/${route}`);
 					await page.waitForFunction(
 						(hash) => document.getElementById("app")?.dataset.route === hash,

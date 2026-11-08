@@ -2,6 +2,7 @@
 	import KpiValue from "../books/KpiValue.svelte";
 	import DashboardBox from "./DashboardBox.svelte";
 	import { type Books, flagsOf, shortPeriodName } from "./dashboard-model.ts";
+	import { cn } from "$lib/utils.ts";
 	import { link } from "./styles.ts";
 
 	/** "Needs a look" (mockup Risk): the months with a refund rate over 10% or 3 disputes or more, each with Show ›,
@@ -31,7 +32,7 @@
 			<span class="ml-auto">
 				<button
 					type="button"
-					class={link}
+					class={cn(link, "text-[12px] text-muted-foreground hover:text-foreground")}
 					aria-label={`Show ${shortPeriodName(flag.period)}`}
 					onclick={() => books.choose(flag.period)}>Show ›</button
 				>
