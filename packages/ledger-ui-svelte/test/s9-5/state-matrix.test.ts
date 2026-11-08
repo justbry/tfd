@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { flushSync } from "svelte";
 import type { MountedApp } from "../../src/app/mount.ts";
 import { fixtureObjects } from "../s9-3/config-support.ts";
@@ -12,6 +12,13 @@ import { fixtureConfigFor, openPane, until } from "../s9-3/harness.ts";
  * (golden-s6.test.ts, golden-s7.test.ts) say what each combination shows, this says what none may show.
  */
 let mounted: MountedApp | undefined;
+/** The first mount of a process compiles the whole app: it is not the first combination's to wait for. */
+beforeAll(async () => {
+	const warm = await openPane("#/vol/plans?theme=light");
+	await pause(20);
+	await warm.app.unmount();
+	document.body.innerHTML = "";
+});
 afterEach(async () => {
 	await mounted?.unmount();
 	mounted = undefined;

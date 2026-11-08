@@ -173,8 +173,9 @@
 		const onKeyDown = (event: KeyboardEvent): void => {
 			if (event.key === "Escape" && dialog === null) exit();
 		};
-		document.addEventListener("keydown", onKeyDown);
-		return () => document.removeEventListener("keydown", onKeyDown);
+		// In the capture phase, before a dialog's own Escape closes it: that Escape is the dialog's, not the portal's.
+		document.addEventListener("keydown", onKeyDown, true);
+		return () => document.removeEventListener("keydown", onKeyDown, true);
 	});
 	let gone = false;
 	onDestroy(() => {
