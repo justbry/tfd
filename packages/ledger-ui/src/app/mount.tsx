@@ -1,4 +1,3 @@
-import { keepLoading } from "./use-loaded.ts";
 import "../theme.css";
 import { type JSX, render } from "preact";
 import {
@@ -10,6 +9,7 @@ import {
 import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
+import { LoadFailed } from "./load-failed.tsx";
 import { formatRoute, parseRoute, type Route, themeOf } from "./route.ts";
 import { Shell } from "./shell.tsx";
 
@@ -21,14 +21,19 @@ function App({
 	reader,
 	writer,
 	clock,
+	signInUrl,
 }: {
 	root: HTMLElement;
 	reader: Reader;
 	writer: Writer;
 	clock: Clock;
+	signInUrl: string | undefined;
 }): JSX.Element | null {
 	const [hash, setHash] = useState(window.location.hash);
 	const [schools, setSchools] = useState<School[] | null>(null);
+	/** Why the schools did not load: the Reader's error kind (`unauthenticated`, `not_found`, …), or `failed`. */
+	const [schoolsFailure, setSchoolsFailure] = useState<string | null>(null);
+	const [schoolsAttempt, setSchoolsAttempt] = useState(0);
 	useLayoutEffect(() => {
 		const onHashChange = (): void => setHash(window.location.hash);
 		window.addEventListener("hashchange", onHashChange);
@@ -41,8 +46,17 @@ function App({
 		setHash(window.location.hash);
 	}, []);
 	useEffect(() => {
-		reader.schools().then(setSchools, keepLoading);
-	}, [reader]);
+		// `schoolsAttempt` is the Try again counter: each press reads the schools again.
+		void schoolsAttempt;
+		setSchoolsFailure(null);
+		reader.schools().then(setSchools, (error: unknown) => {
+			const kind =
+				typeof error === "object" && error !== null && "kind" in error
+					? String((error as { kind: unknown }).kind)
+					: "failed";
+			setSchoolsFailure(kind);
+		});
+	}, [reader, schoolsAttempt]);
 
 	/** Before the schools load the route's school is a placeholder; only its query (the theme) is used then. */
 	const route = parseRoute(hash, schools?.map((school) => school.id) ?? []);
@@ -58,6 +72,14 @@ function App({
 		setHash(canonical);
 	}, [hash, canonical]);
 
+	if (!schools && schoolsFailure !== null)
+		return (
+			<SchoolsFailure
+				kind={schoolsFailure}
+				signInUrl={signInUrl}
+				onRetry={() => setSchoolsAttempt((attempt) => attempt + 1)}
+			/>
+		);
 	if (!schools) return null;
 	return (
 		<Shell
@@ -74,11 +96,57 @@ function App({
 	);
 }
 
+/** What the app shows when it cannot list the schools: a signed-out visitor is sent to sign in (the session cookie of
+ * B4 Uni is what the ledger token is minted from), a person with no school is told so, and any other failure offers to
+ * read again. Never a blank page. */
+function SchoolsFailure({
+	kind,
+	signInUrl,
+	onRetry,
+}: {
+	kind: string;
+	signInUrl: string | undefined;
+	onRetry: () => void;
+}): JSX.Element {
+	if (kind === "unauthenticated")
+		return (
+			<div class="note" role="alert" data-test="signed-out">
+				<span>
+					You are not signed in. Sign in to B4 Uni, then come back to this page.
+				</span>
+				<span class="sp" />
+				{signInUrl && (
+					<a class="btn s" href={signInUrl} data-test="sign-in">
+						Sign in
+					</a>
+				)}
+				<button type="button" class="btn s" onClick={onRetry}>
+					Try again
+				</button>
+			</div>
+		);
+	if (kind === "not_found")
+		return (
+			<div class="note" role="alert" data-test="no-schools">
+				<span>
+					This account is not an owner or admin of any school on B4 Uni.
+				</span>
+			</div>
+		);
+	return <LoadFailed what="your schools" onRetry={onRetry} />;
+}
+
 /** Mounts the ledger UI on `root` (protocol §3). `theme=light|dark` puts that class on `root`, as the mockup puts it on
  * `.app`. */
 export function mountApp(
 	root: HTMLElement,
-	options: { reader: Reader; writer: Writer; clock: Clock },
+	options: {
+		reader: Reader;
+		writer: Writer;
+		clock: Clock;
+		/** Where a signed-out visitor signs in (the HTTP build); the fixture build is never signed out. */
+		signInUrl?: string;
+	},
 ): { unmount(): void } {
 	root.classList.add("app");
 	render(
@@ -87,6 +155,7 @@ export function mountApp(
 			reader={options.reader}
 			writer={options.writer}
 			clock={options.clock}
+			signInUrl={options.signInUrl}
 		/>,
 		root,
 	);

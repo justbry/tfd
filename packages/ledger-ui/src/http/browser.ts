@@ -58,7 +58,7 @@ function pendingStorage(): StorageLike {
  */
 export function mountHttpApp(
 	root: HTMLElement,
-	options: { apiBase: string; workerBase: string },
+	options: { apiBase: string; workerBase: string; webBase: string },
 ): void {
 	const mountedAt = Date.now() / millisecondsPerSecond;
 	const browserFetch = (url: string, init: RequestInit) => fetch(url, init);
@@ -99,6 +99,8 @@ export function mountHttpApp(
 					mountedAt,
 					timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
 				),
+				// The ledger token is minted from B4 Uni's session cookie: a signed-out visitor signs in on the web app.
+				signInUrl: `${options.webBase}/signin`,
 			}),
 		);
 }
