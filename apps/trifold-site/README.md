@@ -8,7 +8,7 @@ Textarea and Label. A standalone package: its own `package.json` and `bun.lock`,
 ## Commands
 
 ```sh
-bun install          # dependencies
+bun install          # dependencies; run it again after changing packages/verify (see below)
 bun run dev          # dev server on http://localhost:5173
 bun run build        # prerender every route into build/
 bun run preview      # serve build/ on http://localhost:4173
@@ -39,7 +39,9 @@ bun run check        # svelte-check
   `tfd-verify` (`packages/verify`, Apache-2.0), a line-for-line port of tfd's canonical bytes, sha256, Ed25519 (strict
   RFC 8032) and schema checks: `tfd-verify/check` runs one whole check (signature, then the books and seal) and loads on
   the first Verify, with the crypto; `tfd-verify/link` encodes `/verify?r=` links without any crypto.
-  `tfd-verify` is a `file:` dependency, so bun copies it into `node_modules`: run `bun install` here after changing it.
+  `tfd-verify` is a `file:` dependency, so bun copies it into `node_modules` at install time. **After changing anything
+  in `packages/verify`, run `bun install` in `apps/trifold-site`**, or the site builds and tests the old copy;
+  `tests/verify-copy.test.ts` fails while the copy differs from `packages/verify/src`.
 - `src/lib/samples/` the sample receipt, a tampered copy, the demo public key, the sample school's October books and
   seal, all made by `scripts/make-samples.ts` from `packages/atm/src`. The private key is generated in memory and
   discarded; it is never written.

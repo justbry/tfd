@@ -8,6 +8,7 @@ import {
 	type BooksVerdict,
 	checkReceiptAgainstEvents,
 	isSignedReceipt,
+	isSignedSeal,
 	type PublicKeys,
 	type SealVerdict,
 	type SignatureVerdict,
@@ -35,10 +36,27 @@ export type Outcome =
 			seal: { month: string; verdict: SealVerdict; covers: boolean } | null;
 	  };
 
+/** The verdicts of a seal whose shape and signature are good, as tfd's verifySeals counts a month's latest seal. */
+const WELL_SIGNED: readonly SealVerdict[] = [
+	"ok",
+	"broken_link",
+	"events_changed",
+];
+
+/** The `seal.month` of an untrusted seal, if it has one as text. */
+const monthOf = (raw: unknown): string | null => {
+	if (typeof raw !== "object" || raw === null) return null;
+	const inner = (raw as { seal?: unknown }).seal;
+	if (typeof inner !== "object" || inner === null) return null;
+	const month = (inner as { month?: unknown }).month;
+	return typeof month === "string" ? month : null;
+};
+
 /**
  * A receipt's signature against `keys`, then, when `loadBooks` has the school's books, the receipt against its event and
- * the month's seal against the seal chain. The month's latest seal decides, as in tfd's verifySeals. Never throws for
- * untrusted input.
+ * the month's seal against the seal chain. The month's latest seal with a good signature decides, as in tfd's
+ * verifySeals; when the month has none, its latest seal of any kind is reported, covering nothing. Never throws for an
+ * untrusted receipt or seal; `books.events` must be the school's tfd events.
  */
 export const checkReceipt = async (
 	value: unknown,
@@ -57,20 +75,30 @@ export const checkReceipt = async (
 
 	const booksVerdict = await checkReceiptAgainstEvents(value, books.events);
 	const month = value.receipt.date.slice(0, 7);
-	const verdicts = await verifySealChain(books.seals, books.events, keys);
-	// The month's latest seal decides, as in tfd's verifySeals.
-	let seal: Extract<Outcome, { kind: "signed" }>["seal"] = null;
-	for (const [index, raw] of books.seals.entries()) {
-		const candidate = raw as {
-			seal?: { month?: string; event_ids?: string[] };
-		};
-		if (candidate.seal?.month !== month) continue;
-		seal = {
-			month,
-			verdict: verdicts[index] ?? "malformed",
-			covers:
-				candidate.seal.event_ids?.includes(value.receipt.event_id) ?? false,
-		};
+	const seals: readonly unknown[] = Array.isArray(books.seals)
+		? books.seals
+		: [];
+	const verdicts = await verifySealChain(seals, books.events, keys);
+	type MonthSeal = Extract<Outcome, { kind: "signed" }>["seal"];
+	let wellSigned: MonthSeal = null;
+	let latest: MonthSeal = null;
+	for (const [index, raw] of seals.entries()) {
+		const verdict = verdicts[index] ?? "malformed";
+		if (isSignedSeal(raw) && WELL_SIGNED.includes(verdict)) {
+			if (raw.seal.month !== month) continue;
+			wellSigned = {
+				month,
+				verdict,
+				covers: raw.seal.event_ids.includes(value.receipt.event_id),
+			};
+		} else if (monthOf(raw) === month) {
+			latest = { month, verdict, covers: false };
+		}
 	}
-	return { kind: "signed", signed: value, books: booksVerdict, seal };
+	return {
+		kind: "signed",
+		signed: value,
+		books: booksVerdict,
+		seal: wellSigned ?? latest,
+	};
 };
