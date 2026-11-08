@@ -24,6 +24,7 @@
 	} from "./plans-menu.ts";
 	import {
 		bodyCell,
+		emptyCell,
 		figureCell,
 		headCell,
 		heading,
@@ -226,7 +227,7 @@
 			</Table.Row>
 		{:else}
 			<Table.Row class={rowStart}>
-				<Table.Cell colspan={6} class={[bodyCell, muted, "py-6 text-center"]} data-test="plan-empty" data-kind="tiers"
+				<Table.Cell colspan={6} class={[bodyCell, muted, emptyCell]} data-test="plan-empty" data-kind="tiers"
 					>No memberships yet.</Table.Cell
 				>
 			</Table.Row>
@@ -290,7 +291,7 @@
 			</Table.Row>
 		{:else}
 			<Table.Row class={rowStart}>
-				<Table.Cell colspan={6} class={[bodyCell, muted, "py-6 text-center"]} data-test="plan-empty" data-kind="addons"
+				<Table.Cell colspan={6} class={[bodyCell, muted, emptyCell]} data-test="plan-empty" data-kind="addons"
 					>None yet.</Table.Cell
 				>
 			</Table.Row>

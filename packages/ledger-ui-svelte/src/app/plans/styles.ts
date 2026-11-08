@@ -19,7 +19,10 @@ export const card = "rounded-[10px] border border-border bg-card p-2.5";
 export const headCell =
 	"h-auto border-b border-border px-2 py-1.5 text-left text-[10.5px] font-medium whitespace-normal text-muted-foreground";
 export const bodyCell =
-	"whitespace-normal border-b border-border px-2 py-[7px] align-middle";
+	"whitespace-normal border-b border-border p-[7px_8px] align-middle";
+/** The empty row's cell: the same shorthand, so that it replaces the cell's own (a longhand beside it would depend on which
+ * stylesheet comes last: gate K). */
+export const emptyCell = "p-[24px_8px] text-center";
 export const rowStart = "border-0 hover:bg-transparent";
 export const figureCell = "text-right tabular-nums";
 /** `.link`. */
