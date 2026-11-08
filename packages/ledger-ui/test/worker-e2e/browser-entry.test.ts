@@ -49,7 +49,11 @@ async function mounted(grants: LedgerSchoolClaim[], school: string) {
 	const systemNow = Date.now;
 	Date.now = () => Date.parse(worker.clock.now());
 	try {
-		mountHttpApp(root, { apiBase, workerBase: `${worker.url}/v1` });
+		mountHttpApp(root, {
+			apiBase,
+			workerBase: `${worker.url}/v1`,
+			webBase: "https://staging.b4uni.com",
+		});
 	} finally {
 		Date.now = systemNow;
 	}

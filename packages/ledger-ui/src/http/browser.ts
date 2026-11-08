@@ -1,8 +1,11 @@
+import { h } from "preact";
 import { mountApp } from "../app/mount.tsx";
 import type { DownloadFile } from "../data/ledger.ts";
 import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
+import type { Writer } from "../data/writer.ts";
 import { createHttpAdapters } from "./adapters.ts";
+import { DemoBanner, type DemoReason } from "./demo-banner.tsx";
 import { memoryStorage, type StorageLike } from "./pending.ts";
 import { localWallTime } from "./school-routes.ts";
 import { timerScheduler } from "./transport.ts";
@@ -58,7 +61,13 @@ function pendingStorage(): StorageLike {
  */
 export function mountHttpApp(
 	root: HTMLElement,
-	options: { apiBase: string; workerBase: string },
+	options: {
+		apiBase: string;
+		workerBase: string;
+		webBase: string;
+		/** The demo schools (the fixtures) a visitor sees when they are signed out or administer no school. */
+		demo?: () => { reader: Reader; writer: Writer; clock: Clock };
+	},
 ): void {
 	const mountedAt = Date.now() / millisecondsPerSecond;
 	const browserFetch = (url: string, init: RequestInit) => fetch(url, init);
@@ -86,12 +95,34 @@ export function mountHttpApp(
 			return answer;
 		},
 	};
+	const signInUrl = `${options.webBase}/signin`;
+	const demo = options.demo;
+	/** Signed out (the ledger token answers 401) or no school (404, an empty list): the demo schools under a large
+	 * alert rather than an empty page. Null when the HTTP app mounts instead. */
+	const showDemo = (reason: DemoReason): null | undefined => {
+		if (!demo) return undefined;
+		mountApp(root, {
+			...demo(),
+			banner: h(DemoBanner, {
+				reason,
+				signInUrl,
+				reload: () => window.location.reload(),
+			}),
+		});
+		return null;
+	};
 	firstSchools
 		.then(
-			(schools) => schools[0]?.timeZone,
-			() => undefined,
+			(schools) =>
+				schools.length === 0 ? showDemo("no_school") : schools[0]?.timeZone,
+			(error: unknown) => {
+				// Any other failure mounts the app, which offers Try again.
+				const reason = demoReasonOf(error);
+				return reason === null ? undefined : showDemo(reason);
+			},
 		)
-		.then((timeZone) =>
+		.then((timeZone) => {
+			if (timeZone === null) return;
 			mountApp(root, {
 				reader: sharedReader,
 				writer,
@@ -99,6 +130,18 @@ export function mountHttpApp(
 					mountedAt,
 					timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
 				),
-			}),
-		);
+				// The ledger token is minted from B4 Uni's session cookie: a signed-out visitor signs in on the web app.
+				signInUrl,
+			});
+		});
+}
+
+/** Which demo a failed first schools read calls for: signed out, or none (another failure). No school is an empty
+ * list, not a failure (`ledger-token.ts`). */
+function demoReasonOf(error: unknown): DemoReason | null {
+	const kind =
+		typeof error === "object" && error !== null && "kind" in error
+			? (error as { kind: unknown }).kind
+			: null;
+	return kind === "unauthenticated" ? "signed_out" : null;
 }

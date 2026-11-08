@@ -1,6 +1,6 @@
 # Trifold pricing strategy
 
-Status: draft, updated 2026-11-06 after reviewing Airtight's pricing (section 9). All prices are starting points to test with design partners, not decisions. Market data and sources are in `market-research.md`. The plan this serves is `business-plan.md`.
+Status: draft, updated 2026-11-06 after reviewing Airtight's pricing (section 9); checked against the other docs and the site's pricing data (`apps/trifold-site/src/lib/pricing/data.ts`) on 2026-11-07. All prices are starting points to test with design partners, not decisions. Market data and sources are in `market-research.md`. The plan this serves is `business-plan.md`.
 
 ## 1. The rule
 
@@ -18,7 +18,7 @@ Keeping these free keeps trust, avoids a fork, and keeps the word "open" true:
 2. Data export. The school owns its books.
 3. Erasure and privacy tools.
 4. Correctness and security fixes.
-5. The standards: the receipt, seal and KPI specs.
+5. The standards: the receipt and seal specs (Apache-2.0). The KPI spec (`schema/kpis.v1.json`) is free to use but is FSL today, like the event envelope schema; calling it part of the open standard needs the owner to make it Apache-2.0 (section 11, item 1).
 
 ## 3. Pricing units
 
@@ -62,8 +62,8 @@ Annual billing: two months free (Starter $290/yr, Pro $790/yr, Witnessed $1,490/
 ### Why these prices (summary of `market-research.md`)
 
 - **Starter at $29** fills the gap between $0 and $79. Most businesses keep QuickBooks ($38) or Xero ($27) at first and need a cheap tier that adds to their books instead of replacing them.
-- **Pro at $79** sits just under QuickBooks Essentials ($85, 3 users) and near Digits ($65) and Puzzle Core ($60), with unlimited seats. It has to replace QuickBooks; stacked on top, the total is $117–164.
-- **Witnessed at $149**, down from a first draft of $199. At $199 it was priced like Pilot's service ($199) without a human behind it, and $50–100 above Digits Pro and Puzzle Complete.
+- **Pro at $79** sits just under QuickBooks Essentials ($85, 3 users) and near Digits Essentials ($65) and Puzzle Core ($72 on Puzzle's own page; aggregators show $60), with unlimited seats. It has to replace QuickBooks; stacked on top, the total is $117–164.
+- **Witnessed at $149**, down from a first draft of $199. At $199 it was priced like Pilot's entry service ($199 on aggregators; Pilot's own page shows Bookkeeping Essentials at $99) without a human behind it, and $79–99 above Puzzle Complete ($120) and Digits Core ($100).
 - **The bookkeeper bundle at ~$349** undercuts human bookkeeping ($349–849+) and the books are provable. Most of it passes through to the partner, so count only Trifold's share as revenue.
 - **Against Airtight** (section 9): their AUD $49 / $99 / $199 plans are roughly US$32 / $65 / $130. Pro at $79 and Witnessed at $149 sit a little above, which the free tier, non-profit pricing, Stripe-native books and payer-held receipts justify. Don't cut prices to match.
 
@@ -94,7 +94,7 @@ Verified 501(c) organizations (IRS determination letter or EIN check) and cooper
 - Non-profits with gross receipts of $50,000 or less get Witnessed free on the Free plan (up to about 200 witnessed receipts a month), once the witness ships.
 - Donation acknowledgments use no credits; board, member and auditor seats are unlimited.
 - Add-on packs ($15–25/mo): the non-profit pack (donation acknowledgments, restricted funds, grant reports, a Form 990 package) and the co-op pack (member capital accounts, patronage allocation, 1099-PATR export).
-- The annual discount stacks with the non-profit price (to decide; the draft pricing page stacks them).
+- The annual discount stacks with the non-profit price (to decide, section 11; the draft pricing page and the site's FAQ stack them).
 - Airtight has no non-profit pricing; this is a clear difference.
 
 ## 4c. Accounting firms
@@ -150,12 +150,12 @@ Free is the Community column, hosted, within Free's limits. Starter is Free plus
 | `journal` (hledger), `report` | ✅ | Scheduled monthly close, CPA package | | Consolidation across schools |
 | `reconcile` (Stripe matching) | ✅ on demand | Daily automatic run plus alerts | Matches enter the witnessed record | |
 | `simulate`, both modes | ✅ | **Pricing Lab** (section 7) | | Network-wide pricing tests |
-| `scenarios`, KPI spec, parity, parquet export | ✅ (the KPI spec is part of the open standard) | KPI dashboards; anonymous benchmarks against peer schools | | Network rollup |
+| `scenarios`, KPI spec, parity, parquet export | ✅ (the KPI spec is FSL today, not yet part of the open standard; section 2) | KPI dashboards; anonymous benchmarks against peer schools | | Network rollup |
 | `share` (revenue-share statement) | ✅ | | | Network revenue-share billing |
 | Receipts, seals, `verify` | ✅ self-signed | | Trifold countersignature, transparency log, per-event chain, auditor portal | White-label verify page |
 | Ledger UI | Single-user, read-only viewer | Multiple users, roles, CPA seats, approvals | Auditor role | SSO, audit log |
 | Rifo agent | Small monthly quota | ✅, with approval modes: **Off**, **Ask first** (default) and **Auto within limits**. Rifo drafts, you approve, the engine does the math | | Custom agents and API |
-| Bank-statement import (CSV/OFX) | CLI import | ✅ hosted, with matching rules | | |
+| Bank-statement import (CSV/OFX) | Not built in tfd yet (planned as a CLI import) | ✅ hosted, with matching rules (planned) | | |
 | Organizations per account | 1 | Up to 3 | | Unlimited, with consolidation |
 | Erasure and privacy tools | ✅ never paywalled | | | |
 | State program receipts | | Compliance packs | | |
@@ -165,7 +165,7 @@ Free is the Community column, hosted, within Free's limits. Starter is Free plus
 
 ## 7. Pricing Lab: what `simulate` becomes in Pro
 
-The `simulate` engine and CLI stay free. They were already published under Apache-2.0, they're a strong developer hook (exit code 1 lets CI block a pricing change), and they run on the core billing engine. Pro sells what the CLI can't do:
+The `simulate` engine and CLI stay free. They were already published under Apache-2.0 (releases 0.6.0 to 0.9.0; from 0.10.0 they are FSL, still free to self-host), they're a strong developer hook (exit code 1 lets CI block a pricing change), and they run on the core billing engine. Pro sells what the CLI can't do:
 
 | Free `simulate` | Paid Pricing Lab |
 |---|---|
@@ -178,18 +178,19 @@ The `simulate` engine and CLI stay free. They were already published under Apach
 
 ## 8. Licensing that supports the pricing
 
-Decided by the owner on 2026-11-06. `justbry/atm` is a public fork of Autumn under Apache-2.0. Every version published so far stays Apache-2.0 for good; a change applies only to future versions. Autumn-derived code keeps its Apache license and notices. All tfd code so far has one author, so changing the license now is easy. The full table and reasoning are in `business-plan.md` section 5.
+Decided by the owner on 2026-11-06. On 2026-11-07 the owner considered a three-year conversion and kept FSL with its fixed two years (three years would mean BUSL-1.1 with a custom grant). The code is a public fork of Autumn, worked on in `justbry/tfd` since 2026-11-07 (`justbry/atm` keeps the old releases). Every version published before the switch (up to 0.9.0) stays Apache-2.0 for good; tfd 0.10.0 (2026-11-07) is the first FSL release. Autumn-derived code keeps its Apache license and notices. All tfd code so far has one author, so changing the license now is easy. The full table and reasoning are in `business-plan.md` section 5.
 
 | Part | License |
 |---|---|
 | tfd engine and CLI (`packages/atm`, except the parts below) | **FSL-1.1-ALv2** (Functional Source License 1.1, Apache-2.0 future license). Free to use, modify and self-host for your own books, for non-commercial education and research, and for professional services to a licensee. Not allowed: offering it to others as a commercial product or service that competes with Trifold. Each release becomes Apache-2.0 two years after it ships |
-| Receipt and seal format, spec and verifier (schemas, `docs/receipts.md`, receipt, seal, sign and canonicalisation code, the website's in-browser verifier) | **Apache-2.0** |
+| Receipt and seal format, spec and verifier (schemas, `docs/receipts.md`, receipt, seal, sign and canonicalisation code, and `tfd-verify` in `packages/verify`, which the website's in-browser verifier comes from) | **Apache-2.0** |
 | Test vectors (golden receipt files) | **CC0-1.0** (public domain) |
 | Autumn code this repo forks (`balance-engine`, `shared`, and so on) | **Apache-2.0** (upstream license, unchanged) |
+| The website (`apps/trifold-site`), all of it (2026-11-07) | Proprietary |
 | Hosted Trifold service, Rifo, the witness | Proprietary (a service; the code is never distributed) |
-| Names | Trademark policy: "Trifold" and "Witnessed by Trifold" are reserved; a fork may say it is based on tfd but may not use the Trifold names |
+| Names | Trademark policy (`TRADEMARKS.md`, draft 2026-11-07): Trifold, Witnessed by Trifold, tfd and Rifo; a fork may say it is based on tfd but may not use the names |
 
-**Open items:** whether the event envelope schema should also be Apache-2.0; whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (tradeoffs in section 4c). Contributor terms: a CLA, decided 2026-11-07 (`CONTRIBUTING.md`).
+**Open items:** whether the event envelope schema (and the KPI spec) should also be Apache-2.0; whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (tradeoffs in section 4c). Contributor terms: a CLA, decided 2026-11-07 (`CONTRIBUTING.md`).
 
 **Claim rule.** An FSL engine can't be called "open source." Say "source-available," "Fair Source" or "free to self-host." "Open format," "open spec," "open standard" and "open verifier" are fine, because those parts are Apache-2.0.
 
@@ -237,8 +238,8 @@ Sources: https://airtight.one/pricing/ and https://airtight.one/
 
 ## 11. Open decisions
 
-1. ~~Engine license~~ Decided 2026-11-06: FSL-1.1-ALv2 for the engine, Apache-2.0 for the format and verifier, CC0-1.0 for vectors (section 8). Still open: the licensor legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need an extra grant (decide before the accountant partner program; tradeoffs in section 4c); whether the event envelope schema should also be Apache-2.0.
+1. ~~Engine license~~ Decided 2026-11-06: FSL-1.1-ALv2 for the engine, Apache-2.0 for the format and verifier, CC0-1.0 for vectors (section 8). Still open: the licensor legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need an extra grant (decide before the accountant partner program; tradeoffs in section 4c); whether the event envelope schema and the KPI spec should also be Apache-2.0.
 2. Is "Trifold as witness" the paid line, or are Stripe matching or Rifo also paid-only?
 3. Final prices, after testing with the design-partner schools.
-4. Whether the annual and non-profit discounts stack.
+4. Whether the annual and non-profit discounts stack. The draft pricing page and the site's pricing FAQ say they do; that is a proposal, not a decision.
 5. The accounting-firm client discount (20% for the first year is a placeholder).

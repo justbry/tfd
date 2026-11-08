@@ -14,7 +14,18 @@ export const NOTICES_FILE = "licenses.txt";
 
 /** The last node_modules/<name>/ in a module id: the package that owns it (scoped names included). */
 const PACKAGE_DIRECTORY = /^(.*\/node_modules\/((?:@[^/]+\/)?[^/]+))\//;
-const LICENSE_FILE = /^(licen[cs]e|copying)(\.(md|txt))?$/i;
+/** LICENSE, LICENSE.md, LICENSE-MIT, COPYING.txt, ...: a dual-licensed package may ship more than one. */
+const LICENSE_FILE = /^(licen[cs]e|copying)([.-][\w.-]+)?$/i;
+/** Apache-2.0 section 4(d): a redistribution carries the package's NOTICE file too. */
+const NOTICE_FILE = /^notice(\.(md|txt))?$/i;
+/** Rollup's prefix for virtual module ids. */
+const VIRTUAL_PREFIX = /^\0/;
+
+const byName = (a: { name: string }, b: { name: string }): number => {
+	if (a.name < b.name) return -1;
+	if (a.name > b.name) return 1;
+	return 0;
+};
 
 type BundledPackage = {
 	name: string;
@@ -26,25 +37,28 @@ type BundledPackage = {
 const packageOf = (directory: string): BundledPackage => {
 	const manifest = JSON.parse(
 		readFileSync(join(directory, "package.json"), "utf8"),
-	) as { name: string; version?: string; license?: string };
-	const licenseFile = readdirSync(directory).find((file) =>
-		LICENSE_FILE.test(file),
-	);
+	) as { name: string; version?: string; license?: unknown };
+	const license =
+		typeof manifest.license === "string" ? manifest.license : undefined;
+	const files = readdirSync(directory).sort();
+	const texts = [
+		...files.filter((file) => LICENSE_FILE.test(file)),
+		...files.filter((file) => NOTICE_FILE.test(file)),
+	].map((file) => readFileSync(join(directory, file), "utf8").trim());
 	return {
 		name: manifest.name,
 		version: manifest.version ?? "",
-		license: manifest.license ?? "see its license text",
-		text: licenseFile
-			? readFileSync(join(directory, licenseFile), "utf8").trim()
-			: `No license file; package.json says ${manifest.license ?? "nothing"}.`,
+		license: license ?? "see its license text",
+		text:
+			texts.length > 0
+				? texts.join("\n\n")
+				: `No license file; package.json says ${license ?? "nothing"}.`,
 	};
 };
 
 /** The text of licenses.txt for the packages in these package directories. */
-export const noticesFor = (directories: Iterable<string>): string => {
-	const packages = [...new Set(directories)]
-		.map(packageOf)
-		.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+const noticesFor = (directories: ReadonlySet<string>): string => {
+	const packages = [...directories].map(packageOf).sort(byName);
 	const sections = packages.map(
 		(bundled) =>
 			`${bundled.name} ${bundled.version} (${bundled.license})\n\n${bundled.text}`,
@@ -81,9 +95,12 @@ export const thirdPartyNotices = ({
 		for (const output of Object.values(bundle)) {
 			if (output.type !== "chunk") continue;
 			for (const id of output.moduleIds) {
-				const match = PACKAGE_DIRECTORY.exec(id.replace(/^\0/, ""));
-				if (match?.[1] && existsSync(join(match[1], "package.json")))
-					directories.add(match[1]);
+				const directory = PACKAGE_DIRECTORY.exec(
+					id.replace(VIRTUAL_PREFIX, ""),
+				)?.[1];
+				if (!directory || directories.has(directory)) continue;
+				if (existsSync(join(directory, "package.json")))
+					directories.add(directory);
 			}
 		}
 		this.emitFile({

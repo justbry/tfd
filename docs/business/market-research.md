@@ -1,6 +1,6 @@
 # Trifold market research
 
-Status: research notes, 2026-11-06. This collects the market data behind `pricing-strategy.md` and `business-plan.md` (both in this folder).
+Status: research notes, 2026-11-06; checked against `../website/competitors.md` on 2026-11-07. This collects the market data behind `pricing-strategy.md` and `business-plan.md` (both in this folder). `../website/competitors.md` holds the competitor facts read from the vendors' own pages on 2026-11-06; where the two differ, the vendor page wins, and the rows below say so.
 
 **How reliable the numbers are.** Most prices come from third-party aggregators, not from the vendors' own pages, and some sources disagree. Treat a figure as accurate to within a few dollars. Recheck the vendor's own page before publishing any comparison. Where sources conflict, the table gives the most recent figure and says so in a note.
 
@@ -31,14 +31,14 @@ Trifold sits between four groups. None of them offers books a third party can ve
 
 | Product | Monthly price | Notes | Source |
 |---|---|---|---|
-| Puzzle | ~$25 / $60 / $120 / $360 | Starter, Core, Complete, Scale. The free Starter promotion ended Sep 2026. Software plus a partner bookkeeper from $171 (up to $10K monthly expenses) | [Puzzle pricing FAQ](https://help.puzzle.io/en/articles/8891734-faq-pricing), [usagepricing](https://www.usagepricing.com/blueprint/activity/puzzle-2026-09-20-promo-ends-free-starter-removed) |
+| Puzzle | $30 / $72 / $120 / $360 (Puzzle's page, 2026-11-06); aggregators show ~$25 / $60 | Starter, Core, Complete, Scale. The free Starter promotion ended Sep 2026. Core + Expert Reviewed is $171 (up to $10K monthly expenses) | [Puzzle pricing FAQ](https://help.puzzle.io/en/articles/8891734-faq-pricing), [usagepricing](https://www.usagepricing.com/blueprint/activity/puzzle-2026-09-20-promo-ends-free-starter-removed) |
 | Digits | $65 / $100 / Pro ~$250 | Essentials, Core, Pro (quoted). No per-user fee. Firms get per-client rates | [Digits pricing](https://www.digits.com/pricing), [softwarefinder](https://softwarefinder.com/accounting-software/digits) |
 
 ### Bookkeeping services
 
 | Product | Monthly price | Notes | Source |
 |---|---|---|---|
-| Pilot | $199 entry; $99 AI-only; human-led $349–849+ | QuickBooks is required and billed separately. Onboarding fee about one month | [Capterra](https://www.capterra.com/p/186313/Pilot/pricing/), [Eightx](https://eightx.co/blog/compare/how-much-does-pilot-cost) |
+| Pilot | Bookkeeping Essentials $99 (Pilot's page, 2026-11-06, up to $100K monthly expenses); aggregators show $199 entry and human-led $349–849+ | QuickBooks is required and billed separately (aggregators). Onboarding fee about one month. Tax from $1,000 a year; CFO from $1,750 a month | [Capterra](https://www.capterra.com/p/186313/Pilot/pricing/), [Eightx](https://eightx.co/blog/compare/how-much-does-pilot-cost) |
 
 ### Vertical software for schools, studios and tutoring
 
@@ -76,13 +76,13 @@ Trifold sits between four groups. None of them offers books a third party can ve
 1. **Prices are rising.** QuickBooks, Xero and FreshBooks all raised prices in 2026, and Puzzle dropped its free tier. A free core, a flat price and unlimited seats stand out right now.
 2. **User caps hurt.** QuickBooks caps users at every tier, so a school that adds its CPA or a second admin has to upgrade. Unlimited seats is a selling point.
 3. **This vertical prices per student.** Jackrabbit charges by student count and Teachworks per lesson, so owners understand per-student pricing. Trifold meters ledger events underneath but can say "for schools up to about 100 students" on its pricing page.
-4. **Owners pay the most for having it done.** Human bookkeeping costs $349–849+ a month, against $60–140 for software. The money is in closing the month, so Rifo's close and the bookkeeper bundle are where premium pricing works.
+4. **Owners pay the most for having it done.** Human bookkeeping costs $349–849+ a month on aggregator figures, against $60–140 for software. The money is in closing the month, so Rifo's close and the bookkeeper bundle are where premium pricing works.
 5. **Nobody offers provable books.** None of the products above offers signed receipts, sealed months or an independent witness. That's Trifold's opening, and the reason vertical tools are partners rather than competitors.
 6. **Discounts are common.** Xero and QuickBooks lead with deep introductory offers. Trifold shouldn't race them on discounts; it competes with a free core and with provable books.
 
 ## 4. Why the first market is microschools in Idaho and Utah
 
-- Trifold already serves these schools through buzz-school and b4uni, which gives it design partners and real data.
+- The owner's own and related businesses (B4 Uni and its family service, buzz-school; Vibes of Light) already run on released tfd versions, which gives design partners and real data. They are related parties, not independent customers (`website-open-questions.md` 4.4).
 - Families using state programs such as Idaho's parental choice tax credit or Utah Fits All need payment records that hold up. **Check each program's current receipt rules before building on this.** The itemised-receipt questions are open in `packages/atm/docs/receipts.md`.
 - Microschools run on Stripe and spreadsheets and usually pay a bookkeeper. That's the exact problem Trifold solves.
 

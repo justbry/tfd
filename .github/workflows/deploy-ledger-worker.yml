@@ -1,0 +1,65 @@
+name: Deploy ledger worker
+
+# Deploys packages/ledger-worker, with the ledger UI as its static assets, to staging (ledger-staging.b4uni.com). Started
+# by hand only: staging is the only environment (wrangler.jsonc, D2/D13). The steps are the hand deploy's:
+#   1. build the UI against the family service (VITE_LEDGER_SOURCE=http). A plain build is the fixture build, and
+#      deploying it puts the fixture school names on staging.
+#   2. check the bundle (a wrangler dry run)
+#   3. deploy
+#   4. staging-e2e stage 1, the checks that need no credential (the bundle's API host, no fixtures, health)
+#
+# The job runs in the GitHub environment `staging`: give it a required reviewer to approve each deploy. Secrets and
+# setup are in docs/ci-and-deploy.md.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-ledger-worker
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: ledger worker (staging)
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
+    environment: staging
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: |
+          bun install --frozen-lockfile
+          bun install --frozen-lockfile --cwd packages/ledger-ui
+
+      - name: Build ledger UI
+        working-directory: packages/ledger-ui
+        env:
+          VITE_LEDGER_SOURCE: http
+          VITE_API_BASE: https://api-staging.b4uni.com
+        run: bun run build
+
+      - name: Check bundle
+        working-directory: packages/ledger-worker
+        run: bun run check:bundle
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/ledger-worker
+          command: deploy --env staging
+
+      - name: Staging end-to-end (stage 1)
+        working-directory: packages/ledger-worker
+        run: bun run staging-e2e --stage 1

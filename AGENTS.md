@@ -16,7 +16,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 
 `plans/tfd-rename.md` has the steps; `packages/atm/docs/frozen-identifiers.md` lists the names that never change, with the reasons. Until a step lands:
 - In prose, say **tfd**; command examples say `tfd`.
-- Keep literal paths (`packages/atm/...`), the repo name `justbry/atm` in `UPSTREAM.md` and release URLs (old `atm-v*` releases stay there), and existing `ATM_*` environment variables as they are.
+- Keep literal paths (`packages/atm/...`), the repo name `justbry/atm` in `UPSTREAM.md` and release URLs (old `atm-v*` releases, up to `atm-v0.10.0`, stay there; `release.ts` still publishes there), and existing `ATM_*` environment variables as they are. The working repository is `justbry/tfd` since 2026-11-07: new PRs go there, against `dev`.
 - Never change bytes inside signed or golden data (receipts, seals, key ids such as `atm-test-1`, schema `$id`s) to rename anything. Signatures and test vectors depend on them.
 - Stored identifiers that contain "atm" stay frozen: mapping labels `atm/booking` and `atm/session-gift-code@v1`, Stripe idempotency keys prefixed `atm:`, the `.atm-tmp-` temp prefix, and `atm_version` in shipped input lines. Renaming them breaks replay, idempotency or existing data.
 
@@ -34,7 +34,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 
 `packages/atm/LICENSING.md` explains the package's licenses in prose. `REUSE.toml` is the machine-readable map: keep both in step when files move.
 
-**Why.** "Anyone can check, forever" needs checking that can never be restricted, so the format, the verifier and the vectors are permissive from day one. FSL stops a hosted clone of the engine; the two-year conversion backs up the promise that the records outlive the company.
+**Why.** "Anyone can check, forever" needs checking that can never be restricted, so the format, the verifier and the vectors are permissive from day one. FSL stops a hosted clone of the engine; the two-year conversion backs up the promise that the records outlive the company. The owner considered three years on 2026-11-07 and kept FSL with its fixed two years (three years would mean BUSL-1.1 with a custom grant). tfd 0.10.0 (2026-11-07) is the first FSL release; releases up to 0.9.0 stay Apache-2.0.
 
 **Rules for code:**
 - A new file that implements receipt or seal *verification* or the format belongs with the Apache-2.0 files: give it an `SPDX-License-Identifier: Apache-2.0` header and add it to `LICENSING.md` and `REUSE.toml`. It must not import FSL code.
@@ -54,7 +54,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 1. **Licensor name.** `LICENSE.md` says "Trifold" until a legal entity exists; then put the entity's name there.
 2. **Accounting firms.** FSL allows "professional services" on a client's own install. A firm hosting tfd for many clients may be a Competing Use. Decide whether to add a grant before the accountant partner program launches. The tradeoffs are in `docs/business/pricing-strategy.md` §4c.
 3. ~~**Contributor terms.**~~ **Decided 2026-11-07: a CLA** (individual and corporate, adapted from the Apache ICLA and CCLA, licensing contributions to Trifold under any terms). See `CONTRIBUTING.md`. Outside contributions wait until its text is published and reviewed by a lawyer.
-4. **Event envelope schema.** Decide whether `schema/envelope.v1.json` and the payload schemas should also be Apache-2.0, so other ledgers can adopt the full standard.
+4. **Event envelope schema.** Decide whether `schema/envelope.v1.json` and the payload schemas should also be Apache-2.0, so other ledgers can adopt the full standard. The KPI spec (`schema/kpis.v1.json`, `kpis/`) is FSL too, so don't call it part of the open standard unless it moves.
 5. **Other Trifold code.** New code outside `packages/atm`, such as `packages/ledger-ui`, falls under the root Apache-2.0 `LICENSE` by default. Decide whether parts of it should be FSL or move to a private repo.
 
 ## Trademarks
@@ -68,7 +68,8 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 ## Claims
 
 What the site and docs may say depends on what has shipped.
-- Never "triple-entry" for Trifold until milestones 2 and 3 ship.
+- Never "triple-entry" for Trifold. Whether it may ever be used, once milestones 2 and 3 ship, is open: this rule said "until milestones 2 and 3 ship" while the business plan, pricing strategy and brand doc say never. Until the owner decides, don't use it.
+- Say "signed receipts and sealed books" for what milestone 1 built. Say that tfd signs receipts and seals months; don't say schools or families use them until a school issues real receipts.
 - Never "Not even Trifold can quietly change your books."
 - No speed numbers.
 - Rifo, the witness, daily payout matching and tax packages are **Next** or **Later**. Never describe them as shipped.

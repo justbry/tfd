@@ -108,15 +108,18 @@ When it is unset, submitting opens the visitor's email app with the fields fille
 
 ## Deploy to Cloudflare Pages
 
-Direct upload:
+CI deploys it (`.github/workflows/trifold-site.yml`): every pull request gets a preview at
+`<branch>.tfd-ledger.pages.dev`, and every push to `dev` goes to production. Setup, secrets and rollback are in
+`docs/ci-and-deploy.md`.
+
+By hand, from this directory:
 
 ```sh
 bun run build
-bunx wrangler pages deploy build --project-name trifold-site
+bunx wrangler pages deploy build --project-name tfd-ledger --branch main --commit-dirty=true
 ```
 
-Or Git integration: build command `bun run build`, output directory `build`, root directory `apps/trifold-site`
-(add `PUBLIC_FORM_ENDPOINT` as an environment variable if used). `wrangler.toml` names the project and its output.
+`wrangler.toml` names the project and its output. Set `PUBLIC_FORM_ENDPOINT` at build time if the form has an endpoint.
 
 `static/_headers` sets the security headers and long-lived caching for `/_app/immutable/*`. `build/404.html` is served
 for unknown paths.
