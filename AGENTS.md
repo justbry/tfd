@@ -54,7 +54,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 
 1. **Licensor name.** `LICENSE.md` says "Trifold" until a legal entity exists; then put the entity's name there.
 2. **Accounting firms.** FSL allows "professional services" on a client's own install. A firm hosting tfd for many clients may be a Competing Use. Decide whether to add a grant before the accountant partner program launches. The tradeoffs are in `docs/business/pricing-strategy.md` §4c.
-3. ~~**Contributor terms.**~~ **Decided 2026-11-07: a CLA** (individual and corporate, adapted from the Apache ICLA and CCLA, licensing contributions to Trifold under any terms). See `CONTRIBUTING.md`. Outside contributions wait until its text is published and reviewed by a lawyer.
+3. ~~**Contributor terms.**~~ **Decided 2026-11-07: a CLA** (individual and corporate, adapted from the Apache ICLA and CCLA, licensing contributions to Trifold under any terms). See `CONTRIBUTING.md`; the v0.1 drafts and the setup checklist are in `legal/cla/`. Outside contributions wait until its text is published and reviewed by a lawyer.
 4. **Event envelope schema.** Decide whether `schema/envelope.v1.json` and the payload schemas should also be Apache-2.0, so other ledgers can adopt the full standard. The KPI spec (`schema/kpis.v1.json`, `kpis/`) is FSL too, so don't call it part of the open standard unless it moves.
 5. **Other Trifold code.** New code outside `packages/atm`, such as `packages/ledger-ui`, falls under the root Apache-2.0 `LICENSE` by default. Decide whether parts of it should be FSL or move to a private repo.
 
