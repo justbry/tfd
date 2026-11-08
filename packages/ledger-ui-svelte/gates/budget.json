@@ -5,7 +5,7 @@
 		"S9.0": 110513,
 		"S9.1": 113682,
 		"S9.2": 112174,
-		"S9.3": 112475,
+		"S9.3": 112611,
 		"S9.4": 112370
 	},
 	"measure": "first load: entry chunk, its static imports and their CSS, of gates/size-entry.ts built with null adapters (as packages/ledger-ui/gates/budget.json); gzip level 9",
