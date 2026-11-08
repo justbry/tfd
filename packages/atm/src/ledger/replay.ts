@@ -153,7 +153,12 @@ export const contextFromEvent = (
 		feature,
 		plan: e.labels.plan,
 		service: e.labels.service,
-		as: e.event_type === "credit.refunded" ? "refunded" : undefined,
+		as:
+			e.event_type === "credit.refunded"
+				? "refunded"
+				: e.event_type === "credit.adjusted"
+					? "adjusted"
+					: undefined,
 		reason: payload.reason as string | undefined,
 		held: payload.held as number | undefined,
 		settleAs: e.event_type === "credit.forfeited" ? "forfeited" : "spent",
