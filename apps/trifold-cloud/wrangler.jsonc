@@ -1,0 +1,52 @@
+// The hosted Trifold product (plans/trifold-cloud/PLAN.md). One Worker serves ledger.* and api.*, routed by Host.
+// Only `staging` is bound. The top level is production and stays unbound until the launch gate (PLAN.md section 10):
+// tests/config.test.ts fails if a route, D1 database or bucket appears there.
+{
+	"name": "trifold-cloud",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-07-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"observability": { "enabled": true },
+	"durable_objects": {
+		"bindings": [{ "name": "ORG", "class_name": "OrgDO" }]
+	},
+	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrgDO"] }],
+	"env": {
+		"staging": {
+			"name": "trifold-cloud-staging",
+			"workers_dev": false,
+			"routes": [
+				{ "pattern": "staging-ledger.trifold.app", "custom_domain": true },
+				{ "pattern": "staging-api.trifold.app", "custom_domain": true }
+			],
+			"durable_objects": {
+				"bindings": [{ "name": "ORG", "class_name": "OrgDO" }]
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "trifold-cloud-staging",
+					"database_id": "f9f3d5e3-e9af-45ce-bb4d-622251dab90f",
+					"migrations_dir": "migrations"
+				}
+			],
+			"r2_buckets": [
+				{ "binding": "BOOKS", "bucket_name": "trifold-staging-books" },
+				{ "binding": "BACKUPS", "bucket_name": "trifold-staging-backups" }
+			],
+			"triggers": { "crons": ["17 * * * *"] },
+			"secrets_store_secrets": [
+				{ "binding": "SIGNING_RECEIPT", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_RECEIPT" },
+				{ "binding": "SIGNING_SEAL", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_SEAL" },
+				{ "binding": "SIGNING_DIRECTORY", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_DIRECTORY" }
+			],
+			"vars": {
+				"ENVIRONMENT": "staging",
+				"LEDGER_HOST": "staging-ledger.trifold.app",
+				"API_HOST": "staging-api.trifold.app",
+				"BACKUP_SUBREQUEST_BUDGET": "900"
+			}
+		}
+	}
+}

@@ -26,6 +26,7 @@ tests/
 !packages/auto-topup/tests
 !packages/cache/tests
 !packages/ledger-worker/tests
+!apps/trifold-cloud/tests
 !apps/trifold-apex/tests
 !packages/encryption/tests
 !packages/sqs/tests

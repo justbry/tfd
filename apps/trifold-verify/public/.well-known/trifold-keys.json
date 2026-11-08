@@ -1,0 +1,20 @@
+{
+	"trifold-staging-2026-11-receipt": {
+		"pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAwxmZV0ZthKj9GO9wNSOnwwY4r7QBPsQu4Hjxs/9mYIk=\n-----END PUBLIC KEY-----\n",
+		"purpose": "receipt",
+		"not_before": "2026-11-01T00:00:00Z",
+		"not_after": "2027-01-31T23:59:59Z"
+	},
+	"trifold-staging-2026-11-seal": {
+		"pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAATJBok2Hs2s7ODYJol2VeKYGkM+t9OlsDTYMpvRi1oY=\n-----END PUBLIC KEY-----\n",
+		"purpose": "seal",
+		"not_before": "2026-11-01T00:00:00Z",
+		"not_after": "2027-01-31T23:59:59Z"
+	},
+	"trifold-staging-2026-11-directory": {
+		"pem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAOpSC4AZEXYKmeEqIGGebuqNEirlwHg+ZqATPmzSi8d0=\n-----END PUBLIC KEY-----\n",
+		"purpose": "directory",
+		"not_before": "2026-11-01T00:00:00Z",
+		"not_after": "2027-01-31T23:59:59Z"
+	}
+}
