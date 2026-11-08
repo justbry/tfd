@@ -17,6 +17,7 @@ supabase.sh
 **/.next/
 **/.vercel/
 **/.turbo/
+**/.wrangler/
 **/.DS_Store
 **/.env*
 tests/
@@ -25,6 +26,7 @@ tests/
 !packages/auto-topup/tests
 !packages/cache/tests
 !packages/ledger-worker/tests
+!apps/trifold-apex/tests
 !packages/encryption/tests
 !packages/sqs/tests
 !packages/catalog-lru/tests
