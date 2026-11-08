@@ -213,6 +213,7 @@
 			viewer,
 			changes,
 			creditUnit: unit.other,
+			readOnly: school.demo,
 			...(unavailable ? { detailUnavailable: true } : {}),
 		};
 	};

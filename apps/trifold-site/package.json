@@ -11,7 +11,7 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
-		"build": "svelte-kit sync && vite build && bun ./scripts/agent-files.ts",
+		"build": "bun ../../catalog/trifold/check.ts && svelte-kit sync && vite build && bun ./scripts/agent-files.ts",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"samples": "bun ./scripts/make-samples.ts",

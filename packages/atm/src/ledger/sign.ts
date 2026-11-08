@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
-import type { AtmPublicKeys, AtmSigner } from "../types.js";
+import type {
+	AtmPublicKeys,
+	AtmSigner,
+	KeyUseVerdict,
+	ReceiptKeyUseVerdict,
+	TfdKeyEntry,
+	TfdKeyPurpose,
+} from "../types.js";
 
 /** Receipts and seals are signed with Ed25519 only: deterministic (RFC 8032), so the same bytes and key give the same signature. */
 const ED25519 = "ed25519";
@@ -18,6 +25,83 @@ export const signBytes = (text: string, signer: AtmSigner): string => {
 	return sign(null, encoder.encode(text), key).toString("base64url");
 };
 
+const PURPOSES: readonly string[] = ["receipt", "seal", "directory"];
+
+/** RFC 3339 UTC with `Z`: a key window or `issued_at` read the same in every verifier's time zone. */
+const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+
+export const isInstant = (value: unknown): value is string =>
+	typeof value === "string" &&
+	UTC_INSTANT.test(value) &&
+	!Number.isNaN(Date.parse(value));
+
+/** A keys-file entry in either form; an object that is not a whole `TfdKeyEntry` is not a key. */
+type KeyEntry = { pem: string; use: TfdKeyEntry | null };
+
+/**
+ * The key published as `keyId`: its PEM, and its purpose and window when the entry is the object form (`use: null` for
+ * the first form, a bare PEM). An entry missing a field, or with a field of the wrong type or a time that is not RFC 3339 UTC (`…Z`), is
+ * `null` (the verifiers call that `unknown_key`). Never throws.
+ */
+export const keyEntryOf = (
+	keys: AtmPublicKeys,
+	keyId: string,
+): KeyEntry | null => {
+	const entry: unknown = Object.hasOwn(keys, keyId) ? keys[keyId] : undefined;
+	if (typeof entry === "string") return { pem: entry, use: null };
+	if (typeof entry !== "object" || entry === null || Array.isArray(entry))
+		return null;
+	const { pem, purpose, not_before, not_after, revoked_at } = entry as Record<
+		string,
+		unknown
+	>;
+	const whole =
+		typeof pem === "string" &&
+		typeof purpose === "string" &&
+		PURPOSES.includes(purpose) &&
+		isInstant(not_before) &&
+		(not_after === null || isInstant(not_after)) &&
+		(revoked_at === undefined || isInstant(revoked_at));
+	return whole ? { pem, use: entry as TfdKeyEntry } : null;
+};
+
+/**
+ * Whether the key that made a good signature vouches for the document: never once revoked (whatever `at` says), then the
+ * purpose, then `at` (the document's signed time) in `[not_before, not_after)`. `at` is `null` for a v1 receipt, which
+ * has no signed time: a key with a window never vouches for one (`key_requires_v2`), or an expired, unrevoked key could
+ * still sign v1 receipts that pass. The first-form key vouches for anything, as before windows. Call it only after the
+ * signature verified.
+ */
+export function keyUse(
+	keys: AtmPublicKeys,
+	keyId: string,
+	purpose: TfdKeyPurpose,
+	at: string,
+): "ok" | KeyUseVerdict;
+export function keyUse(
+	keys: AtmPublicKeys,
+	keyId: string,
+	purpose: TfdKeyPurpose,
+	at: string | null,
+): "ok" | ReceiptKeyUseVerdict;
+export function keyUse(
+	keys: AtmPublicKeys,
+	keyId: string,
+	purpose: TfdKeyPurpose,
+	at: string | null,
+): "ok" | ReceiptKeyUseVerdict {
+	const use = keyEntryOf(keys, keyId)?.use;
+	if (!use) return "ok";
+	if (use.revoked_at !== undefined) return "key_revoked";
+	if (use.purpose !== purpose) return "key_wrong_purpose";
+	if (at === null) return "key_requires_v2";
+	const time = Date.parse(at);
+	const inWindow =
+		time >= Date.parse(use.not_before) &&
+		(use.not_after === null || time < Date.parse(use.not_after));
+	return inWindow ? "ok" : "outside_key_window";
+}
+
 /**
  * Whether `sig` is an Ed25519 signature of `text` by the key published as `keyId`. A key id `keys` does not hold, or holds
  * as anything but an Ed25519 public key, is `unknown_key`. A `sig` that is not the one base64url spelling of 64 bytes is
@@ -29,8 +113,8 @@ export const verifyBytes = (
 	sig: string,
 	keys: AtmPublicKeys,
 ): "ok" | "unknown_key" | "bad_signature" => {
-	const pem = Object.hasOwn(keys, keyId) ? keys[keyId] : undefined;
-	if (typeof pem !== "string") return "unknown_key";
+	const pem = keyEntryOf(keys, keyId)?.pem;
+	if (pem === undefined) return "unknown_key";
 	let key: ReturnType<typeof createPublicKey>;
 	try {
 		key = createPublicKey(pem);

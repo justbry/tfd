@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Effect, ManagedRuntime } from "effect";
 import { AdapterError } from "$contract/http/errors.ts";
 import { memoryStorage } from "$contract/http/pending.ts";
-import { httpLayer } from "../../src/effect/layers.ts";
+import { httpLayer } from "../../src/effect/http-layer.ts";
 import { memoryLog } from "../../src/effect/log.ts";
 import { read, run } from "../../src/effect/run.ts";
 import { toUiError, UiError } from "../../src/effect/ui-error.ts";

@@ -12,6 +12,7 @@
 	import { toUiError, type UiError } from "../../effect/ui-error.ts";
 	import { useApp } from "../context.ts";
 	import { perform } from "../context.ts";
+	import DemoReadOnlyNote from "../DemoReadOnlyNote.svelte";
 	import Icon from "../Icon.svelte";
 	import LedgerCopySheet from "./LedgerCopy.svelte";
 	import LoadFailed from "../LoadFailed.svelte";
@@ -265,8 +266,12 @@
 	// ---- what the route and the session say
 	const view = $derived(plansViewOf(viewing));
 	const owner = $derived(school.role === "owner");
+	/** A demo school refuses every write: it shows the tables alone, with no control that would write. */
+	const readOnly = $derived(school.demo);
 	const modeAsked = $derived(route.query.get("mode"));
-	const mode = $derived<Mode>(modeAsked === "preview" || modeAsked === "code" ? modeAsked : "edit");
+	const mode = $derived<Mode>(
+		!readOnly && (modeAsked === "preview" || modeAsked === "code") ? modeAsked : "edit",
+	);
 	const changes = $derived(session ? diffMenus(session.live, session.draft) : []);
 	$effect(() => {
 		if (session) onDraftChange(school.id, changes.length > 0);
@@ -469,7 +474,7 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 	<div onclickcapture={flushYaml} data-test="plans">
 		<div inert={editing !== null || reviewing || ledgerCopy !== null}>
-			{#if view.admin}
+			{#if view.admin && !readOnly}
 				<PlanSetup
 					steps={setupSteps({
 						stripeConnected: session.summary.stripeConnected,
@@ -510,46 +515,51 @@
 						><PaneIcon name="edit" class="mr-[3px] size-[11px] align-[-1px]" />Draft · {changeCount(changes.length)}</Badge
 					>
 				{/if}
-				<span class="flex-1"></span>
-				<div class={segment} role="group" aria-label="Plans view">
-					{#each modes as option (option.mode)}
-						<button
-							type="button"
-							class={segmentButton}
-							aria-pressed={option.mode === mode}
-							data-test="plan-mode"
-							data-mode={option.mode}
-							onclick={() => chooseMode(option.mode)}><PaneIcon name={option.icon} />{option.label}</button
+				<!-- On the left: the demo alert covers the toolbar's right end. -->
+				{#if readOnly}
+					<DemoReadOnlyNote />
+				{:else}
+					<span class="flex-1"></span>
+					<div class={segment} role="group" aria-label="Plans view">
+						{#each modes as option (option.mode)}
+							<button
+								type="button"
+								class={segmentButton}
+								aria-pressed={option.mode === mode}
+								data-test="plan-mode"
+								data-mode={option.mode}
+								onclick={() => chooseMode(option.mode)}><PaneIcon name={option.icon} />{option.label}</button
+							>
+						{/each}
+					</div>
+					{#if changes.length > 0}
+						<Button
+							variant="tool"
+							size="tool"
+							data-test="plan-discard"
+							title={writeTitle}
+							disabled={view.preview}
+							onclick={() => {
+								changeDraft(session.live);
+								notify(app, "Draft discarded.");
+							}}><PaneIcon name="undo" />Discard draft</Button
 						>
-					{/each}
-				</div>
-				{#if changes.length > 0}
+					{/if}
 					<Button
-						variant="tool"
+						variant="primary"
 						size="tool"
-						data-test="plan-discard"
-						title={writeTitle}
-						disabled={view.preview}
-						onclick={() => {
-							changeDraft(session.live);
-							notify(app, "Draft discarded.");
-						}}><PaneIcon name="undo" />Discard draft</Button
+						data-test="plan-review"
+						title={reason}
+						aria-describedby={reason ? reasonId : undefined}
+						disabled={!canPublish}
+						onclick={() => (reviewing = true)}><PaneIcon name="upload" />Review and publish</Button
 					>
-				{/if}
-				<Button
-					variant="primary"
-					size="tool"
-					data-test="plan-review"
-					title={reason}
-					aria-describedby={reason ? reasonId : undefined}
-					disabled={!canPublish}
-					onclick={() => (reviewing = true)}><PaneIcon name="upload" />Review and publish</Button
-				>
-				{#if reason}<span class="sr-only" id={reasonId}>{reason}</span>{/if}
-				{#if session.saveStatus === "failed" && problemList.length === 0}
-					<Button variant="tool" size="tool-small" data-test="plan-retry-save" onclick={retrySave}
-						><PaneIcon name="undo" />Retry save</Button
-					>
+					{#if reason}<span class="sr-only" id={reasonId}>{reason}</span>{/if}
+					{#if session.saveStatus === "failed" && problemList.length === 0}
+						<Button variant="tool" size="tool-small" data-test="plan-retry-save" onclick={retrySave}
+							><PaneIcon name="undo" />Retry save</Button
+						>
+					{/if}
 				{/if}
 			</div>
 			{#if problemList.length > 0 && mode !== "code"}
@@ -575,10 +585,11 @@
 						addons: session.draft.addons.length >= planLimits.addons,
 					}}
 					{owner}
+					{readOnly}
 					onOpen={open}
 					onMembers={(tierId) => leave("members", ["plan", tierId])}
 				/>
-				{#if view.admin}
+				{#if view.admin && !readOnly}
 					<div class={[muted, "mt-2 flex flex-wrap items-center gap-1.5"]} data-test="plan-ledger-copy-row">
 						<PaneIcon name="layers" />
 						<span>The copy kept in the ledger: names, descriptions, order and audiences, never prices.</span>

@@ -74,7 +74,7 @@ export const EMPTY_GRANTS_STATE: GrantsState = {
 	invoices: {},
 };
 
-const ORG = {
+export const ORG = {
 	config: {
 		reverse_deduction_order: false,
 		block_overdue_entitlements: false,

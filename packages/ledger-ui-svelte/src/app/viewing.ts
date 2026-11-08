@@ -1,10 +1,9 @@
-import {
-	type AudienceView,
-	audienceNames,
-	type Disclosure,
-	resolveViewAs,
-	type ViewAsOption,
+import type {
+	AudienceView,
+	Disclosure,
+	ViewAsOption,
 } from "$contract/data/disclosure.ts";
+import { audienceNames, resolveViewAs } from "./view-as.ts";
 
 /** What the route views (`as=`, resolved by the contract's `resolveViewAs`): the school's disclosure, the View as row
  * chosen and the audience view it shows. In a preview the banner shows and the periods follow the previewed audience

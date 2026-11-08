@@ -15,14 +15,15 @@ its one dependency is `@noble/ed25519` (MIT). Not on npm yet (`private: true`).
 | Import | What it has |
 |---|---|
 | `tfd-verify` | `verifyReceipt` (shape, key id, then strict Ed25519), `checkReceiptAgainstEvents` (the books make the receipt again, byte for byte), `verifySealChain` (each seal's signature, its link to the seal before, and its events hashed and counted again), `receiptOf`, `canonicalize`, `sha256Hex`, the shape checks and the types. |
-| `tfd-verify/check` | `checkReceipt`: the whole check of one receipt as a verifier page runs it, the signature, then the books and the month's seal when the caller has them. |
+| `tfd-verify/check` | `checkReceipt`: the whole check of one receipt as a verifier page runs it, the signature, then the books and the month's seal when the caller has them. `checkReceiptInSeal`: a receipt against its month's published seal alone (no events): `ok`, `not_sealed` (nothing published yet, not a failure), a `receipt_*` or `seal_*` verdict, `seal_other_school`, `seal_other_month` or `not_in_seal`. |
 | `tfd-verify/link` | `encodeReceiptParam` and `decodeReceiptParam` for `/verify?r=` links (base64url of the receipt's JSON). No crypto, so a page can read a link without loading the verifier. |
 
 ```ts
 import { verifyReceipt } from "tfd-verify";
 
 const verdict = await verifyReceipt(JSON.parse(text), { "key-id": "-----BEGIN PUBLIC KEY-----…" });
-// "ok" | "malformed" | "unknown_key" | "bad_signature"
+// "ok" | "malformed" | "unknown_key" | "bad_signature" | "key_revoked" | "key_wrong_purpose" | "outside_key_window"
+// | "key_requires_v2"
 ```
 
 Every check is async (WebCrypto) and never throws for untrusted input.
@@ -42,10 +43,20 @@ counts as its public key. Anything else is `unknown_key`.
 `tests/pem-cases.ts` lists key texts with the verdict tfd gives each; `tests/pem.test.ts` holds tfd-verify to them, and
 the site's `tests/pem.test.ts` runs tfd's own `verifyBytes` on the same texts.
 
+Receipts are v1 or v2; v2 adds a signed `issued_at` (RFC 3339 UTC). A keys file maps a key id to a PEM, or to
+`{ pem, purpose: "receipt" | "seal" | "directory", not_before, not_after, revoked_at? }` (`not_after: null` is still
+open). With the object form a key of another purpose fails (`key_wrong_purpose`), a v2 receipt's `issued_at` or a seal's
+`sealed_at` outside `[not_before, not_after)` fails (`outside_key_window`), and a revoked key fails everything it ever
+signed, whatever time the document claims (`key_revoked`). A v1 receipt has no signing time, so a key with dates never
+vouches for one: it fails `key_requires_v2` (after `key_revoked` and `key_wrong_purpose`). A v1 receipt under a bare
+PEM verifies as before. In a seal chain, a seal's key verdicts come before its link, so a revoked key's seal is
+`key_revoked` even when its `prev_seal_hash` is broken too; it is `superseded` once a later `ok` seal of the same month
+follows it, and the next seal still links to it by its hash.
+
 ## Tests
 
 ```sh
-bun test tests   # tfd's receipt test vectors (packages/atm/tests/golden/receipt/, CC0-1.0)
+bun test tests   # tfd's receipt test vectors (packages/atm/tests/golden/receipt/ and receipt-v2/, CC0-1.0)
 bun run ts
 ```
 
@@ -54,7 +65,8 @@ byte, the signed receipt must verify, and each tampered or malformed variant mus
 The Trifold website (`apps/trifold-site/tests/verifier.test.ts`) also runs this package beside tfd's code on its sample
 receipts.
 
-`tests/check.test.ts` covers `checkReceipt`: a pass, each failure, untrusted seal entries and which seal decides.
+`tests/golden-v2.test.ts` runs the v2 vectors (each must get the verdict in `cases.json`), the windowed-key rules, the
+seal chain's revocation rule and `checkReceiptInSeal`. `tests/check.test.ts` covers `checkReceipt`: a pass, each failure, untrusted seal entries and which seal decides.
 
 The site depends on this package as `file:../../packages/verify`, which bun copies into the site's `node_modules`.
 **After changing a file here, run `bun install` in `apps/trifold-site`**; the site's `tests/verify-copy.test.ts` fails

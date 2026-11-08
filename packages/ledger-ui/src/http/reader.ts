@@ -164,10 +164,12 @@ export function createHttpReader(options: {
 
 	/** Not signed in, or no school: the demo schools alone. Null when the Worker serves none (production) or cannot
 	 * be read: the person is then signed out, or has no school, as before demo schools. */
-	const demoOnly = async (): Promise<School[] | null> => {
+	const demoOnly = async (
+		answer: ReturnType<WorkerSource["schools"]>,
+	): Promise<School[] | null> => {
 		let rows: WorkerSchoolStatus[];
 		try {
-			rows = (await worker.schools()).data.schools;
+			rows = (await answer).data.schools;
 		} catch {
 			return null;
 		}
@@ -246,19 +248,25 @@ export function createHttpReader(options: {
 			// The schools are read once per page and again on Try again: a 401 kept from before is asked again here, and
 			// every other read keeps it (`ledger-token.ts`).
 			tokens.forgetSignedOut();
+			// The demo schools' list needs no token: it is read alongside the token, so a signed-out page does not wait
+			// for the token's 401 before it. A signed-in page reads the list again with its bearer, below.
+			const anonymous = worker.schools({ anonymous: true });
+			anonymous.catch(() => {
+				// Read only by `demoOnly`, which says what a failure means.
+			});
 			let token: LedgerToken | null;
 			try {
 				token = await tokens.current();
 			} catch (error) {
 				// Signed out: the demo schools, or the sign-in prompt where there are none.
 				if (!isUnauthenticated(error)) throw error;
-				const demos = await demoOnly();
+				const demos = await demoOnly(anonymous);
 				if (!demos) throw error;
 				session = "signed_out";
 				return demos;
 			}
 			if (!token) {
-				const demos = await demoOnly();
+				const demos = await demoOnly(anonymous);
 				session = "no_school";
 				if (!demos) leftOut = [];
 				return demos ?? [];
@@ -326,8 +334,11 @@ export function createHttpReader(options: {
 			seen(school, await worker.kpiDocument({ school, audience, pinLocked })),
 
 		disclosure: async (school) => {
-			const { subject, claim } = await claimOf(school);
-			const answer = await worker.disclosure(school);
+			// A demo school's disclosure needs no token: it is read alongside the claim, so it does not wait for a
+			// signed-out page's 401. Another school's is read only once the token lists it.
+			const [{ subject, claim }, answer] = isDemoSchool(school)
+				? await Promise.all([claimOf(school), worker.disclosure(school)])
+				: [await claimOf(school), await worker.disclosure(school)];
 			return assembleDisclosure(seen(school, answer), viewerOf(subject, claim));
 		},
 

@@ -1,0 +1,3 @@
+dist/
+# the repository root ignores tests/; this package keeps its tests
+!tests/

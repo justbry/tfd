@@ -1,0 +1,11 @@
+Copyright 2026 Trifold. All rights reserved.
+
+Trifold's own plan catalog in this directory (its menus, policy, plan
+allowances and the code that reads and checks them) is proprietary. You may
+view it. You may not copy, modify, host or redistribute it, in whole or in
+part, without written permission from Trifold. "Trifold", "tfd" and "Rifo"
+are Trifold's brands.
+
+It is written in the menu format of tfd (packages/atm in this repository) and
+checked with tfd, which has its own license (packages/atm/LICENSE.md).
+Nothing in this directory is under that license.

@@ -8,13 +8,18 @@ SPDX-FileCopyrightText = "2026 Trifold"
 SPDX-License-Identifier = "FSL-1.1-ALv2"
 
 [[annotations]]
-path = ["schema/receipt.v1.json", "schema/seal.v1.json", "docs/receipts.md"]
+path = [
+	"schema/receipt.v1.json",
+	"schema/receipt.v2.json",
+	"schema/seal.v1.json",
+	"docs/receipts.md",
+]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Trifold"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-path = "tests/golden/receipt/**"
+path = ["tests/golden/receipt/**", "tests/golden/receipt-v2/**"]
 precedence = "override"
 SPDX-FileCopyrightText = "2026 Trifold"
 SPDX-License-Identifier = "CC0-1.0"

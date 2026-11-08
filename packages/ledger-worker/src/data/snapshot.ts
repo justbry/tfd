@@ -1,8 +1,13 @@
 /**
  * One school's views generation, opened for a request: the manifest (so `asOf`), the verified view readers, and the
- * things worked out from the event log (the events up to `asOf`, the menu, the KPI rows), each once per generation and
- * kept in the isolate while the manifest stays the same. The events come from the generation's stored log (`answers.ts`)
- * when it has one, one object, and else from the shipper's day files.
+ * things worked out from the event log (the events up to `asOf`, the menu, the KPI rows), each read when a route first
+ * asks for it and kept in the isolate, once worked out, while the manifest stays the same. The events come from the
+ * generation's stored log (`answers.ts`) when it has one, one object, and else from the shipper's day files.
+ *
+ * Only worked-out values are kept, never a promise of one: a read belongs to the request that started it, and the Workers
+ * runtime cancels it when that request ends, so a promise kept for later requests could never settle. A route that does
+ * not ask for the events (`members-income` reads the views alone) then ends before the log arrives, and every request of
+ * the generation after it that awaits the events would hang.
  */
 
 import type { AtmEvent } from "tfd";
@@ -102,10 +107,11 @@ export const kpiRowsOf = (
 		.map(({ kpiId, period, unit, value }) => ({ kpiId, period, unit, value }));
 };
 
+/** What the isolate keeps of a generation: each value once a request has worked it out. */
 type Derived = {
-	events: Promise<AtmEvent[]>;
-	menu: Promise<SchoolMenu | null>;
-	rows: Promise<KpiDocumentRow[]>;
+	events?: AtmEvent[];
+	menu?: SchoolMenu | null;
+	rows?: KpiDocumentRow[];
 };
 
 const generations = new Map<string, Derived>();
@@ -188,37 +194,68 @@ export const openSnapshot = async (
 	}
 	const { asOf, generatedFrom } = reader.manifest;
 	const key = `${school}|${asOf}|${generatedFrom.lastEventId}|${generatedFrom.eventCount}`;
-	let derived = generations.get(key);
-	if (derived === undefined) {
-		const given = options.events;
-		const events =
-			given === undefined
-				? eventsOf(store, school, opened, asOf)
-				: Promise.resolve(eventsUpTo([...given], asOf));
-		const menu = events.then(latestMenu);
-		const rows = Promise.all([events, menu]).then(([list, found]) => {
-			const zone = found?.timeZone ?? list.at(-1)?.tz ?? "UTC";
-			return kpiRowsOf(list, localWallTime(Date.parse(asOf), zone).slice(0, 7));
-		});
-		derived = { events, menu, rows };
-		// a failed read is not kept: the next request reads again
-		for (const promise of [events, menu, rows])
-			promise.catch(() => generations.delete(key));
-		generations.set(key, derived);
+	let kept = generations.get(key);
+	if (kept === undefined) {
+		kept = {};
+		generations.set(key, kept);
 		while (generations.size > KEPT_GENERATIONS) {
 			const oldest = generations.keys().next().value;
 			if (oldest === undefined) break;
 			generations.delete(oldest);
 		}
 	}
-	const kept = derived;
+	const derived = kept;
+	// this request's reads, started when a route first asks; a failed read keeps nothing, so the next request reads again
+	const given = options.events;
+	let events: Promise<AtmEvent[]> | undefined;
+	let menu: Promise<SchoolMenu | null> | undefined;
+	let rows: Promise<KpiDocumentRow[]> | undefined;
+	const eventsOnce = (): Promise<AtmEvent[]> => {
+		events ??=
+			derived.events !== undefined
+				? Promise.resolve(derived.events)
+				: (given === undefined
+						? eventsOf(store, school, opened, asOf)
+						: Promise.resolve(eventsUpTo([...given], asOf))
+					).then((list) => {
+						derived.events = list;
+						return list;
+					});
+		return events;
+	};
+	const menuOnce = (): Promise<SchoolMenu | null> => {
+		menu ??=
+			derived.menu !== undefined
+				? Promise.resolve(derived.menu)
+				: eventsOnce().then((list) => {
+						const found = latestMenu(list);
+						derived.menu = found;
+						return found;
+					});
+		return menu;
+	};
+	const rowsOnce = (): Promise<KpiDocumentRow[]> => {
+		rows ??=
+			derived.rows !== undefined
+				? Promise.resolve(derived.rows)
+				: Promise.all([eventsOnce(), menuOnce()]).then(([list, found]) => {
+						const zone = found?.timeZone ?? list.at(-1)?.tz ?? "UTC";
+						const worked = kpiRowsOf(
+							list,
+							localWallTime(Date.parse(asOf), zone).slice(0, 7),
+						);
+						derived.rows = worked;
+						return worked;
+					});
+		return rows;
+	};
 	return {
 		school,
 		reader,
 		asOf,
-		events: () => kept.events,
-		menu: () => kept.menu,
-		kpiRows: () => kept.rows,
+		events: eventsOnce,
+		menu: menuOnce,
+		kpiRows: rowsOnce,
 	};
 };
 

@@ -1,0 +1,56 @@
+[
+	{
+		"file": "valid.signed.canonical.jsonl",
+		"verdict": {
+			"ok": true
+		}
+	},
+	{
+		"file": "tampered.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "bad_signature"
+		}
+	},
+	{
+		"file": "wrong-purpose.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "key_wrong_purpose"
+		}
+	},
+	{
+		"file": "outside-window.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "outside_key_window"
+		}
+	},
+	{
+		"file": "revoked.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "key_revoked"
+		}
+	},
+	{
+		"file": "backdated-forgery.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "key_revoked"
+		}
+	},
+	{
+		"file": "resigned.signed.canonical.jsonl",
+		"verdict": {
+			"ok": true
+		}
+	},
+	{
+		"file": "v1-windowed-key.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "key_requires_v2"
+		}
+	}
+]

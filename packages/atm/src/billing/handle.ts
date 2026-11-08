@@ -532,12 +532,15 @@ const planOf = ({
 	return tierId ? `${tierId}${version}` : `plan${version}`;
 };
 
+/** What `eventsOf` and `planChangedOf` read of the caller's input: the menu, its version and the cause. */
+type EventInput = Pick<FactInput, "menu" | "menuVersion" | "eventId">;
+
 /**
  * The credit events one mutation makes. The engine's event rules take one feature at a time, so a mutation that
  * moves several (a tier with visits and retreats) is cut by feature: each feature's balance rows and rollovers go to
- * its own call, the rest of the changes to the first.
+ * its own call, the rest of the changes to the first. `grantsStateFromCallerRows` books its opening command with it.
  */
-const eventsOf = ({
+export const eventsOf = ({
 	mutation,
 	before,
 	catalog,
@@ -549,7 +552,7 @@ const eventsOf = ({
 	mutation: SubjectStateMutation;
 	before: SubjectState | null;
 	catalog: ReturnType<typeof toCatalog>;
-	input: FactInput;
+	input: EventInput;
 	grants: GrantsState;
 	labels: Record<string, string>;
 	reason: string;
@@ -665,13 +668,13 @@ const eventsOf = ({
 };
 
 /** The record of a command that moved no credits; the handler logs every command it runs, so it says `complete`. */
-const planChangedOf = ({
+export const planChangedOf = ({
 	mutation,
 	input,
 	labels,
 }: {
 	mutation: SubjectStateMutation;
-	input: FactInput;
+	input: EventInput;
 	labels: Record<string, string>;
 }): AtmEvent =>
 	planChangedEvent({
@@ -892,6 +895,24 @@ const decidePayout = (
 	};
 };
 
+/**
+ * The decided state with the menu version it ran under, when the holder is pinned to one (`GrantsState.menuVersion`): it
+ * was already, or the input pins it. Only a decision that changes the state records it, so a replay still changes nothing.
+ */
+const withMenuVersion = (
+	result: GrantResult,
+	before: GrantsState,
+	input: FactInput,
+): GrantResult => {
+	const pinned =
+		before.menuVersion !== undefined || input.pinMenuVersion === true;
+	if (!pinned || sameJson(before, result.state)) return result;
+	return {
+		...result,
+		state: { ...result.state, menuVersion: String(input.menuVersion) },
+	};
+};
+
 const decideAndRun = (
 	input: FactInput,
 	env: AtmEnv,
@@ -959,7 +980,7 @@ const decideAndRun = (
 	});
 	if (decision === null) return nothing();
 	if (!decision.ok) return decision.refusal;
-	const { result } = decision;
+	const result = withMenuVersion(decision.result, grants, input);
 
 	// Run the commands in order against the stored rows, one revision step each. The engine creates a customer at
 	// revision zero; a subject whose only row so far is the grants row (a dollar gift came first) holds a later

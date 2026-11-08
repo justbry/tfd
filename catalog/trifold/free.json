@@ -1,0 +1,16 @@
+{
+	"id": "free",
+	"name": "Free",
+	"grants": [
+		{
+			"featureId": "events",
+			"amount": 300,
+			"every": "month"
+		},
+		{
+			"featureId": "credits",
+			"amount": 200,
+			"every": "month"
+		}
+	]
+}

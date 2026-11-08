@@ -6,8 +6,13 @@
 		"S9.1": 113682,
 		"S9.2": 112174,
 		"S9.3": 112611,
-		"S9.4": 112370
+		"S9.4": 112370,
+		"S9.5": 112870,
+		"S9.7a": 113531
 	},
 	"measure": "first load: entry chunk, its static imports and their CSS, of gates/size-entry.ts built with null adapters (as packages/ledger-ui/gates/budget.json); gzip level 9",
-	"note": "S9.0 is the Svelte 5 runtime, bits-ui, Effect 4 (about 41 KB gzip of it), tailwind-merge and tailwind-variants, and the shell; the Preact package's S7 first load is 22256. S9.0 at most firstCeiling; S9.<k> at most growth times the last recorded slice."
+	"note": "S9.0 is the Svelte 5 runtime, bits-ui, Effect 4 (about 41 KB gzip of it), tailwind-merge and tailwind-variants, and the shell; the Preact package's S7 first load is 22256. S9.0 at most firstCeiling; S9.<k> at most growth times the last recorded slice.",
+	"ceilings": {
+		"S9.7a": 113700
+	}
 }

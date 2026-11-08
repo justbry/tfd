@@ -10,9 +10,25 @@
  * anything it cannot place: a tier, add-on or feature the menu does not have, a lot that is no grant of the
  * membership's tier, a tier grant or add-on with no lot (atm would never refill it), rows on different cycles.
  *
+ * What the caller does that atm's rules place on their own rows (D12 T2):
+ * - an admin adjustment (`adjust:<kind>`): a row of its own that never refills and never lapses (`adjustRowOp`, the row `adjustCredits` writes);
+ * - a quantity raise mid-cycle (a `subscription_update` invoice's tier lot, lasting to the same cycle end as the cycle's
+ *   lot): folded into the cycle's row, as atm's own raise adds to it. The quantity is the membership's, never read back
+ *   from a lot's amount (a prorated raise can be a whole number of units by chance);
+ * - a refund of some of a row's invoices: each invoice with a lot taken back is recorded as taken back;
+ * - a recurring add-on dropped while its lots still hold credits: a retired row, lapsing where its lots do.
+ *
+ * It also returns the opening events (D12 T3): the engine command that makes the subject with exactly these rows, so a
+ * log that starts at the import replays (without them a member's log has no subject until the next invoice).
+ *
  * Pure: no I/O, no clock (`now` is passed). The same input always gives the same output.
  */
+import { deterministicUlid } from "../ledger/ids.js";
+import { runOnState, toCatalog } from "../ledger/run.js";
 import type {
+	AdjustKind,
+	AtmEnv,
+	AtmEvent,
 	BillingRow,
 	CallerCreditLotRow,
 	CallerMembershipRow,
@@ -23,9 +39,12 @@ import type {
 	Interval,
 	InvoiceRecord,
 	MembershipRecord,
+	Menu,
 	MenuAddon,
 	MenuTier,
 } from "../types.js";
+import { adjustKindOfLabel, adjustRowOp } from "./adjust.js";
+import { resolveEnv } from "./env.js";
 import {
 	addonCp,
 	addonProductId,
@@ -36,6 +55,8 @@ import {
 	EMPTY_GRANTS_STATE,
 	expiryZoneOf,
 	giftEntId,
+	menuCatalogRows,
+	ORG,
 	onceEntId,
 	productOp,
 	type RowSpec,
@@ -45,7 +66,8 @@ import {
 	tierProductId,
 	tierSpecs,
 } from "./grants.js";
-import { grantsRow, sortRows } from "./rows.js";
+import { eventsOf, planChangedOf } from "./handle.js";
+import { grantsRow, rowsFromState, sortRows } from "./rows.js";
 import { subscriptionStatus } from "./status.js";
 
 const MS_PER_SECOND = 1000;
@@ -54,19 +76,29 @@ const TIER_SOURCE = "tier";
 const ADDON_SOURCE_PREFIX = "addon:";
 /** `allowance / amount` is a whole quantity up to the floating point a REAL column carries. */
 const QUANTITY_TOLERANCE = 1e-9;
+const IMPORT_MAPPING = "import/caller-rows";
+const IMPORT_REASON = "imported from the caller's credit lots";
 
 type Lot = CallerCreditLotRow;
 
-/** One credit row atm will hold, with the caller's lots that fed it (oldest first). */
+/**
+ * One credit row atm will hold, with the caller's lots that fed it (oldest first), in refills: the lots of one cycle (the
+ * cycle's own lot, then the raises that last to the same end). `retired`: a dropped add-on's row, which no longer refills.
+ */
 type RowPlan = {
 	rowId: string;
 	spec: RowSpec;
 	cpId: string;
 	lots: Lot[];
+	refills: Lot[][];
+	retired: boolean;
 };
 
 /** A one-time add-on's lot: its own row, never refilled. */
 type OncePlan = { lot: Lot; addon: MenuAddon; feature: string };
+
+/** An admin adjustment's lot: its own row, never refilled, never lapsing. */
+type AdjustPlan = { lot: Lot; kind: AdjustKind };
 
 /** UTF-16 code unit order (not the locale's), so the output is the same wherever it runs. */
 const compareText = (left: string, right: string): number => {
@@ -82,11 +114,38 @@ const lapsed = (lot: Lot, now: number): boolean =>
 
 const customerIdOf = (familyId: string): string => `family:${familyId}`;
 
+const sumOf = (lots: readonly Lot[], read: (lot: Lot) => number): number =>
+	lots.reduce((sum, lot) => sum + read(lot), 0);
+
+/**
+ * A row's lots as refills. A quantity raise mid-cycle is a lot of the tier that lasts to the same end as the cycle's own
+ * lot (the caller's `raiseLots`), so on a tier row that refills with the plan it joins the refill before it; every other
+ * lot is a refill of its own.
+ */
+const refillsOf = (lots: readonly Lot[], foldRaises: boolean): Lot[][] => {
+	const refills: Lot[][] = [];
+	for (const lot of lots) {
+		const current = refills[refills.length - 1];
+		const cycleLot = current?.[0];
+		if (
+			foldRaises &&
+			current &&
+			cycleLot &&
+			lot.expires_at !== null &&
+			lot.expires_at === cycleLot.expires_at
+		)
+			current.push(lot);
+		else refills.push([lot]);
+	}
+	return refills;
+};
+
 /** What the caller's rows say about one member, as atm's rows and grants state. See the file comment. */
 export const grantsStateFromCallerRows = (
 	input: CallerRowsInput,
 ): CallerRowsImport => {
 	const { membership, lots, menu, now } = input;
+	const env = resolveEnv(input.env);
 	const expiryZone = expiryZoneOf(input.policy, menu);
 	const problems: string[] = [];
 	const problem = (message: string) => problems.push(message);
@@ -139,8 +198,9 @@ export const grantsStateFromCallerRows = (
 			...structuredClone(EMPTY_GRANTS_STATE),
 			holder,
 			membership: membershipRecord,
+			menuVersion: String(membership.menu_version),
 		};
-		return { state, rows: [grantsRow(state)] };
+		return { state, rows: [grantsRow(state)], events: [], revision: 0 };
 	}
 
 	// ---- place every lot on a row atm will hold ---------------------------------------------------------------
@@ -150,10 +210,18 @@ export const grantsStateFromCallerRows = (
 		: [];
 	const rowPlans = new Map<string, RowPlan>();
 	const onceLots: OncePlan[] = [];
-	const planOf = (spec: RowSpec, cpId: string): RowPlan => {
+	const adjustLots: AdjustPlan[] = [];
+	const planOf = (spec: RowSpec, cpId: string, retired = false): RowPlan => {
 		const have = rowPlans.get(spec.rowId);
 		if (have) return have;
-		const made: RowPlan = { rowId: spec.rowId, spec, cpId, lots: [] };
+		const made: RowPlan = {
+			rowId: spec.rowId,
+			spec,
+			cpId,
+			lots: [],
+			refills: [],
+			retired,
+		};
 		rowPlans.set(spec.rowId, made);
 		return made;
 	};
@@ -196,9 +264,20 @@ export const grantsStateFromCallerRows = (
 			planOf(spec, TIER_CP).lots.push(lot);
 			continue;
 		}
+		const adjustKind = adjustKindOfLabel(lot.source);
+		if (adjustKind !== null) {
+			if (lot.expires_at !== null) {
+				problem(
+					`${where} is an adjustment that expires at ${lot.expires_at}: an adjustment row never lapses`,
+				);
+				continue;
+			}
+			adjustLots.push({ lot, kind: adjustKind });
+			continue;
+		}
 		if (!lot.source.startsWith(ADDON_SOURCE_PREFIX)) {
 			problem(
-				`${where} has a source atm does not know (expected tier or addon:<id>)`,
+				`${where} has a source atm does not know (expected tier, addon:<id> or adjust:<kind>)`,
 			);
 			continue;
 		}
@@ -227,12 +306,8 @@ export const grantsStateFromCallerRows = (
 			onceLots.push({ lot, addon, feature: lot.feature_id });
 			continue;
 		}
-		if (!recurringAddons.some((a) => a.id === addon.id)) {
-			problem(
-				`${where} is for add-on ${addon.id}, which ${label} no longer has (addon_ids ${JSON.stringify(membership.addon_ids)}): atm cannot take a lot of a dropped add-on`,
-			);
-			continue;
-		}
+		// An add-on the membership no longer has: its lots still hold credits until they lapse, on a row that no longer refills.
+		const dropped = !recurringAddons.some((a) => a.id === addon.id);
 		const specs = addonSpecs(menu, addon.id).filter(
 			(s) => s.feature === lot.feature_id,
 		);
@@ -243,8 +318,20 @@ export const grantsStateFromCallerRows = (
 			);
 			continue;
 		}
-		planOf(spec, `cp_addon_${addon.id}`).lots.push(lot);
+		planOf(spec, addonCp(addon.id), dropped).lots.push(lot);
 	}
+	for (const plan of rowPlans.values())
+		plan.refills = refillsOf(
+			plan.lots,
+			plan.cpId === TIER_CP && plan.spec.interval === plan.spec.plan,
+		);
+	const retiredAddons = [
+		...new Set(
+			[...rowPlans.values()]
+				.filter((p) => p.retired)
+				.map((p) => p.cpId.slice("cp_addon_".length)),
+		),
+	].sort(compareText);
 
 	// Everything the menu says the plan grants must have a lot, or atm would never refill it (it refills rows it holds).
 	if (tier)
@@ -260,28 +347,29 @@ export const grantsStateFromCallerRows = (
 					`${label} has no lot for add-on ${addon.id}'s grant of ${spec.feature}: atm would never refill it`,
 				);
 
-	// Each credit row's lots by invoice: an invoice twice in one row is not something the caller's unique index allows.
+	// Each credit row's lots by invoice, with the refill each went into: an invoice twice in one row is not something the
+	// caller's unique index allows.
 	const epochs = new Map<string, Map<string, number>>();
 	for (const plan of rowPlans.values()) {
 		const byInvoice = new Map<string, number>();
-		for (const lot of plan.lots) {
-			if (byInvoice.has(lot.invoice_id))
-				problem(
-					`credit row ${plan.rowId} has two lots for invoice ${lot.invoice_id}`,
-				);
-			byInvoice.set(lot.invoice_id, byInvoice.size + 1);
-		}
+		for (const [index, refill] of plan.refills.entries())
+			for (const lot of refill) {
+				if (byInvoice.has(lot.invoice_id))
+					problem(
+						`credit row ${plan.rowId} has two lots for invoice ${lot.invoice_id}`,
+					);
+				byInvoice.set(lot.invoice_id, index + 1);
+			}
 		epochs.set(plan.rowId, byInvoice);
 	}
-
-	// ---- the cycle the credits are in: read from the newest lot of every row that refills with the plan -----------
+	// ---- the cycle the credits are in: read from the newest refill of every row that refills with the plan ---------
 	const zone = menu.timeZone;
 	const cycleRows = [...rowPlans.values()].filter(
-		(p) => p.spec.interval === p.spec.plan,
+		(p) => !p.retired && p.spec.interval === p.spec.plan,
 	);
 	const cycleEnds = new Map<string, number>();
 	for (const plan of cycleRows) {
-		const newest = plan.lots[plan.lots.length - 1] as Lot;
+		const newest = cycleLotOf(plan);
 		const end = cycleEndOf({
 			lot: newest,
 			rollover: plan.spec.rollover,
@@ -310,37 +398,27 @@ export const grantsStateFromCallerRows = (
 	const cycleStart =
 		cycleEnd === null ? null : addUtcMonths(cycleEnd, -cycleLength);
 
-	// ---- the quantity the credits reflect: what the tier's newest lot granted over the menu's per-unit amount ------
-	let creditQuantity = membership.quantity;
-	const quantities = new Set<number>();
+	// ---- the quantity the credits reflect: the membership's ------------------------------------------------------
+	// Not read back from a lot: a raise's prorated amount can be a whole number of units by chance (1 of a 1-a-unit grant,
+	// raised from 2 to 3 with half the cycle left), which would read as quantity 1. The cycle's own lot must still be a
+	// whole number of the menu's per-unit amount, or it is no grant of this tier.
+	const creditQuantity = membership.quantity;
 	for (const plan of cycleRows.filter((p) => p.cpId === TIER_CP)) {
-		const newest = plan.lots[plan.lots.length - 1] as Lot;
-		const units = newest.allowance / plan.spec.amount;
+		const cycleLot = cycleLotOf(plan);
+		const units = cycleLot.allowance / plan.spec.amount;
 		const whole = Math.round(units);
 		if (whole < 1 || Math.abs(units - whole) > QUANTITY_TOLERANCE)
 			problem(
-				`lot ${newest.id} grants ${newest.allowance} ${plan.spec.feature}, which is not a whole number of the menu's ${plan.spec.amount} per unit`,
+				`lot ${cycleLot.id} grants ${cycleLot.allowance} ${plan.spec.feature}, which is not a whole number of the menu's ${plan.spec.amount} per unit`,
 			);
-		else quantities.add(whole);
 	}
-	if (quantities.size > 1)
-		problem(
-			`the tier's rows of ${label} were granted at different quantities (${[...quantities].join(", ")})`,
-		);
-	if (quantities.size === 1) creditQuantity = [...quantities][0] as number;
 	for (const plan of cycleRows.filter((p) => p.cpId !== TIER_CP)) {
-		const newest = plan.lots[plan.lots.length - 1] as Lot;
-		if (newest.allowance !== plan.spec.amount)
+		const cycleLot = cycleLotOf(plan);
+		if (cycleLot.allowance !== plan.spec.amount)
 			problem(
-				`lot ${newest.id} grants ${newest.allowance} ${plan.spec.feature}, but add-on ${plan.cpId.replace("cp_addon_", "")} grants ${plan.spec.amount} on the menu`,
+				`lot ${cycleLot.id} grants ${cycleLot.allowance} ${plan.spec.feature}, but add-on ${plan.cpId.replace("cp_addon_", "")} grants ${plan.spec.amount} on the menu`,
 			);
 	}
-
-	for (const plan of rowPlans.values())
-		if (plan.cpId === TIER_CP && removalIsPartial(plan.lots))
-			problem(
-				`credit row ${plan.rowId} has lots taken back for some invoices only`,
-			);
 	throwIfAny(problems);
 
 	// ---- build the rows -----------------------------------------------------------------------------------------
@@ -362,7 +440,13 @@ export const grantsStateFromCallerRows = (
 		creditQuantity,
 	).row as { id: string };
 	addRow("customerProducts", tierProduct.id, tierProduct);
-	for (const addon of recurringAddons) {
+	// A dropped add-on keeps its product, as atm's own drop does (it stops the rows refilling and leaves the product).
+	for (const addon of [
+		...recurringAddons,
+		...retiredAddons.map(
+			(id) => menu.addons.find((a) => a.id === id) as MenuAddon,
+		),
+	]) {
 		const product = productOp(
 			addonCp(addon.id),
 			addonProductId(addon.id, addon.price.every),
@@ -388,6 +472,7 @@ export const grantsStateFromCallerRows = (
 			? (membership.stripe_event_at ?? membership.updated_at) * MS_PER_SECOND
 			: null,
 		membership: membershipRecord,
+		menuVersion: String(membership.menu_version),
 	};
 	const granted = new Map<string, GrantedRow[]>();
 	const grantedOf = (invoiceId: string): GrantedRow[] => {
@@ -399,33 +484,37 @@ export const grantsStateFromCallerRows = (
 	};
 
 	for (const plan of rowPlans.values()) {
-		const { spec } = plan;
+		const { spec, refills } = plan;
 		const first = plan.lots[0] as Lot;
-		const newest = plan.lots[plan.lots.length - 1] as Lot;
+		const current = refills[refills.length - 1] as Lot[];
+		const newest = current[current.length - 1] as Lot;
 		const own = spec.interval === spec.plan;
 		// A row on its own interval (a yearly grant on a monthly plan) is refilled a full interval after its seed: the lot's
-		// event time is the nearest the rows come to the seed (the invoice's period start is not kept).
+		// event time is the nearest the rows come to the seed (the invoice's period start is not kept). A retired row does
+		// not refill: it lapses where its newest lots do.
 		const boundary = own
-			? (cycleEnds.get(plan.rowId) as number)
+			? (cycleEnds.get(plan.rowId) ?? (newest.expires_at as number))
 			: addUtcMonths(newest.created_at, MONTHS_PER_INTERVAL[spec.interval]);
+		const stopped = ended || plan.retired;
 		const row = rowOp({
 			rowId: plan.rowId,
 			cpId: plan.cpId,
 			entitlementId: spec.entId,
 			feature: spec.feature,
 			customerId,
-			balance: lapsed(newest, now) ? 0 : newest.balance,
-			nextResetAt: ended ? null : boundary,
-			expiresAt: ended ? newest.expires_at : null,
+			balance: sumOf(current, (lot) => (lapsed(lot, now) ? 0 : lot.balance)),
+			nextResetAt: stopped ? null : boundary,
+			expiresAt: stopped ? newest.expires_at : null,
 			t: first.created_at,
 		}).row as Record<string, unknown>;
-		row.adjustment = newest.adjustment;
-		row.additional_balance = newest.additional_balance;
+		row.adjustment = sumOf(current, (lot) => lot.adjustment);
+		row.additional_balance = sumOf(current, (lot) => lot.additional_balance);
 		addRow("customerEntitlements", plan.rowId, row);
-		state.rows[plan.rowId] = plan.lots.length;
+		if (plan.retired) state.retired[plan.rowId] = refills.length;
+		else state.rows[plan.rowId] = refills.length;
 
 		// What earlier cycles left, still alive: the rollovers the engine would have made, with the caller's own expiry.
-		for (const older of plan.lots.slice(0, -1)) {
+		for (const older of refills.slice(0, -1).flat()) {
 			if (lapsed(older, now) || older.balance <= 0) continue;
 			addRow("rollovers", `roll_${older.id}`, {
 				id: `roll_${older.id}`,
@@ -446,11 +535,12 @@ export const grantsStateFromCallerRows = (
 				feature: spec.feature,
 				units: lot.allowance,
 				epoch,
-				// The newest lot's leftovers become the rollover the engine makes at the next reset (its own month arithmetic);
-				// an older lot's already are one, expiring where the caller's lot expires.
+				// The current refill's leftovers become the rollover the engine makes at the next reset (its own month
+				// arithmetic); an older refill's already are one, expiring where the caller's lot expires. A retired row is
+				// never reset: its lots' credits lapse where the lots do.
 				rolloverExpiresAt: rolloverExpiresAtOf({
 					lot,
-					newest,
+					current: current.includes(lot) && !plan.retired,
 					rollover: spec.rollover,
 					boundary,
 					zone: expiryZone,
@@ -489,9 +579,27 @@ export const grantsStateFromCallerRows = (
 		});
 	}
 
-	// Every invoice the lots name is a decided invoice: a replay finds its record and grants nothing.
+	// An adjustment is no invoice: its row holds what is left of it, and no invoice record names it.
+	for (const { lot, kind } of adjustLots) {
+		const row = adjustRowOp({
+			adjustmentId: lot.id,
+			kind,
+			feature: lot.feature_id,
+			customerId,
+			credits: lot.balance,
+			at: lot.created_at,
+		}).row as Record<string, unknown>;
+		row.adjustment = lot.adjustment;
+		row.additional_balance = lot.additional_balance;
+		addRow("customerEntitlements", row.id as string, row);
+		state.rows[row.id as string] = 1;
+	}
+
+	// Every invoice the lots name is a decided invoice: a replay finds its record and grants nothing. An invoice with any
+	// lot taken back is taken back (a refund takes back a whole invoice; the lots still holding credits keep them).
 	const lotsByInvoice = new Map<string, Lot[]>();
 	for (const lot of lots) {
+		if (adjustKindOfLabel(lot.source) !== null) continue;
 		const same = lotsByInvoice.get(lot.invoice_id) ?? [];
 		same.push(lot);
 		lotsByInvoice.set(lot.invoice_id, same);
@@ -502,31 +610,137 @@ export const grantsStateFromCallerRows = (
 		const record: InvoiceRecord = {
 			paidAt: Math.min(...same.map((l) => l.created_at)),
 			granted: grantedOf(invoiceId),
-			removed: same.every((l) => l.removed_at !== null),
+			removed: same.some((l) => l.removed_at !== null),
 		};
 		state.invoices[invoiceId] = record;
 	}
-	return { state, rows: sortRows([...engineRows, grantsRow(state)]) };
+	return opened({
+		state,
+		engineRows,
+		menu,
+		now,
+		env,
+		policyVersion: input.policyVersion ?? "unknown",
+		importId:
+			input.importId ??
+			deterministicUlid({
+				timeMs: now,
+				revision: 0,
+				seed: JSON.stringify(["import", membership.school_id, membership.id]),
+			}),
+	});
+};
+
+/** The cycle's own lot of a row: the first of its newest refill (the raises after it last to the same end). */
+const cycleLotOf = (plan: RowPlan): Lot =>
+	(plan.refills[plan.refills.length - 1] as Lot[])[0] as Lot;
+
+/**
+ * The rows written by the engine itself: one `applyBillingPlan` from no subject that inserts every row, its mutation
+ * booked as events, so a replay of the log from the import makes the same rows. The rows returned are the engine's state
+ * after it (the columns it keeps), with the grants row beside them.
+ */
+const opened = ({
+	state,
+	engineRows,
+	menu,
+	now,
+	env,
+	policyVersion,
+	importId,
+}: {
+	state: GrantsState;
+	engineRows: readonly BillingRow[];
+	menu: Menu;
+	now: number;
+	env: AtmEnv;
+	policyVersion: number | string;
+	importId: string;
+}): CallerRowsImport => {
+	const holder = state.identity as { orgId: string; customerId: string };
+	const identity = {
+		orgId: holder.orgId,
+		env,
+		customerId: holder.customerId,
+		entityId: null,
+	};
+	// Not `<ULID>:<step>`, a handler's: the import is the caller's own command (a stored-inputs replay carries it, and the
+	// holder's seed at its first input covers it).
+	const commandId = `import:${importId}`;
+	const command = {
+		schemaVersion: 1,
+		type: "applyBillingPlan",
+		org: ORG,
+		commandId,
+		requestId: commandId,
+		identity,
+		occurredAt: now,
+		entityIds: [],
+		expiringPooledBalanceIds: [],
+		ops: engineRows.map((row) => ({
+			op: "insert",
+			table: row.table,
+			row: row.data,
+		})),
+	};
+	const catalogRows = menuCatalogRows({ menu, school: holder.orgId, env });
+	const catalog = toCatalog(catalogRows);
+	const run = runOnState({ state: null, catalog, command });
+	const { mutation } = run;
+	if (
+		!(mutation && run.state) ||
+		(mutation.result as { status?: string } | undefined)?.status === "rejected"
+	)
+		throw new Error(
+			`the engine would not make the imported rows of ${holder.customerId}: the catalog of this menu does not carry them`,
+		);
+	const input = {
+		menu,
+		menuVersion: state.menuVersion ?? "",
+		eventId: importId,
+	};
+	const labels = {
+		menu_version: input.menuVersion,
+		policy_version: String(policyVersion),
+		mapping: IMPORT_MAPPING,
+	};
+	const credits: AtmEvent[] = eventsOf({
+		mutation,
+		before: null,
+		catalog,
+		input,
+		grants: state,
+		labels,
+		reason: IMPORT_REASON,
+	});
+	const events =
+		credits.length > 0 ? credits : [planChangedOf({ mutation, input, labels })];
+	return {
+		state,
+		rows: sortRows([...rowsFromState(run.state), grantsRow(state)]),
+		events,
+		revision: mutation.revision.after,
+	};
 };
 
 /**
- * The newest lot's leftovers roll over at `boundary`, lapsing as the policy's rules count the months (`zone`); an older
- * lot's already are a rollover, expiring where the lot does.
+ * The current refill's leftovers roll over at `boundary`, lapsing as the policy's rules count the months (`zone`); an
+ * older refill's already are a rollover, expiring where the lot does.
  */
 const rolloverExpiresAtOf = ({
 	lot,
-	newest,
+	current,
 	rollover,
 	boundary,
 	zone,
 }: {
 	lot: Lot;
-	newest: Lot;
+	current: boolean;
 	rollover: RowSpec["rollover"];
 	boundary: number;
 	zone: string | null;
 }): number | null => {
-	if (lot === newest) return rolloverExpiry(rollover, boundary, zone);
+	if (current) return rolloverExpiry(rollover, boundary, zone);
 	return rollover ? lot.expires_at : null;
 };
 
@@ -534,19 +748,6 @@ const throwIfAny = (problems: readonly string[]): void => {
 	if (problems.length === 0) return;
 	throw new Error(
 		`the caller's rows cannot be moved onto atm as they are: ${problems.join("; ")}`,
-	);
-};
-
-/** Some lots of a row taken back and others not, which a refund or a lost dispute does not make (it takes back a whole invoice). */
-const removalIsPartial = (lots: readonly Lot[]): boolean => {
-	const byInvoice = new Map<string, boolean[]>();
-	for (const lot of lots) {
-		const flags = byInvoice.get(lot.invoice_id) ?? [];
-		flags.push(lot.removed_at !== null);
-		byInvoice.set(lot.invoice_id, flags);
-	}
-	return [...byInvoice.values()].some(
-		(flags) => flags.some(Boolean) && !flags.every(Boolean),
 	);
 };
 

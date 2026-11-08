@@ -53,6 +53,7 @@
 		removedNames,
 		full,
 		owner,
+		readOnly,
 		onOpen,
 		onMembers,
 	}: {
@@ -69,13 +70,15 @@
 		full: Record<PlanKind, boolean>;
 		/** The signed-in person owns the school: admins are told that owners publish. */
 		owner: boolean;
+		/** A demo school: no Add buttons, no pencils, and its rows open nothing. */
+		readOnly: boolean;
 		onOpen: (kind: PlanKind, id: string | null) => void;
 		onMembers: (tierId: string) => void;
 	} = $props();
 
 	const them = $derived(removedNames.length === 1 ? "it" : "them");
 	const rowClass = (changed: boolean): string =>
-		`cursor-pointer border-0 hover:bg-secondary/60 ${changed ? "[&>td:first-child]:shadow-[inset_2px_0_0_var(--warning)]" : ""}`;
+		`border-0 ${readOnly ? "" : "cursor-pointer hover:bg-secondary/60"} ${changed ? "[&>td:first-child]:shadow-[inset_2px_0_0_var(--warning)]" : ""}`;
 	const monthlyOf = (monthlyMinor: number | null): string =>
 		monthlyMinor === null ? noMonthlyText : formatMoney(monthlyMinor, menu.currency);
 	const addTitle = (kind: PlanKind): string | undefined =>
@@ -145,7 +148,7 @@
 				data-plan={tier.id}
 				data-kind="tiers"
 				data-changed={changed ? "" : undefined}
-				onclick={() => onOpen("tiers", tier.id)}
+				onclick={readOnly ? undefined : () => onOpen("tiers", tier.id)}
 			>
 				<Table.Cell class={bodyCell}>
 					<b data-test="plan-name">{tier.name}</b>{" "}
@@ -222,7 +225,7 @@
 					{/if}
 				</Table.Cell>
 				<Table.Cell class={[bodyCell, "text-right"]}>
-					{@render editButton(tier.name, () => onOpen("tiers", tier.id))}
+					{#if !readOnly}{@render editButton(tier.name, () => onOpen("tiers", tier.id))}{/if}
 				</Table.Cell>
 			</Table.Row>
 		{:else}
@@ -234,6 +237,7 @@
 		{/each}
 	</Table.Body>
 </Table.Root>
+{#if !readOnly}
 <div class="mt-2">
 	<Button
 		variant="tool"
@@ -247,6 +251,7 @@
 		<PaneIcon name="plus" />Add membership
 	</Button>
 </div>
+{/if}
 <h5 class={heading}>
 	<PaneIcon name="gift" /> Packs and add-ons{" "}
 	<span class={[muted, "font-normal normal-case"]} data-test="plan-count" data-kind="addons">{menu.addons.length} of {planLimits.addons}</span>
@@ -271,7 +276,7 @@
 				data-plan={addon.id}
 				data-kind="addons"
 				data-changed={changed ? "" : undefined}
-				onclick={() => onOpen("addons", addon.id)}
+				onclick={readOnly ? undefined : () => onOpen("addons", addon.id)}
 			>
 				<Table.Cell class={bodyCell}>
 					<b data-test="plan-name">{addon.name}</b>
@@ -286,7 +291,7 @@
 				<Table.Cell class={[bodyCell, "text-right"]}></Table.Cell>
 				<Table.Cell class={[bodyCell, "text-right"]}></Table.Cell>
 				<Table.Cell class={[bodyCell, "text-right"]}>
-					{@render editButton(addon.name, () => onOpen("addons", addon.id))}
+					{#if !readOnly}{@render editButton(addon.name, () => onOpen("addons", addon.id))}{/if}
 				</Table.Cell>
 			</Table.Row>
 		{:else}
@@ -298,6 +303,7 @@
 		{/each}
 	</Table.Body>
 </Table.Root>
+{#if !readOnly}
 <div class="mt-2">
 	<Button
 		variant="tool"
@@ -311,7 +317,8 @@
 		<PaneIcon name="plus" />Add pack
 	</Button>
 </div>
+{/if}
 <p class={[muted, "mt-2.5"]} data-test="plan-note">
 	<Icon name="info" class="mr-1 inline align-[-2px]" /> A change starts a new version for new purchases. Members keep the
-	version they bought.{owner ? "" : " Admins edit the draft; owners publish."}
+	version they bought.{owner || readOnly ? "" : " Admins edit the draft; owners publish."}
 </p>

@@ -1,0 +1,109 @@
+{
+	"currency": "usd",
+	"timeZone": "America/New_York",
+	"features": [
+		{
+			"id": "events",
+			"name": "Ledger events",
+			"unit": {
+				"one": "ledger event",
+				"other": "ledger events"
+			}
+		},
+		{
+			"id": "credits",
+			"name": "Credits",
+			"unit": {
+				"one": "credit",
+				"other": "credits"
+			}
+		}
+	],
+	"tiers": [
+		{
+			"id": "starter",
+			"name": "Starter",
+			"blurb": "Hosted books and signed receipts, for small schools.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 2900
+				},
+				{
+					"interval": "year",
+					"amount": 29000
+				}
+			],
+			"grants": [
+				{
+					"featureId": "events",
+					"amount": 5000,
+					"every": "month"
+				},
+				{
+					"featureId": "credits",
+					"amount": 1000,
+					"every": "month"
+				}
+			]
+		},
+		{
+			"id": "pro",
+			"name": "Pro",
+			"blurb": "Everything in Starter, with a month that closes on a schedule.",
+			"public": false,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 7900
+				},
+				{
+					"interval": "year",
+					"amount": 79000
+				}
+			],
+			"grants": [
+				{
+					"featureId": "events",
+					"amount": 25000,
+					"every": "month"
+				},
+				{
+					"featureId": "credits",
+					"amount": 5000,
+					"every": "month"
+				}
+			]
+		},
+		{
+			"id": "audited",
+			"name": "Audited",
+			"blurb": "Audit-ready books an auditor, grantor or state program can check.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 14900
+				},
+				{
+					"interval": "year",
+					"amount": 149000
+				}
+			],
+			"grants": [
+				{
+					"featureId": "events",
+					"amount": 25000,
+					"every": "month"
+				},
+				{
+					"featureId": "credits",
+					"amount": 8000,
+					"every": "month"
+				}
+			]
+		}
+	],
+	"addons": []
+}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import {
+		defaultTabOf,
 		formatRoute,
 		parseRoute,
 		type Route,
@@ -8,8 +9,9 @@
 	} from "$contract/app/route.ts";
 	import type { School } from "$contract/data/types.ts";
 	import { read } from "../effect/run.ts";
-	import type { UiError } from "../effect/ui-error.ts";
+	import { toUiError, type UiError } from "../effect/ui-error.ts";
 	import { type AppContext, provideApp } from "./context.ts";
+	import type { DemoBannerOptions } from "./mount.ts";
 	import LoadFailed from "./LoadFailed.svelte";
 	import { retryingRead } from "./retrying-read.ts";
 	import { reportsItsOwnRender } from "./shell-model.ts";
@@ -20,7 +22,11 @@
 	 * the route it shows, puts the theme class on <html>, and records the rendered hash in `root.dataset.route`: at
 	 * once for a pane that shows no data of its own, and for one that does (the Dashboard) once it says its data or
 	 * its message is on screen. A failed schools read shows the message in place, with Retry, as well as in a toast. */
-	let { root, context }: { root: HTMLElement; context: AppContext } = $props();
+	let {
+		root,
+		context,
+		banner,
+	}: { root: HTMLElement; context: AppContext; banner?: DemoBannerOptions } = $props();
 	// svelte-ignore state_referenced_locally
 	provideApp(context); // the mount's context never changes, so its first value is the one to provide
 
@@ -64,8 +70,16 @@
 		};
 	});
 
+	/** The demo alert shows while the schools listed are the demo ones: signed out, or an account with no school. Where
+	 * the Worker lists none, the read fails and the app shows its own message instead. */
+	const demoReason = $derived(
+		banner && schools && schools.length > 0 ? banner.reason() : null,
+	);
+
 	const route = $derived(
-		parseRoute(hash, schools?.map((school) => school.id) ?? []),
+		parseRoute(hash, schools?.map((school) => school.id) ?? [], (id) =>
+			defaultTabOf(schools?.find((school) => school.id === id)),
+		),
 	);
 	const canonical = $derived(schools ? formatRoute(route) : null);
 	const theme = $derived(themeOf(route.query));
@@ -109,5 +123,12 @@
 		}}
 		bind:chrome
 	/>
+{/if}
+{#if banner && demoReason}
+	{#await banner.load() then { default: DemoBanner }}
+		<DemoBanner reason={demoReason} signInUrl={banner.signInUrl} onSignedIn={banner.onSignedIn} />
+	{:catch failed}
+		<LoadFailed error={toUiError(failed)} />
+	{/await}
 {/if}
 <Toaster store={context.toasts} anchor={chrome} frame={root} />

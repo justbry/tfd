@@ -10,10 +10,13 @@
 		lock,
 		icon = "lock",
 		hooks = "disclosure",
+		surface,
 	}: {
 		lock: LockPanel;
 		icon?: PaneIconName;
 		hooks?: "disclosure" | "roster";
+		/** The gated surface this panel stands for (`data-surface`), where a golden file addresses it. */
+		surface?: string;
 	} = $props();
 	const names = $derived(
 		hooks === "roster"
@@ -26,6 +29,7 @@
 	class="grid justify-items-center gap-1.5 rounded-xl border border-dashed border-border bg-card px-3.5 py-[34px] text-center"
 	data-test="lock-panel"
 	data-lock={lock.reason}
+	data-surface={surface}
 >
 	<PaneIcon name={icon} class="size-[26px] text-muted-foreground" />
 	<h4 class="m-0 text-[14px]" data-test={names.heading}>{lock.who}</h4>
