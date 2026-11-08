@@ -439,11 +439,12 @@ export function Plans({
 							Draft · {changeCount(changes.length)}
 						</span>
 					)}
-					<span class="sp" />
+					{/* On the left: the demo alert covers the toolbar's right end. */}
 					{readOnly ? (
 						<DemoReadOnlyNote />
 					) : (
 						<>
+							<span class="sp" />
 							{/* biome-ignore lint/a11y/useSemanticElements: the mockup's segmented control is a div; a fieldset brings its own border and padding */}
 							<div class="seg" role="group" aria-label="Plans view">
 								{modes.map((option) => (
