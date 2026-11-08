@@ -8,7 +8,7 @@ public API and Stripe webhooks), one Worker routed by `Host`. The plan, the mile
 |---|---|
 | `src/router.ts` | Routes by host; `GET /healthz` on both hosts checks D1 and R2 (503 if either fails) |
 | `src/org-do.ts` | `OrgDO`, one SQLite-backed Durable Object per organization (handler, inbox and alarm in M3) |
-| `src/backup.ts` | The nightly cron: copies each new version of every books object into the locked backup bucket |
+| `src/backup.ts` | The nightly cron: copies each new version of every books object into the locked backup bucket, resuming across runs |
 | `migrations/` | D1 migrations (`bun run migrate:staging`) |
 
 ## Environments
@@ -20,8 +20,28 @@ Only `staging` is bound. The top level of `wrangler.jsonc` is production and sta
 |---|---|
 | Hosts | `staging-ledger.trifold.app`, `staging-api.trifold.app` (Workers custom domains; Cloudflare manages their DNS) |
 | D1 | `trifold-cloud-staging` (Time Travel: 30 days, built in) |
-| R2 | `trifold-staging-books`; `trifold-staging-backups` with a 30-day bucket lock |
+| R2 | `trifold-staging-books`; `trifold-staging-backups` (below) |
 | Cron | `17 3 * * *`, the backup |
+
+## Backups
+
+| Store | How it is kept | Restore |
+|---|---|---|
+| D1 | Time Travel, 30 days, built in | `wrangler d1 time-travel restore trifold-cloud-staging --timestamp=…` |
+| Org Durable Objects | SQLite point-in-time recovery, 30 days, built in | per object, from the DO's bookmark API (runbook in M7) |
+| R2 books | Nightly copy to `trifold-staging-backups` as `versions/<etag>/<key>` | copy the wanted versions back |
+
+The backup bucket has a 30-day bucket lock (copies can't be deleted or overwritten for 30 days, which is why each
+version has its own key) and a lifecycle rule that expires copies after 35 days. Both were set with wrangler:
+
+```sh
+bunx wrangler@4.90.0 r2 bucket lock add trifold-staging-backups --name keep-30-days --retention-days 30
+bunx wrangler@4.90.0 r2 bucket lifecycle add trifold-staging-backups --name expire-35-days --prefix "" --expire-days 35
+```
+
+A run copies at most 800 subrequests' worth and saves its cursor in D1 (`schema_meta.backup_state`); the next run
+resumes. The watermark moves only after a pass with no failures. A failed object is logged and fails the cron run, so it
+shows as an error in Workers observability.
 
 `apps/trifold-verify` is the verifier host (`staging-verify.trifold.app`): static assets only, no Worker code.
 
@@ -34,4 +54,6 @@ bun run migrate:staging && bun run deploy:staging
 (cd ../trifold-verify && bunx wrangler@4.90.0 deploy --env staging)
 ```
 
-CI (`.github/workflows/trifold-cloud.yml`) tests every pull request and deploys staging when run by hand.
+CI (`.github/workflows/trifold-cloud.yml`) tests every pull request; it deploys staging when run by hand, or on every
+push to `dev` once the repository variable `TRIFOLD_CLOUD_DEPLOY` is `on` (set it after giving the `staging`
+environment a token with Workers, D1 and R2 edit). The signing keys (Secrets Store) arrive with M1 and M3.

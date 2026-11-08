@@ -1,12 +1,17 @@
 /** The few binding shapes this Worker uses, typed locally so the package needs no workers-types dependency. */
-export type D1Database = {
-	prepare(query: string): { first<T = unknown>(): Promise<T | null> };
+export type D1PreparedStatement = {
+	bind(...values: unknown[]): D1PreparedStatement;
+	first<T = Record<string, unknown>>(): Promise<T | null>;
+	run(): Promise<unknown>;
 };
+
+export type D1Database = { prepare(query: string): D1PreparedStatement };
 
 export type R2Object = {
 	key: string;
 	etag: string;
 	size: number;
+	uploaded: Date;
 	customMetadata?: Record<string, string>;
 };
 
@@ -36,8 +41,9 @@ export type DurableObjectNamespace = {
 
 export type CloudEnv = {
 	DB: D1Database;
+	/** The books: `schools/<orgId>/…` (PLAN.md section 6). */
 	BOOKS: R2Bucket;
-	/** Nightly copy of BOOKS, under a bucket lock (PLAN.md M0). */
+	/** Versioned copies of BOOKS, under a bucket lock (PLAN.md M0). */
 	BACKUPS: R2Bucket;
 	ORG: DurableObjectNamespace;
 	ENVIRONMENT: "staging" | "production";

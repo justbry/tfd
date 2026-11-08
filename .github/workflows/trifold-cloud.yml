@@ -3,7 +3,8 @@ name: Trifold cloud
 # The hosted product (apps/trifold-cloud, ledger.* and api.*) and its verifier (apps/trifold-verify, verify.*). Plan:
 # plans/trifold-cloud/PLAN.md.
 #   - pull request or push to dev touching either app: typecheck and test
-#   - Run workflow (by hand): the same, then deploy both to staging and check /healthz on every staging host
+#   - push to dev with repository variable TRIFOLD_CLOUD_DEPLOY=on, or Run workflow: the same, then deploy both to
+#     staging and check every staging host
 # Production is unbound (wrangler.jsonc) until the launch gate. The deploy job runs in the GitHub environment
 # `staging`; its CLOUDFLARE_API_TOKEN needs Workers Scripts, Workers Routes, D1 and R2 edit (docs/ci-and-deploy.md).
 
@@ -49,7 +50,7 @@ jobs:
 
   staging:
     name: trifold-cloud (staging deploy)
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.TRIFOLD_CLOUD_DEPLOY == 'on')
     needs: test
     runs-on: ${{ fromJSON(vars.CI_RUNNER || '"ubuntu-latest"') }}
     environment: staging
@@ -64,6 +65,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.90.0"
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/trifold-cloud
           command: d1 migrations apply trifold-cloud-staging --env staging --remote
@@ -71,6 +73,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.90.0"
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/trifold-cloud
           command: deploy --env staging
@@ -78,6 +81,7 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          wranglerVersion: "4.90.0"
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/trifold-verify
           command: deploy --env staging

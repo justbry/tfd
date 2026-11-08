@@ -20,7 +20,12 @@ export const route = async (
 				? "api"
 				: null;
 	if (surface === null) return notFound();
-	if (url.pathname === "/healthz" && request.method === "GET")
-		return health(env, surface);
+	if (
+		url.pathname === "/healthz" &&
+		(request.method === "GET" || request.method === "HEAD")
+	) {
+		const response = await health(env, surface);
+		return request.method === "HEAD" ? new Response(null, response) : response;
+	}
 	return notFound();
 };

@@ -1,6 +1,6 @@
 /** Headers every answer carries. The ledger UI's CSP is set where the UI is served (M4). */
 const SECURITY_HEADERS: Record<string, string> = {
-	"Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+	"Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 	"X-Content-Type-Options": "nosniff",
 	"Referrer-Policy": "strict-origin-when-cross-origin",
 	"X-Frame-Options": "DENY",
