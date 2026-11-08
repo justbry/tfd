@@ -30,6 +30,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 | Receipt test vectors (`packages/atm/tests/golden/receipt/`) | **CC0-1.0** | `packages/atm/REUSE.toml` |
 | The website (`apps/trifold-site`): all of it, code, copy, design, images | **Proprietary**, all rights reserved | `apps/trifold-site/LICENSE` |
 | The pitch brief (`apps/trifold-brief`): the password-protected, multi-audience decks, their sources, scripts and rendered pages | **Proprietary**, all rights reserved; embedded fonts under the SIL OFL 1.1 | `apps/trifold-brief/LICENSE` |
+| Logo concepts (`docs/brand/logo/`): SVGs, animations, favicons, previews | **Proprietary**, all rights reserved | `docs/brand/logo/LICENSE` |
 | The verifier SDK `tfd-verify` (`packages/verify`): tfd's receipt and seal checks for browsers and other WebCrypto runtimes; the website's verifier comes from it | **Apache-2.0** | SPDX headers; `packages/verify/LICENSE`, `packages/verify/REUSE.toml` |
 | Hosted service, Rifo, the witness | Proprietary, not in this repo | — |
 

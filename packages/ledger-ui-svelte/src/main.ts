@@ -17,6 +17,18 @@ if (root) {
 			import("./app/mount.ts"),
 			import("./effect/layers.ts"),
 		]);
-		mountApp(root, { layer: fixtureLayer({ calendar }), calendar });
+		// `?config=stale|step-up` in the route's query puts the copy in the ledger in that state (gate K, the shots).
+		const asked = new URLSearchParams(window.location.hash.split("?")[1]).get(
+			"config",
+		);
+		const configScenario =
+			asked === "stale" || asked === "step-up" ? asked : undefined;
+		mountApp(root, {
+			layer: fixtureLayer({
+				calendar,
+				...(configScenario ? { configScenario } : {}),
+			}),
+			calendar,
+		});
 	}
 }
