@@ -14,7 +14,7 @@ export function cn(...inputs: ClassValue[]): string {
 
 /** The prop helpers shadcn-svelte's components import from `$lib/utils`. */
 type WithoutChild<T> = T extends { child?: unknown } ? Omit<T, "child"> : T;
-type WithoutChildren<T> = T extends { children?: unknown }
+export type WithoutChildren<T> = T extends { children?: unknown }
 	? Omit<T, "children">
 	: T;
 export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;

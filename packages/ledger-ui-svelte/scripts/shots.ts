@@ -75,6 +75,11 @@ const executablePath = join(
 );
 const widths = [1100, 728, 390];
 const dashboardTab = "document.querySelector('.tab[data-p=dash]').click()";
+/** The mockup's Vibes of Light opens with the saved draft the fixtures have (Glow $65 to $70 a month): its Plans shots
+ * first run the same change (the S3 golden file's `mockupSteps`). */
+const glowDraft =
+	"SC.vol.pl.draft.tiers.find(t=>t.id==='glow').month=70;render()";
+const promosTab = "document.querySelector('.tab[data-p=cod]').click()";
 const bookingsTab = "document.querySelector('.tab[data-p=bk]').click()";
 const membersTab = "document.querySelector('.tab[data-p=mem]').click()";
 const ledgerTab = "document.querySelector('.tab[data-p=led]').click()";
@@ -246,6 +251,49 @@ const entries: Array<{
 		route: "#/vol/members?as=public",
 		clicks: [],
 		mockupSteps: `${membersTab};setVa('public')`,
+	},
+	// S9.3: the Plans tab (Edit, Preview, Code, the editor and the review) and Promos.
+	{
+		id: "plans-edit",
+		route: "#/vol/plans",
+		clicks: [],
+		mockupSteps: glowDraft,
+	},
+	{
+		id: "plans-preview",
+		route: "#/vol/plans?mode=preview",
+		clicks: [],
+		mockupSteps: `${glowDraft};document.querySelector('#pl [data-pmode=preview]').click()`,
+	},
+	{
+		id: "plans-code",
+		route: "#/vol/plans?mode=code",
+		clicks: [],
+		mockupSteps: `${glowDraft};document.querySelector('#pl [data-pmode=code]').click()`,
+	},
+	{
+		id: "plans-drawer",
+		route: "#/vol/plans",
+		clicks: ["[data-test=plan-row][data-plan=glow] [data-test=plan-edit]"],
+		mockupSteps: `${glowDraft};document.querySelector('[data-pe="tiers:glow"]').click()`,
+	},
+	{
+		id: "plans-review",
+		route: "#/vol/plans",
+		clicks: ["[data-test=plan-review]"],
+		mockupSteps: `${glowDraft};document.querySelector('#prev').click()`,
+	},
+	{
+		id: "promos-list",
+		route: "#/vol/promos",
+		clicks: [],
+		mockupSteps: promosTab,
+	},
+	{
+		id: "promos-create",
+		route: "#/vol/promos",
+		clicks: ["[data-test=promo-new]"],
+		mockupSteps: `${promosTab};document.querySelector('#newcode').click()`,
 	},
 	// S9.4: the Ledger and Reports tabs, each audience's view of them.
 	{
