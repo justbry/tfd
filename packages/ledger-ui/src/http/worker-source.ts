@@ -64,6 +64,8 @@ export type WorkerSchoolStatus = {
 	timeZone?: string;
 	currency?: string;
 	creditUnit?: { one: string; other: string };
+	/** A demo school's latest booking day, or null when it has none. */
+	bookingsOpenOn?: string | null;
 };
 
 /** `GET /v1/schools/:school/disclosure`: the Reader adds `viewer`, and each View as row's `held`, `audience` and
@@ -140,6 +142,13 @@ export interface WorkerSource {
 		school: string;
 		key: string;
 	}): Promise<WorkerAnswer<WorkerMemberMoney>>;
+	/** `GET /v1/schools/:school/demo-api/<route>`: a demo school's answer to a buzz-school read, shaped as that route's
+	 * (`route` is the path after `/school-admin/schools/<id>/`, e.g. `billing/members-list`). */
+	demoApi(query: {
+		school: string;
+		route: string;
+		query?: Record<string, string | undefined>;
+	}): Promise<WorkerAnswer<unknown>>;
 }
 
 /** Part 1's Worker: every call rejects with `not_connected`. */
@@ -161,6 +170,7 @@ export function notConnectedWorker(): WorkerSource {
 		incomeStatement: reject("incomeStatement"),
 		membersIncome: reject("membersIncome"),
 		memberMoney: reject("memberMoney"),
+		demoApi: reject("demoApi"),
 	};
 }
 
@@ -337,5 +347,7 @@ export function createFetchWorkerSource(options: {
 			read(id, "/members-income", { from, to }),
 		memberMoney: ({ school: id, key }) =>
 			read(id, `/members/${encodeURIComponent(key)}/money`),
+		demoApi: ({ school: id, route, query }) =>
+			read(id, `/demo-api/${route}`, query),
 	};
 }

@@ -273,7 +273,8 @@ describe("the views job and demo schools", () => {
 		expect(demoRuns(third)[0]?.school).not.toBe(demoRuns(second)[0]?.school);
 		// both are now fresh: none is due
 		expect(demoRuns(await runViewsJob(store, later))).toEqual([]);
-	});
+		// each rebuild reads the demo log a second time, for its route answers
+	}, 60_000);
 });
 
 describe("the demo seed", () => {
@@ -312,9 +313,11 @@ describe("the demo seed", () => {
 		expect(await harness.bucket.head(stray)).toBeNull();
 		expect(await realKeys()).toEqual(realBefore);
 		const facts = await store.get(demoFactsKey("demo-tiny-school"));
-		expect(JSON.parse(new TextDecoder().decode(facts.body))).toEqual(
-			demoFactsOf("tiny-school"),
-		);
+		// the facts, and the day of the preset's latest booking (`demo/demo-api-store.ts`)
+		expect(JSON.parse(new TextDecoder().decode(facts.body))).toEqual({
+			...demoFactsOf("tiny-school"),
+			bookingsOpenOn: "2026-06-30",
+		});
 	});
 
 	test("a preset that is not a school preset is refused", async () => {

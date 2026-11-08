@@ -1,7 +1,7 @@
 /**
  * Seeds the demo schools in the staging bucket (`src/demo.ts`, owner decision 2026-11-08): each of atm's fifteen school
- * presets as `schools/demo-<preset>/`, its events in the shipper's batch files and its display facts, then its views as
- * of now. A rerun replaces the demo prefixes and touches nothing else; no other school's prefix is listed, read or
+ * presets as `schools/demo-<preset>/`, its events in the shipper's batch files, its display facts and its answers to the
+ * buzz-school reads (`demo-api/`), then its views as of now. A rerun replaces the demo prefixes and touches nothing else; no other school's prefix is listed, read or
  * written. Usage, from the repo root:
  *
  *   set -a; . ~/.config/b4uni/r2-stg-ledger-s3.env; set +a
@@ -56,7 +56,7 @@ export type DemoSeedCommand = {
 };
 
 export const demoReportLine = (report: DemoSeedReport): string =>
-	`${report.school.padEnd(28)} written:${report.written} unchanged:${report.unchanged} removed:${report.removed} views:${report.viewsAsOf ?? "not built"}`;
+	`${report.school.padEnd(28)} written:${report.written} unchanged:${report.unchanged} removed:${report.removed} answers:${report.answers.written}/${report.answers.unchanged}/${report.answers.removed} views:${report.viewsAsOf ?? "not built"}`;
 
 /** Runs the command and answers its exit code. Nothing it prints holds a credential. */
 export const runDemoSeed = async (

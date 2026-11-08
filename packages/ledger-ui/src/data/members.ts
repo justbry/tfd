@@ -114,7 +114,8 @@ export type AttentionReason = {
 	bookingId: string | null;
 };
 
-/** One row of the Members table. Plan holders join their membership by `Member.profileId === Person.id`; a role
+/** One row of the Members table. Plan holders join their membership by `Member.profileId === Person.id` (the family
+ * id when `profileId` is null: the membership is the family's own); a role
  * holder with no plan has no membership and shows "No plan" / "no plan", never 0. Rows sort by attention score
  * (highest first), then role (owner, admin, member), then name. */
 export type Person = {
@@ -152,11 +153,12 @@ export type MembersSummary = {
 	currency: string;
 	/** Unredeemed gift codes that expire within 30 days, masked as the Promos tab masks them. */
 	expiringGifts: Array<{ maskedCode: string; expiresOn: string }>;
-	/** The school's booking rules the release preview quotes (Settings "Rules in force"). */
+	/** The school's booking rules the release preview quotes (Settings "Rules in force"); null where no source states
+	 * them (D11), and the preview then quotes none. */
 	bookingRules: {
 		lateCancel: "spend" | "release";
 		noShow: "spend" | "release";
-	};
+	} | null;
 };
 
 // ---- Brief A item 4: GET .../ledger/capabilities

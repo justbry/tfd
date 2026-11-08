@@ -1,20 +1,15 @@
 /**
  * The demo schools' seed (`demo.ts`): each of atm's fifteen school presets (the mart presets) as `schools/demo-<preset>/`,
- * its events in the shipper's batch files (`planOutbox`, one `batch-*.jsonl` per local day) and its display facts in
- * `demo.json`. A rerun replaces those objects and touches nothing outside the demo prefixes; the views are then built as
+ * its events in the shipper's batch files (`planOutbox`, one `batch-*.jsonl` per local day), its display facts in
+ * `demo.json` and its answers to the buzz-school reads under `demo-api/` (`demo/demo-api-store.ts`). A rerun replaces those objects and touches nothing outside the demo prefixes; the views are then built as
  * of `now`. Used by `scripts/seed-demo.ts` (the staging bucket) and the test harness.
  */
 import { createHash } from "node:crypto";
 import { type AtmEvent, planOutbox, type Store } from "tfd";
 import { runViews } from "tfd/worker";
 import { latestMenu } from "../data/menu.js";
-import { putText, textOf } from "../data/store-io.js";
-import {
-	DEMO_PREFIX,
-	type DemoFacts,
-	demoFactsKey,
-	demoNameOf,
-} from "../demo.js";
+import { type DemoApiReport, writeDemoApi } from "../demo/demo-api-store.js";
+import { DEMO_PREFIX, type DemoFacts, demoNameOf } from "../demo.js";
 import { presetEvents } from "./seed.js";
 
 /** atm's school presets (`PROFILES` without an `org`): the studio, church, SaaS, creator and ad hoc ones are not demos. */
@@ -71,6 +66,8 @@ export type DemoSeedReport = {
 	unchanged: number;
 	/** Event objects of an earlier seed this one no longer produces, deleted. */
 	removed: number;
+	/** The route answers under `demo-api/` (`demo/demo-api-store.ts`), worked out as of `now`. */
+	answers: DemoApiReport;
 	/** The views' `asOf`, or null when `views` was false. */
 	viewsAsOf: string | null;
 };
@@ -102,8 +99,9 @@ const keysUnder = async (store: Store, prefix: string): Promise<string[]> => {
 
 /**
  * Writes one preset as `demo-<preset>`: the batches it produces (a batch key carries the hash of its bytes, so one that
- * exists already holds them), then deletes every other object under its `events/`, then `demo.json`, then (unless
- * `views` is false) runs the views as of `now`. Refuses a preset that is not a school preset.
+ * exists already holds them), then deletes every other object under its `events/`, then writes its `demo-api/` answers
+ * and `demo.json` as of `now`, then (unless `views` is false) runs the views as of `now`. Refuses a preset that is not a
+ * school preset.
  */
 export const seedDemoSchool = async (
 	store: Store,
@@ -130,6 +128,7 @@ export const seedDemoSchool = async (
 		written: 0,
 		unchanged: 0,
 		removed: 0,
+		answers: { written: 0, unchanged: 0, removed: 0 },
 		viewsAsOf: null,
 	};
 	const missing = batches.filter((batch) => {
@@ -155,9 +154,13 @@ export const seedDemoSchool = async (
 		await store.delete(key, sha256Of(stored.body));
 		report.removed += 1;
 	}
-	const facts = `${JSON.stringify(demoFactsOf(preset, events))}\n`;
-	if ((await textOf(store, demoFactsKey(school))) !== facts)
-		await putText(store, demoFactsKey(school), facts);
+	report.answers = await writeDemoApi(
+		store,
+		school,
+		events,
+		demoFactsOf(preset, events),
+		options.now,
+	);
 	if (options.views !== false) {
 		const run = await runViews(store, school, options.now);
 		if (!run.ok)

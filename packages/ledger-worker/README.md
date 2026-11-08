@@ -101,7 +101,11 @@ Owner decision 2026-11-08 (contract section 11, "Demo schools"): with `LEDGER_DE
 `^demo-[a-z0-9-]+$` is a demo school (`src/demo.ts`). `GET /v1/schools` and a demo school's reads need no token; every
 caller holds it as owner with the finance grant; an invalid or expired token is still a 401; a config verify or put on one
 is `403 demo_read_only`. `GET /v1/schools` lists the token's schools, then the demo schools in the bucket (`demo: true`,
-with `name`, `timeZone`, `currency` and `creditUnit` from `schools/demo-<preset>/demo.json`).
+with `name`, `timeZone`, `currency`, `creditUnit` and `bookingsOpenOn` from `schools/demo-<preset>/demo.json`).
+`GET /v1/schools/demo-<preset>/demo-api/<route>` serves the demo school's answers to the buzz-school reads the UI makes
+(`src/routes/demo-api.ts`): `ledger/school`, `ledger/capabilities`, `billing/members-list`, `billing/menu/versions[/<n>]`,
+`bookings?from=&to=` and `finance-grants`, shaped as buzz-school's own, worked out from the preset's events
+(`src/demo/route-answers.ts`). A real school id is 404 there, token or not.
 
 The data is atm's fifteen school presets (the mart presets), through the real path: events, the views job, the endpoints.
 
@@ -109,11 +113,13 @@ The data is atm's fifteen school presets (the mart presets), through the real pa
     bun run --cwd packages/ledger-worker seed:demo [--preset <name>]... [--no-views]
 
 writes each preset's events to `schools/demo-<preset>/events/date=<day>/batch-*.jsonl` (the shipper's `planOutbox`), deletes
-any other object under that `events/`, writes `demo.json`, and runs the views as of now. A rerun replaces the demo prefixes
+any other object under that `events/`, writes `demo.json` and the route answers under `demo-api/` as of now
+(`src/demo/demo-api-store.ts`), and runs the views as of now. A rerun replaces the demo prefixes
 and touches no other one. It refuses a bucket whose name holds `prod`, and any bucket but `b4uni-stg-ledger`. No watermark is
 written: nothing ships to a demo school, so `asOf` is the run's time. The views job rebuilds one demo school per run (the one
 whose views are oldest, once they are an hour old), so fifteen logs of a year of daily batches do not cost every run thousands of
-reads. The harness seeds them with `startLedgerWorker({ presets, demoPresets })`.
+reads; each rebuild writes that school's route answers again, as of its views. The harness seeds them with
+`startLedgerWorker({ presets, demoPresets })`.
 
 ## The views job and `asOf`
 

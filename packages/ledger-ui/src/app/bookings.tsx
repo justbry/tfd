@@ -25,6 +25,7 @@ import {
 	type BookingsPeriod,
 	bookingsDays,
 	bookingsLabel,
+	bookingsOpenOffset,
 	readBookingsPeriod,
 } from "./bookings-period.ts";
 import { Icon, type IconName } from "./icon.tsx";
@@ -51,10 +52,10 @@ const bookingsNote =
 
 /** The period (`range=` and `offset=`, shared with the top bar's control) and `filter=outcome|approval|cutoff`
  * (absent: all). */
-function readView(query: URLSearchParams): View {
+function readView(query: URLSearchParams, opensOffset: number): View {
 	const filter = query.get("filter");
 	return {
-		...readBookingsPeriod(query),
+		...readBookingsPeriod(query, opensOffset),
 		filter:
 			filter === "outcome" || filter === "approval" || filter === "cutoff"
 				? filter
@@ -130,7 +131,10 @@ function statusBadges(
 		badges.push({ text: "Needs outcome", tone: "b-bad" });
 	else if (insideCutoff(booking, clock))
 		badges.push({
-			text: `Inside ${cutoffHours(booking.cutoffMinutes)} cutoff`,
+			text:
+				booking.cutoffMinutes === null
+					? "Inside cutoff"
+					: `Inside ${cutoffHours(booking.cutoffMinutes)} cutoff`,
 			tone: "b-warn",
 		});
 	else if (booking.attendance)
@@ -363,7 +367,7 @@ export function Bookings({
 	onPendingBookings: PaneProps["onPendingBookings"];
 }): JSX.Element | null {
 	const { option, preview } = useViewing();
-	const view = readView(route.query);
+	const view = readView(route.query, bookingsOpenOffset(school, clock.today));
 	const { from, to } = bookingsDays(view, clock.today);
 	const key = `${school.id}/${from}/${to}`;
 	const [loaded, setLoaded] = useState<Loaded | null>(null);

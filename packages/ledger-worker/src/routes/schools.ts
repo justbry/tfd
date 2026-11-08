@@ -1,7 +1,12 @@
 /** `GET /v1/schools`: how fresh each of the token's schools' views are, then the demo schools in the bucket. */
 import { readViewsFromStore } from "tfd/worker";
 import type { Store } from "../data/store-io.js";
-import { DEMO_SCHOOL, type DemoFacts, readDemoFacts } from "../demo.js";
+import {
+	DEMO_SCHOOL,
+	type DemoBookingsFact,
+	type DemoFacts,
+	readDemoFacts,
+} from "../demo.js";
 import { lagMinutesOf } from "../http.js";
 import { schoolIdsIn } from "../views-job.js";
 
@@ -15,10 +20,13 @@ export type SchoolFreshness = {
 	stale: boolean;
 };
 
-/** A demo school's row: its freshness, `demo: true` and the facts buzz-school has none of. */
-export type DemoSchoolRow = SchoolFreshness & { demo: true } & DemoFacts;
+/** A demo school's row: its freshness, `demo: true`, the facts buzz-school has none of and the day its Bookings tab
+ * opens on. */
+export type DemoSchoolRow = SchoolFreshness & { demo: true } & DemoFacts &
+	DemoBookingsFact;
 
-const freshnessOf = async (
+/** The views' `asOf` and lag, or nulls when the school has no views yet. */
+export const freshnessOf = async (
 	store: Store,
 	id: string,
 	now: number,

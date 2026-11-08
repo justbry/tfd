@@ -57,11 +57,17 @@ export const demoNameOf = (school: string): string => {
 const isText = (value: unknown): value is string =>
 	typeof value === "string" && value.length > 0;
 
+/** The local date (`YYYY-MM-DD`) of the school's latest booking: its Bookings tab opens on that week when it lies
+ * before the current one (`demo/demo-api-store.ts`). */
+export type DemoBookingsFact = { bookingsOpenOn: string | null };
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 /** The school's stored facts, each one the seed left out or garbled replaced by a plain label. */
 export const readDemoFacts = async (
 	store: Store,
 	school: string,
-): Promise<DemoFacts> => {
+): Promise<DemoFacts & DemoBookingsFact> => {
 	let stored: Record<string, unknown> = {};
 	try {
 		const text = await textOf(store, demoFactsKey(school));
@@ -82,5 +88,10 @@ export const readDemoFacts = async (
 			isText(unit?.one) && isText(unit.other)
 				? { one: unit.one, other: unit.other }
 				: FALLBACK_UNIT,
+		bookingsOpenOn:
+			typeof stored.bookingsOpenOn === "string" &&
+			DAY.test(stored.bookingsOpenOn)
+				? stored.bookingsOpenOn
+				: null,
 	};
 };
