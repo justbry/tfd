@@ -24,7 +24,11 @@ export type R2Bucket = {
 		cursor?: string;
 	}>;
 	head(key: string): Promise<R2Object | null>;
-	get(key: string): Promise<R2ObjectBody | null>;
+	/** With `onlyIf`, R2 answers the object without a body when the precondition fails. */
+	get(
+		key: string,
+		options?: { onlyIf?: { etagMatches?: string } },
+	): Promise<R2ObjectBody | R2Object | null>;
 	put(
 		key: string,
 		body: ReadableStream,
@@ -39,6 +43,9 @@ export type DurableObjectNamespace = {
 	get(id: unknown): DurableObjectStub;
 };
 
+/** A Secrets Store binding. */
+export type SecretBinding = { get(): Promise<string> };
+
 export type CloudEnv = {
 	DB: D1Database;
 	/** The books: `schools/<orgId>/…` (PLAN.md section 6). */
@@ -46,6 +53,12 @@ export type CloudEnv = {
 	/** Versioned copies of BOOKS, under a bucket lock (PLAN.md M0). */
 	BACKUPS: R2Bucket;
 	ORG: DurableObjectNamespace;
+	/** Ed25519 private keys (PKCS8 PEM), one per purpose (PLAN.md section 3.5). */
+	SIGNING_RECEIPT: SecretBinding;
+	SIGNING_SEAL: SecretBinding;
+	SIGNING_DIRECTORY: SecretBinding;
+	/** Subrequests one backup run may use; 900 fits the Free plan's limit, raise toward 9,000 on Paid. */
+	BACKUP_SUBREQUEST_BUDGET?: string;
 	ENVIRONMENT: "staging" | "production";
 	/** The product UI host, e.g. staging-ledger.trifold.app. */
 	LEDGER_HOST: string;

@@ -21,7 +21,8 @@ Only `staging` is bound. The top level of `wrangler.jsonc` is production and sta
 | Hosts | `staging-ledger.trifold.app`, `staging-api.trifold.app` (Workers custom domains; Cloudflare manages their DNS) |
 | D1 | `trifold-cloud-staging` (Time Travel: 30 days, built in) |
 | R2 | `trifold-staging-books`; `trifold-staging-backups` (below) |
-| Cron | `17 3 * * *`, the backup |
+| Cron | `17 * * * *`, the backup (hourly; `BACKUP_SUBREQUEST_BUDGET` per run, 900 by default, raise toward 9,000 on the Paid plan) |
+| Signing keys | Secrets Store `TRIFOLD_STAGING_SIGNING_RECEIPT`, `_SEAL`, `_DIRECTORY` (Ed25519, key ids `trifold-staging-2026-11-<purpose>`); `/healthz` proves they import. Public halves: `apps/trifold-verify/public/.well-known/trifold-keys.json`. The private PEMs live only in Secrets Store and `~/.config/trifold/keys/staging/` (mode 600) |
 
 ## Backups
 
@@ -39,11 +40,15 @@ bunx wrangler@4.90.0 r2 bucket lock add trifold-staging-backups --name keep-30-d
 bunx wrangler@4.90.0 r2 bucket lifecycle add trifold-staging-backups --name expire-35-days --prefix "" --expire-days 35
 ```
 
-A run copies at most 800 subrequests' worth and saves its cursor in D1 (`schema_meta.backup_state`); the next run
+A run copies at most `BACKUP_SUBREQUEST_BUDGET` subrequests' worth and saves its cursor in D1 (`schema_meta.backup_state`); the next run
 resumes. The watermark moves only after a pass with no failures. A failed object is logged and fails the cron run, so it
 shows as an error in Workers observability.
 
-`apps/trifold-verify` is the verifier host (`staging-verify.trifold.app`): static assets only, no Worker code.
+Each copy is fetched with `onlyIf: { etagMatches }`, so an object rewritten after the listing is never stored under the old
+ETag; it counts as a failure and the next pass copies the current version.
+
+`apps/trifold-verify` is the verifier host (`staging-verify.trifold.app`): static assets only, no Worker code. Its `_headers` CSP names only the staging API; the
+production build will need its own headers file when production is bound.
 
 ## Run
 
@@ -56,4 +61,4 @@ bun run migrate:staging && bun run deploy:staging
 
 CI (`.github/workflows/trifold-cloud.yml`) tests every pull request; it deploys staging when run by hand, or on every
 push to `dev` once the repository variable `TRIFOLD_CLOUD_DEPLOY` is `on` (set it after giving the `staging`
-environment a token with Workers, D1 and R2 edit). The signing keys (Secrets Store) arrive with M1 and M3.
+environment a token with Workers, D1 and R2 edit).

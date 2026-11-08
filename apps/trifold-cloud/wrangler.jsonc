@@ -35,11 +35,17 @@
 				{ "binding": "BOOKS", "bucket_name": "trifold-staging-books" },
 				{ "binding": "BACKUPS", "bucket_name": "trifold-staging-backups" }
 			],
-			"triggers": { "crons": ["17 3 * * *"] },
+			"triggers": { "crons": ["17 * * * *"] },
+			"secrets_store_secrets": [
+				{ "binding": "SIGNING_RECEIPT", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_RECEIPT" },
+				{ "binding": "SIGNING_SEAL", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_SEAL" },
+				{ "binding": "SIGNING_DIRECTORY", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_DIRECTORY" }
+			],
 			"vars": {
 				"ENVIRONMENT": "staging",
 				"LEDGER_HOST": "staging-ledger.trifold.app",
-				"API_HOST": "staging-api.trifold.app"
+				"API_HOST": "staging-api.trifold.app",
+				"BACKUP_SUBREQUEST_BUDGET": "900"
 			}
 		}
 	}

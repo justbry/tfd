@@ -1,12 +1,19 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import worker from "../src/index";
-import { fakeEnv } from "./fakes";
+import { fakeEnv, signingPem } from "./fakes";
 
 const LEDGER = "staging-ledger.trifold.app";
 const API = "staging-api.trifold.app";
 
-const call = (url: string, env = fakeEnv(), method = "GET") =>
-	worker.fetch(new Request(url, { method }), env);
+let pem = "";
+beforeAll(async () => {
+	pem = await signingPem();
+});
+
+const env = (overrides: Parameters<typeof fakeEnv>[0] = {}) =>
+	fakeEnv(overrides, pem);
+const call = (url: string, environment = env(), method = "GET") =>
+	worker.fetch(new Request(url, { method }), environment);
 
 describe("routing by host", () => {
 	test("healthz answers on the ledger host with every check", async () => {
@@ -17,7 +24,7 @@ describe("routing by host", () => {
 			service: "trifold-cloud",
 			surface: "ledger",
 			environment: "staging",
-			checks: { d1: true, books: true, backups: true },
+			checks: { d1: true, books: true, backups: true, signing: true },
 		});
 	});
 
@@ -26,7 +33,7 @@ describe("routing by host", () => {
 			surface: string;
 		};
 		expect(body.surface).toBe("api");
-		const head = await call(`https://${API}/healthz`, fakeEnv(), "HEAD");
+		const head = await call(`https://${API}/healthz`, env(), "HEAD");
 		expect(head.status).toBe(200);
 		expect(await head.text()).toBe("");
 	});
@@ -38,14 +45,14 @@ describe("routing by host", () => {
 	test("unknown paths and methods are 404", async () => {
 		expect((await call(`https://${LEDGER}/nope`)).status).toBe(404);
 		expect(
-			(await call(`https://${LEDGER}/healthz`, fakeEnv(), "POST")).status,
+			(await call(`https://${LEDGER}/healthz`, env(), "POST")).status,
 		).toBe(404);
 	});
 
 	test("a failing binding makes healthz 503 without leaking the reason", async () => {
 		const response = await call(
 			`https://${API}/healthz`,
-			fakeEnv({ booksFail: true }),
+			env({ booksFail: true }),
 		);
 		expect(response.status).toBe(503);
 		const text = await response.text();
@@ -53,8 +60,21 @@ describe("routing by host", () => {
 			d1: true,
 			books: false,
 			backups: true,
+			signing: true,
 		});
 		expect(text).not.toContain("R2 down");
+	});
+
+	test("a signing key that doesn't import makes healthz 503", async () => {
+		const response = await call(
+			`https://${API}/healthz`,
+			env({ badSigningKey: true }),
+		);
+		expect(response.status).toBe(503);
+		expect(
+			((await response.json()) as { checks: { signing: boolean } }).checks
+				.signing,
+		).toBe(false);
 	});
 
 	test("every answer carries the security headers", async () => {

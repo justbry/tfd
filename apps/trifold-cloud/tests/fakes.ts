@@ -30,6 +30,7 @@ export const memoryBucket = (
 	};
 	for (const [key, bytes] of Object.entries(initial)) write(key, bytes);
 	let calls = 0;
+	let streamedPuts = 0;
 	const bucket: R2Bucket = {
 		list: async ({ limit = 1000, cursor } = {}) => {
 			calls += 1;
@@ -63,26 +64,42 @@ export const memoryBucket = (
 					}
 				: null;
 		},
-		get: async (key) => {
+		get: async (key, options) => {
 			calls += 1;
 			const stored = objects.get(key);
 			if (!stored) return null;
-			return {
+			const meta = {
 				key,
 				etag: stored.etag,
 				size: stored.bytes.length,
 				uploaded: stored.uploaded,
+			};
+			const wanted = options?.onlyIf?.etagMatches;
+			// R2 answers a failed precondition with the object's metadata and no body.
+			if (wanted !== undefined && wanted !== stored.etag) return meta;
+			return {
+				...meta,
 				body: new Response(stored.bytes).body as ReadableStream,
 			};
 		},
 		put: async (key, body, options) => {
 			calls += 1;
+			if (!(body instanceof ReadableStream))
+				throw new Error("put expects a stream");
+			streamedPuts += 1;
 			if (failingPuts.has(key)) throw new Error("put refused");
 			if (objects.has(key)) throw new Error("locked: overwrite refused");
 			write(key, await new Response(body).text(), options?.customMetadata);
 		},
 	};
-	return { bucket, objects, write, failingPuts, calls: () => calls };
+	return {
+		bucket,
+		objects,
+		write,
+		failingPuts,
+		calls: () => calls,
+		streamedPuts: () => streamedPuts,
+	};
 };
 
 /** Just enough of D1 for `schema_meta` reads and upserts. */
@@ -115,8 +132,28 @@ export const memoryD1 = (fail = false) => {
 	return { db, meta };
 };
 
+/** A fresh Ed25519 private key as PKCS8 PEM, as Secrets Store would hand it over. */
+export const signingPem = async (): Promise<string> => {
+	const pair = (await crypto.subtle.generateKey({ name: "Ed25519" }, true, [
+		"sign",
+		"verify",
+	])) as CryptoKeyPair;
+	const der = new Uint8Array(
+		await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+	);
+	const base64 = btoa(String.fromCharCode(...der));
+	return `-----BEGIN PRIVATE KEY-----\n${base64}\n-----END PRIVATE KEY-----\n`;
+};
+
+const secret = (value: string) => ({ get: async () => value });
+
 export const fakeEnv = (
-	overrides: { d1Fails?: boolean; booksFail?: boolean } = {},
+	overrides: {
+		d1Fails?: boolean;
+		booksFail?: boolean;
+		badSigningKey?: boolean;
+	} = {},
+	pem = "",
 ): CloudEnv => {
 	const books = memoryBucket().bucket;
 	return {
@@ -134,6 +171,9 @@ export const fakeEnv = (
 			idFromName: (name) => name,
 			get: () => ({ fetch: async () => new Response("unused") }),
 		},
+		SIGNING_RECEIPT: secret(overrides.badSigningKey ? "not a key" : pem),
+		SIGNING_SEAL: secret(pem),
+		SIGNING_DIRECTORY: secret(pem),
 		ENVIRONMENT: "staging",
 		LEDGER_HOST: "staging-ledger.trifold.app",
 		API_HOST: "staging-api.trifold.app",

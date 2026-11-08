@@ -88,9 +88,10 @@ jobs:
       - name: Check every staging host
         run: |
           set -euo pipefail
-          for url in https://staging-ledger.trifold.app/healthz https://staging-api.trifold.app/healthz \
-                     https://staging-verify.trifold.app/.well-known/trifold-keys.json; do
-            code=$(curl -s -o /dev/null -w '%{http_code}' --retry 5 --retry-delay 5 --retry-all-errors "$url")
-            echo "$url $code"
-            test "$code" = 200
+          for url in https://staging-ledger.trifold.app/healthz https://staging-api.trifold.app/healthz; do
+            body=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors "$url")
+            echo "$url $body"
+            echo "$body" | jq -e '.ok == true and .environment == "staging"' > /dev/null
           done
+          keys=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors https://staging-verify.trifold.app/.well-known/trifold-keys.json)
+          echo "$keys" | jq -e 'to_entries | length >= 3 and all(.value.purpose != null)' > /dev/null

@@ -1,9 +1,9 @@
 import type { D1Database, R2Bucket } from "./env";
 
-/** A page of 200 costs at most 601 subrequests (list, then head, get and put per object), so one page always fits. */
+/** Each fresh object costs up to three subrequests (head, get, put) after the page's list call. */
 const PAGE_SIZE = 200;
-/** Stays well inside a cron invocation's subrequest budget; a pass that needs more resumes on the next run. */
-export const MAX_SUBREQUESTS_PER_RUN = 800;
+/** The default budget of one run; the cron runs hourly, so a pass that needs more resumes within the hour. */
+export const DEFAULT_SUBREQUEST_BUDGET = 900;
 const STATE_KEY = "backup_state";
 
 /**
@@ -62,12 +62,14 @@ export const backupBucket = async ({
 	backup,
 	state,
 	now,
+	budget = DEFAULT_SUBREQUEST_BUDGET,
 	log = console,
 }: {
 	source: R2Bucket;
 	backup: R2Bucket;
 	state: BackupState;
 	now: Date;
+	budget?: number;
 	log?: Pick<Console, "error">;
 }): Promise<BackupResult> => {
 	const passStartedAt = state.passStartedAt ?? now.toISOString();
@@ -79,7 +81,7 @@ export const backupBucket = async ({
 	const counts = { copied: 0, skipped: 0, failed: 0 };
 
 	while (true) {
-		if (subrequests + 1 > MAX_SUBREQUESTS_PER_RUN) {
+		if (subrequests + 1 > budget) {
 			return {
 				...counts,
 				complete: false,
@@ -93,7 +95,7 @@ export const backupBucket = async ({
 		);
 		// Each fresh object costs up to three subrequests (head, get, put). Not enough budget left for this page: stop
 		// before it and resume from the same cursor, so no object of the page is half-done.
-		if (subrequests + fresh.length * 3 > MAX_SUBREQUESTS_PER_RUN) {
+		if (subrequests + fresh.length * 3 > budget) {
 			return {
 				...counts,
 				complete: false,
@@ -109,8 +111,19 @@ export const backupBucket = async ({
 					continue;
 				}
 				subrequests += 2;
-				const body = await source.get(object.key);
-				if (!body) continue;
+				// Only the version the listing named: an object rewritten since the list would otherwise land under the old
+				// ETag, where the lock would then refuse the correction. A miss counts as a failure, so the watermark stays
+				// and the next pass copies whatever version is current.
+				const body = await source.get(object.key, {
+					onlyIf: { etagMatches: object.etag },
+				});
+				if (!(body && "body" in body)) {
+					counts.failed += 1;
+					log.error(
+						"backup skipped an object that changed or vanished since the listing",
+					);
+					continue;
+				}
 				await backup.put(target, body.body, {
 					customMetadata: { sourceKey: object.key },
 				});
@@ -139,12 +152,14 @@ export const runBackup = async (
 	}: { db: D1Database; source: R2Bucket; backup: R2Bucket },
 	now: Date,
 	log: Pick<Console, "log" | "error"> = console,
+	budget = DEFAULT_SUBREQUEST_BUDGET,
 ): Promise<BackupResult> => {
 	const result = await backupBucket({
 		source,
 		backup,
 		state: await readBackupState(db),
 		now,
+		budget,
 		log,
 	});
 	await writeBackupState(db, result.state);

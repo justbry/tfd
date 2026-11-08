@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	backupBucket,
 	backupKey,
-	MAX_SUBREQUESTS_PER_RUN,
+	DEFAULT_SUBREQUEST_BUDGET,
 	readBackupState,
 	runBackup,
 } from "../src/backup";
@@ -113,7 +113,7 @@ describe("nightly backup", () => {
 				quiet,
 			);
 			expect(source.calls() + backup.calls() - before).toBeLessThanOrEqual(
-				MAX_SUBREQUESTS_PER_RUN,
+				DEFAULT_SUBREQUEST_BUDGET,
 			);
 			runs += 1;
 		} while (!result.complete && runs < 20);
@@ -174,5 +174,47 @@ describe("nightly backup", () => {
 			complete: true,
 		});
 		expect((await readBackupState(db)).watermark).toBe(NOW.toISOString());
+	});
+
+	test("an object rewritten between the listing and the copy is not stored under the old ETag", async () => {
+		const source = memoryBucket(
+			{ a: "old" },
+			() => new Date("2026-11-01T00:00:00Z"),
+		);
+		const backup = memoryBucket();
+		const listedEtag = source.objects.get("a")?.etag as string;
+		// Rewrite "a" after the list call but before the get: wrap list to rewrite once it has answered.
+		const list = source.bucket.list;
+		source.bucket.list = async (options) => {
+			const page = await list(options);
+			source.write("a", "new");
+			return page;
+		};
+		const result = await backupBucket({
+			source: source.bucket,
+			backup: backup.bucket,
+			state: { watermark: null },
+			now: NOW,
+			log: quiet,
+		});
+		expect(result).toMatchObject({
+			copied: 0,
+			failed: 1,
+			state: { watermark: null },
+		});
+		expect(backup.objects.has(backupKey("a", listedEtag))).toBe(false);
+	});
+
+	test("bodies are streamed into the backup, not buffered", async () => {
+		const source = memoryBucket({ a: "1", b: "2" });
+		const backup = memoryBucket();
+		await backupBucket({
+			source: source.bucket,
+			backup: backup.bucket,
+			state: { watermark: null },
+			now: NOW,
+			log: quiet,
+		});
+		expect(backup.streamedPuts()).toBe(2);
 	});
 });

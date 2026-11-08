@@ -39,6 +39,10 @@ describe("production stays unbound until the launch gate", () => {
 		expect(Object.keys(config).sort()).toEqual([...CLOUD_TOP_LEVEL].sort());
 		expect(config.workers_dev).toBe(false);
 		expect(Object.keys(config.env)).toEqual(["staging"]);
+		// The org Durable Object is SQLite-backed (its storage is the tfd handler's database, PLAN.md section 3.1).
+		expect(config.migrations).toEqual([
+			{ tag: "v1", new_sqlite_classes: ["OrgDO"] },
+		]);
 	});
 
 	test("trifold-verify's top level holds only the allowed keys, and staging is the only environment", async () => {
@@ -67,5 +71,17 @@ describe("production stays unbound until the launch gate", () => {
 			),
 		).toEqual(["trifold-staging-books", "trifold-staging-backups"]);
 		expect(staging.vars.ENVIRONMENT).toBe("staging");
+		expect(
+			staging.secrets_store_secrets.map(
+				(secret: { binding: string; secret_name: string }) => [
+					secret.binding,
+					secret.secret_name,
+				],
+			),
+		).toEqual([
+			["SIGNING_RECEIPT", "TRIFOLD_STAGING_SIGNING_RECEIPT"],
+			["SIGNING_SEAL", "TRIFOLD_STAGING_SIGNING_SEAL"],
+			["SIGNING_DIRECTORY", "TRIFOLD_STAGING_SIGNING_DIRECTORY"],
+		]);
 	});
 });
