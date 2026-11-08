@@ -56,6 +56,10 @@
 		<SchoolSwitcher {schools} current={route.schoolId} onChoose={onChooseSchool} />
 	</div>
 	<div class="relative max-[440px]:order-5">
+		{#if school && route.tab === "bookings"}
+			<!-- The Bookings pane puts its own period control here (it brings it with its chunk). -->
+			<div data-test="period-slot" class="contents"></div>
+		{:else}
 		<PeriodControl
 			{period}
 			{today}
@@ -69,6 +73,7 @@
 			onCompareChange={(checked) =>
 				onNavigate(withQuery(route, "compare", checked ? "1" : null))}
 		/>
+		{/if}
 	</div>
 	{#if school && viewing}
 		<div class="relative max-[440px]:order-6">
@@ -76,7 +81,9 @@
 		</div>
 	{/if}
 	<span class="min-w-0 flex-1 basis-0 max-[440px]:order-2"></span>
-	<span class="hidden h-0 basis-full max-[440px]:order-4 max-[440px]:block" aria-hidden="true"></span>
+	<!-- The break before the second row: hidden above 440px by a rule of its own (a plain `hidden` would lose to the same
+	     rule in the stylesheet of a pane loaded later, which sits after this one in the cascade). -->
+	<span class="h-0 basis-full min-[441px]:hidden max-[440px]:order-4" aria-hidden="true"></span>
 	<div class="shrink-0 max-[440px]:order-3">
 		<HelpMenu {onToast} />
 	</div>

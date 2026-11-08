@@ -2,6 +2,8 @@
 	/** Where the panes loaded on demand come from; a test swaps one for a chunk that fails. */
 	export const chunks = {
 		dashboard: () => import("./dashboard/Dashboard.svelte"),
+		bookings: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.bookings()),
+		members: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.members()),
 		allSchools: () => import("./AllSchools.svelte"),
 	};
 </script>
@@ -34,9 +36,16 @@
 	import { useApp } from "./context.ts";
 	import EmptyPane from "./EmptyPane.svelte";
 	import Icon from "./Icon.svelte";
+	import LazyPane from "./LazyPane.svelte";
 	import LoadFailed from "./LoadFailed.svelte";
 	import { type RetryingRead, retryingRead } from "./retrying-read.ts";
-	import { shownPeriod, staleText, tabBadge, tabNames } from "./shell-model.ts";
+	import {
+		readsDisclosure,
+		shownPeriod,
+		staleText,
+		tabBadge,
+		tabNames,
+	} from "./shell-model.ts";
 	import { badgeTones, mockBadge } from "./styles.ts";
 	import TopBar from "./TopBar.svelte";
 	import { previewTail, resolveViewing } from "./viewing.ts";
@@ -156,49 +165,13 @@
 		navigate(target);
 	};
 
-	/** The Dashboard, loaded the first time it is shown, so that the first page load carries none of it. A chunk that
-	 * fails to load is the pane's message, with Retry loading it again. */
-	let dashboardModule: Promise<
-		typeof import("./dashboard/Dashboard.svelte")
-	> | null = $state(null);
-	let dashboardChunkError = $state<UiError | null>(null);
-	const loadDashboard = (): void => {
-		const loading = chunks.dashboard();
-		dashboardChunkError = null;
-		dashboardModule = loading;
-		loading.catch((failure: unknown) => {
-			if (dashboardModule === loading) dashboardChunkError = toUiError(failure);
-		});
-	};
-	$effect(() => {
-		if (school && route.tab === "dashboard" && !dashboardModule)
-			loadDashboard();
-	});
-	/** All schools, loaded the first time it is shown, as the Dashboard is: a school's page does not carry it. */
-	let allSchoolsModule: Promise<typeof import("./AllSchools.svelte")> | null =
-		$state(null);
-	let allSchoolsChunkError = $state<UiError | null>(null);
-	const loadAllSchools = (): void => {
-		const loading = chunks.allSchools();
-		allSchoolsChunkError = null;
-		allSchoolsModule = loading;
-		loading.catch((failure: unknown) => {
-			if (allSchoolsModule === loading)
-				allSchoolsChunkError = toUiError(failure);
-		});
-	};
-	$effect(() => {
-		if (!school && !allSchoolsModule) loadAllSchools();
-	});
 	/** A chunk that did not load is the pane's message: the route is on screen. */
-	$effect(() => {
-		if (!school && allSchoolsChunkError) onPaneRendered(formatRoute(route));
-	});
+	const chunkFailed = (): void => onPaneRendered(formatRoute(route));
 
-	/** The Dashboard cannot show without the disclosure or its chunk: either failure is the pane's message, and the
+	/** The panes that read the school's disclosure cannot show without it: its failure is the pane's message, and the
 	 * route is on screen. */
 	$effect(() => {
-		if (route.tab === "dashboard" && (disclosureError || dashboardChunkError))
+		if (readsDisclosure(route.tab) && disclosureError)
 			onPaneRendered(formatRoute(route));
 	});
 
@@ -307,26 +280,19 @@
 				class="overflow-x-auto p-3.5"
 				data-test={tab === route.tab ? "pane" : undefined}
 			>
-				{#if tab === route.tab && tab === "dashboard"}
-					<div class="text-[12px]" data-pane="dashboard">
-						{#if viewing && dashboardModule}
-							{#await dashboardModule then { default: Dashboard }}
-								<Dashboard
-									{route}
-									{school}
-									{viewing}
-									{navigate}
-									onRendered={onPaneRendered}
-								/>
-							{:catch failure}
-								<LoadFailed error={toUiError(failure)} onRetry={loadDashboard} />
-							{/await}
-						{:else if disclosureError}
+				{#if tab === route.tab && readsDisclosure(tab)}
+					<div class="text-[12px]" data-pane={tab}>
+						{#if disclosureError}
 							<LoadFailed
 								error={disclosureError}
 								onRetry={() => disclosureRead?.run()}
 								busy={disclosureBusy}
 							/>
+						{:else}
+							{@const paneProps = viewing
+								? { route, school, viewing, navigate, onRendered: onPaneRendered }
+								: null}
+							<LazyPane load={() => chunks[tab]()} props={paneProps} onFailed={chunkFailed} />
 						{/if}
 					</div>
 				{:else if tab === route.tab}
@@ -337,18 +303,11 @@
 	</Tabs.Root>
 {:else}
 	<section class="overflow-x-auto p-3.5" aria-label="All schools" data-test="pane">
-		{#if allSchoolsModule}
-			{#await allSchoolsModule then { default: AllSchools }}
-				<AllSchools
-					{schools}
-					{period}
-					onOpen={chooseSchool}
-					onRendered={() => onPaneRendered(formatRoute(route))}
-				/>
-			{:catch failure}
-				<LoadFailed error={toUiError(failure)} onRetry={loadAllSchools} />
-			{/await}
-		{/if}
+		<LazyPane
+			load={() => chunks.allSchools()}
+			props={{ schools, period, onOpen: chooseSchool, onRendered: () => onPaneRendered(formatRoute(route)) }}
+			onFailed={chunkFailed}
+		/>
 	</section>
 {/if}
 {#if settingsSheet}

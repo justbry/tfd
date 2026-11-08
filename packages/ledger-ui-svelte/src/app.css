@@ -9,9 +9,24 @@
 
 @import "./tailwind-shared.css";
 
-/* The Dashboard (and the books parts it alone uses) brings its own utilities with its chunk (dashboard.css). */
+/* The Dashboard (and the books parts it alone uses) brings its own utilities with its chunk (dashboard.css), and so
+   do the card, table and sheet components that only panes loaded on demand draw (each pane's stylesheet names the
+   components it draws). */
 @source not "./app/dashboard";
 @source not "./app/books";
+@source not "./lib/components/ui/card";
+@source not "./lib/components/ui/table";
+@source not "./lib/components/ui/sheet";
+@source not "./app/AllSchools.svelte";
+@source not "./app/SettingsSheet.svelte";
+/* So do Bookings and Members (their folders, the parts they share, and the dialog, field and label components only
+   they draw). */
+@source not "./app/bookings";
+@source not "./app/members";
+@source not "./app/panes";
+@source not "./app/PaneIcon.svelte";
+@source not "./lib/components/ui/dialog";
+@source not "./lib/components/ui/native-select";
 
 :root {
 	--radius: 10px;

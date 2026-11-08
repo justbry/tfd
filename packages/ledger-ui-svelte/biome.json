@@ -3,7 +3,14 @@
 	"root": false,
 	"extends": "//",
 	"files": {
-		"includes": ["**", "!src/app/dashboard/dashboard.css"]
+		"includes": [
+			"**",
+			"!src/app/dashboard/dashboard.css",
+			"!src/app/bookings/bookings.css",
+			"!src/app/members/members.css",
+			"!src/app/all-schools.css",
+			"!src/app/settings-sheet.css"
+		]
 	},
 	"overrides": [
 		{

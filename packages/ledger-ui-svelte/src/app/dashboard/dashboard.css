@@ -7,3 +7,4 @@
 @import "../../tailwind-shared.css";
 @source "./";
 @source "../books";
+@source "../../lib/components/ui/card";
