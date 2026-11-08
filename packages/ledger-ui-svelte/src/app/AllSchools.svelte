@@ -1,20 +1,90 @@
 <script lang="ts">
+	import { Effect } from "effect";
 	import { type Period, periodLabel } from "$contract/app/period.ts";
 	import type { School } from "$contract/data/types.ts";
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import * as Table from "$lib/components/ui/table/index.ts";
+	import { messageFor } from "../effect/messages.ts";
+	import { read } from "../effect/run.ts";
+	import type { UiError } from "../effect/ui-error.ts";
+	import {
+		incomeTotals,
+		type SchoolFigures,
+		schoolFigures,
+		viewerReads,
+	} from "./all-schools-model.ts";
+	import { useApp } from "./context.ts";
 	import Icon from "./Icon.svelte";
+	import { formatMoney } from "./money.ts";
+	import { retryingRead } from "./retrying-read.ts";
 	import { badgeTones, mockBadge } from "./styles.ts";
 
-	/** The All schools pane (mockup `#all`, `portfolio()`): one row per school, a total row. Outstanding and Income
-	 * come from the Dashboard's documents in S9.1; until then they are a dash, never 0. A school with no attention
-	 * count (the HTTP build) shows a dash too. */
+	/** The All schools pane (mockup `#all`, `portfolio()`): one row per school, a total row. Outstanding is the
+	 * school's credits outstanding, held included (the Members summary), for a viewer who sees the roster; Income is
+	 * the period's income (memberships and bookings less discounts, `membersIncome`) for a viewer who sees live money:
+	 * the viewer's own audience at each school decides, and a figure they may not see says who may, never 0. Each
+	 * school is read through the app's Effect layer; a failed read is a toast with Retry and "not available" in its
+	 * cells. The Income total is per currency and says when it leaves a school out. A school with no attention count
+	 * (the HTTP build) shows a dash. */
 	let {
 		schools,
 		period,
 		onOpen,
 	}: { schools: School[]; period: Period; onOpen: (schoolId: string) => void } =
 		$props();
+
+	const app = useApp();
+	type Shown =
+		| { state: "loading" }
+		| { state: "failed"; error: UiError }
+		| { state: "loaded"; figures: SchoolFigures };
+	let shown = $state<Record<string, Shown>>({});
+	$effect(() => {
+		const { from, to } = period;
+		const reads = schools.map((school) => {
+			shown[school.id] = { state: "loading" };
+			const reading = retryingRead(
+				app,
+				() =>
+					Effect.gen(function* () {
+						const disclosure = yield* read((reader) => reader.disclosure(school.id));
+						const may = viewerReads(disclosure);
+						const summary = may.roster
+							? yield* read((reader) => reader.membersSummary({ schoolId: school.id }))
+							: null;
+						const income = may.income
+							? yield* read((reader) =>
+									reader.membersIncome({ schoolId: school.id, from, to }),
+								)
+							: null;
+						return schoolFigures(summary, income, summary?.currency ?? school.currency);
+					}),
+				{
+					value: (figures) => {
+						shown[school.id] = { state: "loaded", figures };
+					},
+					failure: (error) => {
+						shown[school.id] = { state: "failed", error };
+					},
+				},
+			);
+			reading.run();
+			return reading;
+		});
+		return () => {
+			for (const reading of reads) reading.cancel();
+		};
+	});
+	const loadedFigures = $derived(
+		schools.map((school) => {
+			const entry = shown[school.id];
+			return entry?.state === "loaded" ? entry.figures : null;
+		}),
+	);
+	const totals = $derived(incomeTotals(loadedFigures));
+	const anyLoading = $derived(
+		schools.some((school) => (shown[school.id]?.state ?? "loading") === "loading"),
+	);
 
 	const counted = $derived(
 		schools.every((school) => school.attentionCount !== null),
@@ -27,7 +97,8 @@
 	const header =
 		"h-auto border-b border-border px-2 py-1.5 text-left align-bottom text-[10.5px] font-medium whitespace-normal text-muted-foreground";
 	const cell = "border-b border-border px-2 py-[7px] align-middle whitespace-normal";
-	const pending = "Not shown yet: it arrives with the Dashboard (S9.1).";
+	const hiddenFigure =
+		"inline-flex items-center gap-[3px] text-[10.5px] font-medium text-muted-foreground";
 </script>
 
 <Table.Root class="text-[12px]" data-test="all-schools">
@@ -53,9 +124,30 @@
 					</button>
 					<div class="font-mono text-[10.5px] leading-tight text-muted-foreground">{school.timeZone}</div>
 				</Table.Cell>
-				{#each ["outstanding", "income"] as column (column)}
-					<Table.Cell class={[cell, "text-right tabular-nums text-muted-foreground"]}>
-						<span aria-hidden="true" title={pending}>—</span><span class="sr-only">{pending}</span>
+				{@const entry = shown[school.id]}
+				{#each ["outstanding", "income"] as const as column (column)}
+					<Table.Cell class={[cell, "text-right tabular-nums"]} data-column={column}>
+						{#if !entry || entry.state === "loading"}
+							<span class="text-muted-foreground"
+								><span aria-hidden="true">…</span><span class="sr-only">Loading</span></span
+							>
+						{:else if entry.state === "failed"}
+							{@const message = messageFor(entry.error)}
+							<span class="text-muted-foreground" title={`${message.title}. ${message.what}`}
+								>Not available<span class="sr-only">: {message.title}. {message.what}</span></span
+							>
+						{:else}
+							{@const figure = entry.figures[column]}
+							{#if "hidden" in figure}
+								<span class={hiddenFigure} title={figure.hidden}
+									><Icon name="lock" class="size-[11px]" />{figure.hidden}</span
+								>
+							{:else if "count" in figure}
+								{figure.count} {figure.unit}
+							{:else}
+								{formatMoney(figure.cents, figure.currency)}
+							{/if}
+						{/if}
 					</Table.Cell>
 				{/each}
 				<Table.Cell class={[cell, "text-right tabular-nums"]}>
@@ -85,11 +177,21 @@
 		{/each}
 		<Table.Row class="border-0 font-semibold hover:bg-transparent" data-test="all-schools-total">
 			<Table.Cell class={cell}>Total</Table.Cell>
-			{#each ["outstanding", "income"] as column (column)}
-				<Table.Cell class={[cell, "text-right tabular-nums font-normal text-muted-foreground"]}>
-					<span aria-hidden="true" title={pending}>—</span><span class="sr-only">{pending}</span>
-				</Table.Cell>
-			{/each}
+			<Table.Cell class={cell} data-column="outstanding"></Table.Cell>
+			<Table.Cell class={[cell, "text-right tabular-nums"]} data-column="income">
+				{#if anyLoading}
+					<span class="text-muted-foreground"
+						><span aria-hidden="true">…</span><span class="sr-only">Loading</span></span
+					>
+				{:else}
+					{totals.totals.map(({ currency, cents }) => formatMoney(cents, currency)).join(" + ")}
+				{/if}
+				{#if totals.partial && !anyLoading}
+					<div class="text-[10.5px] font-normal text-muted-foreground" data-test="income-partial">
+						{totals.totals.length > 0 ? "Leaves out schools whose income you do not see" : "Not shown"}
+					</div>
+				{/if}
+			</Table.Cell>
 			<Table.Cell class={[cell, "text-right tabular-nums"]}>{counted ? attentionTotal : "—"}</Table.Cell>
 			<Table.Cell class={cell}></Table.Cell>
 		</Table.Row>

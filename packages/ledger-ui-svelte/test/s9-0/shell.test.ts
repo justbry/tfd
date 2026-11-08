@@ -97,20 +97,17 @@ describe("the shell", () => {
 			"Total",
 		);
 		expect(textOf("[data-test=all-schools-total] td:nth-child(4)")).toBe("7");
-		for (const column of [2, 3])
-			expect(
-				textOf(
-					`[data-test=all-schools-total] td:nth-child(${column}) .sr-only`,
-				),
-			).toBe("Not shown yet: it arrives with the Dashboard (S9.1).");
 		expect(
 			textOf("[data-test=all-schools-row][data-school=map] td:last-child"),
 		).toBe("26 min · stale");
-		expect(
-			textOf(
-				"[data-test=all-schools-row][data-school=vol] td:nth-child(2) .sr-only",
-			),
-		).toBe("Not shown yet: it arrives with the Dashboard (S9.1).");
+		// S9.1 fills Outstanding and Income (test/s9-1/all-schools.test.ts checks every cell).
+		await until(
+			() =>
+				textOf(
+					"[data-test=all-schools-row][data-school=vol] [data-column=outstanding]",
+				) === "63 sessions",
+			"the figures",
+		);
 		expect(textOf("[data-test=school-name]")).toBe("All schools");
 	});
 	test("a school opened from All schools goes to its Plans", async () => {

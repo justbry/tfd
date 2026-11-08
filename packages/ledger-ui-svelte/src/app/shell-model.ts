@@ -61,7 +61,8 @@ export const opensOnTabs: ReadonlySet<string> = new Set([
 	"members",
 ]);
 
-/** The money period a route shows (the Preact `viewedPeriod` with no audience yet: View as arrives in S9.1). */
+/** The money period a route asks for, before the shell snaps it to what the viewed audience may pick (the Preact
+ * `viewedPeriod`, whose snap needs the disclosure). */
 export function shownPeriod(
 	asked: string | null,
 	today: string,
@@ -89,3 +90,8 @@ export const schoolLabel = (school: School): string =>
 /** The stale banner's text (mockup `#bnr`). */
 export const staleText = (school: School): string =>
 	`Data is ${school.lagMinutes} min behind: the shipper may be stuck. Recent events can be missing.`;
+
+/** The tabs whose pane reports its own render (it loads data, so the route is on screen only once that data, or its
+ * message, is): the others are on screen as soon as the shell is. */
+export const reportsItsOwnRender = (tab: string): boolean =>
+	tab === "dashboard";
