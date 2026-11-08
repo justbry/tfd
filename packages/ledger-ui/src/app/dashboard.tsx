@@ -36,6 +36,22 @@ const featuredScenarios = 4;
 /** Real data has no presets: the query then names none, and the Reader answers the school's one document (the HTTP
  * Reader sends no preset to the Worker). */
 const noPreset = "";
+/** The longest the other audiences' documents wait for the browser to be idle after the first paint. */
+const idleTimeoutMilliseconds = 2000;
+/** Where the browser has no idle callback (Safari), the wait past the first paint instead. */
+const idleFallbackMilliseconds = 200;
+
+/** Runs `run` once the browser is idle, after the paint of what is on screen; the answer cancels it. */
+function whenIdle(run: () => void): () => void {
+	if (typeof requestIdleCallback === "function") {
+		const handle = requestIdleCallback(run, {
+			timeout: idleTimeoutMilliseconds,
+		});
+		return () => cancelIdleCallback(handle);
+	}
+	const timer = setTimeout(run, idleFallbackMilliseconds);
+	return () => clearTimeout(timer);
+}
 
 type DashboardView = "money" | "members" | "risk";
 type ViewOption = { id: DashboardView; label: string; icon: IconName };
@@ -1373,8 +1389,9 @@ export function Dashboard({
 	const presetAsked = query.get("preset");
 	const key = `${school.id}/${presetAsked}/${audience}/${pinLocked}`;
 	const [loaded, setLoaded] = useState<Loaded | null>(null);
-	/** The documents read so far, by the `key` that asked for them, and the other audiences' right after the first paint:
-	 * picking another View as row shows its document in the same click, with no wait for the Reader. */
+	/** The documents read so far, by the `key` that asked for them, and the other audiences' once the browser is idle
+	 * after the first paint (so they never compete with it): picking another View as row shows its document in the same
+	 * click, with no wait for the Reader. */
 	const documents = useRef(new Map<string, KpiDocument>());
 	const heldAudiences = disclosure.viewAs.flatMap((row) =>
 		row.held ? [row.audience] : [],
@@ -1386,6 +1403,7 @@ export function Dashboard({
 		// `attempt` is the Try again counter: each press reads again.
 		void attempt;
 		let current = true;
+		let cancelIdle: (() => void) | null = null;
 		const failed = failFor(key);
 		const load = async (): Promise<void> => {
 			const { presets } = await reader.dashboardOptions();
@@ -1408,18 +1426,20 @@ export function Dashboard({
 				return read;
 			};
 			const document = await read(audience, pinLocked);
-			if (current) setLoaded({ key, school: school.id, presets, document });
+			if (!current) return;
+			setLoaded({ key, school: school.id, presets, document });
 			const others = new Set(heldKey.split(",") as Array<typeof audience>);
 			others.delete(audience);
-			await Promise.all(
-				[...others].map((other) => read(other, false).catch(() => undefined)),
-			);
+			cancelIdle = whenIdle(() => {
+				for (const other of others) read(other, false).catch(() => undefined);
+			});
 		};
 		load().catch((error: unknown) => {
 			if (current) failed(error);
 		});
 		return () => {
 			current = false;
+			cancelIdle?.();
 		};
 	}, [
 		reader,

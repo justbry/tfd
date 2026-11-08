@@ -86,9 +86,6 @@ in its `sources`; "Not stated" means its public pages don't say. Trifold's price
 
 ## Placeholders to replace before launch
 
-- **Domain.** `SITE_ORIGIN` in `src/lib/config.ts` is `https://gettrifold.com`, which is not registered yet. Canonical
-  links, Open Graph URLs, `sitemap.xml` and `robots.txt` all read it.
-- **Contact address.** `CONTACT_EMAIL` (`hello@gettrifold.com`) in the same file.
 - **People block** on the homepage and the founder section of `/about`: marked placeholders.
 - **Legal** (`src/content/legal.md`): draft stubs, `noindex`.
 
@@ -109,7 +106,8 @@ When it is unset, submitting opens the visitor's email app with the fields fille
 ## Deploy to Cloudflare Pages
 
 CI deploys it (`.github/workflows/trifold-site.yml`): every pull request gets a preview at
-`<branch>.tfd-ledger.pages.dev`, and every push to `dev` goes to production. Setup, secrets and rollback are in
+`<branch>.tfd-ledger.pages.dev`, and every push to `dev` goes to production at https://trifold.app (also served at
+`www.trifold.app` and `tfd-ledger.pages.dev`; `SITE_ORIGIN` in `src/lib/config.ts` sets the canonical). Setup, secrets and rollback are in
 `docs/ci-and-deploy.md`.
 
 By hand, from this directory:

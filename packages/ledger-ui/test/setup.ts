@@ -15,3 +15,14 @@ if (!existsSync(join(packageRoot, "src/fixtures/mart/documents.json"))) {
 }
 
 GlobalRegistrator.register({ url: "https://ledger.test/" });
+
+/** happy-dom has no idle callback. A browser runs one once the page is idle after a paint; a test page is idle at once,
+ * so here it runs on the next task. A test that needs to hold it replaces it (`test/s1/dashboard.test.ts`). */
+if (typeof globalThis.requestIdleCallback !== "function") {
+	globalThis.requestIdleCallback = (run) =>
+		setTimeout(
+			() => run({ didTimeout: false, timeRemaining: () => 0 }),
+			0,
+		) as unknown as number;
+	globalThis.cancelIdleCallback = (handle) => clearTimeout(handle);
+}
