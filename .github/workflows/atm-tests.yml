@@ -98,13 +98,24 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # The tarball is cached, so a release-CDN outage on github.com does not fail the job once one run has fetched it.
+      - name: Cache hledger
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/hledger
+          key: hledger-1.52.1-linux-x64
+
       # The journal and report tests that call hledger skip themselves when it is not installed, which on a runner means
       # they never run: so the version their golden CSV was made with is installed here, from the release, checked
-      # against the sha256 GitHub publishes for it. A box that already has this version keeps it.
+      # against the sha256 GitHub publishes for it. A box that already has this version keeps it. The download goes
+      # through the API's asset route (asset 407746896 is 1.52.1's hledger-linux-x64.tar.gz), which keeps answering
+      # while github.com's release pages answer 504.
       - name: Install hledger
         env:
           HLEDGER_VERSION: "1.52.1"
+          HLEDGER_ASSET_ID: "407746896"
           HLEDGER_SHA256: 55bff5785d7528b939e4642a21d3c12a75a8095fedc973340b31dfd7367dd7a2
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$(uname -s)-$(uname -m)" != "Linux-x86_64" ]; then
             echo "::warning::hledger $HLEDGER_VERSION is installed for Linux x86_64 only; the hledger tests will skip here"
@@ -115,12 +126,16 @@ jobs:
             exit 0
           fi
           dir="$RUNNER_TEMP/hledger"
-          mkdir -p "$dir"
-          curl --fail --silent --show-error --location --retry 3 \
-            --output "$dir/hledger.tar.gz" \
-            "https://github.com/simonmichael/hledger/releases/download/$HLEDGER_VERSION/hledger-linux-x64.tar.gz"
-          echo "$HLEDGER_SHA256  $dir/hledger.tar.gz" | sha256sum --check -
-          tar -xzf "$dir/hledger.tar.gz" -C "$dir" hledger
+          cache="$HOME/.cache/hledger"
+          mkdir -p "$dir" "$cache"
+          if ! echo "$HLEDGER_SHA256  $cache/hledger.tar.gz" | sha256sum --check --status - 2>/dev/null; then
+            curl --fail --silent --show-error --location --retry 5 --retry-delay 10 --retry-all-errors \
+              --header "Authorization: Bearer $GH_TOKEN" --header "Accept: application/octet-stream" \
+              --output "$cache/hledger.tar.gz" \
+              "https://api.github.com/repos/hledgerorg/hledger/releases/assets/$HLEDGER_ASSET_ID"
+          fi
+          echo "$HLEDGER_SHA256  $cache/hledger.tar.gz" | sha256sum --check -
+          tar -xzf "$cache/hledger.tar.gz" -C "$dir" hledger
           echo "$dir" >> "$GITHUB_PATH"
           "$dir/hledger" --version
 
