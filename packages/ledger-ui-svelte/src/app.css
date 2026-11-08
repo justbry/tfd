@@ -18,6 +18,9 @@
 @source not "./lib/components/ui/table";
 @source not "./lib/components/ui/sheet";
 @source not "./app/AllSchools.svelte";
+/* The demo alert (the HTTP build only) has its own stylesheet in its own chunk. */
+@source not "./app/demo-banner";
+@source not "./lib/components/ui/alert";
 @source not "./app/SettingsSheet.svelte";
 /* So do Bookings and Members (their folders, the parts they share, and the dialog, field and label components only
    they draw). */

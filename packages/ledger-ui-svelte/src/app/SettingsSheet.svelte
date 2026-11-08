@@ -2,6 +2,7 @@
 	import "./settings-sheet.css";
 	import type { Theme } from "$contract/app/route.ts";
 	import * as Sheet from "$lib/components/ui/sheet/index.ts";
+	import DemoReadOnlyNote from "./DemoReadOnlyNote.svelte";
 	import Icon from "./Icon.svelte";
 	import type { IconName } from "./icons.ts";
 
@@ -14,6 +15,7 @@
 		top,
 		subtitle,
 		allSchools,
+		demo = false,
 		theme,
 		onThemeChange,
 	}: {
@@ -25,6 +27,8 @@
 		top: number;
 		subtitle: string;
 		allSchools: boolean;
+		/** A demo school refuses every write: the sheet says so where the school's own settings go. */
+		demo?: boolean;
 		theme: Theme;
 		onThemeChange: (theme: Theme) => void;
 	} = $props();
@@ -73,6 +77,9 @@
 				</button>
 			{/each}
 		</div>
+		{#if demo}
+			<p class="mt-4 mb-0" data-test="settings-demo"><DemoReadOnlyNote /></p>
+		{/if}
 		<div class="mt-4 flex items-start gap-1.5 text-muted-foreground" data-test="settings-note">
 			<Icon name="info" class="mt-px" />
 			{allSchools

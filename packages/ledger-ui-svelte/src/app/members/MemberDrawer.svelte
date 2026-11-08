@@ -6,6 +6,7 @@
 	import { Badge } from "$lib/components/ui/badge/index.ts";
 	import * as Sheet from "$lib/components/ui/sheet/index.ts";
 	import type { UiError } from "../../effect/ui-error.ts";
+	import DemoReadOnlyNote from "../DemoReadOnlyNote.svelte";
 	import LoadFailed from "../LoadFailed.svelte";
 	import { retryFor } from "../panes/retry-for.ts";
 	import { schoolMoney } from "../panes/money-text.ts";
@@ -172,6 +173,9 @@
 		<div class="mt-3 mb-2.5 flex flex-wrap items-start gap-1.5">
 			{#if member}
 				<DrawerButton icon="eye" label="View as member" reason="" locked={false} tone="primary" hook="drawer-action" action="view-as-member" onclick={() => onAction("view-as-member")} />
+				{#if context.readOnly}
+					<DemoReadOnlyNote />
+				{:else}
 				<DrawerButton
 					icon="mail"
 					label="Send invoice"
@@ -191,6 +195,7 @@
 					onclick={() => onAction("adjust")}
 				/>
 				<DrawerButton icon="undo" label="Refund" reason={capabilityReason(capabilities, "refund", "drawer")} {locked} hook="drawer-action" action="refund" onclick={() => onAction("refund")} />
+				{/if}
 			{:else}
 				<DrawerButton icon="eye" label="View as member" reason="No plan, so there is no member portal to view" locked={false} hook="drawer-action" action="view-as-member" onclick={() => onAction("view-as-member")} />
 			{/if}

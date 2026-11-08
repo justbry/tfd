@@ -42,10 +42,12 @@
 	const matches = (name: string): boolean =>
 		name.toLowerCase().includes(search.trim().toLowerCase());
 	const allShown = $derived(matches("All schools"));
-	const shownSchools = $derived(schools.filter((school) => matches(school.name)));
+	const ownSchools = $derived(schools.filter((school) => !school.demo && matches(school.name)));
+	const demoSchools = $derived(schools.filter((school) => school.demo && matches(school.name)));
 	const shownIds = $derived([
 		...(allShown ? [allSchools] : []),
-		...shownSchools.map((school) => school.id),
+		...ownSchools.map((school) => school.id),
+		...demoSchools.map((school) => school.id),
 	]);
 	const tabStop = $derived(shownIds.includes(current) ? current : shownIds[0]);
 
@@ -175,10 +177,30 @@
 					<span class="text-muted-foreground">{schools.length}</span>
 				</button>
 			{/if}
-			{#if allShown && shownSchools.length > 0}
+			{#if allShown && (ownSchools.length > 0 || demoSchools.length > 0)}
 				<hr class={popoverRule} aria-hidden="true" />
 			{/if}
-			{#each shownSchools as school (school.id)}
+			{#each ownSchools as school (school.id)}
+				{@render schoolRow(school)}
+			{/each}
+			{#if demoSchools.length > 0}
+				<div role="group" aria-label="Demo" data-test="demo-schools">
+					<div class="px-2 pt-1.5 pb-0.5 text-[10.5px] font-semibold tracking-[0.05em] text-muted-foreground uppercase" aria-hidden="true">Demo</div>
+					{#each demoSchools as school (school.id)}
+						{@render schoolRow(school)}
+					{/each}
+				</div>
+			{/if}
+		</div>
+		<div role="status" data-test="school-none">
+			{#if shownIds.length === 0}
+				<p class="m-0 px-2 py-1.5 text-muted-foreground">No school matches “{search.trim()}”</p>
+			{/if}
+		</div>
+	</Popover.Content>
+</Popover.Root>
+
+{#snippet schoolRow(school: School)}
 				<button
 					type="button"
 					role="option"
@@ -199,12 +221,4 @@
 						<Badge class={[mockBadge, badgeTones.warning]}>{school.attentionCount}</Badge>
 					{/if}
 				</button>
-			{/each}
-		</div>
-		<div role="status" data-test="school-none">
-			{#if shownIds.length === 0}
-				<p class="m-0 px-2 py-1.5 text-muted-foreground">No school matches “{search.trim()}”</p>
-			{/if}
-		</div>
-	</Popover.Content>
-</Popover.Root>
+{/snippet}

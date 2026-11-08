@@ -1,0 +1,7 @@
+/* The demo alert's utilities, loaded with its chunk (see app/promos/promos.css): the first page load of the fixture
+   build and of a signed-in visit never fetch it. Theme and utilities only, the base styles and the tokens are app.css's. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../../tailwind-shared.css";
+@source "./";
+@source "../../lib/components/ui/alert";

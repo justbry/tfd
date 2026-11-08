@@ -20,6 +20,13 @@
  *    pane stylesheet): for each pane view and the popover, menu, drawer and dialog states the shots cover, the computed
  *    style of every element outside the shell's chrome is the same in both builds. The deduplicated stylesheets may
  *    not change how a pane looks.
+ * 5. The demo alert (S9.7a), in the HTTP build (`--http <origin>`, built with VITE_LEDGER_SOURCE=http, and
+ *    `--http-reference <origin>`, the same build with LEDGER_SINGLE_SHEET=1): the Worker and buzz-school are answered by
+ *    the browser's own request interception, so no network is needed. Signed out (open, folded) and with no school
+ *    (open), light and dark, at 1100, 728 and 390 px: the alert is pinned 12px from the top right, inside the viewport,
+ *    framed 2px solid in the warning colour, no wider than 380px, above the settings sheet's layer and below the toasts';
+ *    and the computed style of the alert and of the shell's bars is the same in both builds (the alert's own
+ *    stylesheet loads after app.css, as a pane's does).
  */
 
 import { createRequire } from "node:module";
@@ -35,6 +42,17 @@ type Page = {
 	waitForSelector(selector: string): Promise<unknown>;
 	waitForTimeout(milliseconds: number): Promise<void>;
 	click(selector: string): Promise<void>;
+	route(
+		url: RegExp,
+		handler: (route: {
+			request(): { method(): string; url(): string };
+			fulfill(options: {
+				status: number;
+				headers?: Record<string, string>;
+				body?: string;
+			}): Promise<void>;
+		}) => Promise<void> | void,
+	): Promise<unknown>;
 	keyboard: { press(key: string): Promise<void> };
 	mouse: { move(x: number, y: number): Promise<unknown> };
 	evaluate<Result, Argument>(
@@ -59,6 +77,8 @@ const argumentOf = (name: string, fallback: string): string => {
 };
 const origin = argumentOf("--app", "http://localhost:5399");
 const reference = argumentOf("--reference", "");
+const httpBuild = argumentOf("--http", "");
+const httpReference = argumentOf("--http-reference", "");
 const executablePath = join(
 	homedir(),
 	"Library/Caches/ms-playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-arm64/chrome-headless-shell",
@@ -636,6 +656,239 @@ if (reference)
 					}
 				}
 			}
+// 5. The demo alert, in the HTTP build.
+const demoSchoolId = "demo-monthly-members";
+const demoRow = {
+	id: demoSchoolId,
+	asOf: "2026-11-05T12:00:00Z",
+	lagMinutes: 3,
+	stale: false,
+	demo: true,
+	name: "Demo · Monthly members",
+	timeZone: "America/Denver",
+	currency: "USD",
+	creditUnit: { one: "class", other: "classes" },
+};
+type Visitor = "signed_out" | "no_school";
+/** A page of the HTTP build whose backends answer as `visitor`: the ledger token is refused (401, or 404 for an account
+ * with no school), the Worker lists the demo school to a request with no bearer, and every other read is a 404. */
+const openHttp = async (
+	base: string,
+	width: number,
+	route: string,
+	visitor: Visitor,
+): Promise<Page> => {
+	const page = await open(width);
+	const allowed = {
+		"access-control-allow-origin": base,
+		"access-control-allow-credentials": "true",
+		"access-control-allow-headers":
+			"content-type, authorization, idempotency-key",
+		"access-control-allow-methods": "GET, POST, PUT, OPTIONS",
+	};
+	const json = (status: number, body: unknown) => ({
+		status,
+		headers: { ...allowed, "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+	await page.route(
+		/^https?:\/\/[^/]+\/(v1\/|school-admin\/)/,
+		async (intercepted) => {
+			const { pathname } = new URL(intercepted.request().url());
+			if (intercepted.request().method() === "OPTIONS")
+				return intercepted.fulfill({ status: 204, headers: allowed });
+			if (pathname === "/school-admin/ledger-token")
+				return intercepted.fulfill(
+					visitor === "signed_out"
+						? json(401, { error: "unauthenticated" })
+						: json(404, { error: "not_found" }),
+				);
+			if (pathname === "/v1/schools")
+				return intercepted.fulfill(
+					json(200, {
+						asOf: null,
+						lagMinutes: null,
+						data: { schools: [demoRow] },
+					}),
+				);
+			return intercepted.fulfill(
+				json(404, { error: { code: "no_data", message: "none" } }),
+			);
+		},
+	);
+	await page.goto(`${base}/${route}`);
+	await page.waitForFunction(
+		(hash: string) => document.getElementById("app")?.dataset.route === hash,
+		route,
+	);
+	await page.waitForSelector("[data-test=demo-banner]");
+	await page.waitForTimeout(300);
+	return page;
+};
+const alertStates: Array<{
+	name: string;
+	visitor: Visitor;
+	act?: (page: Page) => Promise<void>;
+	folded: boolean;
+}> = [
+	{ name: "signed out, open", visitor: "signed_out", folded: false },
+	{
+		name: "signed out, folded to the pill",
+		visitor: "signed_out",
+		folded: true,
+		act: async (page) => {
+			await page.click(
+				"[data-test=demo-banner] button[aria-label='Fold the demo alert']",
+			);
+			await page.waitForSelector("[data-test=demo-banner-folded]");
+			await page.mouse.move(1, 899);
+			await page.evaluate(() =>
+				(document.activeElement as HTMLElement | null)?.blur(),
+			);
+		},
+	},
+	{ name: "no school, open", visitor: "no_school", folded: false },
+];
+const alertSelectors = [
+	"[data-test=demo-banner]",
+	"[data-test=demo-banner-folded]",
+	...audited.filter((selector) => selector !== "[data-test=toasts]"),
+];
+type Geometry = {
+	position: string;
+	top: number;
+	rightGap: number;
+	width: number;
+	viewport: number;
+	border: string;
+	warning: string;
+	zIndex: string;
+	role: string | null;
+	label: string | null;
+	text: string;
+};
+const geometry = (page: Page, folded: boolean): Promise<Geometry | null> =>
+	page.evaluate((isFolded: boolean) => {
+		const element = document.querySelector<HTMLElement>(
+			isFolded ? "[data-test=demo-banner-folded]" : "[data-test=demo-banner]",
+		);
+		if (!element) return null;
+		const probe = document.createElement("i");
+		probe.style.color = "var(--warning)";
+		document.body.appendChild(probe);
+		const warning = getComputedStyle(probe).color;
+		probe.remove();
+		const style = getComputedStyle(element);
+		const rect = element.getBoundingClientRect();
+		return {
+			position: style.position,
+			top: rect.top,
+			rightGap: window.innerWidth - rect.right,
+			width: rect.width,
+			viewport: window.innerWidth,
+			border: `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`,
+			warning,
+			zIndex: style.zIndex,
+			role: element.getAttribute("role"),
+			label: element.getAttribute("aria-label"),
+			text: element.textContent?.replace(/\s+/g, " ").trim() ?? "",
+		};
+	}, folded);
+if (httpBuild)
+	for (const theme of themes)
+		for (const width of widths)
+			for (const state of alertStates) {
+				const route = `#/${demoSchoolId}/plans?theme=${theme}`;
+				const where = `demo alert, ${state.name}, ${theme} ${width}px`;
+				const page = await openHttp(httpBuild, width, route, state.visitor);
+				await state.act?.(page);
+				await page.waitForTimeout(400);
+				const found = await geometry(page, state.folded);
+				if (!found) problems.push(`${where}: the alert is not on the page`);
+				else {
+					if (found.position !== "fixed")
+						problems.push(`${where}: position ${found.position}, not fixed`);
+					if (
+						Math.abs(found.top - 12) > 0.5 ||
+						Math.abs(found.rightGap - 12) > 0.5
+					)
+						problems.push(
+							`${where}: ${found.top}px from the top and ${found.rightGap}px from the right, not 12px`,
+						);
+					if (found.rightGap < 0 || found.width > found.viewport - 24 + 0.5)
+						problems.push(
+							`${where}: ${found.width}px wide leaves the ${found.viewport}px page`,
+						);
+					if (found.border !== `2px solid ${found.warning}`)
+						problems.push(
+							`${where}: border ${found.border}, not 2px solid ${found.warning}`,
+						);
+					if (!state.folded && found.width > 380.5)
+						problems.push(`${where}: ${found.width}px wide, over 380px`);
+					if (!(Number(found.zIndex) > 80 && Number(found.zIndex) < 95))
+						problems.push(
+							`${where}: z-index ${found.zIndex}, not above the settings sheet (80) and below the toasts (95)`,
+						);
+					if (
+						!state.folded &&
+						(found.role !== "alert" || found.label !== "Demo data")
+					)
+						problems.push(`${where}: role ${found.role}, label ${found.label}`);
+					if (state.folded && found.text !== "Demo data · Sign in")
+						problems.push(`${where}: the pill says "${found.text}"`);
+					if (
+						!state.folded &&
+						state.visitor === "signed_out" &&
+						!found.text.includes("I have signed in")
+					)
+						problems.push(`${where}: no "I have signed in" button`);
+				}
+				if (httpReference) {
+					const deduped = await snapshot(page, alertSelectors);
+					const whole = await openHttp(
+						httpReference,
+						width,
+						route,
+						state.visitor,
+					);
+					await state.act?.(whole);
+					await whole.waitForTimeout(400);
+					const expected = await snapshot(whole, alertSelectors);
+					await whole.close();
+					const keys = Object.keys(expected);
+					if (keys.length !== Object.keys(deduped).length)
+						problems.push(
+							`${where}: ${Object.keys(deduped).length} elements, ${keys.length} in the reference build`,
+						);
+					else {
+						if (keys.length < 12)
+							problems.push(`${where}: only ${keys.length} elements compared`);
+						let reported = 0;
+						for (const key of keys) {
+							// Custom properties are the theme's: the reference sheet declares the ones its utilities use on every
+							// element, the deduplicated one only where app.css does. What they style is what is compared.
+							const changed = Object.keys(expected[key] ?? {}).filter(
+								(property) =>
+									!property.startsWith("--") &&
+									expected[key]?.[property] !== deduped[key]?.[property],
+							);
+							if (changed.length > 0 && reported < 3) {
+								reported += 1;
+								problems.push(
+									`${where}: ${key} differs from the reference build: ${changed
+										.slice(0, 4)
+										.map(
+											(property) =>
+												`${property} ${expected[key]?.[property]} (reference) -> ${deduped[key]?.[property]}`,
+										)
+										.join("; ")}`,
+								);
+							}
+						}
+					}
+				}
+				await page.close();
+			}
 await browser.close();
 if (problems.length > 0) {
 	process.stdout.write(
@@ -644,5 +897,5 @@ if (problems.length > 0) {
 	process.exit(1);
 }
 process.stdout.write(
-	`computed styles hold: tabs (every tab, light and dark, 3 widths), the shell after the panes' CSS loads, the chosen period rows${reference ? ", and every pane state against the reference build" : ""}\n`,
+	`computed styles hold: tabs (every tab, light and dark, 3 widths), the shell after the panes' CSS loads, the chosen period rows${reference ? ", and every pane state against the reference build" : ""}${httpBuild ? ", and the demo alert (signed out open and folded, no school) in the HTTP build" : ""}\n`,
 );
