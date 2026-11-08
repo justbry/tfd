@@ -17,6 +17,7 @@ supabase.sh
 **/.next/
 **/.vercel/
 **/.turbo/
+**/.wrangler/
 **/.DS_Store
 **/.env*
 tests/
@@ -26,6 +27,7 @@ tests/
 !packages/cache/tests
 !packages/ledger-worker/tests
 !apps/trifold-cloud/tests
+!apps/trifold-apex/tests
 !packages/encryption/tests
 !packages/sqs/tests
 !packages/catalog-lru/tests
@@ -218,4 +220,3 @@ server/experiments/*/out/
 
 # readable stage snapshots of scenario bundles: `atm scenario check --snapshots` writes them, only to print a diff
 packages/atm/fixtures/scenarios/*/stages/
-**/.wrangler/

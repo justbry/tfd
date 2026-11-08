@@ -1,0 +1,10 @@
+{
+	"//": "src alone, with web-platform types only (no bun, no node): a src file that reaches for Buffer or node: does not compile.",
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"lib": ["ES2022", "DOM"],
+		"types": [],
+		"rootDir": "src"
+	},
+	"include": ["src/**/*.ts"]
+}

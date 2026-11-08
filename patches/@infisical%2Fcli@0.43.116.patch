@@ -1,0 +1,17 @@
+diff --git a/src/index.cjs b/src/index.cjs
+index 57c0cf56a073bcb6e5ed4e3d8efb443155777810..72c47e51dad9dfe7928b308f337d6c69c0bc34ad 100644
+--- a/src/index.cjs
++++ b/src/index.cjs
+@@ -169,6 +169,12 @@ async function main() {
+       fs.chmodSync(path.join(outputDir, "infisical"), "755");
+     }
+   } catch (error) {
++    // Patched (tfd): CI never runs the infisical binary, so a failed download (GitHub's release CDN answering 504)
++    // must not fail `bun install` there. Local installs still fail loudly, because the pre-commit scan needs it.
++    if (process.env.CI) {
++      console.warn("Infisical CLI download failed; continuing because CI is set:", error.message);
++      process.exit(0);
++    }
+     console.error("Error downloading or extracting Infisical CLI:", error);
+     process.exit(1);
+   }

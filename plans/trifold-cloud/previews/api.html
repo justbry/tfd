@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090F;--raised:#0E1424;--fg:#E9ECF4;--muted:#9AA3B8;--dim:#4A5268;--line:#FFFFFF14;--proof:#5BE3A1;--seal:#F2B447;--ember:#FF9B54;--alert:#E07A5F}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif}
+.win{border-radius:14px;overflow:hidden;border:1px solid #2a3145;background:var(--bg);color:var(--fg)}
+.chrome{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#141a2b;border-bottom:1px solid #222a3e}
+.dots i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:#3a4258}
+.url{flex:1;font:12px "JetBrains Mono",monospace;color:#c9cfdd;background:#0b1020;border-radius:7px;padding:5px 10px}
+.url b{color:var(--fg);font-weight:500}.lock{color:var(--proof)}
+.mono{font-family:"JetBrains Mono",monospace}.lbl{font:11px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.disp{font-family:Fraunces,serif;font-weight:300}
+.btn{display:inline-block;background:var(--seal);color:#16203a;font-weight:600;font-size:13px;border-radius:9px;padding:8px 14px}
+.ghost{display:inline-block;border:1px solid #2a3145;color:var(--fg);font-size:13px;border-radius:9px;padding:7px 13px}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:14px}
+.ok{color:var(--proof)}.tnum{font-variant-numeric:tabular-nums}
+.stage{background:var(--ember);color:#16203a;font:600 10px "JetBrains Mono",monospace;letter-spacing:.1em;padding:3px 7px;border-radius:5px}
+</style></head><body>
+<div class="win">
+ <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><div class="url"><span class="lock">🔒</span> <b>api.trifold.app</b>/</div></div>
+ <div style="display:grid;grid-template-columns:1fr 1.15fr">
+  <div style="padding:24px 26px;border-right:1px solid var(--line)">
+   <div class="lbl">Trifold API · v1</div>
+   <div class="disp" style="font-size:28px;margin:6px 0 10px">Read your books as JSON</div>
+   <p style="color:var(--muted);font-size:13px;line-height:1.55">Events, receipts and seals for every organization your key can see. Read-only. Keys are made in <span class="mono">ledger.trifold.app → API keys</span>, scoped per org, shown once.</p>
+   <div style="display:grid;gap:6px;font-size:12.5px;margin:16px 0" class="mono">
+    <div><span class="ok">GET</span> /v1/orgs</div>
+    <div><span class="ok">GET</span> /v1/orgs/{slug}/ledger?from=&amp;to=</div>
+    <div><span class="ok">GET</span> /v1/orgs/{slug}/receipts/{event_id}</div>
+    <div><span class="ok">GET</span> /v1/orgs/{slug}/seals/{YYYY-MM}</div>
+    <div><span class="ok">GET</span> /v1/orgs/{slug}/reports/income?month=</div>
+    <div><span style="color:var(--seal)">POST</span> /webhooks/stripe <span style="color:var(--dim)">· Stripe only</span></div>
+   </div>
+   <span class="btn">Docs: trifold.app/docs/api</span> <span class="ghost">openapi.json</span>
+  </div>
+  <div style="padding:20px 22px;background:#0a0e19">
+   <div class="lbl" style="margin-bottom:8px">Request</div>
+<pre class="mono" style="margin:0 0 14px;font-size:12px;line-height:1.6;color:#c9cfdd;white-space:pre-wrap">curl https://api.trifold.app/v1/orgs/juniper-school/receipts/01JBX7Q2M4 \
+  -H "Authorization: Bearer tf_live_••••••••3k9a"</pre>
+   <div class="lbl" style="margin-bottom:8px">Response <span class="ok">200</span></div>
+<pre class="mono" style="margin:0;font-size:12px;line-height:1.6;color:#c9cfdd">{
+  <span style="color:var(--muted)">"receipt"</span>: {
+    "v": 2, "school": "org_01JB8Z4K2M9X",
+    "key": "customer:3be1…c90d",
+    "event_id": "01JBX7Q2M4…",
+    "event_type": "payment.succeeded",
+    "event_time": "2026-10-31T16:02:11Z",
+    "date": "2026-10-31",
+    "amount": <span style="color:var(--seal)">64000</span>, "currency": "usd",
+    "stripe_id": "pi_3Q…",
+    "cause": "01JBX7Q1ZK…",
+    "event_hash": "9f3c…a1e0",
+    "issued_at": "2026-10-31T16:02:40Z"
+  },
+  <span style="color:var(--muted)">"key_id"</span>: "trifold-2026-10",
+  <span style="color:var(--muted)">"sig"</span>: "kQ3v…Yw",
+  <span style="color:var(--muted)">"verify_url"</span>: <span class="ok">"https://verify.trifold.app/#r=eyJ…"</span>
+}</pre>
+  </div>
+ </div>
+ <div style="display:flex;gap:18px;padding:10px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)" class="mono"><span>401 token_invalid</span><span>403 finance_required</span><span>404 not_found</span><span>429 rate_limited · Retry-After</span><span style="margin-left:auto">status: <span class="ok">ok</span></span></div>
+</div>
+</body></html>
