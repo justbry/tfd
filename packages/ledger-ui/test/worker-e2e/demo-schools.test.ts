@@ -145,6 +145,35 @@ describe.skipIf(skip)("demo schools on the real Worker", () => {
 		}
 	});
 
+	test("signed out, the first view is a demo school's Dashboard, and no tab of it is an empty pane", async () => {
+		const app = await mounted([], "#/", { signedOut: true });
+		try {
+			await app.shown(`#/${demos[0]}/dashboard`);
+			for (const tab of ["plans", "members", "bookings", "promos"]) {
+				app.root.removeAttribute("data-route");
+				window.location.hash = `#/${demos[0]}/${tab}`;
+				window.dispatchEvent(new HashChangeEvent("hashchange"));
+				await app.shown(`#/${demos[0]}/${tab}`);
+				expect({
+					tab,
+					note: app.root.querySelector("[data-test=demo-tab-note]") !== null,
+				}).toEqual({ tab, note: true });
+			}
+			for (const tab of ["ledger", "reports"]) {
+				app.root.removeAttribute("data-route");
+				window.location.hash = `#/${demos[0]}/${tab}`;
+				window.dispatchEvent(new HashChangeEvent("hashchange"));
+				await app.shown(`#/${demos[0]}/${tab}`);
+				const pane = app.root.querySelector("[data-test=pane]");
+				expect({ tab, empty: (pane?.textContent ?? "").trim() === "" }).toEqual(
+					{ tab, empty: false },
+				);
+			}
+		} finally {
+			app.close();
+		}
+	});
+
 	test("signed out, the Ledger of a demo school lists rows named from the Worker's keys", async () => {
 		const app = await mounted([], "#/demo-monthly-members/ledger", {
 			signedOut: true,

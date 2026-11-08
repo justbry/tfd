@@ -358,7 +358,13 @@ export function Promos({
 		if (loaded || status.failed) onRendered();
 	});
 	if (status.failed)
-		return <LoadFailed what="the promos" onRetry={status.retry} />;
+		return (
+			<LoadFailed
+				what="the promos"
+				error={status.error}
+				onRetry={status.retry}
+			/>
+		);
 	if (!loaded) return null;
 
 	const { promos, currency, unit } = loaded;

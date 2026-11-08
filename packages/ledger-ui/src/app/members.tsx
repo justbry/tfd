@@ -29,6 +29,7 @@ import {
 import { saveFile } from "./download.ts";
 import { saveCsv } from "./download-button.tsx";
 import { Icon } from "./icon.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import { LockPanel } from "./lock-panel.tsx";
 import { type BookingAction, MemberDrawer } from "./member-drawer.tsx";
 import {
@@ -80,7 +81,7 @@ import { formatMoney } from "./money.ts";
 import type { PaneProps } from "./panes.tsx";
 import { monthAndDay, type Period, periodName } from "./period.ts";
 import { type Route, withQuery } from "./route.ts";
-import { keepLoading } from "./use-loaded.ts";
+import { keepLoading, useReadFailure } from "./use-loaded.ts";
 import { useViewedPeriod, useViewing } from "./viewing.ts";
 
 /** The status chips: `show=attention|canceled` (absent: all). */
@@ -1050,8 +1051,13 @@ export function Members({
 	);
 	const key = `${school.id}/${period.from}/${period.to}`;
 	const [loaded, setLoaded] = useState<Loaded | null>(null);
+	const read = useReadFailure(key);
+	const { failFor, attempt } = read;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		let current = true;
+		const failed = failFor(key);
 		const load = async (): Promise<void> => {
 			const query = { schoolId: school.id };
 			const [
@@ -1083,12 +1089,20 @@ export function Members({
 					switchTiers,
 				});
 		};
-		load().catch(keepLoading);
+		load().catch((error: unknown) => {
+			if (current) failed(error);
+		});
 		return () => {
 			current = false;
 		};
-	}, [reader, school.id, period.from, period.to, key]);
-	if (loaded?.key !== key) return null;
+	}, [reader, school.id, period.from, period.to, key, failFor, attempt]);
+	useLayoutEffect(() => {
+		if (read.failed) onRendered();
+	});
+	if (loaded?.key !== key)
+		return read.failed ? (
+			<LoadFailed what="the members" error={read.error} onRetry={read.retry} />
+		) : null;
 	return (
 		<Roster
 			loaded={loaded}

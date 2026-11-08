@@ -11,6 +11,9 @@ import {
 import type { Change } from "./portal-format.ts";
 import type { SchoolTab } from "./route.ts";
 
+/** The note a demo school shows on a tab it has no data for (`shell.tsx`). */
+export { DemoTabNote } from "./demo-note.tsx";
+
 /** Everything a pane may be given; each takes the props it names. */
 export type PaneProps = BooksPaneProps & {
 	/** Plans: the school's draft kept by the shell, and where a changed one goes. */

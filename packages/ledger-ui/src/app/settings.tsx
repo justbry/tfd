@@ -17,6 +17,7 @@ import {
 import type { School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
 import { Icon, type IconName } from "./icon.tsx";
+import { LoadFailed } from "./load-failed.tsx";
 import { LockPanel } from "./lock-panel.tsx";
 import { formatMoney } from "./money.ts";
 import { monthAndDay } from "./period.ts";
@@ -29,7 +30,7 @@ import {
 	saveFailed,
 	useDialogChain,
 } from "./settings-shared.tsx";
-import { keepLoading } from "./use-loaded.ts";
+import { useReadFailure } from "./use-loaded.ts";
 import { exitPreviewTitle, type Viewing } from "./viewing.ts";
 
 /** The school's money without decimals, as the mockup's `kusd0` writes it; minor units in. */
@@ -911,16 +912,33 @@ export function SchoolSettings({
 	onModal: (modal: ComponentChildren) => void;
 }): JSX.Element | null {
 	const [settings, setSettings] = useState<SettingsData | null>(null);
+	const read = useReadFailure(school.id);
+	const { failFor, attempt } = read;
 	useEffect(() => {
+		// `attempt` is the Try again counter: each press reads again.
+		void attempt;
 		let current = true;
-		reader.settings(school.id).then((loaded) => {
-			if (current) setSettings(loaded);
-		}, keepLoading);
+		const failed = failFor(school.id);
+		reader.settings(school.id).then(
+			(loaded) => {
+				if (current) setSettings(loaded);
+			},
+			(error: unknown) => {
+				if (current) failed(error);
+			},
+		);
 		return () => {
 			current = false;
 		};
-	}, [reader, school.id]);
-	if (!settings) return null;
+	}, [reader, school.id, failFor, attempt]);
+	if (!settings)
+		return read.failed ? (
+			<LoadFailed
+				what="the school's settings"
+				error={read.error}
+				onRetry={read.retry}
+			/>
+		) : null;
 	const own = viewing.option.value === "owner";
 	const section: Section = {
 		school,
