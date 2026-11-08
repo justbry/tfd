@@ -765,6 +765,7 @@ function Rules({
 	/** Null where no source has the rules (D11). */
 	rules: SchoolRules | null;
 	unit: CreditUnit;
+	/** An admin of a real school; a demo school is read-only, so it has no way to an edit. */
 	canEdit: boolean;
 	onEdit: () => void;
 }): JSX.Element {
@@ -985,7 +986,7 @@ export function Reports({
 				<Rules
 					rules={rules.rules}
 					unit={rules.unit ?? school.creditUnit}
-					canEdit={admin}
+					canEdit={admin && !school.demo}
 					onEdit={() => onToast("Opening school settings in buzz-school…")}
 				/>
 			</div>

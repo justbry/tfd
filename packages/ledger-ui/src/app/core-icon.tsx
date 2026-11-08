@@ -1,7 +1,8 @@
 import type { JSX } from "preact";
 
-/** The mockup's stroke icons (its `IC` table) that the first page load draws: the top bar, the tabs and the drawer.
- * The rest are in `icon.tsx`, which only the panes loaded on demand import, so they stay out of the first load. */
+/** The mockup's stroke icons (its `IC` table) that the first page load draws: the top bar, the tabs, the drawer and a
+ * failed read's note (`load-failed.tsx`). The rest are in `icon.tsx`, which only the panes loaded on demand import,
+ * so they stay out of the first load. */
 export const coreShapes = {
 	alert: <path d="M12 4l9 16H3L12 4zM12 10v4M12 17h.01" />,
 	building: (
@@ -31,6 +32,12 @@ export const coreShapes = {
 		<>
 			<circle cx="12" cy="12" r="9" />
 			<path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01" />
+		</>
+	),
+	info: (
+		<>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 11v5M12 8h.01" />
 		</>
 	),
 	layers: (
