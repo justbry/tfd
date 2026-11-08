@@ -1,0 +1,25 @@
+# Contributing
+
+Work goes on a feature branch with a pull request against `dev`; nothing is pushed to `main`. The rules for names, licensing and claims are in `AGENTS.md`; code style is in `.claude/CLAUDE.md`.
+
+## Contributor License Agreement
+
+Every outside contribution needs a signed **Contributor License Agreement (CLA)** first. Owner's decision, 2026-11-07: a CLA rather than DCO.
+
+**What it grants.** Contributors keep their copyright and give Trifold a license; nothing is assigned. That license is:
+- perpetual, worldwide and irrevocable, covering copyright and patents;
+- broad enough that Trifold may release the contribution under any license, including FSL-1.1-ALv2, Apache-2.0 and proprietary terms.
+
+**Why a CLA.** This repository mixes FSL, Apache-2.0, CC0 and proprietary code (`LICENSING.md`), and code moves between them. For example, a spec file moves from FSL to Apache-2.0, or engine code moves into the proprietary hosted service. A DCO only certifies that you may contribute under the file's current license, so contributed code could never move. A CLA keeps that possible.
+
+**The text.** There are two forms:
+- an individual CLA;
+- a corporate CLA, for contributors whose employer owns their work.
+
+Both will be adapted from the Apache Software Foundation's ICLA and CCLA, the base most company CLAs use. A bot will collect signatures on pull requests.
+
+**Until the text is published,** outside contributions can't be accepted. Open an issue instead. A lawyer reviews the text before it's used, once the legal entity exists (the licensor is "Trifold" until then).
+
+## Trademarks
+
+A fork must rename itself. What you may say about Trifold, tfd and Rifo is in `TRADEMARKS.md`.

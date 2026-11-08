@@ -278,4 +278,4 @@ Decided by the owner on 2026-11-06.
 
 **Why.** "Anyone can check, forever" needs checking (verifier, format, vectors) to be unrestrictable. The engine is protected from a hosted clone, but each release becomes fully open after two years, so even if Trifold disappears, the code becomes Apache-2.0.
 
-**Open items:** the licensor's legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (decide before the accountant partner program); contributor terms (DCO or CLA) before accepting outside contributions; whether the event envelope schema should also be Apache-2.0 so other ledgers can adopt the full standard.
+**Open items:** the licensor's legal entity name (the LICENSE says "Trifold" until a company is formed); whether accounting firms hosting tfd for many clients need a grant beyond FSL's professional-services clause (decide before the accountant partner program); contributor terms are decided (a CLA, 2026-11-07, `CONTRIBUTING.md`); whether the event envelope schema should also be Apache-2.0 so other ledgers can adopt the full standard.

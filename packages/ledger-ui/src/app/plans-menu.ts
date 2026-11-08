@@ -133,13 +133,14 @@ export function stripeFactsOf(
 	};
 }
 
-/** A school with no menu version yet starts from its currency, time zone and the features plans can grant. */
+/** A school with no menu version yet starts from its currency, time zone and the features plans can grant. A school
+ * with no currency either (no Stripe account, `School.currency` null) starts with an empty one: its money reads "—". */
 export const emptyMenu = (
-	currency: string,
+	currency: string | null,
 	timeZone: string,
 	features: MenuFeature[],
 ): Menu => ({
-	currency: currency.toLowerCase(),
+	currency: currency?.toLowerCase() ?? "",
 	timeZone,
 	features,
 	tiers: [],

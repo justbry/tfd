@@ -34,7 +34,7 @@ import { exitPreviewTitle, type Viewing } from "./viewing.ts";
 
 /** The school's money without decimals, as the mockup's `kusd0` writes it; minor units in. */
 const moneyOf =
-	(currency: string) =>
+	(currency: string | null) =>
 	(minorUnits: number): string =>
 		formatMoney(minorUnits, currency, true);
 

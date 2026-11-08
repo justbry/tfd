@@ -399,8 +399,11 @@ export function Shell({
 					data-test="stale-banner"
 					inert={settingsOpen || portalShown}
 				>
-					<CoreIcon name="alert" /> Data is {school.lagMinutes} min behind: the
-					shipper may be stuck. Recent events can be missing.
+					<CoreIcon name="alert" />{" "}
+					{school.lagMinutes === null
+						? "No ledger data has shipped yet"
+						: `Data is ${school.lagMinutes} min behind`}
+					: the shipper may be stuck. Recent events can be missing.
 				</div>
 			)}
 			<section

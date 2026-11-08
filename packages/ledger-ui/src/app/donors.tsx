@@ -16,7 +16,7 @@ import {
 import { DownloadButton } from "./download-button.tsx";
 import { Icon } from "./icon.tsx";
 import { LockPanel } from "./lock-panel.tsx";
-import { formatMoney } from "./money.ts";
+import { csvCurrency, formatMoney } from "./money.ts";
 import { monthAndDay } from "./period.ts";
 import { Figure } from "./report-figure.tsx";
 
@@ -41,7 +41,7 @@ function DonorTable({
 }: {
 	report: Extract<DonorsReport, { kind: "identified" }>;
 	audience: ViewerAudience;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	const shown = report.rows.slice(0, topDonors);
 	return (
@@ -119,7 +119,7 @@ function DonorSpread({
 	currency,
 }: {
 	report: Extract<DonorsReport, { kind: "spread" }>;
-	currency: string;
+	currency: string | null;
 }): JSX.Element {
 	const { donors, buckets, medianCents } = report;
 	const year = report.through.slice(0, 4);
@@ -211,7 +211,7 @@ export function Donors({
 }: {
 	report: DonorsReport;
 	audience: ViewerAudience;
-	currency: string;
+	currency: string | null;
 	today: string;
 	writer: BooksPaneProps["writer"];
 	onToast: (text: string) => void;
@@ -266,7 +266,7 @@ export function Donors({
 						title="Download donors and payers as CSV"
 						label="Download CSV"
 						name={csvFileNames.donors(today)}
-						columns={donorsColumns(currency)}
+						columns={donorsColumns(csvCurrency(currency))}
 						rows={report.rows}
 					/>
 				</span>
