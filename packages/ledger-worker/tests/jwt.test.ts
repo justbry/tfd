@@ -321,7 +321,7 @@ describe("JwksCache", () => {
 		]);
 	});
 
-	test("concurrent callers share one fetch", async () => {
+	test("concurrent callers each fetch for themselves, and the keys stay cached once one is done", async () => {
 		const signer = await testSigner(1);
 		let fetched = 0;
 		const cache = new JwksCache("https://jwks.test", async () => {
@@ -330,6 +330,23 @@ describe("JwksCache", () => {
 			return response([signer.jwk]);
 		});
 		await Promise.all([cache.current(0), cache.current(0), cache.current(0)]);
-		expect(fetched).toBe(1);
+		expect(fetched).toBe(3);
+		await cache.current(1);
+		expect(fetched).toBe(3);
+	});
+
+	test("a fetch that never finishes holds nothing up for the next caller", async () => {
+		const signer = await testSigner(1);
+		let fetched = 0;
+		const cache = new JwksCache("https://jwks.test", () => {
+			fetched += 1;
+			return fetched === 1
+				? new Promise<Response>(() => undefined)
+				: Promise.resolve(response([signer.jwk]));
+		});
+		cache.current(0).catch(() => undefined);
+		const keys = await cache.current(0);
+		expect(keys.keys).toHaveLength(1);
+		expect(fetched).toBe(2);
 	});
 });
