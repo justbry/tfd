@@ -18,6 +18,19 @@ The site workflow always runs its checks. It deploys only when both Cloudflare s
 otherwise, so a missing secret never fails a run. A pull request from a fork gets no secrets, so it is checked but not
 previewed.
 
+Each previewed pull request gets one comment from the workflow with two links, edited on every push: the branch alias
+(`<branch>.tfd-ledger.pages.dev`, always the newest deploy of that branch) and the commit's own deploy
+(`<id>.tfd-ledger.pages.dev`). Every run also writes the links to its job summary.
+
+### Who can open a preview
+
+A preview is public: anyone with the link can open it, and branch aliases are guessable. Fine for the marketing site;
+not for a branch carrying anything confidential. To restrict previews, turn on Cloudflare Access for them: dashboard,
+**Workers & Pages > tfd-ledger > Settings > General > Access policy > Enable**. That puts every preview
+(`*.tfd-ledger.pages.dev`) behind a Cloudflare login; production (`tfd-ledger.pages.dev`) stays public. The policy it
+creates allows only the account's own email; add others under **Zero Trust > Access > Applications**. Free up to 50
+users.
+
 ## One-time Cloudflare setup
 
 Two tokens, each with only what its workflow needs: a Pages token for the repository, and a Workers token that only the
@@ -58,7 +71,7 @@ b4uni.com. The token in `~/.config/b4uni/cloudflare.env` has no Workers access, 
 
 ```sh
 # Repository secrets: the website workflow.
-gh secret set CLOUDFLARE_ACCOUNT_ID -R justbry/tfd --body '<account id>'
+gh secret set CLOUDFLARE_ACCOUNT_ID -R justbry/tfd --body '<account id>'   # set 2026-11-08
 gh secret set CLOUDFLARE_API_TOKEN -R justbry/tfd          # paste the Pages token at the prompt
 
 # The staging environment, with you as the required reviewer, and its own Workers token.

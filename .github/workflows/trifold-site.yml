@@ -34,8 +34,10 @@ on:
       - ".github/workflows/trifold-site.yml"
   workflow_dispatch:
 
+# pull-requests: write is only for the preview-link comment.
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: trifold-site-${{ github.ref }}
@@ -92,6 +94,7 @@ jobs:
         run: echo "::warning::Not deployed, CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID is not set (see docs/ci-and-deploy.md)"
 
       - name: Deploy
+        id: deploy
         if: env.CAN_DEPLOY == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
@@ -99,3 +102,43 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/trifold-site
           command: pages deploy build --project-name tfd-ledger --branch ${{ env.PAGES_BRANCH }} --commit-hash ${{ github.sha }} --commit-dirty=true
+
+      - name: Summary
+        if: env.CAN_DEPLOY == 'true'
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+        run: |
+          {
+            echo "### Trifold site: ${{ github.event_name == 'pull_request' && 'preview' || 'production' }}"
+            echo
+            echo "- Branch: ${ALIAS_URL:-none}"
+            echo "- This deploy: $DEPLOYMENT_URL"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per pull request, found by its marker and edited on each push, so the links stay current.
+      - name: Comment the preview links
+        if: env.CAN_DEPLOY == 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+        run: |
+          marker='<!-- trifold-site-preview -->'
+          body="$marker
+          **Site preview**
+
+          | | |
+          |---|---|
+          | Branch (follows each push) | ${ALIAS_URL:-none} |
+          | This commit (\`${GITHUB_SHA::7}\`) | $DEPLOYMENT_URL |
+
+          Preview links are public unless Cloudflare Access is on for previews (docs/ci-and-deploy.md)."
+          comment_id=$(gh api --paginate "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | tail -n 1)
+          if [ -n "$comment_id" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" -f body="$body" >/dev/null
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
+          fi
