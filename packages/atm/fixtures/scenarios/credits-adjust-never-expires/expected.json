@@ -1,0 +1,40 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-2": 78000,
+				"fees": 2352,
+				"stripe": 75648,
+				"net": 75648,
+				"avail:family:fam_8k2:visit": 5
+			},
+			"reconcile": {
+				"2026-01": [],
+				"2026-02": [],
+				"2026-03": []
+			}
+		}
+	],
+	"notes": [
+		"decision 7: adjustCredits. A goodwill adjustment of 3 visits on 20 January is a row of its own that never refills and never expires",
+		"A pays 15 January (2), 15 February (2 rolled + 2 granted), 15 March (the cron expires the rolled 2 at 18:00; the renewal rolls 2 and grants 2): refilling 2, rolled 2, adjustment 3 = 7. The correction of -2 on 20 March takes the soonest expiry first, the rolled 2 (not the adjustment): 5",
+		"the crons of 20 April 2026 and 20 April 2027 book nothing: the rolled row is empty and the adjustment has no expiry. 5 left",
+		"money: 3 x 260.00, fees 3 x 7.84; an adjustment moves no money"
+	]
+}

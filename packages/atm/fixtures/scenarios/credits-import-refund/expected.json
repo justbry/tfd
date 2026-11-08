@@ -1,0 +1,39 @@
+{
+	"verdict": "DISCREPANCY",
+	"answers": [
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"refunds": 26000,
+				"stripe": -26000,
+				"net": -26000,
+				"avail:family:fam_8k2:visit": 0
+			},
+			"pinned": {
+				"refunds": 0,
+				"stripe": 0,
+				"net": 0
+			},
+			"reconcile": {
+				"2026-02": [
+					"missing_in_log refund re_1",
+					"amount_differs net -"
+				]
+			}
+		}
+	],
+	"discrepancies": [
+		"D8"
+	],
+	"notes": [
+		"the family service imports a sparkle-2 member on 1 February with its January lot (2 visits, invoice in_old1 paid on 15 January, before the import). seedHandlerIndexes indexes the invoice and its payment refs",
+		"5 February: Stripe refunds the whole 260.00 (charge.refunded). The index finds the holder, the full refund takes the invoice's 2 visits back (credit.adjusted -2): 0 left. Without the seed the refund would wait for ever (409 unmatched_payment)",
+		"DISCREPANCY D8: the handler never booked the invoice's payment, so it books no payment.refunded. The hand numbers are what a refund should do (refunds 260.00, cash and net -260.00); pinned is today's 0. Reconcile prints missing_in_log refund re_1 and amount_differs net"
+	]
+}

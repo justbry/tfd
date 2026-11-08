@@ -60,8 +60,24 @@ const TEST_TIMEOUT = FULL ? 20 * MINUTES : 4 * MINUTES;
 const ERASED_FACT_IN_WAL =
 	"after: an erased fact is still in the raw bytes of the SQLite file or its -wal";
 
+/**
+ * F5 and F6: `tfd simulate --inputs` refuses to answer (exit 2) for these bundles, so each of its six checks reports it.
+ * F5: members on different menu versions (one catalog cannot decide them all); F6: a refund of an invoice paid before the
+ * import (the stored inputs hold no such invoice, so the replay decides it differently from the log).
+ */
+const SIMULATE_REFUSES = [
+	"simulate identity sch_vol: exit 0, baseline identical, no change",
+	"simulate upgradeGrant prorated sch_vol: a result, not an error (exit 0 or 1)",
+	"simulate upgradeGrant full sch_vol: a result, not an error (exit 0 or 1)",
+	"simulate upgradeGrant none sch_vol: a result, not an error (exit 0 or 1)",
+	"simulate price +10% sch_vol: a result, not an error (exit 0 or 1)",
+	"simulate rollover cap 1 sch_vol: a result, not an error (exit 0 or 1)",
+];
+
 /** Findings pinned by scenario: what the run shows today and the design says it should not. */
 const KNOWN_FINDINGS: Record<string, string[]> = {
+	"credits-menu-version": SIMULATE_REFUSES,
+	"credits-import-refund": SIMULATE_REFUSES,
 	"refused-invoice": [REFUSED_NOT_IN_FOLDER],
 	"renewal-before-create": [REFUSED_NOT_IN_FOLDER],
 	"erasure-drill": [ERASED_FACT_IN_WAL],

@@ -1,0 +1,51 @@
+{
+	"sch_vol": {
+		"invoices": [
+			{
+				"id": "in_pack",
+				"status": "paid",
+				"amount_paid": 9000,
+				"currency": "usd",
+				"created": 1768499940,
+				"livemode": true,
+				"status_transitions": {
+					"paid_at": 1768500000
+				}
+			},
+			{
+				"id": "in_gift",
+				"status": "paid",
+				"amount_paid": 13000,
+				"currency": "usd",
+				"created": 1768503540,
+				"livemode": true,
+				"status_transitions": {
+					"paid_at": 1768503600
+				}
+			}
+		],
+		"refunds": [],
+		"disputes": [],
+		"payouts": [],
+		"balanceTransactions": [
+			{
+				"id": "txn_in_pack",
+				"type": "charge",
+				"amount": 9000,
+				"fee": 291,
+				"net": 8709,
+				"currency": "usd",
+				"created": 1768500000
+			},
+			{
+				"id": "txn_in_gift",
+				"type": "charge",
+				"amount": 13000,
+				"fee": 407,
+				"net": 12593,
+				"currency": "usd",
+				"created": 1768503600
+			}
+		]
+	}
+}

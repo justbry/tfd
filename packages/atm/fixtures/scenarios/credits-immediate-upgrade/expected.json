@@ -1,0 +1,40 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-1": 13000,
+				"income:membership:sparkle-2": 34807,
+				"fees": 1476,
+				"stripe": 46331,
+				"net": 46331,
+				"avail:family:fam_8k2:visit": 4
+			},
+			"reconcile": {
+				"2026-01": [],
+				"2026-02": []
+			}
+		}
+	],
+	"notes": [
+		"decision 2: sparkle-1 (13,000, 1 visit) to sparkle-2 (26,000, 2 visits) on 25 January, 21 of the cycle's 31 days left",
+		"credit line -13,000 x 21/31 = -8,806 (8,806.45), charge 26,000 x 21/31 = 17,613 (17,612.9): the member pays 8,807; fee 8,807 x 2.9% = 255 + 30 = 285; the upgrade invoice is booked under the new tier",
+		"credits: 1 on 15 January; the upgrade grants the 1 extra visit at once, 1 x 21/31 rounded up = 1: 2; the renewal on 15 February carries the 2 over (cap 2) and grants 2: 4",
+		"income sparkle-1 130.00, sparkle-2 88.07 + 260.00 = 348.07; fees 4.07 + 2.85 + 7.84 = 14.76; cash 463.31"
+	]
+}

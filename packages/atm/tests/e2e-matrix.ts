@@ -14,8 +14,11 @@ import { decimalToUnits } from "../src/ledger/util.js";
 import { loadScenarioBundles } from "../src/scenario/bundle.js";
 import { runBundle } from "../src/scenario/bundle-run.js";
 import type {
+	AdjustKind,
 	AtmEvent,
 	BundleStep,
+	CallerCreditLotRow,
+	CallerMembershipRow,
 	ReconcileResult,
 	ReconcileStripe,
 	ScenarioBundle,
@@ -85,6 +88,34 @@ export type Step =
 			at: number;
 			school?: string;
 			month: string;
+	  }
+	| {
+			/** The school publishes menu version `menuVersion` of the case's `menus`. */
+			kind: "publish";
+			at: number;
+			school?: string;
+			menuVersion: string;
+	  }
+	| {
+			/** The family service imports a member from its own rows: the rows, the opening events, the seeded claims and indexes. */
+			kind: "import";
+			at: number;
+			school?: string;
+			membership: CallerMembershipRow;
+			lots: CallerCreditLotRow[];
+			eventIds?: string[];
+			invoices?: { invoiceId: string; paymentRefs: string[] }[];
+	  }
+	| {
+			/** An admin adjusts a family's balance of one feature. */
+			kind: "adjust";
+			at: number;
+			school?: string;
+			family: string;
+			commandId: string;
+			adjustKind: AdjustKind;
+			feature: string;
+			credits: number;
 	  };
 
 /** The steps that deliver a Stripe event (the others are the family service's own). */
@@ -138,6 +169,10 @@ export type Case = {
 	/** Which handler path it walks (the matrix doc's column). */
 	path: string;
 	menu?: Menu;
+	/** The school's policy over the defaults (`resolvePolicy`), when the rule under test sits behind a policy field. */
+	policy?: Record<string, unknown>;
+	/** The menu versions the school publishes (the first is served until a `publish` step): members stay on the one they bought. */
+	menus?: Record<string, Menu>;
 	/** The caller's fee lookup: by invoice id (a booking's, by payment intent); left out, the endpoint has no `paymentFee` at all. */
 	fees?: Record<string, number | null>;
 	steps: Step[];
@@ -438,18 +473,61 @@ export const eventsCsv = (events: readonly AtmEvent[]): string =>
 		),
 	].join("\n")}\n`;
 
+/**
+ * The credit balances a log replays to. Members on different menu versions (`menus`) cannot be decided by one catalog (a
+ * version's grants are in its catalog), so each holder's events replay under the catalog of the version their decisions are
+ * labelled with.
+ */
+export const replayBalances = (
+	events: readonly AtmEvent[],
+	menu: Menu,
+	school: string,
+	env?: "test" | "live",
+	menus?: Record<string, Menu>,
+): {
+	balances: ReturnType<typeof replayEvents>["balances"];
+	asOf: string | null;
+} => {
+	const replay = (replayed: readonly AtmEvent[], under: Menu) =>
+		replayEvents({
+			events: replayed,
+			catalog: menuCatalogRows({
+				menu: under,
+				school,
+				...(env ? { env } : {}),
+			}),
+		});
+	if (menus === undefined) {
+		const { balances, asOf } = replay(events, menu);
+		return { balances, asOf };
+	}
+	const balances: ReturnType<typeof replayEvents>["balances"] = [];
+	let asOf: string | null = null;
+	for (const key of [...new Set(events.map((event) => event.key))].sort()) {
+		const own = events.filter((event) => event.key === key);
+		const version = own.find((event) => event.labels.menu_version)?.labels
+			.menu_version;
+		const result = replay(
+			own,
+			version === undefined ? menu : (menus[version] ?? menu),
+		);
+		balances.push(...result.balances);
+		if (result.asOf !== null && (asOf === null || result.asOf > asOf))
+			asOf = result.asOf;
+	}
+	return { balances, asOf };
+};
+
 const replayedBalances = (
 	events: readonly AtmEvent[],
 	menu: Menu,
 	school: string,
 	env?: "test" | "live",
+	menus?: Record<string, Menu>,
 ): Numbers => {
 	const out: Numbers = {};
-	const { balances } = replayEvents({
-		events,
-		catalog: menuCatalogRows({ menu, school, ...(env ? { env } : {}) }),
-	});
-	for (const balance of balances) {
+	for (const balance of replayBalances(events, menu, school, env, menus)
+		.balances) {
 		const name = `${balance.holder}:${balance.feature}`;
 		if (balance.avail !== 0) out[`avail:${name}`] = balance.avail;
 		if (balance.held !== 0) out[`held:${name}`] = balance.held;
@@ -511,6 +589,8 @@ export const bundleOfCase = (c: Case): ScenarioBundle => {
 			school: schools[0] as string,
 			schools,
 			menu: c.menu ?? baseMenu,
+			...(c.policy ? { policy: c.policy } : {}),
+			...(c.menus ? { menus: c.menus } : {}),
 			title: c.title,
 			path: c.path,
 			...(c.env ? { env: c.env } : {}),
@@ -540,6 +620,34 @@ export const bundleOfCase = (c: Case): ScenarioBundle => {
 					...where,
 					family: step.family,
 					feature: step.feature,
+				};
+			if (step.kind === "publish")
+				return {
+					kind: "publish",
+					atMs: step.at,
+					...where,
+					menuVersion: step.menuVersion,
+				};
+			if (step.kind === "import")
+				return {
+					kind: "import",
+					atMs: step.at,
+					...where,
+					membership: step.membership,
+					lots: step.lots,
+					...(step.eventIds ? { eventIds: step.eventIds } : {}),
+					...(step.invoices ? { invoices: step.invoices } : {}),
+				};
+			if (step.kind === "adjust")
+				return {
+					kind: "adjust",
+					atMs: step.at,
+					...where,
+					family: step.family,
+					commandId: step.commandId,
+					adjustKind: step.adjustKind,
+					feature: step.feature,
+					credits: step.credits,
 				};
 			return {
 				atMs: step.at,
@@ -585,6 +693,8 @@ export const loadCases = async (): Promise<Case[]> => {
 			title: scenario.title ?? scenario.id,
 			path: scenario.path ?? "",
 			menu: scenario.menu,
+			...(scenario.policy ? { policy: scenario.policy } : {}),
+			...(scenario.menus ? { menus: scenario.menus } : {}),
 			...(scenario.fees ? { fees: scenario.fees } : {}),
 			...(scenario.env ? { env: scenario.env } : {}),
 			...(scenario.priceIds ? { priceIds: scenario.priceIds } : {}),
@@ -621,6 +731,34 @@ export const loadCases = async (): Promise<Case[]> => {
 						...where,
 						family: step.family,
 						feature: step.feature,
+					};
+				if (step.kind === "publish")
+					return {
+						kind: "publish",
+						at: step.atMs,
+						...where,
+						menuVersion: step.menuVersion,
+					};
+				if (step.kind === "import")
+					return {
+						kind: "import",
+						at: step.atMs,
+						...where,
+						membership: step.membership,
+						lots: step.lots,
+						...(step.eventIds ? { eventIds: step.eventIds } : {}),
+						...(step.invoices ? { invoices: step.invoices } : {}),
+					};
+				if (step.kind === "adjust")
+					return {
+						kind: "adjust",
+						at: step.atMs,
+						...where,
+						family: step.family,
+						commandId: step.commandId,
+						adjustKind: step.adjustKind,
+						feature: step.feature,
+						credits: step.credits,
 					};
 				return {
 					at: step.atMs,
@@ -693,7 +831,7 @@ export const runCase = async (c: Case): Promise<CaseRun> => {
 				monthly: files["income-statement-monthly"]
 					? monthlyNumbers(files["income-statement-monthly"])
 					: {},
-				replayed: replayedBalances(events, menu, book.school, c.env),
+				replayed: replayedBalances(events, menu, book.school, c.env, c.menus),
 				creditSums: sums,
 				files,
 				reconciled,

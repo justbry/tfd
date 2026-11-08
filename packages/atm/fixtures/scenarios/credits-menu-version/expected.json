@@ -1,0 +1,49 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-2": 130000,
+				"fees": 3920,
+				"stripe": 126080,
+				"net": 126080,
+				"avail:family:fam_8k2:visit": 4,
+				"avail:family:fam_b2:visit": 6
+			},
+			"reconcile": {
+				"2026-01": [],
+				"2026-02": [],
+				"2026-03": []
+			}
+		}
+	],
+	"notes": [
+		"decision 6: the school publishes menu version 2 on 1 February (sparkle-2: 3 visits a month, carry 3, the same price). Member A bought on version 1 (2 a month, carry 2) and stays on it; member B joins on 20 February and is pinned to version 2",
+		"A: 2 on 15 January; 15 February 2 rolled + 2 granted: 4 (not 3 granted); 15 March 18:00 the cron expires the rolled 2, the renewal five minutes later rolls 2 and grants 2: 4. B: 3 on 20 February; 20 March 3 rolled + 3 granted: 6",
+		"each credit.granted is labelled with the version it ran under (A 1, B 2). The books replay holder by holder, each under its own version's catalog: one catalog cannot decide members on different versions",
+		"money: 5 x 260.00 = 1,300.00, fees 5 x 7.84 = 39.20, cash 1,260.80"
+	]
+}
