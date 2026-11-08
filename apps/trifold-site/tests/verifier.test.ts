@@ -208,7 +208,7 @@ test("?r= links carry a receipt intact", () => {
 
 test('the result card words every failing outcome; only a malformed file is "This isn\'t a Trifold receipt"', () => {
 	const card = readFileSync(
-		join(import.meta.dir, "../src/lib/components/VerifierResult.svelte"),
+		join(import.meta.dir, "../src/lib/verify/report.ts"),
 		"utf8",
 	);
 	const worded: Record<Exclude<Outcome["kind"], "malformed">, true> = {
