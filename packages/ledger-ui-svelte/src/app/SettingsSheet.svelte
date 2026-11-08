@@ -3,7 +3,8 @@
 	import type { Theme } from "$contract/app/route.ts";
 	import type { School } from "$contract/data/types.ts";
 	import * as Sheet from "$lib/components/ui/sheet/index.ts";
-		import Icon from "./Icon.svelte";
+	import DemoReadOnlyNote from "./DemoReadOnlyNote.svelte";
+	import Icon from "./Icon.svelte";
 	import type { IconName } from "./icons.ts";
 	import SchoolSettings from "./settings/SchoolSettings.svelte";
 	import type { Viewing } from "./viewing.ts";
@@ -31,7 +32,8 @@
 		top: number;
 		subtitle: string;
 		allSchools: boolean;
-		/** The school whose settings these are, and what the route views of it (null until its audiences are read). */
+		/** The school whose settings these are, and what the route views of it (null until its audiences are read). A demo
+		 * school refuses every write: the sheet says so where the school's own settings go. */
 		school: School | undefined;
 		viewing: Viewing | null;
 		theme: Theme;
@@ -89,6 +91,8 @@
 				<Icon name="info" class="mt-px" />
 				Accounting, keys and connections are set per school. Open a school to change them.
 			</div>
+		{:else if school?.demo}
+			<p class="mt-4 mb-0" data-test="settings-demo"><DemoReadOnlyNote /></p>
 		{:else if school && viewing}
 			<SchoolSettings {school} {viewing} />
 		{/if}

@@ -58,6 +58,7 @@
 		overdueDays,
 	} from "./booking-model.ts";
 	import BookingDialog from "./BookingDialog.svelte";
+	import DemoReadOnlyNote from "../DemoReadOnlyNote.svelte";
 	import BookingRow from "./BookingRow.svelte";
 	import BookingsPeriodControl from "./BookingsPeriodControl.svelte";
 	import { mount, onDestroy, onMount, unmount } from "svelte";
@@ -439,6 +440,7 @@
 		<span class={muted} data-test="booking-range-dates">
 			{monthAndDay(days.from)}{days.from === days.to ? "" : ` – ${monthAndDay(days.to)}`} · change it in the period control
 		</span>
+		{#if school.demo}<DemoReadOnlyNote />{/if}
 		<span class={toolsSpacer}></span>
 		{#each chips as option (option.slug)}
 			<button
@@ -482,7 +484,7 @@
 								<span>
 									<PaneIcon name={group.icon} class="mr-1 inline align-[-2px]" />{group.heading}
 								</span>
-								{#if needing.length > 1}
+								{#if needing.length > 1 && !school.demo}
 									<Button
 										variant="tool"
 										size="tool-small"

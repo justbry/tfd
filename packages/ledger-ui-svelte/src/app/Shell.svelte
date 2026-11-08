@@ -11,6 +11,9 @@
 		reports: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.reports()),
 		allSchools: () => import("./AllSchools.svelte"),
 	};
+	/** The panes whose data a demo school does not have (S8-contract section 11 "Demo schools"): the scenarios hold no
+	 * promo or gift events. They show `DemoTabNote` instead. */
+	const demoNoteTabs: ReadonlySet<string> = new Set(["promos"]);
 </script>
 
 <script lang="ts">
@@ -22,6 +25,7 @@
 	} from "$contract/app/period.ts";
 	import {
 		allSchools,
+		defaultTabOf,
 		formatRoute,
 		type Route,
 		type SchoolTab,
@@ -39,6 +43,7 @@
 	import type { ToastInput } from "../effect/toast-model.ts";
 	import { toUiError, type UiError } from "../effect/ui-error.ts";
 	import { useApp } from "./context.ts";
+	import DemoTabNote from "./DemoTabNote.svelte";
 	import EmptyPane from "./EmptyPane.svelte";
 	import Icon from "./Icon.svelte";
 	import LazyPane from "./LazyPane.svelte";
@@ -186,6 +191,12 @@
 			onPaneRendered(formatRoute(route));
 	});
 
+	/** A demo school's tab with no data shows the demo note instead of its pane, and says the route is on screen. */
+	const demoNote = $derived(Boolean(school?.demo && demoNoteTabs.has(route.tab)));
+	$effect(() => {
+		if (demoNote) onPaneRendered(formatRoute(route));
+	});
+
 	/** Each school's last tab, in memory only (mockup `s.last`). */
 	const lastTabs: Record<string, SchoolTab> = {};
 	$effect(() => {
@@ -201,7 +212,11 @@
 		navigate(
 			chosen === allSchools
 				? { schoolId: chosen, tab: allSchools, query }
-				: { schoolId: chosen, tab: lastTabs[chosen] ?? "plans", query },
+				: {
+						schoolId: chosen,
+						tab: lastTabs[chosen] ?? defaultTabOf(schools.find((candidate) => candidate.id === chosen)),
+						query,
+					},
 		);
 	};
 	const chooseTab = (tab: string): void => {
@@ -292,7 +307,9 @@
 				class="overflow-x-auto p-3.5"
 				data-test={tab === route.tab ? "pane" : undefined}
 			>
-				{#if tab === route.tab && readsDisclosure(tab)}
+				{#if tab === route.tab && demoNote}
+					<DemoTabNote />
+				{:else if tab === route.tab && readsDisclosure(tab)}
 					<div class="text-[12px]" data-pane={tab}>
 						{#if disclosureError}
 							<LoadFailed

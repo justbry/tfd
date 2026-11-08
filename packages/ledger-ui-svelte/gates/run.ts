@@ -5,7 +5,8 @@
  * I frozen install, F the contract's fixtures, Y types (svelte-check), B Biome on the package's files changed since
  * `--base`, S first-load size against gates/budget.json, T every test group (bun run test, hygiene included), K
  * computed styles in a real browser (scripts/check-styles.ts: the built app served by `vite preview` on port
- * `--style-port`, 5399 by default, and the one-stylesheet reference build on the next port; happy-dom has no cascade, so only a browser can see a rule that a later stylesheet
+ * `--style-port`, 5399 by default, the one-stylesheet reference build on the next port, and (S9.7a) the HTTP build and its
+ * reference on the two after: the demo alert's states and the staging check's strings, scripts/check-http-build.ts; happy-dom has no cascade, so only a browser can see a rule that a later stylesheet
  * overrides). K needs the Chromium headless shell and playwright-core in /tmp/ledger-shots that scripts/shots.ts uses:
  * without them it is red, unless `--skip-browser` says this machine has none. Stops at the first red gate.
  */
@@ -22,8 +23,9 @@ const argument = (name: string, fallback?: string): string => {
 };
 const slice = argument("--slice");
 const base = argument("--base", "origin/dev");
-const sliceMatch = /^S9\.(\d+)$/.exec(slice);
-if (!sliceMatch) throw new Error(`--slice is S9.<k>, not ${slice}`);
+const sliceMatch = /^S9\.(\d+)([a-z]?)$/.exec(slice);
+if (!sliceMatch)
+	throw new Error(`--slice is S9.<k> or S9.<k><letter>, not ${slice}`);
 const sliceNumber = Number(sliceMatch[1]);
 const packageRoot = join(import.meta.dir, "..");
 const repositoryRoot = join(packageRoot, "..", "..");
@@ -33,6 +35,8 @@ type Budget = {
 	firstCeiling: number;
 	growth: number;
 	sizes: Record<string, number>;
+	/** A slice's own hard limit, when it is tighter than the growth rule (S9.7a: 113,700). */
+	ceilings?: Record<string, number>;
 };
 
 const run = (
@@ -135,18 +139,21 @@ const bytes = [...firstLoad].reduce(
 const budget = JSON.parse(
 	readFileSync(join(import.meta.dir, "budget.json"), "utf8"),
 ) as Budget;
+/** A lettered slice (S9.7a) follows the recording of its own number, if any, and then the slices before it. */
+const searchFrom = sliceMatch[2] ? sliceNumber : sliceNumber - 1;
 const recorded = Array.from(
-	{ length: sliceNumber },
-	(_, index) => sliceNumber - 1 - index,
+	{ length: searchFrom + 1 },
+	(_, index) => searchFrom - index,
 ).find((number) => budget.sizes[`S9.${number}`] !== undefined);
 const previous =
 	recorded === undefined ? undefined : budget.sizes[`S9.${recorded}`];
-const limit =
+const growthLimit =
 	sliceNumber === 0
 		? budget.firstCeiling
 		: previous === undefined || recorded === undefined
 			? Number.NaN
 			: Math.floor(previous * budget.growth ** (sliceNumber - recorded));
+const limit = Math.min(growthLimit, budget.ceilings?.[slice] ?? growthLimit);
 if (!(bytes <= limit)) {
 	process.stdout.write(`S red: ${bytes} gzip bytes, limit ${limit}\n`);
 	process.exit(1);
@@ -172,6 +179,31 @@ else {
 			LEDGER_SINGLE_SHEET: "1",
 		},
 	);
+	// The HTTP build, as staging deploys it: the staging API host, the demo alert's words, no fixture school; and its
+	// one-stylesheet reference, for the demo alert's computed styles.
+	const httpEnvironment = {
+		VITE_LEDGER_SOURCE: "http",
+		VITE_API_BASE: "https://api-staging.b4uni.com",
+	};
+	run(
+		"K http build",
+		"bunx",
+		["vite", "build", "--outDir", "tmp/dist-http"],
+		packageRoot,
+		httpEnvironment,
+	);
+	run(
+		"K http reference build",
+		"bunx",
+		["vite", "build", "--outDir", "tmp/dist-http-reference"],
+		packageRoot,
+		{ ...httpEnvironment, LEDGER_SINGLE_SHEET: "1" },
+	);
+	run("K http bundle", "bun", [
+		"scripts/check-http-build.ts",
+		"tmp/dist-http",
+		"dist",
+	]);
 	const serve = (port: number, directory: string): ChildProcess =>
 		spawn(
 			"bunx",
@@ -192,17 +224,22 @@ else {
 	const previews = [
 		serve(stylePort, "dist"),
 		serve(stylePort + 1, "tmp/dist-reference"),
+		serve(stylePort + 2, "tmp/dist-http"),
+		serve(stylePort + 3, "tmp/dist-http-reference"),
 	];
 	const origin = `http://localhost:${stylePort}`;
 	const referenceOrigin = `http://localhost:${stylePort + 1}`;
+	const httpOrigin = `http://localhost:${stylePort + 2}`;
+	const httpReferenceOrigin = `http://localhost:${stylePort + 3}`;
 	let served = false;
 	for (let attempt = 0; attempt < 50 && !served; attempt += 1) {
 		served = await Promise.all(
-			[origin, referenceOrigin].map((address) =>
-				fetch(address).then(
-					(response) => response.ok,
-					() => false,
-				),
+			[origin, referenceOrigin, httpOrigin, httpReferenceOrigin].map(
+				(address) =>
+					fetch(address).then(
+						(response) => response.ok,
+						() => false,
+					),
 			),
 		).then((answers) => answers.every(Boolean));
 		if (!served) await new Promise((resolve) => setTimeout(resolve, 200));
@@ -210,7 +247,7 @@ else {
 	if (!served) {
 		for (const preview of previews) preview.kill();
 		process.stdout.write(
-			`K red: vite preview did not answer on ${origin} and ${referenceOrigin}\n`,
+			`K red: vite preview did not answer on ${origin}, ${referenceOrigin}, ${httpOrigin} and ${httpReferenceOrigin}\n`,
 		);
 		process.exit(1);
 	}
@@ -222,6 +259,10 @@ else {
 			origin,
 			"--reference",
 			referenceOrigin,
+			"--http",
+			httpOrigin,
+			"--http-reference",
+			httpReferenceOrigin,
 		],
 		{
 			cwd: packageRoot,

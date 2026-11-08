@@ -80,7 +80,9 @@
 		</div>
 	</div>
 	<div class="flex flex-wrap justify-end gap-1">
-		{#if waiting}
+		{#if context.readOnly}
+			<!-- A demo school refuses every write: its bookings offer none. -->
+		{:else if waiting}
 			<Badge class={[paneBadge, badgeTones.warning]}><PaneIcon name="clock" class="mr-[3px] size-[11px]" />waiting to ship</Badge>
 		{:else if booking.state === "requested"}
 			{@render button("remind", "mail", "Remind host", "")}

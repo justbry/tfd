@@ -73,6 +73,8 @@
 	{#if plan.waiting}
 		<div class={note} data-test="portal-plan-note"><Icon name="clock" /> A change is on its way. It can take a few minutes.</div>
 	{/if}
+	<!-- A demo school refuses every write: its member's view offers no change. -->
+	{#if !school.demo}
 	<div class={actions}>
 		<ActionButton action="quantity" icon="sliders" label="Change amount" reason={quantityReason} {preview} onclick={handlers.onQuantity} />
 		{#if plan.ended}
@@ -97,6 +99,7 @@
 			/>
 		{/if}
 	</div>
+	{/if}
 </div>
 
 {#each viewed.balances as balance (balance.featureId)}

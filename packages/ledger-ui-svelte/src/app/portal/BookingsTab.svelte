@@ -57,7 +57,7 @@
 							<span class={pillClass("neutral")} data-test="portal-booking-status">Awaiting confirmation</span>
 						{:else if status === "paid"}
 							<span class={muted} data-test="portal-booking-status">Contact the school to cancel</span>
-						{:else}
+						{:else if !school.demo}
 							<ActionButton
 								action="cancel-booking"
 								label="Cancel booking"

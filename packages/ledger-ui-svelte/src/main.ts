@@ -1,7 +1,7 @@
 import "./app.css";
 
 /** The fixture build: the mockup's fixed calendar and the fixture layer. `VITE_LEDGER_SOURCE=http` (with
- * `VITE_API_BASE` and `VITE_LEDGER_WORKER_BASE`) builds the HTTP layer instead; the other branch is dead and
+ * `VITE_API_BASE`, `VITE_WEB_BASE` and `VITE_LEDGER_WORKER_BASE`) builds the HTTP layer instead; the other branch is dead and
  * dropped. */
 const calendar = { today: "2026-11-05", now: "2026-11-05T12:00" };
 const root = document.getElementById("app");
@@ -11,6 +11,7 @@ if (root) {
 		mountHttpApp(root, {
 			apiBase: import.meta.env.VITE_API_BASE ?? "https://api.b4uni.com",
 			workerBase: import.meta.env.VITE_LEDGER_WORKER_BASE ?? "/v1",
+			webBase: import.meta.env.VITE_WEB_BASE ?? "https://b4uni.com",
 		});
 	} else {
 		const [{ mountApp }, { fixtureLayer }] = await Promise.all([
