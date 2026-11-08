@@ -65,6 +65,8 @@ type HarnessModule = {
 		presets: readonly string[];
 		schools?: readonly string[];
 		now?: string;
+		/** School presets seeded as demo schools (`demo-<preset>`), with `LEDGER_DEMO_SCHOOLS=on`. */
+		demoPresets?: readonly string[];
 	}): Promise<LedgerHarness>;
 };
 
@@ -146,17 +148,25 @@ const json = (body: unknown, status = 200): Response =>
 export function fakeBuzzSchool(
 	worker: LedgerHarness,
 	grants: LedgerSchoolClaim[],
-	options: { tokenLifetimeSeconds?: number } = {},
+	options: {
+		tokenLifetimeSeconds?: number;
+		/** No B4 Uni session: the ledger-token route answers 401. */
+		signedOut?: boolean;
+	} = {},
 ) {
 	const lifetime = options.tokenLifetimeSeconds ?? 300;
 	const minted: string[] = [];
 	const workerCalls: string[] = [];
+	/** Each buzz-school path asked for, in order. */
+	const apiCalls: string[] = [];
 	const fetch: Fetch = async (url, init) => {
 		if (url.startsWith(worker.url)) {
 			workerCalls.push(url.slice(worker.url.length));
 			return Bun.fetch(url, init);
 		}
 		const { pathname } = new URL(url);
+		apiCalls.push(pathname);
+		if (options.signedOut) return json({ error: "unauthenticated" }, 401);
 		if (pathname === "/school-admin/ledger-token" && init.method === "POST") {
 			const issuedAt = Math.floor(
 				Date.parse(worker.clock.now()) / millisecondsPerSecond,
@@ -206,7 +216,7 @@ export function fakeBuzzSchool(
 		}
 		return json({ error: "not_found" }, 404);
 	};
-	return { fetch, minted, workerCalls };
+	return { fetch, minted, workerCalls, apiCalls };
 }
 
 /** Part 1's adapters on the real Worker: the fetch WorkerSource at `${url}/v1`, buzz-school faked. */
@@ -215,6 +225,7 @@ export function httpAdaptersOn(
 	grants: LedgerSchoolClaim[],
 	options: {
 		tokenLifetimeSeconds?: number;
+		signedOut?: boolean;
 	} = {},
 ) {
 	const buzzSchool = fakeBuzzSchool(worker, grants, options);

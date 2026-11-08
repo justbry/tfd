@@ -168,7 +168,8 @@ function moveBetweenOptions(
 }
 
 /** The school switcher's content (mockup `#sp`, `renderSP`): the search field, then the listbox, its rows
- * `role=option`. The listbox is one Tab stop: the current school's row, or the first row when the search hides it.
+ * `role=option`: the person's own schools, then the demo schools in a group under "Demo". The listbox is one Tab stop:
+ * the current school's row, or the first row when the search hides it.
  * Arrow Up and Down, Home and End move between rows, Enter and Space choose, and Arrow Down in the search field
  * enters the list. */
 export function SchoolList({
@@ -184,10 +185,16 @@ export function SchoolList({
 	const matches = (name: string): boolean =>
 		name.toLowerCase().includes(search.trim().toLowerCase());
 	const allShown = matches("All schools");
-	const shownSchools = schools.filter((school) => matches(school.name));
+	const ownSchools = schools.filter(
+		(school) => !school.demo && matches(school.name),
+	);
+	const demoSchools = schools.filter(
+		(school) => school.demo && matches(school.name),
+	);
 	const shownIds = [
 		...(allShown ? [allSchools] : []),
-		...shownSchools.map((school) => school.id),
+		...ownSchools.map((school) => school.id),
+		...demoSchools.map((school) => school.id),
 	];
 	const tabStop = shownIds.includes(current) ? current : shownIds[0];
 
@@ -226,6 +233,16 @@ export function SchoolList({
 		tabIndex: schoolId === tabStop ? 0 : -1,
 		onClick: () => onChoose(schoolId),
 	});
+	const schoolRow = (school: School): JSX.Element => (
+		<button key={school.id} {...optionProps(school.id, schoolLabel(school))}>
+			<Icon name="building" />
+			<span class="sp2">{school.name}</span>
+			{school.stale && <span class="badge b-warn">stale</span>}
+			{school.attentionCount !== null && school.attentionCount > 0 && (
+				<span class="badge b-warn">{school.attentionCount}</span>
+			)}
+		</button>
+	);
 
 	return (
 		<>
@@ -264,19 +281,16 @@ export function SchoolList({
 				)}
 				{/* biome-ignore lint/a11y/noAriaHiddenOnFocusable: an hr is not focusable; inside the listbox it is only a line, so it leaves the accessibility tree. */}
 				<hr aria-hidden="true" />
-				{shownSchools.map((school) => (
-					<button
-						key={school.id}
-						{...optionProps(school.id, schoolLabel(school))}
-					>
-						<Icon name="building" />
-						<span class="sp2">{school.name}</span>
-						{school.stale && <span class="badge b-warn">stale</span>}
-						{school.attentionCount !== null && school.attentionCount > 0 && (
-							<span class="badge b-warn">{school.attentionCount}</span>
-						)}
-					</button>
-				))}
+				{ownSchools.map(schoolRow)}
+				{demoSchools.length > 0 && (
+					// biome-ignore lint/a11y/useSemanticElements: a listbox groups its options with role=group; a fieldset groups form controls.
+					<div role="group" aria-label="Demo" data-test="demo-schools">
+						<div class="vah mut" aria-hidden="true">
+							Demo
+						</div>
+						{demoSchools.map(schoolRow)}
+					</div>
+				)}
 			</div>
 		</>
 	);

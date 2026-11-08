@@ -31,7 +31,9 @@
 			],
 			"vars": {
 				"LEDGER_ISS": "https://api-staging.b4uni.com",
-				"LEDGER_JWKS_URL": "https://api-staging.b4uni.com/.well-known/ledger-jwks.json"
+				"LEDGER_JWKS_URL": "https://api-staging.b4uni.com/.well-known/ledger-jwks.json",
+				// the demo-<preset> schools open to every caller, read-only (src/demo.ts): staging only, never production
+				"LEDGER_DEMO_SCHOOLS": "on"
 			}
 		}
 	}

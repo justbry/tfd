@@ -8,6 +8,7 @@ import type {
 } from "../data/members.ts";
 import type { CreatedKey } from "../data/settings.ts";
 import type { Writer } from "../data/writer.ts";
+import { demoReadOnly, isDemoSchool } from "./demo.ts";
 import {
 	AdapterError,
 	isRetryable,
@@ -36,6 +37,8 @@ import { isRecord, numberOf, oneOf, recordOf, stringOf } from "./wire.ts";
  *   `pin_locked` (the 429 of the shared PIN limit) as refusals, so the pane can say which.
  * - **The mailed-link step-up** (money writes and finance grants, 403 `step_up_required`) rejects `step_up`: only the
  *   person can open the mailed link.
+ * - **Demo schools** (`demo.ts`) are read-only: every write on one rejects `read_only` ("Demo school: read-only")
+ *   before any request. A download is the browser's own, and the PIN guards nothing there, so the books just open.
  */
 
 export type PinSource = {
@@ -70,6 +73,36 @@ const storedRequestOf = (request: unknown): unknown =>
 
 const instantOf = (unixSeconds: number): string =>
 	new Date(unixSeconds * 1000).toISOString();
+
+/** The school a Writer call is about: its first argument (`saveMenu(schoolId, …)`) or that argument's `schoolId` or
+ * `school`. */
+const schoolOfCall = (args: readonly unknown[]): string | null => {
+	const [first] = args;
+	if (typeof first === "string") return first;
+	if (!isRecord(first)) return null;
+	const school = first.schoolId ?? first.school;
+	return typeof school === "string" ? school : null;
+};
+
+/** `writer` with every call on a demo school refused before it runs (`download` and `unlockBooks` aside). */
+function demoGuarded(writer: Writer): Writer {
+	const guarded: Record<string, unknown> = {};
+	for (const [name, call] of Object.entries(writer) as [
+		string,
+		(...args: unknown[]) => Promise<unknown>,
+	][])
+		guarded[name] =
+			name === "download"
+				? call
+				: (...args: unknown[]) => {
+						const school = schoolOfCall(args);
+						if (school === null || !isDemoSchool(school)) return call(...args);
+						if (name === "unlockBooks")
+							return Promise.resolve({ unlocked: true });
+						return Promise.reject(demoReadOnly(name));
+					};
+	return guarded as unknown as Writer;
+}
 
 export function createHttpWriter(options: {
 	api: ApiClient;
@@ -206,7 +239,7 @@ export function createHttpWriter(options: {
 			throw notAvailable(call, reference);
 		};
 
-	return {
+	return demoGuarded({
 		recordOutcome,
 		cancelBooking,
 		remindHost: unavailable(
@@ -458,5 +491,5 @@ export function createHttpWriter(options: {
 			"confirmDisclosureStepUp",
 			"no disclosure route (build list group 8)",
 		),
-	};
+	});
 }

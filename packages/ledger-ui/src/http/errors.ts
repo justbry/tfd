@@ -15,6 +15,7 @@
  * - `schema_mismatch`: the route answered a shape the UI contract cannot take without inventing a field.
  * - `not_available`: nothing provides this call yet (the contract's D11/D12: a gap, never a 0 or fixture data).
  * - `not_connected`: a ledger Worker call before part 2 connects the Worker.
+ * - `read_only`: a write on a demo school (`demo.ts`), refused before any request.
  */
 export type AdapterErrorKind =
 	| "step_up"
@@ -33,7 +34,8 @@ export type AdapterErrorKind =
 	| "network"
 	| "schema_mismatch"
 	| "not_available"
-	| "not_connected";
+	| "not_connected"
+	| "read_only";
 
 export type AdapterErrorDetail = {
 	/** The HTTP status, when there was an answer. */

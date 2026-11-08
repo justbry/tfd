@@ -12,6 +12,8 @@ export type LedgerEnv = {
 	/** The family service's `/.well-known/ledger-jwks.json`. */
 	LEDGER_JWKS_URL: string;
 	ASSETS?: AssetsBinding;
+	/** `on` (staging only): the `demo-<preset>` schools are open to every caller, read-only (`demo.ts`). */
+	LEDGER_DEMO_SCHOOLS?: string;
 	/** Test harness only: a URL that answers the clock as an ISO instant (see `testing/worker-entry.ts`). */
 	TEST_CLOCK_URL?: string;
 };

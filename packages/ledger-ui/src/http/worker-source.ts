@@ -20,12 +20,13 @@ import type {
 	LedgerTypeFilter,
 } from "../data/ledger.ts";
 import type { HistoryEvent, PaymentRow } from "../data/members.ts";
+import { isDemoSchool } from "./demo.ts";
 import {
 	AdapterError,
 	type AdapterErrorKind,
 	schemaMismatch,
 } from "./errors.ts";
-import type { LedgerTokenSource } from "./ledger-token.ts";
+import type { LedgerToken, LedgerTokenSource } from "./ledger-token.ts";
 import type { Fetch, Scheduler } from "./transport.ts";
 import {
 	isRecord,
@@ -52,12 +53,17 @@ export type WorkerAnswer<Data> = {
 	data: Data;
 };
 
-/** `GET /v1/schools`: one row per school of the token. */
+/** `GET /v1/schools`: one row per school of the token, then one per demo school (`demo.ts`), which adds its facts. */
 export type WorkerSchoolStatus = {
 	id: string;
 	asOf: string | null;
 	lagMinutes: number | null;
 	stale: boolean;
+	demo?: true;
+	name?: string;
+	timeZone?: string;
+	currency?: string;
+	creditUnit?: { one: string; other: string };
 };
 
 /** `GET /v1/schools/:school/disclosure`: the Reader adds `viewer`, and each View as row's `held`, `audience` and
@@ -217,7 +223,9 @@ function answerOf<Data>(path: string, body: unknown): WorkerAnswer<Data> {
 }
 
 /** The fetch source over section 11: base `/v1` on the UI's own origin, GET only, the ledger token as the bearer. A
- * 401 mints a new token and tries once more; a `409 view_mismatch` waits `retryAfterSeconds` and tries once more. */
+ * 401 mints a new token and tries once more; a `409 view_mismatch` waits `retryAfterSeconds` and tries once more.
+ * `GET /schools` and a demo school's reads go without a bearer when there is no token (signed out, or no school): the
+ * Worker serves those to anyone on staging. */
 export function createFetchWorkerSource(options: {
 	fetch: Fetch;
 	/** `/v1` on the UI's origin, or a full URL in tests. */
@@ -225,9 +233,15 @@ export function createFetchWorkerSource(options: {
 	tokens: LedgerTokenSource;
 	scheduler: Scheduler;
 }): WorkerSource {
+	/** The token for a read that needs none: a failure to mint one (signed out) is no token. */
+	const optionalToken = (refreshed: boolean): Promise<LedgerToken | null> =>
+		(refreshed ? options.tokens.refresh() : options.tokens.current()).catch(
+			() => null,
+		);
 	const get = async <Data>(
 		path: string,
 		query: Record<string, string | undefined> = {},
+		open = false,
 	): Promise<WorkerAnswer<Data>> => {
 		const search = new URLSearchParams();
 		for (const [name, value] of Object.entries(query))
@@ -237,10 +251,12 @@ export function createFetchWorkerSource(options: {
 		let refreshed = false;
 		let waited = false;
 		for (;;) {
-			const token = refreshed
-				? await options.tokens.refresh()
-				: await options.tokens.current();
-			if (!token)
+			const token = open
+				? await optionalToken(refreshed)
+				: refreshed
+					? await options.tokens.refresh()
+					: await options.tokens.current();
+			if (!token && !open)
 				throw new AdapterError(
 					"not_found",
 					"no ledger token: the person administers no school",
@@ -254,7 +270,7 @@ export function createFetchWorkerSource(options: {
 					method: "GET",
 					headers: {
 						accept: "application/json",
-						authorization: `Bearer ${token.token}`,
+						...(token ? { authorization: `Bearer ${token.token}` } : {}),
 					},
 				});
 			} catch (cause) {
@@ -273,7 +289,7 @@ export function createFetchWorkerSource(options: {
 				return answerOf<Data>(path, body);
 			}
 			const error = await workerErrorOf(response, path);
-			if (error.kind === "unauthenticated" && !refreshed) {
+			if (error.kind === "unauthenticated" && !refreshed && token) {
 				refreshed = true;
 				continue;
 			}
@@ -288,32 +304,38 @@ export function createFetchWorkerSource(options: {
 		}
 	};
 	const school = (id: string) => `/schools/${encodeURIComponent(id)}`;
+	/** A read of one school's: open (no bearer needed) for a demo school. */
+	const read = <Data>(
+		id: string,
+		path: string,
+		query: Record<string, string | undefined> = {},
+	) => get<Data>(`${school(id)}${path}`, query, isDemoSchool(id));
 	return {
-		schools: () => get("/schools"),
+		schools: () => get("/schools", {}, true),
 		kpiDocument: ({ school: id, audience, pinLocked }) =>
-			get(`${school(id)}/kpi`, {
+			read(id, "/kpi", {
 				audience,
 				pin: pinLocked ? "locked" : "open",
 			}),
-		disclosure: (id) => get(`${school(id)}/disclosure`),
+		disclosure: (id) => read(id, "/disclosure"),
 		audienceReport: ({ school: id, audience, from, to }) =>
-			get(`${school(id)}/audience-report`, { audience, from, to }),
+			read(id, "/audience-report", { audience, from, to }),
 		ledger: ({ school: id, from, to, type, drill }) =>
-			get(`${school(id)}/ledger`, {
+			read(id, "/ledger", {
 				from,
 				to,
 				type: type ?? undefined,
 				drill: drill ?? undefined,
 			}),
 		incomeStatement: ({ school: id, from, to, compare }) =>
-			get(`${school(id)}/income-statement`, {
+			read(id, "/income-statement", {
 				from,
 				to,
 				compare: compare ? "1" : "0",
 			}),
 		membersIncome: ({ school: id, from, to }) =>
-			get(`${school(id)}/members-income`, { from, to }),
+			read(id, "/members-income", { from, to }),
 		memberMoney: ({ school: id, key }) =>
-			get(`${school(id)}/members/${encodeURIComponent(key)}/money`),
+			read(id, `/members/${encodeURIComponent(key)}/money`),
 	};
 }

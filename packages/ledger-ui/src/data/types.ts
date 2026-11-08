@@ -23,6 +23,9 @@ export type School = {
 	lagMinutes: number | null;
 	/** Members that need attention; null when no source counts them (the HTTP build): no badge, never 0. */
 	attentionCount: number | null;
+	/** A demo school (staging's golden scenarios, S8-contract section 11 "Demo schools"): fictional, read-only, listed
+	 * after the person's own schools under "Demo". */
+	demo: boolean;
 	/** Null when no source has them (the HTTP build): the tabs show no badge. */
 	tabBadges: {
 		/** The plans have unpublished changes. */

@@ -5,6 +5,11 @@
  * Every `/v1` answer is `Cache-Control: private, no-store`. Order of checks: the token (401), the route, the school in the
  * token's `schools[]` (404 `not_found`, the same for an unknown school), the gate of the endpoint (403), the query (400),
  * then the data (404 `no_data`, 409, 503).
+ *
+ * Demo schools (`demo.ts`, `LEDGER_DEMO_SCHOOLS=on`): `GET /v1/schools` and a demo school's paths need no token. A
+ * token that is sent is checked all the same (an invalid or expired one is a 401); a valid one that does not list the
+ * demo school reads it too. Every caller holds a demo school as its owner with the finance grant; a config verify or
+ * put on one is refused (403 `demo_read_only`).
  */
 import { R2BindingStore } from "tfd/worker";
 import {
@@ -19,6 +24,7 @@ import {
 import { JwksCache, JwksUnavailable } from "./auth/jwks.js";
 import { type Jwks, kidOf, LEDGER_AUDIENCE, verifyJwt } from "./auth/jwt.js";
 import { openSnapshot } from "./data/snapshot.js";
+import { DEMO_GRANT, demoSchoolsOn, isDemoSchool } from "./demo.js";
 import type { LedgerEnv, ScheduledController } from "./env.js";
 import {
 	ApiError,
@@ -29,6 +35,7 @@ import {
 } from "./http.js";
 import {
 	type ConfigAction,
+	MAX_BODY_BYTES,
 	putConfigRoute,
 	readConfigRoute,
 	verifyConfigRoute,
@@ -48,7 +55,7 @@ import {
 import { ledgerRoute } from "./routes/ledger.js";
 import { memberMoneyRoute } from "./routes/member-money.js";
 import { oneOf } from "./routes/query.js";
-import { schoolsRoute } from "./routes/schools.js";
+import { demoSchoolsRoute, schoolsRoute } from "./routes/schools.js";
 import { runViewsJob, type ViewsJobResult } from "./views-job.js";
 
 const SCHOOL_PATH = /^\/v1\/schools\/([^/]+)\/(.+)$/;
@@ -198,6 +205,20 @@ const decode = (segment: string): string => {
 	}
 };
 
+/** The school a `/v1/schools/:school/...` path names, or null (no school path, or one that does not decode). */
+const schoolOfPath = (pathname: string): string | null => {
+	const segment = SCHOOL_PATH.exec(pathname)?.[1];
+	if (segment === undefined) return null;
+	try {
+		return decodeURIComponent(segment);
+	} catch {
+		return null;
+	}
+};
+
+const tokenMissing = (): ApiError =>
+	new ApiError("token_missing", "A bearer token is required.");
+
 export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 	const clock = options.clock ?? (() => Date.now());
 	const fetchJwks =
@@ -214,17 +235,16 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		return cache;
 	};
 
+	/** The token's caller, or null when the request sends no `Authorization` header at all. */
 	const authenticate = async (
 		request: Request,
 		env: LedgerEnv,
 		now: number,
-	): Promise<Caller> => {
+	): Promise<Caller | null> => {
 		const header = request.headers.get("authorization");
-		if (header === null)
-			throw new ApiError("token_missing", "A bearer token is required.");
+		if (header === null) return null;
 		const token = BEARER.exec(header)?.[1];
-		if (token === undefined)
-			throw new ApiError("token_missing", "A bearer token is required.");
+		if (token === undefined) throw tokenMissing();
 		const cache = cacheFor(env.LEDGER_JWKS_URL);
 		const verifyOptions = {
 			iss: env.LEDGER_ISS,
@@ -270,16 +290,34 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		now: number,
 	): Promise<Response> => {
 		const caller = await authenticate(request, env, now);
+		const demoOn = demoSchoolsOn(env);
+		if (caller === null) {
+			// no token: only the demo schools' list and paths, and only where they are on
+			const pathSchool = schoolOfPath(url.pathname);
+			const open =
+				url.pathname === "/v1/schools"
+					? demoOn
+					: pathSchool !== null && isDemoSchool(pathSchool, env);
+			if (!open) throw tokenMissing();
+		}
+		/** The caller's grant on `school`: any caller's owner grant on a demo school, else the token's entry. */
+		const grantOf = (school: string): SchoolGrant => {
+			if (isDemoSchool(school, env)) return DEMO_GRANT;
+			const grant = caller?.schools.get(school);
+			if (grant === undefined)
+				throw new ApiError("not_found", "No such school.");
+			return grant;
+		};
 		const configPath = CONFIG_SCHOOL_PATH.exec(url.pathname);
 		if (request.method !== "GET" && configPath === null)
 			throw new ApiError("method_not_allowed", "Only GET is served.");
 		const store = new R2BindingStore(env.LEDGER_BUCKET);
 		if (url.pathname === "/v1/schools") {
-			const freshness = await schoolsRoute(
-				store,
-				[...caller.schools.keys()],
-				now,
-			);
+			const ids = caller === null ? [] : [...caller.schools.keys()];
+			const freshness = [
+				...(await schoolsRoute(store, ids, now)),
+				...(demoOn ? await demoSchoolsRoute(store, new Set(ids), now) : []),
+			];
 			const known = freshness.flatMap((school) =>
 				school.asOf === null ? [] : [school.asOf],
 			);
@@ -297,16 +335,19 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		const rest = match[2] as string;
 		const config = configActionOf(request.method, rest);
 		if (config !== null) {
-			const grant = caller.schools.get(school);
-			if (grant === undefined)
-				throw new ApiError("not_found", "No such school.");
+			const grant = grantOf(school);
+			if (config.action !== "read" && isDemoSchool(school, env))
+				throw new ApiError(
+					"demo_read_only",
+					"Demo school: read-only. Its config cannot be changed.",
+				);
 			const context = {
 				store,
 				school,
 				name: config.name,
 				grant,
-				subject: caller.subject,
-				stepUpAt: caller.stepUpAt,
+				subject: caller?.subject ?? null,
+				stepUpAt: caller?.stepUpAt ?? null,
 				now,
 				request,
 			};
@@ -326,8 +367,7 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 				: memberMoney;
 		if (route === undefined)
 			throw new ApiError("not_found", "No such endpoint.");
-		const grant = caller.schools.get(school);
-		if (grant === undefined) throw new ApiError("not_found", "No such school.");
+		const grant = grantOf(school);
 		if (route.gate === "finance" && !grant.finance)
 			throw new ApiError(
 				"finance_required",
@@ -386,9 +426,18 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 					),
 				);
 			} finally {
-				// a refusal that never read the body (owner_only, step_up_required) would leave it on the connection
-				if (request.body !== null && !request.bodyUsed)
-					await request.body.cancel();
+				// A refusal that never read the body (owner_only, step_up_required, demo_read_only) would leave it on the
+				// connection. One of a config body's size is read to the end, so the connection stays usable for the
+				// caller's next request (a cancelled one can reset it); a larger or unsized one is cancelled.
+				if (request.body !== null && !request.bodyUsed) {
+					const declared = Number(request.headers.get("content-length"));
+					if (
+						request.headers.has("content-length") &&
+						declared <= MAX_BODY_BYTES
+					)
+						await request.arrayBuffer().catch(() => undefined);
+					else await request.body.cancel();
+				}
 			}
 		},
 

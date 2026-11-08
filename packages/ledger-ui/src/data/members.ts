@@ -177,12 +177,12 @@ export type CapabilityAction =
 
 /** Why an action is not allowed: `owner_only` (shown "Owner role needed" in the menu, "Refunds need the owner role
  * in this school" on the drawer button), `stripe_permission_missing` with the permission (shown "The Stripe key lacks
- * <permission>. Fix it in Settings."), `not_built`. */
+ * <permission>. Fix it in Settings."), `not_built`, `demo` (a demo school, read-only: "Demo school: read-only"). */
 export type Capability =
 	| { allowed: true }
 	| {
 			allowed: false;
-			reason: "owner_only" | "not_built";
+			reason: "owner_only" | "not_built" | "demo";
 	  }
 	| {
 			allowed: false;
