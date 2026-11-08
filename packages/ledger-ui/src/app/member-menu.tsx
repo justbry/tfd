@@ -78,7 +78,29 @@ export type PersonContext = {
 	viewer: Viewer;
 	changes: Change[];
 	creditUnit: string;
+	/** A demo school, which refuses every write: only the items that read are listed, and the drawer shows no
+	 * write buttons. */
+	readOnly: boolean;
 };
+
+/** What a demo school's menu keeps: the items that write nothing. */
+const readOnlyActions: ReadonlySet<MenuAction> = new Set<MenuAction>([
+	"view-as-member",
+	"csv",
+	"stripe",
+]);
+
+/** The items a read-only menu keeps, with no separator at either end or two in a row. */
+function readOnlyItems(items: Array<MenuItem | null>): Array<MenuItem | null> {
+	const kept: Array<MenuItem | null> = [];
+	for (const entry of items) {
+		if (entry === null) {
+			if (kept.length > 0 && kept.at(-1) !== null) kept.push(null);
+		} else if (readOnlyActions.has(entry.action)) kept.push(entry);
+	}
+	if (kept.at(-1) === null) kept.pop();
+	return kept;
+}
 
 const noPlanReason = "No plan, so there is no member portal to view";
 
@@ -233,7 +255,7 @@ function menuItems(context: PersonContext): Array<MenuItem | null> {
 			),
 		);
 	}
-	return items;
+	return context.readOnly ? readOnlyItems(items) : items;
 }
 
 /** The ⋯ button of a row or the drawer. */

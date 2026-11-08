@@ -10,6 +10,7 @@ import { type Menu, planLimits } from "../data/plans.ts";
 import type { Reader } from "../data/reader.ts";
 import type { Clock, School } from "../data/types.ts";
 import type { Writer } from "../data/writer.ts";
+import { DemoReadOnlyNote } from "./demo-note.tsx";
 import { Icon } from "./icon.tsx";
 import { LoadFailed } from "./load-failed.tsx";
 import type { PaneProps } from "./panes.tsx";
@@ -262,7 +263,9 @@ export function Plans({
 	const { live, draft, summary, saveStatus } = session;
 	const view = plansViewOf(viewing);
 	const owner = school.role === "owner";
-	const mode = modeOf(route.query);
+	/** A demo school refuses every write: it shows the tables alone, with no control that would write. */
+	const readOnly = school.demo;
+	const mode = readOnly ? "edit" : modeOf(route.query);
 	const changes = diffMenus(live, draft);
 	const problemList = problems(draft);
 	const askedShow = route.query.get("show");
@@ -392,7 +395,7 @@ export function Plans({
 	return (
 		<div onClickCapture={yaml.flush}>
 			<div inert={editing !== null || reviewing}>
-				{view.admin && (
+				{view.admin && !readOnly && (
 					<PlanSetup
 						steps={setupSteps({
 							stripeConnected: summary.stripeConnected,
@@ -437,61 +440,67 @@ export function Plans({
 						</span>
 					)}
 					<span class="sp" />
-					{/* biome-ignore lint/a11y/useSemanticElements: the mockup's segmented control is a div; a fieldset brings its own border and padding */}
-					<div class="seg" role="group" aria-label="Plans view">
-						{modes.map((option) => (
+					{readOnly ? (
+						<DemoReadOnlyNote />
+					) : (
+						<>
+							{/* biome-ignore lint/a11y/useSemanticElements: the mockup's segmented control is a div; a fieldset brings its own border and padding */}
+							<div class="seg" role="group" aria-label="Plans view">
+								{modes.map((option) => (
+									<button
+										key={option.mode}
+										type="button"
+										class={option.mode === mode ? "on" : undefined}
+										aria-pressed={option.mode === mode}
+										data-test="plan-mode"
+										data-mode={option.mode}
+										onClick={() => chooseMode(option.mode)}
+									>
+										<Icon name={option.icon} />
+										{option.label}
+									</button>
+								))}
+							</div>
+							{changes.length > 0 && (
+								<button
+									type="button"
+									class="btn"
+									data-test="plan-discard"
+									title={writeTitle}
+									disabled={view.preview}
+									onClick={() => {
+										changeDraft(live);
+										onToast("Draft discarded.");
+									}}
+								>
+									<Icon name="undo" />
+									Discard draft
+								</button>
+							)}
 							<button
-								key={option.mode}
 								type="button"
-								class={option.mode === mode ? "on" : undefined}
-								aria-pressed={option.mode === mode}
-								data-test="plan-mode"
-								data-mode={option.mode}
-								onClick={() => chooseMode(option.mode)}
+								class="btn p"
+								data-test="plan-review"
+								title={reason}
+								aria-describedby={reason ? reasonId : undefined}
+								disabled={!canPublish}
+								onClick={() => setReviewing(true)}
 							>
-								<Icon name={option.icon} />
-								{option.label}
+								<Icon name="upload" />
+								Review and publish
 							</button>
-						))}
-					</div>
-					{changes.length > 0 && (
-						<button
-							type="button"
-							class="btn"
-							data-test="plan-discard"
-							title={writeTitle}
-							disabled={view.preview}
-							onClick={() => {
-								changeDraft(live);
-								onToast("Draft discarded.");
-							}}
-						>
-							<Icon name="undo" />
-							Discard draft
-						</button>
-					)}
-					<button
-						type="button"
-						class="btn p"
-						data-test="plan-review"
-						title={reason}
-						aria-describedby={reason ? reasonId : undefined}
-						disabled={!canPublish}
-						onClick={() => setReviewing(true)}
-					>
-						<Icon name="upload" />
-						Review and publish
-					</button>
-					{reason && (
-						<span class="visually-hidden" id={reasonId}>
-							{reason}
-						</span>
-					)}
-					{saveStatus === "failed" && problemList.length === 0 && (
-						<button type="button" class="btn s" onClick={() => save(draft)}>
-							<Icon name="undo" />
-							Retry save
-						</button>
+							{reason && (
+								<span class="visually-hidden" id={reasonId}>
+									{reason}
+								</span>
+							)}
+							{saveStatus === "failed" && problemList.length === 0 && (
+								<button type="button" class="btn s" onClick={() => save(draft)}>
+									<Icon name="undo" />
+									Retry save
+								</button>
+							)}
+						</>
 					)}
 				</div>
 				{problemList.length > 0 && mode !== "code" && (
@@ -519,6 +528,7 @@ export function Plans({
 							addons: draft.addons.length >= planLimits.addons,
 						}}
 						owner={owner}
+						readOnly={readOnly}
 						onOpen={open}
 						onMembers={(tierId) => leave("members", ["plan", tierId])}
 					/>
