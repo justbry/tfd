@@ -1,4 +1,5 @@
 import type { D1Database, R2Bucket } from "./env";
+import { readMeta, writeMeta } from "./meta";
 
 /** Each fresh object costs up to three subrequests (head, get, put) after the page's list call. */
 const MAX_PAGE_SIZE = 200;
@@ -10,6 +11,11 @@ export const pageSizeFor = (budget: number): number =>
 /** The default budget of one run; the cron runs hourly, so a pass that needs more resumes within the hour. */
 export const DEFAULT_SUBREQUEST_BUDGET = 900;
 const STATE_KEY = "backup_state";
+/**
+ * The watermark is this Worker's clock but is compared with R2's `uploaded` times. Re-check a margin before it, so a
+ * write just after a pass starts that R2 stamps slightly earlier isn't missed; a copy already held costs only a head.
+ */
+const CLOCK_SKEW_MS = 5 * 60_000;
 
 /**
  * The backup copy of one version of a source object. The backup bucket's lock refuses overwrites, so each version has
@@ -20,12 +26,14 @@ export const backupKey = (key: string, etag: string): string =>
 
 /**
  * Where a pass is. `watermark`: every object uploaded before it is already copied. `cursor` and `passStartedAt`: a
- * pass in progress, resumed by the next run; when it completes, the watermark moves to when it started.
+ * pass in progress, resumed by the next run; when it completes, the watermark moves to when it started. `passFailed`:
+ * an earlier run of this pass had a failure, so the pass must not move the watermark even if its last run is clean.
  */
 export type BackupState = {
 	watermark: string | null;
 	cursor?: string;
 	passStartedAt?: string;
+	passFailed?: boolean;
 };
 
 export type BackupResult = {
@@ -38,25 +46,13 @@ export type BackupResult = {
 	state: BackupState;
 };
 
-export const readBackupState = async (db: D1Database): Promise<BackupState> => {
-	const row = await db
-		.prepare("SELECT value FROM schema_meta WHERE key = ?")
-		.bind(STATE_KEY)
-		.first<{ value: string }>();
-	return row ? (JSON.parse(row.value) as BackupState) : { watermark: null };
-};
+export const readBackupState = async (db: D1Database): Promise<BackupState> =>
+	(await readMeta<BackupState>(db, STATE_KEY)) ?? { watermark: null };
 
-export const writeBackupState = async (
+export const writeBackupState = (
 	db: D1Database,
 	state: BackupState,
-): Promise<void> => {
-	await db
-		.prepare(
-			"INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-		)
-		.bind(STATE_KEY, JSON.stringify(state))
-		.run();
-};
+): Promise<void> => writeMeta(db, STATE_KEY, state);
 
 /**
  * One run of the hourly backup. Lists the source from the saved cursor, copies objects uploaded at or after the
@@ -83,21 +79,25 @@ export const backupBucket = async ({
 		throw new Error(`backup budget must be at least ${MIN_SUBREQUEST_BUDGET}`);
 	const passStartedAt = state.passStartedAt ?? now.toISOString();
 	const since = state.watermark
-		? new Date(state.watermark).getTime()
+		? new Date(state.watermark).getTime() - CLOCK_SKEW_MS
 		: Number.NEGATIVE_INFINITY;
 	let cursor = state.cursor;
 	let subrequests = 0;
 	const counts = { copied: 0, skipped: 0, failed: 0 };
+	const resume = (): BackupResult => ({
+		...counts,
+		complete: false,
+		used: subrequests,
+		state: {
+			watermark: state.watermark,
+			cursor,
+			passStartedAt,
+			...(state.passFailed || counts.failed > 0 ? { passFailed: true } : {}),
+		},
+	});
 
 	while (true) {
-		if (subrequests + 1 > budget) {
-			return {
-				...counts,
-				complete: false,
-				used: subrequests,
-				state: { watermark: state.watermark, cursor, passStartedAt },
-			};
-		}
+		if (subrequests + 1 > budget) return resume();
 		const page = await source.list({ limit: pageSizeFor(budget), cursor });
 		subrequests += 1;
 		const fresh = page.objects.filter(
@@ -105,14 +105,7 @@ export const backupBucket = async ({
 		);
 		// Each fresh object costs up to three subrequests (head, get, put). Not enough budget left for this page: stop
 		// before it and resume from the same cursor, so no object of the page is half-done.
-		if (subrequests + fresh.length * 3 > budget) {
-			return {
-				...counts,
-				complete: false,
-				used: subrequests,
-				state: { watermark: state.watermark, cursor, passStartedAt },
-			};
-		}
+		if (subrequests + fresh.length * 3 > budget) return resume();
 		for (const object of fresh) {
 			const target = backupKey(object.key, object.etag);
 			try {
@@ -131,7 +124,7 @@ export const backupBucket = async ({
 				if (!(body && "body" in body)) {
 					counts.failed += 1;
 					log.error(
-						"backup skipped an object that changed or vanished since the listing",
+						`backup skipped ${object.key}: it changed or vanished since the listing`,
 					);
 					continue;
 				}
@@ -142,7 +135,7 @@ export const backupBucket = async ({
 			} catch (error) {
 				counts.failed += 1;
 				log.error(
-					`backup failed for an object: ${error instanceof Error ? error.message : String(error)}`,
+					`backup failed for ${object.key}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 		}
@@ -150,7 +143,8 @@ export const backupBucket = async ({
 		cursor = page.cursor;
 	}
 
-	const watermark = counts.failed === 0 ? passStartedAt : state.watermark;
+	const passClean = counts.failed === 0 && !state.passFailed;
+	const watermark = passClean ? passStartedAt : state.watermark;
 	return { ...counts, complete: true, used: subrequests, state: { watermark } };
 };
 

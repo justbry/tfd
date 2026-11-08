@@ -1,5 +1,6 @@
 import { backupKey } from "./backup";
 import type { D1Database, R2Bucket } from "./env";
+import { readMeta, writeMeta } from "./meta";
 
 const STATE_KEY = "prune_state";
 const MAX_PAGE_SIZE = 200;
@@ -19,25 +20,13 @@ export type PruneResult = {
 	state: PruneState;
 };
 
-export const readPruneState = async (db: D1Database): Promise<PruneState> => {
-	const row = await db
-		.prepare("SELECT value FROM schema_meta WHERE key = ?")
-		.bind(STATE_KEY)
-		.first<{ value: string }>();
-	return row ? (JSON.parse(row.value) as PruneState) : {};
-};
+export const readPruneState = async (db: D1Database): Promise<PruneState> =>
+	(await readMeta<PruneState>(db, STATE_KEY)) ?? {};
 
-export const writePruneState = async (
+export const writePruneState = (
 	db: D1Database,
 	state: PruneState,
-): Promise<void> => {
-	await db
-		.prepare(
-			"INSERT INTO schema_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-		)
-		.bind(STATE_KEY, JSON.stringify(state))
-		.run();
-};
+): Promise<void> => writeMeta(db, STATE_KEY, state);
 
 const supersededSince = async (
 	db: D1Database,
@@ -92,16 +81,29 @@ export const pruneSuperseded = async ({
 		subrequests += 1;
 		for (const copy of page.objects) {
 			const match = VERSIONED.exec(copy.key);
-			// A copy younger than the retention can't have been superseded that long (and the lock keeps it anyway).
-			if (!match || copy.uploaded.getTime() > cutoff) {
+			if (!match) {
 				counts.kept += 1;
 				continue;
 			}
+			// A young copy is still checked, so its supersession is recorded from the day it happens; it just can't be
+			// deleted until it is past the retention too (the lock would refuse anyway).
+			const young = copy.uploaded.getTime() > cutoff;
 			const [, etag, sourceKey] = match as unknown as [string, string, string];
 			try {
 				subrequests += 1;
 				const current = await source.head(sourceKey);
 				if (current?.etag === etag) {
+					// Current again (never superseded, or restored from this copy with its original bytes): forget any
+					// earlier supersession, so a later mistake gets its full 30 days.
+					// Look first: most current copies were never superseded, and a read is cheaper than a write.
+					subrequests += 1;
+					if ((await supersededSince(db, copy.key)) !== null) {
+						subrequests += 1;
+						await db
+							.prepare("DELETE FROM backup_superseded WHERE copy_key = ?")
+							.bind(copy.key)
+							.run();
+					}
 					counts.kept += 1;
 					continue;
 				}
@@ -118,7 +120,7 @@ export const pruneSuperseded = async ({
 					counts.kept += 1;
 					continue;
 				}
-				if (new Date(firstSeen).getTime() > cutoff) {
+				if (young || new Date(firstSeen).getTime() > cutoff) {
 					counts.kept += 1;
 					continue;
 				}
@@ -140,7 +142,7 @@ export const pruneSuperseded = async ({
 			} catch (error) {
 				counts.failed += 1;
 				log.error(
-					`prune failed for a copy: ${error instanceof Error ? error.message : String(error)}`,
+					`prune failed for ${copy.key}: ${error instanceof Error ? error.message : String(error)}`,
 				);
 			}
 		}

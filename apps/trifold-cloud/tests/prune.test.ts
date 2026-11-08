@@ -60,6 +60,20 @@ describe("pruning superseded copies", () => {
 		expect(backup.objects.has(backupKey("a", etag))).toBe(false);
 	});
 
+	test("a copy restored to the source and deleted again gets a fresh 30 days", async () => {
+		const { source, backup, put, copy, prune } = setup();
+		const etag = put("a", "one", OLD);
+		copy("a", etag, OLD);
+		const stored = source.objects.get("a");
+		source.objects.delete("a");
+		await prune(NOW);
+		if (stored) source.objects.set("a", stored);
+		await prune(new Date(NOW.getTime() + DAY));
+		source.objects.delete("a");
+		expect(await prune(LATER)).toMatchObject({ deleted: 0 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(true);
+	});
+
 	test("a year-old object rewritten just now keeps its old copy for 30 days, and longer until the new version is copied", async () => {
 		const { backup, put, copy, prune } = setup();
 		const first = put("a", "one", OLD);
@@ -76,12 +90,17 @@ describe("pruning superseded copies", () => {
 		expect(backup.objects.has(backupKey("a", second))).toBe(true);
 	});
 
-	test("a young copy is never considered", async () => {
-		const { source, put, copy, prune } = setup();
+	test("a young copy superseded the same day is deleted 30 days later, not 60", async () => {
+		const { source, backup, put, copy, prune } = setup();
 		const etag = put("a", "one", NOW);
 		copy("a", etag, NOW);
 		source.objects.delete("a");
 		expect(await prune(NOW)).toMatchObject({ deleted: 0, kept: 1 });
+		expect(await prune(new Date(NOW.getTime() + 10 * DAY))).toMatchObject({
+			deleted: 0,
+		});
+		expect(await prune(LATER)).toMatchObject({ deleted: 1 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(false);
 	});
 
 	test("a large backup is pruned across runs within the budget", async () => {
@@ -119,5 +138,29 @@ describe("pruning superseded copies", () => {
 		const second = await runPass(LATER);
 		expect(second.deleted).toBe(300);
 		expect(second.runs).toBeGreaterThan(1);
+	});
+
+	test("restoring an object clears its supersession, so a later mistake gets the full 30 days", async () => {
+		const { source, backup, put, copy, prune } = setup();
+		const etag = put("a", "one", OLD);
+		copy("a", etag, OLD);
+		source.objects.delete("a");
+		await prune(NOW);
+		// Restored three days later with the original bytes: the fake gives a new ETag on every write, so pin it back.
+		const restoredAt = new Date(NOW.getTime() + 3 * DAY);
+		put("a", "one", restoredAt);
+		(source.objects.get("a") as { etag: string }).etag = etag;
+		await prune(restoredAt);
+		// Deleted again 200 days later: the copy must survive the next 30 days.
+		const secondMistake = new Date(NOW.getTime() + 200 * DAY);
+		source.objects.delete("a");
+		expect(await prune(secondMistake)).toMatchObject({ deleted: 0 });
+		expect(
+			await prune(new Date(secondMistake.getTime() + 10 * DAY)),
+		).toMatchObject({ deleted: 0 });
+		expect(backup.objects.has(backupKey("a", etag))).toBe(true);
+		expect(
+			await prune(new Date(secondMistake.getTime() + 31 * DAY)),
+		).toMatchObject({ deleted: 1 });
 	});
 });

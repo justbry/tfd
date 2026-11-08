@@ -506,6 +506,7 @@ function Roster({
 					viewer,
 					changes,
 					creditUnit: unit.other,
+					readOnly: school.demo,
 				}
 			: null;
 	};

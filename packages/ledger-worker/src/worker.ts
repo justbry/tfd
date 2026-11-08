@@ -7,7 +7,8 @@
  * an `ETag` (`If-None-Match` answers 304) and `private, max-age=0, must-revalidate` (`public, max-age=60` on a demo
  * school). Order of checks: the token (401), the route, the school in the token's `schools[]` (404 `not_found`, the
  * same for an unknown school), the gate of the endpoint (403), the query (400), then the data (404 `no_data`, 409, 503).
- * Every check runs before a stored answer is looked up.
+ * Every check runs before a stored answer is looked up. Every `/v1` answer, errors too, carries `Server-Timing`
+ * (`timing.ts`): the phases' names and times, no ids.
  *
  * Demo schools (`demo.ts`, `LEDGER_DEMO_SCHOOLS=on`): `GET /v1/schools` and a demo school's paths need no token. A
  * token that is sent is checked all the same (an invalid or expired one is a 401); a valid one that does not list the
@@ -77,6 +78,7 @@ import {
 	storedAnswer,
 	type WaitUntil,
 } from "./routes/stored.js";
+import { Timing, timedCache, timedStore } from "./timing.js";
 import { runViewsJob, type ViewsJobResult } from "./views-job.js";
 
 const SCHOOL_PATH = /^\/v1\/schools\/([^/]+)\/(.+)$/;
@@ -301,6 +303,13 @@ const defaultAnswersCache = (): AnswersCache | null =>
 	(globalThis as { caches?: { default?: AnswersCache } }).caches?.default ??
 	null;
 
+/** The answer with its `Server-Timing` (`timing.ts`), `total` up to now. */
+const withTiming = (response: Response, timing: Timing): Response => {
+	const timed = new Response(response.body, response);
+	timed.headers.set("server-timing", timing.header());
+	return timed;
+};
+
 export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 	const clock = options.clock ?? (() => Date.now());
 	const answersCache = (): AnswersCache | null =>
@@ -375,18 +384,25 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		url: URL,
 		now: number,
 		waitUntil: WaitUntil,
+		timing: Timing,
 	): Promise<Response> => {
-		const caller = await authenticate(request, env, now);
+		let caller: Caller | null = null;
+		if (request.headers.has("authorization"))
+			caller = await timing.measure("auth", () =>
+				authenticate(request, env, now),
+			);
+		else timing.note("auth", "none");
 		const demoApi = DEMO_API_PATH.exec(url.pathname);
 		if (demoApi !== null) {
 			// a demo school's buzz-school answers: no token needed, and nothing for any other school
+			timing.endpoint("demo-api");
 			const school = decode(demoApi[1] as string);
 			if (!isDemoSchool(school, env))
 				throw new ApiError("not_found", "No such endpoint.");
 			if (request.method !== "GET")
 				throw new ApiError("method_not_allowed", "Only GET is served.");
 			return demoApiRoute(
-				new R2BindingStore(env.LEDGER_BUCKET),
+				timedStore(new R2BindingStore(env.LEDGER_BUCKET), timing),
 				school,
 				demoApi[2] as string,
 				url.searchParams,
@@ -414,8 +430,9 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		const configPath = CONFIG_SCHOOL_PATH.exec(url.pathname);
 		if (request.method !== "GET" && configPath === null)
 			throw new ApiError("method_not_allowed", "Only GET is served.");
-		const store = new R2BindingStore(env.LEDGER_BUCKET);
+		const store = timedStore(new R2BindingStore(env.LEDGER_BUCKET), timing);
 		if (url.pathname === "/v1/schools") {
+			timing.endpoint("schools");
 			const ids = caller === null ? [] : [...caller.schools.keys()];
 			const [listed, demo] = await Promise.all([
 				schoolsRoute(store, ids, now),
@@ -439,6 +456,7 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 		const rest = match[2] as string;
 		const config = configActionOf(request.method, rest);
 		if (config !== null) {
+			timing.endpoint(`config-${config.action}`);
 			const grant = grantOf(school);
 			if (config.action !== "read" && isDemoSchool(school, env))
 				throw new ApiError(
@@ -471,6 +489,7 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 				: memberMoney;
 		if (route === undefined)
 			throw new ApiError("not_found", "No such endpoint.");
+		timing.endpoint(moneyKey === undefined ? rest : "member-money");
 		const grant = grantOf(school);
 		if (route.gate === "finance" && !grant.finance)
 			throw new ApiError(
@@ -492,14 +511,16 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 			};
 			if (matchesEtag(request.headers.get("if-none-match"), etag))
 				return notModifiedResponse(headers);
+			const cache = answersCache();
 			const stored = await storedAnswer({
 				store,
 				school,
 				pointer,
 				name: use.name,
 				origin: url.origin,
-				cache: answersCache(),
+				cache: cache === null ? null : timedCache(cache, timing),
 				waitUntil,
+				timing,
 			});
 			if (stored !== null)
 				return storedResponse(
@@ -508,34 +529,40 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 					headers,
 				);
 		}
-		const snapshot = await openSnapshot(store, school, { opened }).catch(
-			(error) => {
-				// The disclosure is policy, not data: a school with no views yet still answers it (the defaults).
-				if (
-					route === routes.disclosure &&
-					error instanceof ApiError &&
-					error.code === "no_data"
-				)
-					return null;
-				throw error;
+		// no stored answer served it: worked out from the views (a fallback where the endpoint has stored answers)
+		return timing.measure(
+			route.stored === undefined ? "compute" : "fallback",
+			async () => {
+				const snapshot = await openSnapshot(store, school, { opened }).catch(
+					(error) => {
+						// The disclosure is policy, not data: a school with no views yet still answers it (the defaults).
+						if (
+							route === routes.disclosure &&
+							error instanceof ApiError &&
+							error.code === "no_data"
+						)
+							return null;
+						throw error;
+					},
+				);
+				if (snapshot === null)
+					return okResponse(
+						disclosureBeforeViews(school, now, adminAudienceOf(grant)),
+						{ asOf: null, lagMinutes: null },
+					);
+				const data = await route.handle({
+					snapshot,
+					query: url.searchParams,
+					now,
+					key: moneyKey === undefined ? null : decode(moneyKey),
+					grant,
+				});
+				return okResponse(data, {
+					asOf: snapshot.asOf,
+					lagMinutes: lagMinutesOf(snapshot.asOf, now),
+				});
 			},
 		);
-		if (snapshot === null)
-			return okResponse(
-				disclosureBeforeViews(school, now, adminAudienceOf(grant)),
-				{ asOf: null, lagMinutes: null },
-			);
-		const data = await route.handle({
-			snapshot,
-			query: url.searchParams,
-			now,
-			key: moneyKey === undefined ? null : decode(moneyKey),
-			grant,
-		});
-		return okResponse(data, {
-			asOf: snapshot.asOf,
-			lagMinutes: lagMinutesOf(snapshot.asOf, now),
-		});
 	};
 
 	return {
@@ -550,6 +577,7 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 				if (env.ASSETS !== undefined) return env.ASSETS.fetch(request);
 				return errorResponse(new ApiError("not_found", "Not found."));
 			}
+			const timing = new Timing();
 			try {
 				// without a context (tests in-process) the cache is filled before the answer goes
 				const pending: Promise<unknown>[] = [];
@@ -563,21 +591,26 @@ export const createLedgerWorker = (options: LedgerWorkerOptions = {}) => {
 					url,
 					await clock(env),
 					waitUntil,
+					timing,
 				);
 				await Promise.all(pending);
-				return response;
+				return withTiming(response, timing);
 			} catch (error) {
-				if (error instanceof ApiError) return errorResponse(error);
+				if (error instanceof ApiError)
+					return withTiming(errorResponse(error), timing);
 				// R2 or the runtime failed: nothing to show for it, and nothing about the request is logged
 				console.error(
 					"ledger request failed",
 					error instanceof Error ? error.name : "unknown",
 				);
-				return errorResponse(
-					new ApiError(
-						"views_unavailable",
-						"The ledger cannot be read right now.",
+				return withTiming(
+					errorResponse(
+						new ApiError(
+							"views_unavailable",
+							"The ledger cannot be read right now.",
+						),
 					),
+					timing,
 				);
 			} finally {
 				// A refusal that never read the body (owner_only, step_up_required, demo_read_only) would leave it on the

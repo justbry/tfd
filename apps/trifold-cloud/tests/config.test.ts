@@ -72,6 +72,7 @@ describe("production stays unbound until the launch gate", () => {
 			),
 		).toEqual(["trifold-staging-books", "trifold-staging-backups"]);
 		expect(staging.vars.ENVIRONMENT).toBe("staging");
+		expect(staging.triggers.crons).toEqual(["17 * * * *"]);
 		expect(
 			staging.secrets_store_secrets.map(
 				(secret: { binding: string; secret_name: string }) => [

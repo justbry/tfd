@@ -21,6 +21,7 @@ import {
 } from "../data/answers.js";
 import { openSnapshot } from "../data/snapshot.js";
 import type { Store } from "../data/store-io.js";
+import type { Timing } from "../timing.js";
 import { disclosureRoute, kpiRoute, zoneOf } from "./kpi.js";
 
 /** What the Worker needs of `caches.default`. */
@@ -125,11 +126,16 @@ export const storedAnswer = async (input: {
 	origin: string;
 	cache: AnswersCache | null;
 	waitUntil: WaitUntil;
+	/** Told when the isolate's copy serves the answer, so the Cache API is not asked. */
+	timing?: Timing;
 }): Promise<string | null> => {
 	const { store, school, pointer, name, origin, cache, waitUntil } = input;
 	const memoKey = `${school}|${pointer.generation}|${pointer.day}`;
 	const kept = bundles.get(memoKey);
-	if (kept !== undefined) return (await kept)?.get(name) ?? null;
+	if (kept !== undefined) {
+		input.timing?.note("cache", "isolate");
+		return (await kept)?.get(name) ?? null;
+	}
 	if (cache !== null) {
 		const hit = await cache
 			.match(cacheKeyOf(origin, school, pointer, name))

@@ -12,17 +12,21 @@ const notFound = (): Response =>
 	);
 
 /** Routes by Host: the ledger UI host and the API host share this Worker (PLAN.md section 2). */
+const surfaceOf = (
+	hostname: string,
+	env: CloudEnv,
+): "ledger" | "api" | null => {
+	if (hostname === env.LEDGER_HOST) return "ledger";
+	if (hostname === env.API_HOST) return "api";
+	return null;
+};
+
 export const route = async (
 	request: Request,
 	env: CloudEnv,
 ): Promise<Response> => {
 	const url = new URL(request.url);
-	const surface =
-		url.hostname === env.LEDGER_HOST
-			? "ledger"
-			: url.hostname === env.API_HOST
-				? "api"
-				: null;
+	const surface = surfaceOf(url.hostname, env);
 	if (surface === null) return notFound();
 	if (
 		url.pathname === "/healthz" &&

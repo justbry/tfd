@@ -63,7 +63,7 @@ env -u CLOUDFLARE_API_TOKEN bunx wrangler@4.90.0 secret put STRIPE_SECRET_KEY --
 |---|---|---|
 | D1 | Time Travel, 30 days, built in | `wrangler d1 time-travel restore trifold-cloud-staging --timestamp=…` |
 | Org Durable Objects | SQLite point-in-time recovery, 30 days, built in | per object, from the DO's bookmark API (runbook in M7) |
-| R2 books | Hourly copy to `trifold-staging-backups` as `versions/<etag>/<key>` | copy the wanted versions back |
+| R2 books | Hourly copy to `trifold-staging-backups` as `versions/<etag>/<key>` | copy the wanted version back to `<key>` with its original bytes in a single-part put, so its ETag matches the copy again; the prune pass then treats that copy as current and clears its supersession date |
 
 The backup bucket has a 30-day bucket lock: a copy can't be deleted or overwritten for 30 days, which is why each
 version has its own key. There is no expiry rule. After each complete backup pass, the cron prunes a copy only once it has been
@@ -71,7 +71,8 @@ version has its own key. There is no expiry rule. After each complete backup pas
 source (rewritten or deleted there), deletes it 30 days after that, and for a rewritten object only once the backup
 holds the current version. The current version of every object is kept however old it is, and an accidental delete or
 bad write at the source leaves the last good copy for 30 days. A deleted org's books leave the backups 30 days after
-the deletion, plus one pass: the retention the privacy policy states (PLAN.md M6).
+the deletion, plus one pass: the retention the privacy policy states (PLAN.md M6). Supersession rows for copies removed some other way are
+never cleaned up; harmless, and tidied in M7.
 
 ```sh
 bunx wrangler@4.90.0 r2 bucket lock add trifold-staging-backups --name keep-30-days --retention-days 30

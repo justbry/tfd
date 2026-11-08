@@ -48,4 +48,13 @@ describe("hourly cron", () => {
 			"1 backup and 0 prune failures",
 		);
 	});
+
+	test("refuses a budget that is not a number or below the minimum", async () => {
+		for (const value of ["lots", "3", "-1"]) {
+			const env = { ...fakeEnv(), BACKUP_SUBREQUEST_BUDGET: value };
+			await expect(runCron(env, new Date(), quiet)).rejects.toThrow(
+				"BACKUP_SUBREQUEST_BUDGET must be a number",
+			);
+		}
+	});
 });
