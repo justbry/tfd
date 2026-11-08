@@ -9,6 +9,7 @@ import {
 import type { School } from "../data/types.ts";
 import { cutoffHours } from "./booking-text.ts";
 import { focusCloseButton } from "./close-focus.ts";
+import { DemoReadOnlyNote } from "./demo-note.tsx";
 import { useFocusTrap } from "./focus-trap.ts";
 import { Icon, type IconName } from "./icon.tsx";
 import {
@@ -205,7 +206,7 @@ function BookingRow({
 				</div>
 			</div>
 			<div class="a">
-				{waiting ? (
+				{context.readOnly ? null : waiting ? (
 					<span class="badge b-warn">
 						<Icon name="clock" />
 						waiting to ship
@@ -239,6 +240,60 @@ function BookingRow({
 				) : null}
 			</div>
 		</div>
+	);
+}
+
+/** The drawer's money buttons: Send invoice, Adjust and Refund. A demo school has none. */
+function MoneyButtons({
+	context,
+	unit,
+	locked,
+	onAction,
+}: {
+	context: PersonContext;
+	unit: DrawerProps["unit"];
+	locked: boolean;
+	onAction: DrawerProps["onAction"];
+}): JSX.Element {
+	const { capabilities, viewer } = context;
+	return (
+		<>
+			<DrawerButton
+				icon="mail"
+				label="Send invoice"
+				reason={
+					viewer.finance
+						? capabilityReason(capabilities, "invoice", "drawer")
+						: "Finance only"
+				}
+				locked={locked}
+				hook="drawer-action"
+				action="invoice"
+				onClick={() => onAction("invoice")}
+			/>
+			<DrawerButton
+				icon="sliders"
+				label={`Adjust ${unit.other}`}
+				reason={
+					viewer.finance
+						? capabilityReason(capabilities, "adjustCredits", "drawer")
+						: "Finance only"
+				}
+				locked={locked}
+				hook="drawer-action"
+				action="adjust"
+				onClick={() => onAction("adjust")}
+			/>
+			<DrawerButton
+				icon="undo"
+				label="Refund"
+				reason={capabilityReason(capabilities, "refund", "drawer")}
+				locked={locked}
+				hook="drawer-action"
+				action="refund"
+				onClick={() => onAction("refund")}
+			/>
+		</>
 	);
 }
 
@@ -371,41 +426,16 @@ export function MemberDrawer({
 							action="view-as-member"
 							onClick={() => onAction("view-as-member")}
 						/>
-						<DrawerButton
-							icon="mail"
-							label="Send invoice"
-							reason={
-								viewer.finance
-									? capabilityReason(capabilities, "invoice", "drawer")
-									: "Finance only"
-							}
-							locked={locked}
-							hook="drawer-action"
-							action="invoice"
-							onClick={() => onAction("invoice")}
-						/>
-						<DrawerButton
-							icon="sliders"
-							label={`Adjust ${unit.other}`}
-							reason={
-								viewer.finance
-									? capabilityReason(capabilities, "adjustCredits", "drawer")
-									: "Finance only"
-							}
-							locked={locked}
-							hook="drawer-action"
-							action="adjust"
-							onClick={() => onAction("adjust")}
-						/>
-						<DrawerButton
-							icon="undo"
-							label="Refund"
-							reason={capabilityReason(capabilities, "refund", "drawer")}
-							locked={locked}
-							hook="drawer-action"
-							action="refund"
-							onClick={() => onAction("refund")}
-						/>
+						{context.readOnly ? (
+							<DemoReadOnlyNote />
+						) : (
+							<MoneyButtons
+								context={context}
+								unit={unit}
+								locked={locked}
+								onAction={onAction}
+							/>
+						)}
 					</>
 				) : (
 					<DrawerButton
