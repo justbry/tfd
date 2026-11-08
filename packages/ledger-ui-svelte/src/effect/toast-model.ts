@@ -21,6 +21,11 @@ export type ToastInput = {
 	action?: ToastAction;
 	/** Stays until dismissed or updated whatever its tone (a retry in progress). */
 	sticky?: boolean;
+	/** A run's progress on this toast's failure ("Retrying (2 of 3)"): shown in place of `detail` and announced
+	 * politely, while the failure sentence (title, detail, what to do) stays as it was. Empty: none. */
+	progress?: string;
+	/** A run started from this toast is on its way: its action is not offered again until it ends. */
+	busy?: boolean;
 	/** Who the toast speaks for (one read of a screen): identical messages merge only within one owner, so that one
 	 * read's recovery never takes down another read's still-valid failure. None: merges with any unowned toast. */
 	owner?: string;

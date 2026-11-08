@@ -1,12 +1,12 @@
 import type { Effect } from "effect";
 import type { AppServices } from "../effect/app-layer.ts";
-import { messageFor } from "../effect/messages.ts";
 import { withRetry } from "../effect/retry.ts";
+import { Toasts } from "../effect/services.ts";
 import type { UiError } from "../effect/ui-error.ts";
 import { type AppContext, perform } from "./context.ts";
 
 export type RetryingRead = {
-	/** Runs the read; while a try is on its way another call does nothing. */
+	/** Runs the read; while a try is on its way another call does nothing (its toast's Retry says it is busy). */
 	run: () => Promise<void>;
 	/** The screen no longer wants this read (another school, an unmount): the run on its way is interrupted (its
 	 * retries and waits stop, its retry toast leaves), its failure toast leaves, and a Retry clicked later does
@@ -19,9 +19,9 @@ let readsMade = 0;
 
 /** A read a screen shows (S9-plan section 5): tried under the read retry rule; a failure is toasted with Retry (the
  * same read again) and Reload, and handed to the screen to show in place. One failure is one toast, owned by this
- * read: a Retry shows its progress in that toast's second line, a later success takes it down, a failure the same way
- * merges into it (its count up), a different failure replaces it. Another read's toasts are never touched, even with
- * the same words. */
+ * read: a run started while that toast is on screen shows its progress there (else in a retry toast of its own), a
+ * later success takes it down, a failure the same way merges into it (its count up), a different failure replaces it.
+ * Another read's toasts are never touched, even with the same words. */
 export function retryingRead<A>(
 	context: AppContext,
 	load: () => Effect.Effect<A, UiError, AppServices>,
@@ -36,25 +36,44 @@ export function retryingRead<A>(
 	/** The run on its way, if any. */
 	let running: AbortController | null = null;
 	let cancelled = false;
-	/** This read's failure toast and its own second line. */
-	let failure: { id: string; detail: string } | null = null;
+	/** This read's failure toast, while it is in the queue. */
+	let failureToast: string | null = null;
+	const where = (id: string): "visible" | "waiting" | "gone" => {
+		const { visible, waiting } = context.toasts.state;
+		if (visible.some((toast) => toast.id === id)) return "visible";
+		if (waiting.some((toast) => toast.id === id)) return "waiting";
+		return "gone";
+	};
+	const markBusy = (id: string, busy: boolean): void => {
+		context.runtime.runFork(
+			Toasts.use((toasts) => toasts.update(id, { busy })),
+		);
+	};
 	/** The read's failure toast is now `next`: the previous one leaves unless it is that same, merged toast. */
-	const settle = (next: { id: string; detail: string } | null): void => {
-		if (failure !== null && failure.id !== next?.id)
-			context.toasts.dismiss(failure.id);
-		failure = next;
+	const settle = (next: string | null): void => {
+		if (failureToast !== null && failureToast !== next)
+			context.toasts.dismiss(failureToast);
+		failureToast = next;
 	};
 	const run = async (): Promise<void> => {
 		if (running || cancelled) return;
+		// A toast dismissed by hand is no longer this read's to settle.
+		if (failureToast !== null && where(failureToast) === "gone")
+			failureToast = null;
+		const progressIn =
+			failureToast !== null && where(failureToast) === "visible"
+				? failureToast
+				: undefined;
 		const controller = new AbortController();
 		running = controller;
 		on.busy?.(true);
+		if (failureToast !== null) markBusy(failureToast, true);
 		const outcome = await perform(
 			context,
 			withRetry(
 				load(),
 				{ kind: "read" },
-				{ owner, ...(failure ? { progressIn: failure } : {}) },
+				{ owner, ...(progressIn === undefined ? {} : { progressIn }) },
 			),
 			{
 				handlers: { retry: run, reload: () => window.location.reload() },
@@ -63,20 +82,21 @@ export function retryingRead<A>(
 			},
 		);
 		running = null;
+		on.busy?.(false);
 		if (cancelled) {
 			// The cancel landed after the failure was reported: that toast speaks for nobody now.
-			if (!outcome.ok && !outcome.interrupted)
+			if (!outcome.ok && !outcome.interrupted && outcome.toastId !== null)
 				context.toasts.dismiss(outcome.toastId);
 			return;
 		}
-		on.busy?.(false);
 		if (outcome.ok) {
 			settle(null);
 			on.value(outcome.value);
 		} else if (!outcome.interrupted) {
-			settle({ id: outcome.toastId, detail: messageFor(outcome.error).what });
+			settle(outcome.toastId);
+			if (outcome.toastId !== null) markBusy(outcome.toastId, false);
 			on.failure?.(outcome.error);
-		}
+		} else if (failureToast !== null) markBusy(failureToast, false);
 	};
 	const cancel = (): void => {
 		cancelled = true;

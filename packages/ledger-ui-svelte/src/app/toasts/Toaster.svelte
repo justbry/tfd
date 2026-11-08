@@ -30,6 +30,7 @@
 		frame: HTMLElement | null;
 	} = $props();
 
+	const trailingStop = /\.$/;
 	const toneIcons: Record<Toast["tone"], IconName> = {
 		error: "alert",
 		warning: "alert",
@@ -62,10 +63,18 @@
 	const edge = $derived(
 		edgeFor({ toastCount: visible.length, focused, usual: usualBox(layout) }),
 	);
+	/** The failure sentence: announced when the toast appears and when a merge bumps its count, never for progress. */
 	const announce = (toast: Toast): string =>
-		[toast.title, toast.detail, toast.doThis, toast.count > 1 ? `${toast.count} times` : ""]
+		`${[toast.title, toast.detail, toast.doThis, toast.count > 1 ? `${toast.count} times` : ""]
 			.filter(Boolean)
-			.join(". ");
+			.map((part) => part?.replace(trailingStop, ""))
+			.join(". ")}.`;
+	/** A run's progress on a toast, announced politely at each step. */
+	const withProgress = $derived(visible.filter((toast) => Boolean(toast.progress)));
+	/** Neither the page nor the frame is a control to come back to, nor a place the stack must avoid. */
+	const isControl = (element: Element): element is HTMLElement =>
+		element instanceof HTMLElement && element !== document.body && element !== frame;
+	let sentinel: HTMLElement | undefined = $state();
 
 	const boxOf = (element: Element): Box => {
 		const { left, top: boxTop, right, bottom } = element.getBoundingClientRect();
@@ -88,7 +97,7 @@
 			anchor ? anchor.getBoundingClientRect().bottom : nextFrame.top,
 		);
 		focused =
-			active instanceof Element && active !== document.body && !region?.contains(active)
+			active instanceof Element && isControl(active) && !region?.contains(active)
 				? boxOf(active)
 				: null;
 	};
@@ -103,17 +112,23 @@
 
 	/** Focus never falls to the page's body when a toast leaves, whatever takes it down (its own button, the read it
 	 * reported recovering, its timer): before the stack redraws, if focus is inside a toast that is leaving, it goes
-	 * back to the control that had it before the stack, else to the Dismiss of a toast that stays, else to the app's
-	 * frame. */
-	const focusTarget = (staying: ReadonlySet<string>): HTMLElement | null => {
-		if (focusBefore?.isConnected) return focusBefore;
+	 * back to the control that had it before the stack, else to the Dismiss of a toast that stays, else to the stack's
+	 * own sentinel (never the app's frame, which the stack would then take for a control to avoid). Each candidate is
+	 * kept only if it took focus: a control disabled meanwhile does not. */
+	const moveFocusOut = (staying: ReadonlySet<string>): void => {
 		const neighbour = [
 			...(region?.querySelectorAll<HTMLElement>("[data-toast-id]") ?? []),
 		].find((element) => staying.has(element.dataset.toastId ?? ""));
-		const dismiss = neighbour?.querySelector<HTMLElement>("[data-test=toast-dismiss]");
-		if (dismiss) return dismiss;
-		if (frame && !frame.hasAttribute("tabindex")) frame.tabIndex = -1;
-		return frame;
+		const candidates = [
+			focusBefore?.isConnected ? focusBefore : null,
+			neighbour?.querySelector<HTMLElement>("[data-test=toast-dismiss]") ?? null,
+			sentinel ?? null,
+		];
+		for (const candidate of candidates) {
+			if (!candidate) continue;
+			candidate.focus();
+			if (document.activeElement === candidate) return;
+		}
 	};
 	$effect.pre(() => {
 		const staying = new Set(visible.map((toast) => toast.id));
@@ -123,17 +138,16 @@
 				active instanceof HTMLElement && region?.contains(active)
 					? active.closest<HTMLElement>("[data-toast-id]")
 					: null;
-			if (holder && !staying.has(holder.dataset.toastId ?? ""))
-				focusTarget(staying)?.focus();
+			if (holder && !staying.has(holder.dataset.toastId ?? "")) moveFocusOut(staying);
 		});
 	});
 
 	onMount(() => {
 		const onFocusIn = (event: FocusEvent): void => {
 			const target = event.target;
-			if (!(target instanceof Element) || region?.contains(target)) return;
+			if (!(target instanceof Element) || !isControl(target) || region?.contains(target)) return;
 			focused = boxOf(target);
-			if (target instanceof HTMLElement) focusBefore = target;
+			focusBefore = target;
 		};
 		const onFocusOut = (event: FocusEvent): void => {
 			if (event.relatedTarget === null) focused = null;
@@ -160,14 +174,18 @@
 	class="pointer-events-none fixed z-(--layer-toast) flex max-w-[calc(100vw-16px)] flex-col gap-2"
 	style={positionStyle(edge, layout)}
 >
+	<span bind:this={sentinel} class="sr-only" tabindex="-1" data-test="toasts-sentinel">Notifications</span>
 	<div class="sr-only" role="alert" data-test="toasts-assertive">
 		{#each visible.filter((toast) => toast.tone === "error") as toast (`${toast.id}-${toast.count}`)}
 			<p>{announce(toast)}</p>
 		{/each}
 	</div>
 	<div class="sr-only" role="status" data-test="toasts-polite">
-		{#each visible.filter((toast) => toast.tone !== "error") as toast (`${toast.id}-${toast.count}`)}
+		{#each visible.filter((toast) => toast.tone !== "error") as toast (`${toast.id}-${toast.count}-${toast.detail ?? ""}`)}
 			<p>{announce(toast)}</p>
+		{/each}
+		{#each withProgress as toast (`${toast.id}-progress-${toast.progress}`)}
+			<p>{toast.title.replace(trailingStop, "")}. {toast.progress}.</p>
 		{/each}
 	</div>
 	{#each visible as toast (toast.id)}
@@ -193,7 +211,9 @@
 						>
 					{/if}
 				</div>
-				{#if toast.detail}
+				{#if toast.progress}
+					<div data-test="toast-progress">{toast.progress}</div>
+				{:else if toast.detail}
 					<div data-test="toast-detail">{toast.detail}</div>
 				{/if}
 				{#if toast.doThis}
@@ -204,7 +224,11 @@
 						type="button"
 						class="mt-1 rounded-md border border-background/40 px-2 py-0.5 font-semibold hover:bg-background/10 focus-visible:outline-2 focus-visible:outline-background"
 						data-test="toast-action"
+						aria-disabled={toast.busy ? "true" : undefined}
+						aria-busy={toast.busy ? "true" : undefined}
 						onclick={() => {
+							// While a run it started is on its way, the action stays focusable but does nothing.
+							if (toast.busy) return;
 							toast.action?.run();
 							if (!toast.action?.keep) store.dismiss(toast.id);
 						}}>{toast.action.label}</button

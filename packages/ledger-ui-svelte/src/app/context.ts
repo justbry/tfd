@@ -29,11 +29,12 @@ export function useApp(): AppContext {
 }
 
 /** A run's end: its value; or its error and the toast that reported it (so that a later success can take the toast
- * down: errors stay until dismissed or fixed); or `interrupted`, when the screen stopped it (no toast, nothing
- * logged: nobody wants that answer any more). */
+ * down: errors stay until dismissed or fixed; null only when even the toast could not be shown, the failure then
+ * being in the log); or `interrupted`, when the screen stopped it (no toast, nothing logged: nobody wants that answer
+ * any more). */
 export type Outcome<A> =
 	| { ok: true; value: A }
-	| { ok: false; interrupted: false; error: UiError; toastId: string }
+	| { ok: false; interrupted: false; error: UiError; toastId: string | null }
 	| { ok: false; interrupted: true };
 
 const interrupted = { ok: false, interrupted: true } as const;
@@ -64,10 +65,37 @@ export type PerformOptions = {
 	signal?: AbortSignal;
 };
 
+/** The last word on a run that failed past its own handler: the report itself died (the log or the toasts broke),
+ * or a defect arrived together with the interruption (Effect then skips the handler). Each step runs on its own, so
+ * that a broken log still lets the toast show and a broken toast still lets the log keep it. */
+async function reportBeyondHandler<A>(
+	runtime: AppContext["runtime"],
+	cause: Cause.Cause<unknown>,
+	options: PerformOptions,
+): Promise<Outcome<A>> {
+	const squashed = Cause.squash(cause);
+	const error = toUiError(squashed);
+	await runtime.runPromiseExit(
+		Log.use((log) =>
+			log.write({ level: "error", message: error.reason, cause: squashed }),
+		),
+	);
+	const shown = await runtime.runPromiseExit(
+		reportFailure(error, options.handlers, options.owner),
+	);
+	return {
+		ok: false,
+		interrupted: false,
+		error,
+		toastId: Exit.isSuccess(shown) ? shown.value : null,
+	};
+}
+
 /** Runs an effect of the app; any failure, typed or a defect, is shown as a toast (with the handlers the screen
  * offers) and returned, so the screen can show the same message in place. The promise never rejects: nothing fails
  * silently. An interruption alone (the signal, or the effect stopping itself) is no failure: no toast, no log. The
- * report is not interruptible, so a toast it shows always comes back as `toastId`. */
+ * report is not interruptible, so a toast it shows always comes back as `toastId`; a failure the handler never saw
+ * is logged and shown after the run. */
 export const perform = async <A>(
 	{ runtime }: Pick<AppContext, "runtime">,
 	effect: Effect.Effect<A, UiError, AppServices>,
@@ -102,5 +130,8 @@ export const perform = async <A>(
 		),
 		options.signal ? { signal: options.signal } : undefined,
 	);
-	return Exit.isSuccess(exit) ? exit.value : (reported ?? interrupted);
+	if (Exit.isSuccess(exit)) return exit.value;
+	if (reported) return reported;
+	if (Cause.hasInterruptsOnly(exit.cause)) return interrupted;
+	return reportBeyondHandler(runtime, exit.cause, options);
 };

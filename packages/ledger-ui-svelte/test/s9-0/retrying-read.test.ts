@@ -4,6 +4,7 @@ import type { AppContext } from "../../src/app/context.ts";
 import { retryingRead } from "../../src/app/retrying-read.ts";
 import { ToastStore } from "../../src/app/toast-store.svelte.ts";
 import { run } from "../../src/effect/run.ts";
+import { Toasts as ToastsService } from "../../src/effect/services.ts";
 import { until } from "../app-harness.ts";
 import { calendar, fixtureRuntime, toastState } from "../helpers.ts";
 
@@ -163,7 +164,7 @@ describe("retryingRead: one failure, one toast", () => {
 		expect(failure?.detail).toBe(failureDetail);
 		const retrying = reading.run();
 		await until(
-			() => shown()[0]?.detail === "Retrying (2 of 3)",
+			() => shown()[0]?.progress === "Retrying (2 of 3)",
 			"the progress in the failure toast",
 		);
 		expect(shown()).toHaveLength(1);
@@ -174,7 +175,101 @@ describe("retryingRead: one failure, one toast", () => {
 		expect(shown()[0]).toMatchObject({
 			id: failure?.id,
 			detail: failureDetail,
+			progress: "",
 			count: 2,
+			busy: false,
 		});
+	});
+	test("a run started from a failure toast dismissed by hand shows its own retry toast", async () => {
+		const { context, shown } = readContext();
+		const { load } = scriptedLoad([...offline, ...offline]);
+		const reading = retryingRead(context, load, { value: () => undefined });
+		await reading.run();
+		context.toasts.dismiss(shown()[0]?.id ?? "missing");
+		await until(() => shown().length === 0, "the dismissal");
+		const retrying = reading.run();
+		await until(
+			() =>
+				shown().some(
+					(toast) =>
+						toast.tone === "info" && toast.detail === "Retrying (2 of 3)",
+				),
+			"a retry toast of its own",
+		);
+		reading.cancel();
+		await retrying;
+	});
+	test("a run started while the failure toast waits behind four shows its own retry toast", async () => {
+		const { context, toasts } = readContext();
+		for (const title of ["a", "b", "c", "d"])
+			await context.runtime.runPromise(
+				ToastsService.use((service) => service.show({ tone: "error", title })),
+			);
+		const { load } = scriptedLoad([...offline, ...offline]);
+		const reading = retryingRead(context, load, { value: () => undefined });
+		await reading.run();
+		const queued = () => [
+			...toastState(toasts).visible,
+			...toastState(toasts).waiting,
+		];
+		const failure = toastState(toasts).waiting[0];
+		expect(failure?.title).toBe("No connection");
+		const retrying = reading.run();
+		await until(
+			() =>
+				queued().some(
+					(toast) =>
+						toast.tone === "info" && toast.detail === "Retrying (2 of 3)",
+				),
+			"a retry toast of its own",
+		);
+		expect(
+			queued().find((toast) => toast.id === failure?.id)?.progress ?? "",
+		).toBe("");
+		reading.cancel();
+		await retrying;
+	});
+	test("a Retry run that succeeds never puts the failure sentence back before its toast leaves", async () => {
+		const { context, toasts, shown } = readContext();
+		const { load } = scriptedLoad([...offline, "network"]);
+		const reading = retryingRead(context, load, { value: () => undefined });
+		await reading.run();
+		const failureId = shown()[0]?.id;
+		let progressSeen = false;
+		let sentenceBack = false;
+		const stop = toasts.subscribe((state) => {
+			const failure = state.visible.find((toast) => toast.id === failureId);
+			if (failure?.progress) progressSeen = true;
+			else if (failure && progressSeen) sentenceBack = true;
+		});
+		await reading.run();
+		stop();
+		expect(progressSeen).toBe(true);
+		expect(sentenceBack).toBe(false);
+		expect(shown()).toEqual([]);
+	});
+	test("while a Retry run is on its way the failure toast is busy; cancelling it mid-progress leaves nothing", async () => {
+		const { context, shown } = readContext();
+		const { counter, load } = scriptedLoad([...offline, ...offline]);
+		const busy: boolean[] = [];
+		const reading = retryingRead(context, load, {
+			value: () => undefined,
+			busy: (value) => busy.push(value),
+		});
+		await reading.run();
+		const retrying = reading.run();
+		await until(
+			() => shown()[0]?.progress === "Retrying (2 of 3)",
+			"the progress",
+		);
+		expect(shown()[0]?.busy).toBe(true);
+		const callsAtCancel = counter.calls;
+		reading.cancel();
+		await retrying;
+		expect(busy.at(-1)).toBe(false);
+		expect(shown()).toEqual([]);
+		await wait(pastTheBackoff);
+		expect(counter.calls).toBe(callsAtCancel);
+		expect(shown()).toEqual([]);
 	});
 });
