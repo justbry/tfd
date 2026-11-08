@@ -9,6 +9,7 @@
 		shiftPeriod,
 		stepAllowed,
 	} from "$contract/app/period.ts";
+	import type { AudienceView } from "$contract/data/disclosure.ts";
 	import { Button } from "$lib/components/ui/button/index.ts";
 	import { Input } from "$lib/components/ui/input/index.ts";
 	import * as Popover from "$lib/components/ui/popover/index.ts";
@@ -17,12 +18,16 @@
 	import InlineError from "./toasts/InlineError.svelte";
 
 	/** The one period control of the top bar (mockup `#pb`, `#pp`, `renderPP`): the steps around the period's name,
-	 * the eight presets, a custom range, Compare. Every period is pickable until View as brings audiences (S9.1). A
-	 * custom range may not start after the clock's today; the problem shows at the fields. */
+	 * the viewed audience's note, the eight presets, the audience's own periods as chips, a custom range, Compare. An
+	 * option the viewed audience may not pick is disabled with the reason (an embargoed preset its publish line, a hidden
+	 * one "—"); days show to finance admins and the owner only, so below them the custom range is its note. On All
+	 * schools (`view` null) every period is pickable. A custom range may not start after the clock's today; the problem
+	 * shows at the fields. */
 	let {
 		period,
 		today,
-		note,
+		view,
+		previewing,
 		changed,
 		compare,
 		timeZoneNote,
@@ -31,8 +36,10 @@
 	}: {
 		period: Period;
 		today: string;
-		/** The viewed audience's note on what it may pick, under the period's name. */
-		note: string | null;
+		/** The viewed audience's periods, presets and note; null on All schools and until the disclosure loads. */
+		view: AudienceView | null;
+		/** View as shows another audience than the viewer's own: the note starts "Previewing". */
+		previewing: boolean;
 		/** The route names a period other than the default: the button shows the dot. */
 		changed: boolean;
 		compare: boolean;
@@ -58,10 +65,14 @@
 	});
 	const step = (direction: 1 | -1) => {
 		const target = shiftPeriod(period, direction);
-		return { target, ...stepAllowed(target, null, today) };
+		return { target, ...stepAllowed(target, view, today) };
 	};
 	const previous = $derived(step(-1));
 	const next = $derived(step(1));
+
+	const presetGate = (label: string) =>
+		view?.presets.find((gate) => gate.label === label);
+	const chips = $derived(view && !view.live ? view.periods : []);
 
 	const pick = (chosen: Period, close: boolean): void => {
 		if (close) open = false;
@@ -135,25 +146,62 @@
 				<Icon name="chevronRight" />
 			</Button>
 		</div>
-		{#if note}
-			<div class="px-2 pb-1 text-center text-[10.5px] text-muted-foreground" data-test="period-note">{note}</div>
+		{#if view}
+			<div class="px-2 pb-1 text-center text-[10.5px] text-muted-foreground" data-test="period-note">
+				{previewing ? "Previewing " : ""}{view.periodNote}
+			</div>
 		{/if}
 		<hr class={popoverRule} />
 		{#each presets as preset (preset.label)}
+			{@const gate = presetGate(preset.label)}
+			{@const pickable = !gate || gate.state === "shown"}
 			<button
 				type="button"
 				class={[popoverRow, preset.label === chosenLabel && "text-primary"]}
 				data-test="period-option"
 				aria-current={preset.label === chosenLabel ? "true" : undefined}
+				disabled={!pickable}
+				title={pickable ? undefined : (gate?.title ?? undefined)}
 				onclick={() => pick(preset.period, true)}
 			>
 				<span class="flex-1">{preset.label}</span>
-				<span class="text-muted-foreground">{periodLabel(preset.period)}</span>
+				<span class="text-muted-foreground"
+					>{gate?.state === "embargoed"
+						? (gate.title ?? periodLabel(preset.period))
+						: gate?.state === "hidden"
+							? "—"
+							: periodLabel(preset.period)}</span
+				>
 			</button>
 		{/each}
+		{#if chips.length > 0}
+			<hr class={popoverRule} />
+			<div class="flex flex-wrap gap-1 px-2 py-1" role="group" aria-label={`${view?.grain ?? "period"}s`}>
+				{#each chips as gate (gate.period)}
+					{@const pickable = gate.state === "shown"}
+					{@const chosen = samePeriod({ from: gate.from, to: gate.to }, period)}
+					<button
+						type="button"
+						class={[
+							"inline-flex items-center rounded-md border border-border bg-card px-2 py-[3px] text-[11px] text-foreground disabled:cursor-not-allowed disabled:opacity-50",
+							chosen && "border-primary text-primary",
+						]}
+						data-test="period-chip"
+						data-period={gate.period}
+						aria-pressed={chosen}
+						disabled={!pickable}
+						title={pickable ? undefined : (gate.title ?? undefined)}
+						onclick={() => pick({ from: gate.from, to: gate.to }, true)}>{gate.label}</button
+					>
+				{/each}
+			</div>
+		{/if}
 		<hr class={popoverRule} />
 		<div class="px-2 py-1" data-test="period-custom">
 			<span class="mb-1 block text-[10.5px] text-muted-foreground">Custom range</span>
+			{#if view?.customRangeNote}
+				<div class="text-[11px] text-muted-foreground" data-test="period-custom-note">{view.customRangeNote}</div>
+			{:else}
 			<div class="mb-1.5 grid grid-cols-2 gap-1.5">
 				<Input
 					type="date"
@@ -181,6 +229,7 @@
 				disabled={problem !== ""}
 				onclick={() => pick({ from, to }, true)}>Apply</Button
 			>
+			{/if}
 		</div>
 		<hr class={popoverRule} />
 		<label class="flex items-center gap-1.5 px-2 py-0.5 text-[11px]">

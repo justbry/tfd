@@ -197,3 +197,21 @@
 		flex: none;
 	}
 }
+
+/* The Dashboard's hatching (mockup `.kwait` and `.kmonths button.kopen`): a period inside its delay, and the live
+   audiences' open month. */
+@utility hatch-wait {
+	background: repeating-linear-gradient(
+		135deg,
+		transparent 0 5px,
+		color-mix(in srgb, var(--ring) 45%, transparent) 5px 6px
+	);
+	color: var(--muted-foreground);
+}
+@utility hatch-open {
+	background: repeating-linear-gradient(
+		135deg,
+		rgba(240, 160, 32, 0.25) 0 3px,
+		transparent 3px 6px
+	);
+}

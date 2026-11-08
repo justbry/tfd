@@ -15,6 +15,7 @@ The question tool was aborted, so these are the recommended options, taken.
 | D20 | How the rewrite lands | New package `packages/ledger-ui-svelte` beside `packages/ledger-ui`. It imports the `Reader`/`Writer` contract and the fixtures from `ledger-ui/src/data` and `src/fixtures` (no fork) and runs the same parity and state-matrix tests. The Worker's `ASSETS` swaps over only when the three-reviewer panel scores 9 or more against the mockup. Staging keeps the Preact UI until then. |
 | D21 | Errors and toasts | **Effect 4.1.2** (`effect@latest` on npm as of today). Section 5. |
 | D22 | PIN step-up for Worker writes | The Worker cannot check a PIN. buzz-school `POST /school-admin/ledger-token` gains an optional `su` claim (unix seconds): present only when the session's PIN was verified in the last 10 minutes. Config writes need `role: owner` and a fresh `su`. buzz-school change **S9-bz1**, one small PR; until it merges the Worker route refuses writes with 403 `step_up_required`. |
+| D23 | All schools totals (owner decision 2026-11-08) | **Summed in the UI, as a documented exception** to "nothing is summed or recomputed". No server route serves a cross-school total, so All schools adds each school's `membersIncome` per currency, in exact integer minor units (never across currencies), and the Needs attention counts. The note under the Income total names the schools it leaves out and why (did not load, or income not seen). |
 
 ## 2. Slices
 

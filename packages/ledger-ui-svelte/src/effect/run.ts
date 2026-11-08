@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { Log, Reader } from "./services.ts";
+import { Log, Reader, Writer } from "./services.ts";
 import { toUiError, type UiError } from "./ui-error.ts";
 
 /** The one bridge from the promise contract to Effect (S9-plan section 5): a rejected call fails with a `UiError`,
@@ -26,3 +26,9 @@ export const read = <A>(
 	call: (reader: Reader["Service"]) => Promise<A>,
 ): Effect.Effect<A, UiError, Reader | Log> =>
 	Reader.use((reader) => run(() => call(reader)));
+
+/** A Writer call as an effect. */
+export const write = <A>(
+	call: (writer: Writer["Service"]) => Promise<A>,
+): Effect.Effect<A, UiError, Writer | Log> =>
+	Writer.use((writer) => run(() => call(writer)));
