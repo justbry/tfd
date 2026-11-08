@@ -786,6 +786,7 @@ const httpApp = async (
 			mountHttpApp(root, {
 				apiBase: run.context.targets.api,
 				workerBase: `${run.context.targets.worker}/v1`,
+				webBase: "https://staging.b4uni.com",
 			});
 		} finally {
 			Date.now = systemNow;
