@@ -11,7 +11,7 @@
 		error,
 		onRetry,
 		busy = false,
-	}: { error: UiError; onRetry?: () => void; busy?: boolean } = $props();
+	}: { error: UiError; onRetry?: (() => void) | undefined; busy?: boolean } = $props();
 	const message = $derived(messageFor(error));
 </script>
 

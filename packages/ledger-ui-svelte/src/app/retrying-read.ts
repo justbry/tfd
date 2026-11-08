@@ -1,6 +1,6 @@
 import type { Effect } from "effect";
 import type { AppServices } from "../effect/app-layer.ts";
-import { withRetry } from "../effect/retry.ts";
+import { type Attempted, withRetry } from "../effect/retry.ts";
 import { Log, Toasts } from "../effect/services.ts";
 import { UiError } from "../effect/ui-error.ts";
 import { type AppContext, perform } from "./context.ts";
@@ -39,6 +39,9 @@ export function retryingRead<A>(
 		failure?: (error: UiError) => void;
 		busy?: (busy: boolean) => void;
 	},
+	/** What is tried: a read (the default), or a write with the `Idempotency-Key` of its action, so that the retry
+	 * rule lets it try again and the Retry the toast offers sends the same request. */
+	attempted: Attempted = { kind: "read" },
 ): RetryingRead {
 	readsMade += 1;
 	const owner = `read-${readsMade}`;
@@ -74,11 +77,10 @@ export function retryingRead<A>(
 		if (failureToast !== null) markBusy(failureToast, true);
 		const outcome = await perform(
 			context,
-			withRetry(
-				load(),
-				{ kind: "read" },
-				{ owner, ...(progressIn === undefined ? {} : { progressIn }) },
-			),
+			withRetry(load(), attempted, {
+				owner,
+				...(progressIn === undefined ? {} : { progressIn }),
+			}),
 			{
 				handlers: { retry: run, reload: () => window.location.reload() },
 				owner,

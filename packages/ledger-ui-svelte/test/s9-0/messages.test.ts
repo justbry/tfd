@@ -42,6 +42,7 @@ describe("the message table", () => {
 			"finance_required",
 			"audience_not_allowed",
 			"stripe_permission_missing",
+			"refund_failed",
 		]);
 		for (const code of serverCodes) expect(codeMessages[code]).toBeDefined();
 	});

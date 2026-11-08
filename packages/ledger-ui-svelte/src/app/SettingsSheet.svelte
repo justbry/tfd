@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "./settings-sheet.css";
 	import type { Theme } from "$contract/app/route.ts";
 	import * as Sheet from "$lib/components/ui/sheet/index.ts";
 	import Icon from "./Icon.svelte";

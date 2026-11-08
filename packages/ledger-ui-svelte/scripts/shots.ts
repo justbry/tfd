@@ -6,7 +6,8 @@
  * served (`bun run dev`, or `vite preview` after a build):
  *   bun scripts/shots.ts [--out shots] [--side app|mock|both] [--app http://localhost:5191] [--nonce K7QX]
  *     [--only dash-]
- * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`).
+ * `--only` keeps the entries whose id starts with it (the Dashboard's start with `dash-`, Bookings' with `bk-`,
+ * Members' with `mem-`).
  * Needs playwright-core in /tmp/ledger-shots and the cached Chromium headless shell, as shoot.mjs does.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -74,10 +75,13 @@ const executablePath = join(
 );
 const widths = [1100, 728, 390];
 const dashboardTab = "document.querySelector('.tab[data-p=dash]').click()";
+const bookingsTab = "document.querySelector('.tab[data-p=bk]').click()";
+const membersTab = "document.querySelector('.tab[data-p=mem]').click()";
 const themes = ["light", "dark"] as const;
 
 /** The shell's entries: the S0 golden file's three shots, then the stale banner, All schools, a toast and the
- * settings; then the Dashboard's (S9.1): each viewer state and grain, the PIN prompt and View as. */
+ * settings; then the Dashboard's (S9.1): each viewer state and grain, the PIN prompt and View as; then Bookings' (S9.2)
+ * and Members' (S9.2): the lists, a dialog, the drawer, the menu and a modal. */
 const entries: Array<{
 	id: string;
 	route: string;
@@ -169,6 +173,77 @@ const entries: Array<{
 		route: "#/b4u/dashboard",
 		clicks: ["[data-test=view-as]"],
 		mockupSteps: `setSchool('b4u');${dashboardTab};document.querySelector('#kview').click()`,
+	},
+	{
+		id: "bk-week",
+		route: "#/vol/bookings",
+		clicks: [],
+		mockupSteps: bookingsTab,
+	},
+	{
+		id: "bk-today-overdue",
+		route: "#/vol/bookings?range=day",
+		clicks: [],
+		mockupSteps: `${bookingsTab};bPer={k:"day",off:0};bookings()`,
+	},
+	{
+		id: "bk-filter-outcome",
+		route: "#/vol/bookings?filter=outcome",
+		clicks: [],
+		mockupSteps: `${bookingsTab};bF="out";bookings()`,
+	},
+	{
+		id: "bk-noshow-dialog",
+		route: "#/vol/bookings",
+		clicks: ["[data-test=booking-action][data-action=noshow]"],
+		mockupSteps: `${bookingsTab};document.querySelector('[data-act=noshow]').click()`,
+	},
+	{
+		id: "bk-period-open",
+		route: "#/vol/bookings",
+		clicks: ["[data-test=period-button]"],
+		mockupSteps: `${bookingsTab};document.querySelector('#pb').click()`,
+	},
+	{
+		id: "bk-lock-member",
+		route: "#/vol/bookings?as=member",
+		clicks: [],
+		mockupSteps: `${bookingsTab};setVa('member')`,
+	},
+	{
+		id: "mem-list",
+		route: "#/vol/members",
+		clicks: [],
+		mockupSteps: membersTab,
+	},
+	{
+		id: "mem-drawer",
+		route: "#/vol/members?member=m_012",
+		clicks: [],
+		mockupSteps: `${membersTab};open('m_012')`,
+	},
+	{
+		id: "mem-menu-open",
+		route: "#/vol/members",
+		clicks: [
+			"[data-test=member-row][data-id=m_012] [data-test=member-menu-button]",
+		],
+		mockupSteps: `${membersTab};document.querySelector('[data-kmenu=m_012]').click()`,
+	},
+	{
+		id: "mem-adjust-modal",
+		route: "#/vol/members",
+		clicks: [
+			"[data-test=member-row][data-id=m_012] [data-test=member-menu-button]",
+			"[data-test=member-menu-item][data-action=adjust]",
+		],
+		mockupSteps: `${membersTab};openAct('adjust','m_012')`,
+	},
+	{
+		id: "mem-lock-public",
+		route: "#/vol/members?as=public",
+		clicks: [],
+		mockupSteps: `${membersTab};setVa('public')`,
 	},
 ].filter((entry) => entry.id.startsWith(only));
 

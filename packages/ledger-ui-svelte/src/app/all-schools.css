@@ -1,0 +1,8 @@
+/* What a pane loaded on demand draws with components the first page load does not (app.css leaves them out of its
+   sources): theme and utilities only, the base styles and the tokens are app.css's. `source(none)` keeps Tailwind from
+   scanning the whole project for this file. */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@import "../tailwind-shared.css";
+@source "./AllSchools.svelte";
+@source "../lib/components/ui/table";
