@@ -17,7 +17,13 @@ import {
 	OrgDO,
 	shipBooks,
 } from "../src/org-do";
-import { durableState, fakeEnv, memoryR2Binding } from "./fakes";
+import {
+	durableState,
+	fakeEnv,
+	fakeStripeApi,
+	feeRoutes,
+	memoryR2Binding,
+} from "./fakes";
 
 const API = "staging-api.trifold.app";
 const SECRET = "whsec_test_books";
@@ -245,7 +251,13 @@ describe("Trifold's books: tfd's handler in the trifold DO", () => {
 	});
 });
 
-/** The Worker and a real OrgDO over bun:sqlite and an in-memory books bucket, wired like the staging bindings. */
+/** Stripe's fee for the golden $29 Starter payment: 2.9% + 30¢. */
+const STARTER_FEE = 114;
+
+/**
+ * The Worker and a real OrgDO over bun:sqlite and an in-memory books bucket, wired like the staging bindings, with a
+ * fake Stripe that knows the payment's fee (`fee.current`; null: its balance transaction is not made yet).
+ */
 const wired = (secret: string | null = SECRET) => {
 	const books = memoryR2Binding();
 	const raw = new Database(":memory:");
@@ -254,8 +266,11 @@ const wired = (secret: string | null = SECRET) => {
 		...fakeEnv(),
 		BOOKS: books.bucket as never,
 		STRIPE_BILLING_WEBHOOK_SECRET: secret ?? undefined,
+		STRIPE_SECRET_KEY: "rk_test_unit",
 	};
-	const object = new OrgDO(state, env);
+	const fee: { current: number | null } = { current: STARTER_FEE };
+	const stripe = fakeStripeApi((request) => feeRoutes(fee.current)(request));
+	const object = new OrgDO(state, env, stripe.fetcher);
 	env.ORG = {
 		idFromName: (name) => name,
 		get: (id) => {
@@ -280,8 +295,20 @@ const wired = (secret: string | null = SECRET) => {
 			}),
 			env,
 		);
-	return { env, raw, books, state, deliver };
+	return { env, raw, books, state, deliver, fee, stripe };
 };
+
+const postingsOf = (raw: Database, type: string) =>
+	(
+		raw.query("SELECT body FROM ledger_outbox ORDER BY id").all() as {
+			body: string;
+		}[]
+	)
+		.map(
+			(row) =>
+				JSON.parse(row.body) as { event_type: string; postings?: unknown },
+		)
+		.find((event) => event.event_type === type)?.postings;
 
 describe("POST /webhooks/billing", () => {
 	test("a signed invoice.paid is applied in the trifold DO and shipped before the 200; a redelivery answers duplicate", async () => {
@@ -307,6 +334,60 @@ describe("POST /webhooks/billing", () => {
 		);
 		expect(books.objects.size).toBe(objects);
 		expect(count(raw, "SELECT COUNT(*) AS n FROM atm_event_claims")).toBe(1);
+	});
+
+	test("the payment is booked with its Stripe fee, read before the handler runs and stored with the input", async () => {
+		const { raw, deliver, stripe } = wired();
+		const response = await deliver(starterPaid());
+		expect(response.status).toBe(200);
+		expect(stripe.calls.map((call) => call.path)).toEqual([
+			"/v1/invoice_payments",
+			"/v1/payment_intents/pi_fee_1",
+		]);
+		expect(postingsOf(raw, "payment.succeeded")).toEqual([
+			{ account: "assets:stripe", amount: "27.86", commodity: "USD" },
+			{
+				account: "expenses:billing:stripe-fees",
+				amount: "1.14",
+				commodity: "USD",
+			},
+			{
+				account: "income:billing:membership:starter",
+				amount: "-29.00",
+				commodity: "USD",
+			},
+		] as never);
+		expect(
+			raw
+				.query("SELECT fee FROM atm_event_inputs WHERE type = 'invoice.paid'")
+				.all(),
+		).toEqual([{ fee: STARTER_FEE }]);
+	});
+
+	test("a fee not known yet is a 503 before the handler runs, so Stripe retries; the retry books it once, with the fee", async () => {
+		const { raw, deliver, fee } = wired();
+		fee.current = null;
+		const payload = starterPaid();
+		const early = await deliver(payload);
+		expect(early.status).toBe(503);
+		expect(((await early.json()) as { outcome: string }).outcome).toBe(
+			"fee_pending",
+		);
+		expect(count(raw, "SELECT COUNT(*) AS n FROM atm_event_claims")).toBe(0);
+		expect(count(raw, "SELECT COUNT(*) AS n FROM ledger_outbox")).toBe(0);
+		fee.current = STARTER_FEE;
+		const retry = await deliver(payload);
+		expect(retry.status).toBe(200);
+		expect(JSON.stringify(postingsOf(raw, "payment.succeeded"))).toContain(
+			"expenses:billing:stripe-fees",
+		);
+	});
+
+	test("no Stripe key on the Worker is a 503 for an invoice.paid, never a payment booked without its fee", async () => {
+		const { env, raw, deliver } = wired();
+		env.STRIPE_SECRET_KEY = undefined as never;
+		expect((await deliver(starterPaid())).status).toBe(503);
+		expect(count(raw, "SELECT COUNT(*) AS n FROM ledger_outbox")).toBe(0);
 	});
 
 	test("a bad, stale or foreign signature is a 400 and never reaches the DO", async () => {

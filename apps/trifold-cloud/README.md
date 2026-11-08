@@ -10,8 +10,8 @@ public API and Stripe webhooks), one Worker routed by `Host`. The plan, the mile
 | `src/org-do.ts` | `OrgDO`, one SQLite-backed Durable Object per organization (handler, inbox and alarm in M3) |
 | `src/backup.ts`, `src/prune.ts`, `src/cron.ts` | The hourly cron: copies each new version of every books object into the locked backup bucket, resuming across runs |
 | `migrations/` | D1 migrations (`bun run migrate:staging`) |
-| `src/billing/` | Trifold's own billing (PLAN.md section 5), staging only: checkout, the billing webhook, the plans pages |
-| `scripts/publish-plans.ts` | Publishes `catalog/trifold`'s menus to Stripe test mode with tfd's `menuToStripe`; writes `src/published-plans.json` |
+| `src/billing/` | Trifold's own billing (PLAN.md section 5), staging only: checkout, the portal, the fee lookup, the billing webhook, the plans pages |
+| `scripts/publish-plans.ts` | Publishes `catalog/trifold`'s menus to Stripe test mode with tfd's `menuToStripe`, and each school's portal configuration with `portalConfigOf`; writes `src/published-plans.json` |
 
 ## Environments
 
@@ -35,12 +35,29 @@ any school would. One Durable Object, `OrgDO` named `trifold`, is those books: i
 | Route | What it does |
 |---|---|
 | `GET staging-ledger…/billing/plans` | Starter and Audited (Pro is a draft), standard or non-profit, monthly or yearly; calls checkout |
-| `GET staging-ledger…/billing/success`, `/billing/cancel` | Checkout's return pages |
+| `GET staging-ledger…/billing/success`, `/billing/cancel` | Checkout's return pages. With `?session_id=cs_test_…` (Checkout puts it there), success offers "Manage your plan" |
 | `POST staging-api…/v1/billing/checkout` | `{ tier, interval, org: std\|np, email? }` → `{ id, url }`: a subscription Checkout Session made with tfd's `checkoutParams` (metadata `b4u_school` = `tf-std`/`tf-np`, `family_id` = a minted `tfa_…` id, never an email). CORS for the ledger host only; 10 a minute per address |
-| `POST staging-api…/webhooks/billing` | Verifies Stripe's signature on the raw body (WebCrypto, 5 minutes), hands the event to the `trifold` DO, which runs tfd's `handleStripeWebhook` and ships the outbox to `schools/<tf-std\|tf-np>/events/…` in the books bucket. 2xx only after the DO committed; a failed ship retries by alarm |
+| `POST staging-api…/v1/billing/portal` | `{ session_id }` → `{ url }`: a billing portal session for the customer of that Checkout Session. The Worker reads the session from Stripe and takes the customer from it; the browser never names a customer. The session must be complete, Trifold's (`b4u_school`) and under a day old (until sign-in, M2). Same CORS and limit as checkout |
+| `POST staging-api…/webhooks/billing` | Verifies Stripe's signature on the raw body (WebCrypto, 5 minutes), hands the event to the `trifold` DO, which reads the Stripe fee of an `invoice.paid` (below), runs tfd's `handleStripeWebhook` and ships the outbox to `schools/<tf-std\|tf-np>/events/…` in the books bucket. 2xx only after the DO committed; a failed ship retries by alarm |
 | `GET staging-api…/v1/billing/books` | Counts only: claims by outcome, outbox rows shipped and not, batch keys |
 
-Checkout, its pages and the books counts answer 404 outside staging; production stays unbound.
+Checkout, the portal, the pages, the webhook and the books counts answer 404 outside staging; production stays
+unbound. Every Stripe call (`src/billing/stripe.ts`) refuses a key that is not `sk_test_`/`rk_test_` before sending,
+and any answer that holds a `livemode: true` object; the webhook answers a live-mode event 200 without applying it.
+
+**Fees.** No webhook event carries Stripe's fee, so before the handler runs, the DO reads it for each `invoice.paid`
+(`src/billing/fees.ts`): the invoice's paid payments (`GET /v1/invoice_payments?invoice=…`), each payment intent's
+latest charge, and that charge's `balance_transaction.fee`. It hands the sum to tfd as `paymentFee`; tfd stores it with
+the input (`atm_event_inputs.fee`) and books `expenses:billing:stripe-fees`. A fee that is not known yet (no paid
+payment, no balance transaction, no key, Stripe down) is a 503 before the handler runs, so Stripe sends the event again;
+tfd books a payment once and never adds a fee later, so the Worker never books one at 0. An invoice with nothing
+collected, or paid out of band, has a fee of 0.
+
+**Portal.** `bun scripts/publish-plans.ts` also makes one billing portal configuration per school, with tfd's
+`portalConfigOf`. No Trifold tier is sold in quantities, so it answers null and the configuration is tfd's base without
+a subscription change: invoice history, the payment method, cancel at the period end, no tier switch. It is marked
+`metadata[b4u_key]=portal`, `b4u_school` and `b4u_portal_version` (a hash of the form): a rerun finds it and changes it
+only when the form changes. Its id is `portalConfiguration` in `src/published-plans.json`.
 
 The Worker imports tfd through `packages/atm/src/cloud.ts`, a Worker-safe entry (no `node:fs`; Ajv is bundled but
 never compiled because the menu is validated and the policy resolved when publishing).
@@ -49,13 +66,38 @@ Secrets (Worker secrets on `trifold-cloud-staging`, put from files under `~/.con
 
 | Secret | File | |
 |---|---|---|
-| `STRIPE_BILLING_WEBHOOK_SECRET` | `stripe-test-billing-webhook.secret` | endpoint `we_1UZSkmDsfMqSNUOEcATOUMeH` (test mode): `invoice.paid`, `invoice_payment.paid`, `customer.subscription.*`, `charge.refunded` |
-| `STRIPE_SECRET_KEY` | `stripe-test-checkout.key` | a restricted TEST key; checkout answers 503 without it |
+| `STRIPE_BILLING_WEBHOOK_SECRET` | `stripe-test-billing-webhook.secret` | endpoint `we_1UZSkmDsfMqSNUOEcATOUMeH` (test mode, API `2025-10-29.clover`) |
+| `STRIPE_SECRET_KEY` | `stripe-test-checkout.key` | a restricted TEST key (`rk_test_…`). Without it checkout and the portal answer 503, and every `invoice.paid` answers 503 (its fee can't be read) until it is set |
+
+The restricted key, made in the Stripe dashboard (test mode of the Krono.Works (Mercury) account, Developers → API
+keys → Create restricted key), needs only:
+
+| Resource | Access | For |
+|---|---|---|
+| Checkout Sessions | Write | creating sessions; reading one back for the portal |
+| Customer portal | Write | portal sessions |
+| Invoices | Read | an invoice's payments (fees) |
+| PaymentIntents | Read | a payment's latest charge (fees) |
+| Charges | Read | the charge of a payment made by charge (fees) |
+| Balance | Read | the charge's balance transaction (fees) |
+
+The endpoint sends exactly what Trifold's books take: `invoice.paid`, `invoice_payment.paid` (links a payment to its
+invoice, so refunds and disputes find it), `customer.subscription.created/updated/deleted`, `charge.refunded`, and
+`charge.dispute.created/closed` (the dispute and its fee). Not `payout.paid/failed`, which tfd's `STRIPE_WEBHOOK_EVENTS`
+also lists: this Stripe account is shared, so its payouts hold money that is not Trifold's, and tfd would book a payout
+(which names no school) into the first school tried. The fee needs no event: it is read from the API.
 
 ```sh
 bun scripts/publish-plans.ts --dry-run   # then without --dry-run; commit src/published-plans.json and deploy
 env -u CLOUDFLARE_API_TOKEN bunx wrangler@4.90.0 secret put STRIPE_SECRET_KEY --env staging < ~/.config/trifold/stripe-test-checkout.key
 ```
+
+To rotate the key: make the new restricted key with the permissions above, write it over
+`~/.config/trifold/stripe-test-checkout.key` (mode 600), run the `secret put` above (it takes effect without a
+deploy), check `/billing/plans` reaches Stripe's Checkout page, then roll the old key in the dashboard (Roll key, expire
+now). To rotate the webhook secret: roll it on the endpoint in the dashboard with the old one expiring in an hour (Stripe
+signs with both until then), write the new one to `stripe-test-billing-webhook.secret`, and
+`secret put STRIPE_BILLING_WEBHOOK_SECRET` the same way.
 
 ## Backups
 

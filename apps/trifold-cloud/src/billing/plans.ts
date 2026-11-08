@@ -17,6 +17,8 @@ export type PublishedSchool = {
 	policy: BillingPolicy;
 	products: Record<string, string>;
 	priceIds: Record<string, string>;
+	/** The billing portal configuration (`bpc_…`) its customers' portal sessions use. */
+	portalConfiguration: string;
 };
 
 /** What `scripts/publish-plans.ts` wrote: Trifold's menus as published to Stripe test mode, by school id. */
