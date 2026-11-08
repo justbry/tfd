@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#07090F;--raised:#0E1424;--fg:#E9ECF4;--muted:#9AA3B8;--dim:#4A5268;--line:#FFFFFF14;--proof:#5BE3A1;--seal:#F2B447;--ember:#FF9B54;--alert:#E07A5F}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif}
+.win{border-radius:14px;overflow:hidden;border:1px solid #2a3145;background:var(--bg);color:var(--fg)}
+.chrome{display:flex;align-items:center;gap:10px;padding:9px 12px;background:#141a2b;border-bottom:1px solid #222a3e}
+.dots i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:#3a4258}
+.url{flex:1;font:12px "JetBrains Mono",monospace;color:#c9cfdd;background:#0b1020;border-radius:7px;padding:5px 10px}
+.url b{color:var(--fg);font-weight:500}.lock{color:var(--proof)}
+.mono{font-family:"JetBrains Mono",monospace}.lbl{font:11px "JetBrains Mono",monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.disp{font-family:Fraunces,serif;font-weight:300}
+.btn{display:inline-block;background:var(--seal);color:#16203a;font-weight:600;font-size:13px;border-radius:9px;padding:8px 14px}
+.ghost{display:inline-block;border:1px solid #2a3145;color:var(--fg);font-size:13px;border-radius:9px;padding:7px 13px}
+.card{background:var(--raised);border:1px solid var(--line);border-radius:12px;padding:14px}
+.ok{color:var(--proof)}.tnum{font-variant-numeric:tabular-nums}
+.stage{background:var(--ember);color:#16203a;font:600 10px "JetBrains Mono",monospace;letter-spacing:.1em;padding:3px 7px;border-radius:5px}
+</style></head><body>
+<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start">
+<div class="win">
+ <div class="chrome"><span class="dots"><i></i><i></i><i></i></span><div class="url"><span class="lock">🔒</span> <b>verify.trifold.app</b>/#r=eyJyZWNlaXB0Ijp7InYiOjIs…</div></div>
+ <div style="padding:26px 30px 30px">
+  <div style="display:flex;justify-content:space-between;align-items:center"><b class="disp" style="font-size:18px">Trifold <span style="color:var(--muted);font-weight:300">verify</span></b><span class="lbl">Checked in your browser</span></div>
+  <div style="margin:26px 0 18px;padding:22px;border-radius:14px;border:1px solid #5BE3A140;background:radial-gradient(120% 140% at 0 0,#5BE3A11f,transparent 60%)">
+   <div class="lbl ok">Result</div>
+   <div class="disp" style="font-size:30px;margin:6px 0">Signed by Trifold for Juniper School<br>and unchanged since.</div>
+   <div style="color:var(--muted);font-size:13px"><span class="ok">✓ Organization name verified</span> (domain juniper.school; from M6, before that: "name as entered, not verified") · receipt key <span class="mono">trifold-2026-10</span> (in use, not revoked)</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+   <div class="card"><div class="lbl">Receipt</div><div class="ok" style="font-size:15px;margin-top:4px">✓ Signature valid</div></div>
+   <div class="card"><div class="lbl">Issuer</div><div class="ok" style="font-size:15px;margin-top:4px">✓ Name verified</div></div>
+   <div class="card"><div class="lbl">Seal · Oct 2026</div><div class="ok" style="font-size:15px;margin-top:4px">✓ In the sealed month</div></div>
+  </div>
+  <div class="card" style="margin-top:14px;font-size:13px">
+   <div style="display:grid;grid-template-columns:130px 1fr;row-gap:7px" class="tnum">
+    <span style="color:var(--muted)">Amount</span><span>$640.00 USD</span>
+    <span style="color:var(--muted)">Date</span><span class="mono">2026-10-31</span>
+    <span style="color:var(--muted)">Type</span><span>Payment received</span>
+    <span style="color:var(--muted)">Event</span><span class="mono" style="color:var(--muted)">01JBX7Q2M4… · sha256 9f3c…a1e0</span>
+   </div>
+  </div>
+  <p style="font-size:12px;color:var(--muted);margin:14px 0 0">A valid signature shows who issued this receipt and that it hasn't changed. It doesn't show that the money moved, or anything about tax treatment. The receipt is checked here; to check the seal, this page asks Trifold for the organization's public seal. The receipt itself is never sent. <u>How this works</u> · <u>Check another receipt</u></p>
+ </div>
+</div>
+<div class="win" style="border-radius:28px">
+ <div style="padding:10px 14px;font:11px 'JetBrains Mono',monospace;color:#c9cfdd;text-align:center;border-bottom:1px solid #222a3e">🔒 verify.trifold.app</div>
+ <div style="padding:18px 16px 22px">
+  <div class="lbl ok">Result</div><div class="disp" style="font-size:24px;margin:6px 0 4px">Signed by Trifold for Juniper School and unchanged since.</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:14px">$640.00 · 2026-10-31</div>
+  <div style="display:grid;gap:8px;font-size:14px"><div class="card ok" style="padding:10px">✓ Receipt</div><div class="card ok" style="padding:10px">✓ Name verified</div><div class="card ok" style="padding:10px">✓ Sealed month</div></div>
+  <div style="margin-top:14px;font-size:12px;color:var(--muted)">Phone view: one result, three checks.</div>
+ </div>
+ <div style="border-top:1px solid #222a3e;padding:14px 16px">
+  <div class="lbl" style="color:var(--alert)">Not valid example</div>
+  <div class="disp" style="font-size:19px;margin-top:4px">This receipt was changed after it was signed.</div>
+  <div style="font-size:12px;color:var(--muted)">The signature doesn't match its contents.</div>
+ </div>
+</div>
+</div>
+</body></html>
