@@ -2,6 +2,9 @@
 	"$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
 	"root": false,
 	"extends": "//",
+	"files": {
+		"includes": ["**", "!src/app/dashboard/dashboard.css"]
+	},
 	"overrides": [
 		{
 			"includes": ["**/*.svelte"],
@@ -25,7 +28,7 @@
 			}
 		},
 		{
-			"includes": ["src/app.css"],
+			"includes": ["src/**/*.css"],
 			"linter": {
 				"rules": {
 					"suspicious": {

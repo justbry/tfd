@@ -1,4 +1,5 @@
 <script lang="ts">
+	import "./dashboard.css";
 	import { Effect } from "effect";
 	import { parsePeriod } from "$contract/app/period.ts";
 	import { formatRoute, type Route, withQuery } from "$contract/app/route.ts";

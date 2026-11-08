@@ -61,6 +61,8 @@ const allowedPackages = [
 	/^tailwind-merge$/,
 	/^tailwind-variants$/,
 	/^tailwindcss$/,
+	// A pane's own stylesheet takes Tailwind's theme and utilities without its base (app.css has it once).
+	/^tailwindcss\/(theme|utilities)\.css$/,
 	/^tw-animate-css$/,
 ];
 /** What the app may take from the Preact package: its contract and adapters, and the two pure route and period

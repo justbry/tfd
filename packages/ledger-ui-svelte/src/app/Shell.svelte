@@ -23,7 +23,6 @@
 	import { Toasts } from "../effect/services.ts";
 	import type { ToastInput } from "../effect/toast-model.ts";
 	import { toUiError, type UiError } from "../effect/ui-error.ts";
-	import AllSchools from "./AllSchools.svelte";
 	import { useApp } from "./context.ts";
 	import EmptyPane from "./EmptyPane.svelte";
 	import Icon from "./Icon.svelte";
@@ -157,6 +156,14 @@
 		if (school && route.tab === "dashboard" && !dashboardModule)
 			dashboardModule = import("./dashboard/Dashboard.svelte");
 	});
+	/** All schools, loaded the first time it is shown, as the Dashboard is: a school's page does not carry it. */
+	let allSchoolsModule: Promise<typeof import("./AllSchools.svelte")> | null =
+		$state(null);
+	$effect(() => {
+		if (!school && !allSchoolsModule)
+			allSchoolsModule = import("./AllSchools.svelte");
+	});
+
 	/** The Dashboard cannot show without the disclosure: its failure is the pane's message, and the route is on
 	 * screen. */
 	$effect(() => {
@@ -299,7 +306,18 @@
 	</Tabs.Root>
 {:else}
 	<section class="overflow-x-auto p-3.5" aria-label="All schools" data-test="pane">
-		<AllSchools {schools} {period} onOpen={chooseSchool} />
+		{#if allSchoolsModule}
+			{#await allSchoolsModule then { default: AllSchools }}
+				<AllSchools
+					{schools}
+					{period}
+					onOpen={chooseSchool}
+					onRendered={() => onPaneRendered(formatRoute(route))}
+				/>
+			{:catch failure}
+				<LoadFailed error={toUiError(failure)} />
+			{/await}
+		{/if}
 	</section>
 {/if}
 {#if settingsSheet}
