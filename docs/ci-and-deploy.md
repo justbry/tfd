@@ -8,14 +8,19 @@ Decided 2026-11-07. `trifold.app` is the only brand domain; each host has one jo
 
 | Host | What | Status |
 |---|---|---|
-| `trifold.app` | Marketing site, docs at `/docs` | Live (Pages `tfd-ledger`) |
-| `www.trifold.app` | 301 to `trifold.app` | Attached; redirect not set yet |
+| `trifold.app` | Marketing site, docs at `/docs` | Live. Worker `trifold-apex` (custom domain) passes each request through to the Pages production deploy (`tfd-ledger.pages.dev`) |
+| `www.trifold.app` | 301 to the same path on `trifold.app` | Live (`trifold-apex`) |
 | `ledger.trifold.app` | The hosted product: sign-in, books, receipts, settings. Orgs by path (`/o/<slug>`), never a subdomain each | Planned |
 | `api.trifold.app` | Public API under `/v1`, Stripe webhooks | Planned |
-| `verify.trifold.app` | Receipt verifier and witness keys. Printed on receipts, so it never moves and carries no app code | Planned |
-| `staging-ledger`, `staging-api`, `staging-verify` | Staging. Flat names: the free certificate covers one subdomain level only | Planned |
-| `send.trifold.app` | Transactional email sender (SPF, DKIM, DMARC) | Planned |
+| `verify.trifold.app` | Receipt verifier and witness keys. Printed on receipts, so it never moves and carries no app code | For now a 302 to `https://trifold.app/verify`, keeping the query (`trifold-apex`), until the verifier app (`apps/trifold-verify`) is promoted there |
+| `staging-ledger`, `staging-api`, `staging-verify` | Staging. Flat names: the free certificate covers one subdomain level only | Live: Workers `trifold-cloud` and `trifold-verify`, `--env staging`. `/healthz` on the first two |
+| `send.trifold.app` | Transactional email sender (SPF, DKIM, DMARC) | Planned; needs its email DNS records |
 | `hello@trifold.app`, `dmarc@trifold.app` | Contact address and DMARC reports, via Email Routing | Not routed yet |
+
+Every live host above is a Worker custom domain, which creates and manages its own DNS record, so none needed a
+credential that can edit DNS on the zone. `send.trifold.app` and Email Routing do need DNS records (SPF, DKIM, DMARC,
+MX). `trifold-apex` (serving the apex, `www` and `verify`) comes from PR #75 (`apps/trifold-apex`), the staging Workers
+from PR #68 (`apps/trifold-cloud`, `apps/trifold-verify`); both were deployed by hand from their branches.
 
 `ledger.b4uni.com` and `ledger-staging.b4uni.com` stay B4 Uni's own install.
 
@@ -24,7 +29,7 @@ Decided 2026-11-07. `trifold.app` is the only brand domain; each host has one jo
 | What | Workflow | When | Where it goes |
 |---|---|---|---|
 | Website (`apps/trifold-site`) | `trifold-site.yml` | pull request to `dev` | preview: `<branch>.tfd-ledger.pages.dev` |
-| | | push to `dev`, or **Run workflow** | production: `trifold.app` (Pages project `tfd-ledger`, branch `main`) |
+| | | push to `dev`, or **Run workflow** | production: Pages project `tfd-ledger`, branch `main`, served at `trifold.app` through `trifold-apex` |
 | Ledger Worker + UI (`packages/ledger-worker`, `packages/ledger-ui`) | `deploy-ledger-worker.yml` | **Run workflow** only, after approval | staging: `ledger-staging.b4uni.com` |
 | `tfd` package | `release-atm.yml` (Release tfd) | a `tfd-v<version>` tag | a release on `justbry/atm` with `tfd-<version>.tgz` |
 
@@ -122,11 +127,13 @@ tfd-ledger > Settings > Builds & deployments > Production branch** should be `ma
 
 ### 6. The custom domain
 
-`trifold.app` is a zone in the same Cloudflare account. Both `trifold.app` and `www.trifold.app` are custom domains on
-the Pages project (**Workers & Pages > tfd-ledger > Custom domains**), and each needs a proxied CNAME to
-`tfd-ledger.pages.dev` in the zone's DNS (**Activate domain** on that tab adds it). Cloudflare issues the certificates
-once the records resolve. `SITE_ORIGIN` in `apps/trifold-site/src/lib/config.ts` makes `https://trifold.app` the
-canonical for every host.
+`trifold.app` is a zone in the same Cloudflare account. The site still deploys to the Pages project, but the public
+hosts are not Pages custom domains: those stayed pending because they need a CNAME, and neither Cloudflare credential
+here can edit DNS on the zone. Instead the Worker `trifold-apex` (`apps/trifold-apex`, PR #75) holds `trifold.app`,
+`www.trifold.app` and `verify.trifold.app` as Worker custom domains, which add their own DNS records and certificates.
+It passes apex requests through to `tfd-ledger.pages.dev`, redirects `www` with a 301 and `verify` with a 302 to
+`/verify`. Deploy it with Wrangler's own login (`bunx wrangler deploy` in `apps/trifold-apex`); it rarely changes.
+`SITE_ORIGIN` in `apps/trifold-site/src/lib/config.ts` makes `https://trifold.app` the canonical for every host.
 
 ### 7. First run
 

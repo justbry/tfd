@@ -1,6 +1,6 @@
 # Trifold Cloud: the hosted, multi-tenant product
 
-Status: plan, revision 11, 2026-11-08. Both reviewers 9/10. Owner decisions marked **(owner)**. Hosts are fixed in `docs/ci-and-deploy.md`
+Status: plan, revision 11, 2026-11-08; hosts brought up to date the same day. Both reviewers 9/10. Owner decisions marked **(owner)**. Hosts are fixed in `docs/ci-and-deploy.md`
 ("Domains"). Previews of each host: `plans/trifold-cloud/previews/*.html`. Revision 11 answers every review round
 (section 12).
 
@@ -28,12 +28,15 @@ until the launch gate (section 10). The test's timeouts allow for the 5-minute v
 
 | Host | Runs | Project |
 |---|---|---|
-| `trifold.app` | Marketing site (live), docs at `/docs` | Pages `tfd-ledger` (`apps/trifold-site`) |
+| `trifold.app`, `www.` | Marketing site (live), docs at `/docs`; `www` 301s to the apex | Pages `tfd-ledger` (`apps/trifold-site`) behind Worker `trifold-apex` (`apps/trifold-apex`) |
 | `ledger.trifold.app` | Product UI and its session API | Worker `trifold-cloud` (`apps/trifold-cloud`) |
 | `api.trifold.app` | `/v1` (keys), `/public/v1` (no auth, CORS), `/webhooks/*` | Same Worker, routed by `Host` |
-| `verify.trifold.app` | Receipt verifier, `/.well-known/trifold-keys.json` | Pages `trifold-verify` (`apps/trifold-verify`), static |
-| `staging-ledger`, `staging-api`, `staging-verify` | Staging | `--env staging`; separate D1, buckets and signing key |
-| `send.trifold.app` | Transactional email | Cloudflare Email Sending |
+| `verify.trifold.app` | Receipt verifier, `/.well-known/trifold-keys.json` | Worker `trifold-verify` (`apps/trifold-verify`), static assets only. Until M1 promotes it, `trifold-apex` 302s this host to `trifold.app/verify` |
+| `staging-ledger`, `staging-api`, `staging-verify` | Staging (live, deployed by hand from PR #68) | `--env staging`; separate D1, buckets and signing key |
+| `send.trifold.app` | Transactional email | Cloudflare Email Sending; needs its DNS records (SPF, DKIM, DMARC) |
+
+Every web host is a Worker custom domain, which creates its own DNS record, so no DNS-edit credential is needed. Only
+`send.` and Email Routing need DNS records added on the zone.
 
 Cookies are host-only (`__Host-tf_session` on `ledger.`); `api.` takes bearer keys only and never reads cookies.
 
@@ -349,7 +352,7 @@ limits, export and delete. The B4 Uni build keeps its own data source.
 
 | # | Milestone | Done when |
 |---|---|---|
-| M0 | Infra and safety | DNS for every host; D1 (Time Travel on), buckets per env, Secrets Store keys; `trifold-cloud` `/healthz` on `staging-ledger` and `staging-api`; CI deploys staging; error reporting and logs on; nightly copy of each books bucket to a locked backup bucket; www→apex; `hello@` and `dmarc@` routed |
+| M0 | Infra and safety | A Worker custom domain for every host (DNS records only for `send.` and Email Routing); D1 (Time Travel on), buckets per env, Secrets Store keys; `trifold-cloud` `/healthz` on `staging-ledger` and `staging-api`; CI deploys staging; error reporting and logs on; nightly copy of each books bucket to a locked backup bucket; www→apex; `hello@` and `dmarc@` routed |
 | M1 | Verifier | `checkReceiptInSeal` and key windows in `packages/verify`; `staging-verify` verifies the golden receipts (`packages/atm/tests/golden/receipt/`) and fails each tampered one; keys file with CORS; mobile Lighthouse ≥ 95 |
 | M2 | Accounts | Email sign-in, sessions, CSRF, Turnstile, orgs, memberships, invites, roles, step-up; D1 migrations; a test for every auth refusal and every cell of the role table |
 | M3 | Books intake | `tfd/cloud` export and workerd tests; merchant mapping released in tfd; OrgDO, adapter, migrations; Connect OAuth (test); webhook → inbox → handler → ship → views → seals; duplicates book once; refusals retry and surface; envs never mix; a real test-mode receipt verifies on `staging-verify` |
