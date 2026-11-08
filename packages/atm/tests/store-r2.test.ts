@@ -2,32 +2,40 @@
  * The Store contract against staging R2, plus the two checks only R2 can answer: rate limiting (check 8) and
  * temporary credentials scoped to a prefix (check 16). Skipped unless the staging bucket's variables are set:
  *
- *   ATM_R2_ENDPOINT           https://<account>.r2.cloudflarestorage.com
- *   ATM_R2_BUCKET             the staging bucket (every run writes under contract/<uuid>/ and deletes it again)
- *   ATM_R2_ACCESS_KEY_ID      an R2 API token's access key (object read and write on that bucket)
- *   ATM_R2_SECRET_ACCESS_KEY
+ *   TFD_R2_ENDPOINT           https://<account>.r2.cloudflarestorage.com
+ *   TFD_R2_BUCKET             the staging bucket (every run writes under contract/<uuid>/ and deletes it again)
+ *   TFD_R2_ACCESS_KEY_ID      an R2 API token's access key (object read and write on that bucket)
+ *   TFD_R2_SECRET_ACCESS_KEY
  *
  * Check 16 also needs the Cloudflare account to mint temporary credentials; without these it is skipped:
  *
- *   ATM_R2_ACCOUNT_ID         the Cloudflare account id
- *   ATM_R2_API_TOKEN          a Cloudflare API token allowed to create R2 temporary access credentials
+ *   TFD_R2_ACCOUNT_ID         the Cloudflare account id
+ *   TFD_R2_API_TOKEN          a Cloudflare API token allowed to create R2 temporary access credentials
  *
- * The parent access key of the temporary credentials is ATM_R2_ACCESS_KEY_ID.
+ * The parent access key of the temporary credentials is TFD_R2_ACCESS_KEY_ID. Each variable is also read by its old
+ * name (`ATM_R2_*`) when the `TFD_R2_*` one is not set.
  */
 
 import { describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { AwsClient } from "aws4fetch";
+import { readEnvironmentVariable } from "../src/environment.js";
 import { R2Store } from "../src/store/r2-store.js";
 import { replaceIfMatch, Stale, Transient, utf8 } from "../src/store/store.js";
 import { emptyStore, failureOf, storeContract } from "./store-contract.js";
 
-const endpoint = process.env.ATM_R2_ENDPOINT;
-const bucket = process.env.ATM_R2_BUCKET;
-const accessKeyId = process.env.ATM_R2_ACCESS_KEY_ID;
-const secretAccessKey = process.env.ATM_R2_SECRET_ACCESS_KEY;
-const accountId = process.env.ATM_R2_ACCOUNT_ID;
-const apiToken = process.env.ATM_R2_API_TOKEN;
+const endpoint = readEnvironmentVariable(process.env, "TFD_R2_ENDPOINT");
+const bucket = readEnvironmentVariable(process.env, "TFD_R2_BUCKET");
+const accessKeyId = readEnvironmentVariable(
+	process.env,
+	"TFD_R2_ACCESS_KEY_ID",
+);
+const secretAccessKey = readEnvironmentVariable(
+	process.env,
+	"TFD_R2_SECRET_ACCESS_KEY",
+);
+const accountId = readEnvironmentVariable(process.env, "TFD_R2_ACCOUNT_ID");
+const apiToken = readEnvironmentVariable(process.env, "TFD_R2_API_TOKEN");
 
 const hasR2 = Boolean(endpoint && bucket && accessKeyId && secretAccessKey);
 const canMintTemporaryCredentials = hasR2 && Boolean(accountId && apiToken);
@@ -58,8 +66,8 @@ const requireEnv = (value: string | undefined, name: string): string => {
 };
 
 const parentCredentials = (): Credentials => ({
-	accessKeyId: requireEnv(accessKeyId, "ATM_R2_ACCESS_KEY_ID"),
-	secretAccessKey: requireEnv(secretAccessKey, "ATM_R2_SECRET_ACCESS_KEY"),
+	accessKeyId: requireEnv(accessKeyId, "TFD_R2_ACCESS_KEY_ID"),
+	secretAccessKey: requireEnv(secretAccessKey, "TFD_R2_SECRET_ACCESS_KEY"),
 });
 
 const storeOn = (
@@ -72,8 +80,8 @@ const storeOn = (
 	} = {},
 ) =>
 	new R2Store({
-		endpoint: requireEnv(endpoint, "ATM_R2_ENDPOINT"),
-		bucket: requireEnv(bucket, "ATM_R2_BUCKET"),
+		endpoint: requireEnv(endpoint, "TFD_R2_ENDPOINT"),
+		bucket: requireEnv(bucket, "TFD_R2_BUCKET"),
 		prefix,
 		...credentials,
 		region: "auto",
@@ -97,7 +105,7 @@ describe.skipIf(!hasR2)("staging R2", () => {
 			supportsPresign: true,
 			hashesMissingMetadata: false,
 			writeWithoutMetadata: async (key, body) => {
-				const url = `${requireEnv(endpoint, "ATM_R2_ENDPOINT")}/${requireEnv(bucket, "ATM_R2_BUCKET")}/${encodePath(`${prefix}${key}`)}`;
+				const url = `${requireEnv(endpoint, "TFD_R2_ENDPOINT")}/${requireEnv(bucket, "TFD_R2_BUCKET")}/${encodePath(`${prefix}${key}`)}`;
 				const response = await client.fetch(url, { method: "PUT", body });
 				const text = await response.text();
 				if (response.status !== 200) {
@@ -223,16 +231,16 @@ const mintTemporaryCredentials = async (
 	prefix: string,
 ): Promise<Credentials> => {
 	const response = await fetch(
-		`https://api.cloudflare.com/client/v4/accounts/${requireEnv(accountId, "ATM_R2_ACCOUNT_ID")}/r2/temp-access-credentials`,
+		`https://api.cloudflare.com/client/v4/accounts/${requireEnv(accountId, "TFD_R2_ACCOUNT_ID")}/r2/temp-access-credentials`,
 		{
 			method: "POST",
 			headers: {
-				authorization: `Bearer ${requireEnv(apiToken, "ATM_R2_API_TOKEN")}`,
+				authorization: `Bearer ${requireEnv(apiToken, "TFD_R2_API_TOKEN")}`,
 				"content-type": "application/json",
 			},
 			body: JSON.stringify({
-				bucket: requireEnv(bucket, "ATM_R2_BUCKET"),
-				parentAccessKeyId: requireEnv(accessKeyId, "ATM_R2_ACCESS_KEY_ID"),
+				bucket: requireEnv(bucket, "TFD_R2_BUCKET"),
+				parentAccessKeyId: requireEnv(accessKeyId, "TFD_R2_ACCESS_KEY_ID"),
 				permission: "object-read-write",
 				ttlSeconds: TEMPORARY_CREDENTIAL_SECONDS,
 				prefixes: [prefix],

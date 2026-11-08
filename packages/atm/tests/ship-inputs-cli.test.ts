@@ -55,7 +55,8 @@ const atm = (args: string[], env: Record<string, string> = {}) =>
 		env: {
 			...Object.fromEntries(
 				Object.entries(process.env).filter(
-					([name]) => !name.startsWith("ATM_R2_"),
+					([name]) =>
+						!name.startsWith("ATM_R2_") && !name.startsWith("TFD_R2_"),
 				),
 			),
 			...env,
@@ -342,13 +343,13 @@ describe("atm inputs ship: exit 2", () => {
 		);
 		refused(
 			atm([...base, "--r2-bucket", "b", "--r2-endpoint", "https://x.example"]),
-			"set ATM_R2_ACCESS_KEY_ID and ATM_R2_SECRET_ACCESS_KEY (there is no flag for them)",
+			"set TFD_R2_ACCESS_KEY_ID and TFD_R2_SECRET_ACCESS_KEY (the ATM_R2_* names still work; there is no flag for them)",
 		);
 		refused(
 			atm([...base, "--r2-bucket", "b", "--r2-endpoint", "https://x.example"], {
 				ATM_R2_ACCESS_KEY_ID: "id-only",
 			}),
-			"set ATM_R2_SECRET_ACCESS_KEY (there",
+			"set TFD_R2_SECRET_ACCESS_KEY (the",
 		);
 	});
 
@@ -397,30 +398,35 @@ describe("atm inputs ship: exit 2", () => {
 		raw.close();
 	});
 
-	test("with the destination from the environment the command reaches the store, and a failure there names no credential", () => {
+	test("with the destination from the environment (TFD_R2_* or the old ATM_R2_*) the command reaches the store, and a failure there names no credential", () => {
 		makeDatabase();
-		const run = atm(
-			[
-				"inputs",
-				"ship",
-				"--db",
-				databaseFile,
-				"--school",
-				SCHOOL,
-				"--env",
-				"live",
-			],
-			{
-				ATM_R2_BUCKET: "bucket",
-				ATM_R2_ENDPOINT: "http://127.0.0.1:1",
-				ATM_R2_ACCESS_KEY_ID: "AKIDENTIFIERFORTEST",
-				ATM_R2_SECRET_ACCESS_KEY: "SECRETFORTESTONLY",
-			},
-		);
-		expect(run.exitCode).toBe(2);
-		const line = oneLine(run.stderr.toString());
-		expect(line).not.toContain("AKIDENTIFIERFORTEST");
-		expect(line).not.toContain("SECRETFORTESTONLY");
+		for (const prefix of ["TFD", "ATM"]) {
+			const run = atm(
+				[
+					"inputs",
+					"ship",
+					"--db",
+					databaseFile,
+					"--school",
+					SCHOOL,
+					"--env",
+					"live",
+				],
+				{
+					[`${prefix}_R2_BUCKET`]: "bucket",
+					[`${prefix}_R2_ENDPOINT`]: "http://127.0.0.1:1",
+					[`${prefix}_R2_ACCESS_KEY_ID`]: "AKIDENTIFIERFORTEST",
+					[`${prefix}_R2_SECRET_ACCESS_KEY`]: "SECRETFORTESTONLY",
+				},
+			);
+			expect(run.exitCode).toBe(2);
+			const line = oneLine(run.stderr.toString());
+			// past the destination checks: the refusal is the store's, not a missing variable
+			expect(line).not.toContain("give --root");
+			expect(line).not.toContain("R2 credentials come from the environment");
+			expect(line).not.toContain("AKIDENTIFIERFORTEST");
+			expect(line).not.toContain("SECRETFORTESTONLY");
+		}
 	}, 60_000);
 });
 
@@ -488,7 +494,7 @@ describe("the destination: flags, then the environment; credentials from the env
 				{ r2Bucket: "b", r2Endpoint: "https://e.example" },
 				{ ATM_R2_ACCESS_KEY_ID: "", ATM_R2_SECRET_ACCESS_KEY: "secret" },
 			),
-		).toThrow("set ATM_R2_ACCESS_KEY_ID (there is no flag");
+		).toThrow("set TFD_R2_ACCESS_KEY_ID (the ATM_R2_* names still work");
 		expect(() =>
 			resolveInputsDestination(
 				{ r2Bucket: "b", r2Endpoint: "bucket.example" },
@@ -510,6 +516,75 @@ describe("the destination: flags, then the environment; credentials from the env
 				endpoint: "https://e.example",
 				accessKeyId: "id",
 				secretAccessKey: "secret",
+			},
+		});
+	});
+
+	test("every variable is read as TFD_R2_* first and ATM_R2_* when that is not set", () => {
+		const legacy = {
+			ATM_R2_BUCKET: "old-bucket",
+			ATM_R2_ENDPOINT: "https://old.example",
+			ATM_R2_PREFIX: "old-prefix",
+			ATM_R2_ACCESS_KEY_ID: "old-id",
+			ATM_R2_SECRET_ACCESS_KEY: "old-secret",
+			ATM_R2_SESSION_TOKEN: "old-token",
+		};
+		const current = {
+			TFD_R2_BUCKET: "new-bucket",
+			TFD_R2_ENDPOINT: "https://new.example",
+			TFD_R2_PREFIX: "new-prefix",
+			TFD_R2_ACCESS_KEY_ID: "new-id",
+			TFD_R2_SECRET_ACCESS_KEY: "new-secret",
+			TFD_R2_SESSION_TOKEN: "new-token",
+		};
+		const options = (name: "old" | "new") => ({
+			kind: "r2" as const,
+			options: {
+				bucket: `${name}-bucket`,
+				endpoint: `https://${name}.example`,
+				prefix: `${name}-prefix`,
+				accessKeyId: `${name}-id`,
+				secretAccessKey: `${name}-secret`,
+				sessionToken: `${name}-token`,
+			},
+		});
+		expect(resolveInputsDestination({}, legacy)).toEqual(options("old"));
+		expect(resolveInputsDestination({}, current)).toEqual(options("new"));
+		expect(resolveInputsDestination({}, { ...legacy, ...current })).toEqual(
+			options("new"),
+		);
+		// an empty TFD_ value is not a value, so the old name is read
+		expect(
+			resolveInputsDestination(
+				{},
+				{ ...legacy, TFD_R2_BUCKET: "", TFD_R2_SECRET_ACCESS_KEY: "" },
+			),
+		).toEqual(options("old"));
+		// a flag still beats both names
+		expect(
+			resolveInputsDestination(
+				{ r2Bucket: "flag-bucket" },
+				{ ...legacy, ...current },
+			),
+		).toMatchObject({ options: { bucket: "flag-bucket" } });
+		// the two names can be mixed, one variable at a time
+		expect(
+			resolveInputsDestination(
+				{},
+				{
+					TFD_R2_BUCKET: "new-bucket",
+					ATM_R2_ENDPOINT: "https://old.example",
+					TFD_R2_ACCESS_KEY_ID: "new-id",
+					ATM_R2_SECRET_ACCESS_KEY: "old-secret",
+				},
+			),
+		).toEqual({
+			kind: "r2",
+			options: {
+				bucket: "new-bucket",
+				endpoint: "https://old.example",
+				accessKeyId: "new-id",
+				secretAccessKey: "old-secret",
 			},
 		});
 	});

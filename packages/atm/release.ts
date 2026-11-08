@@ -333,7 +333,7 @@ const main = async () => {
 	if (build.exitCode !== 0) throw new Error("the build failed");
 	const checks = Bun.spawnSync(["bun", "test", "tests/dist.test.ts"], {
 		cwd: here,
-		env: { ...process.env, ATM_DIST: distDir },
+		env: { ...process.env, TFD_DIST: distDir },
 		stdout: "inherit",
 		stderr: "inherit",
 	});

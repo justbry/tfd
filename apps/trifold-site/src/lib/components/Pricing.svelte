@@ -103,7 +103,7 @@
 	<p class="mx-auto mt-1.5 min-h-[22px] max-w-[720px] text-center text-sm text-muted-foreground" aria-live="polite">
 		{#if org === "np"}
 			<strong class="text-foreground">Non-profit &amp; co-op pricing</strong> for verified 501(c) organizations and cooperatives.
-			Under $50K a year? The plan is Witnessed free on the Free plan, once the witness ships.
+			Under $50K a year? You get Trifold's witness free on the Free plan, once it ships.
 		{/if}
 	</p>
 
@@ -194,7 +194,7 @@
 						{#each COLUMNS as column (column.id)}
 							<th scope="col" class="sticky top-0 z-20 border-b border-line-strong bg-card px-3 py-2.5 text-center align-bottom">
 								<span
-									class="block font-display text-[17px] font-[450] {column.id === 'witnessed'
+									class="block font-display text-[17px] font-[450] {column.id === 'audited'
 										? 'text-ember-text dark:text-seal'
 										: ''}">{column.name}</span
 								> <span class="num mt-0.5 block text-xs text-muted-foreground">{columnPrice(column)}</span>
@@ -222,7 +222,7 @@
 								{#each cells as raw, index (index)}
 									{@const cell = resolve(raw)}
 									<td
-										class="border-b border-border px-3 py-2.5 text-center align-middle {COLUMNS[index]?.id === 'witnessed'
+										class="border-b border-border px-3 py-2.5 text-center align-middle {COLUMNS[index]?.id === 'audited'
 											? 'bg-[color-mix(in_srgb,var(--seal)_10%,transparent)]'
 											: COLUMNS[index]?.id === 'pro'
 												? 'bg-foreground/[0.03]'
@@ -312,7 +312,7 @@
 	<section class="mt-18"><Faq items={PRICING_FAQ} id="pricing-faq" /></section>
 
 	<p class="mt-12 border-t border-border pt-4 text-[13px] text-muted-foreground">
-		Planned pricing, 2026-11-06. Prices in USD, before any sales tax. Features marked "soon" aren't available yet.
+		Planned pricing, 2026-11-07. Prices in USD, before any sales tax. Features marked "soon" aren't available yet.
 		Non-profit and co-op pricing will require verification. Donation acknowledgments, once they ship, will be written to
 		meet IRS written-acknowledgment requirements; Trifold doesn't guarantee any donor's deduction.
 	</p>

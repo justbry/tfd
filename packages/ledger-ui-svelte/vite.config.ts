@@ -13,6 +13,9 @@ export default defineConfig({
 		alias: {
 			$lib: fileURLToPath(new URL("./src/lib", import.meta.url)),
 			$contract: fileURLToPath(new URL("../ledger-ui/src", import.meta.url)),
+			"$worker-config": fileURLToPath(
+				new URL("../ledger-worker/src/config", import.meta.url),
+			),
 		},
 	},
 	build: { target: "es2022", sourcemap: false },

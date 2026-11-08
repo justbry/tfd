@@ -1,6 +1,6 @@
-## The three sides of every dollar
+## Where a payment is recorded
 
-Every payment is recorded three ways, and the three should agree.
+Every payment lands in your books and on a signed receipt the payer keeps, and Stripe keeps its own record of the charge. Today anyone can check a receipt against the books, and you can reconcile the books against Stripe when you ask. Matching every payment to Stripe each day is next.
 
 | Side | Whose | What it is | Status |
 |---|---|---|---|

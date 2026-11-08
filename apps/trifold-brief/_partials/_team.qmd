@@ -1,0 +1,15 @@
+## The ask and the team: for the owner to fill in {#team}
+
+<span class="kicker">Investment</span>
+
+<div class="placeholder"><strong>Owner to fill in</strong>Amount, instrument and terms; use of funds; the milestones it buys. Founders, roles and advisors.</div>
+
+<p class="fine">Disclosed: B4 Uni's family service already runs on released tfd versions. B4 Uni and Vibes of Light are the founder's own or related businesses: design partners, not independent customers.</p>
+
+::: {.notes}
+Placeholder: none of the source docs names the team or states an ask, round size, valuation or use of funds.
+
+Fact on the slide: `docs/business/business-plan.md` §1 (B4 Uni's family service uses released tfd versions as a pinned dependency, but doesn't yet call the engine's handler, shipper or receipts; B4 Uni and Vibes of Light are the owner's own or related businesses, design partners, not independent customers); `docs/business/website-open-questions.md` 4.4 (disclose the connection). No customer counts or testimonials anywhere in this brief.
+
+What the next 90 days are for: business-plan §11 (domains and a trademark clearance search; the spec in its own repo; 5–10 design-partner schools; the open owner decisions), and the "Three experiments" slide.
+:::

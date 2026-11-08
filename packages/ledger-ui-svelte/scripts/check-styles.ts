@@ -11,10 +11,11 @@
  * 2. Cascade audit: a pane's stylesheet loads after app.css, so a plain utility in it can override a rule the first
  *    page load styled the shell with. For the top bar, the tabs row, the stale and preview banners and the toast stack
  *    (with a focused dismiss button, `:focus-visible`), every computed property of every element is read on a fresh
- *    page and again after the Dashboard, Bookings, Members, All schools and the settings sheet have loaded their CSS;
+ *    page and again after the Dashboard, Bookings, Members, Ledger, Reports, All schools and the settings sheet have loaded their CSS;
  *    any difference fails.
  * 3. The chosen row of each period popover (the shell's, and the Bookings pane's) is in the primary colour once the
  *    panes' CSS is loaded.
+ * (Ledger and Reports, S9.4: their stylesheets load with the lazy routes of 2, and every state of both tabs is in 4.)
  * 4. Differential (with `--reference <origin>`, a build made with LEDGER_NO_DEDUPE=1, which keeps every rule in every
  *    pane stylesheet): for each pane view and the popover, menu, drawer and dialog states the shots cover, the computed
  *    style of every element outside the shell's chrome is the same in both builds. The deduplicated stylesheets may
@@ -73,11 +74,15 @@ const tabs = [
 	"ledger",
 	"reports",
 ];
-/** The routes that load each lazy stylesheet: the Dashboard, Bookings, Members, All schools; the settings sheet is opened. */
+/** The routes that load each lazy stylesheet: the Dashboard, Bookings, Members, Ledger, Reports, All schools; the settings sheet is opened. */
 const lazyRoutes = [
 	"#/vol/dashboard",
 	"#/vol/bookings",
 	"#/vol/members",
+	"#/vol/plans",
+	"#/vol/promos",
+	"#/vol/ledger",
+	"#/vol/reports",
 	"#/all/all",
 ];
 const audited = [
@@ -327,6 +332,38 @@ const clicked =
 			await page.click(selector);
 		}
 	};
+/** Types into a field the way a person does: the value, then an `input` event. */
+const typed =
+	(selector: string, value: string) =>
+	async (page: Page): Promise<void> => {
+		await page.waitForSelector(selector);
+		await page.evaluate(
+			(argument: { selector: string; value: string }) => {
+				const field = document.querySelector<HTMLInputElement>(
+					argument.selector,
+				);
+				if (!field) throw new Error(`no ${argument.selector}`);
+				field.value = argument.value;
+				field.dispatchEvent(new Event("input", { bubbles: true }));
+			},
+			{ selector, value },
+		);
+	};
+const sheetStatus =
+	(text: string) =>
+	async (page: Page): Promise<void> => {
+		await page.waitForFunction(
+			(wanted: string) =>
+				document
+					.querySelector("[data-test=ledger-copy-status]")
+					?.textContent?.trim() === wanted,
+			text,
+		);
+	};
+const openCopy = clicked(
+	"[data-test=plan-ledger-copy]",
+	"[data-test=ledger-copy-tier]",
+);
 const rowMenu =
 	"[data-test=member-row][data-id=m_012] [data-test=member-menu-button]";
 const paneStates: Array<{
@@ -381,12 +418,111 @@ const paneStates: Array<{
 		),
 	},
 	{ name: "members, lock panel", route: "#/vol/members?as=public" },
+	{ name: "plans, edit with a draft", route: "#/vol/plans" },
+	{ name: "plans, preview", route: "#/vol/plans?mode=preview" },
+	{ name: "plans, code", route: "#/vol/plans?mode=code" },
+	{ name: "plans, an admin's view", route: "#/b4u/plans" },
+	{ name: "plans, previewing governance", route: "#/vol/plans?as=governance" },
+	{ name: "plans, empty school (Get started)", route: "#/nw/plans" },
+	{
+		name: "plans, plan drawer",
+		route: "#/vol/plans",
+		act: clicked(
+			"[data-test=plan-row][data-plan=glow] [data-test=plan-edit]",
+			"[data-test=plan-drawer]",
+		),
+	},
+	{
+		name: "plans, review dialog",
+		route: "#/vol/plans",
+		act: clicked("[data-test=plan-review]", "[data-test=plan-publish-dialog]"),
+	},
+	{
+		name: "copy in the ledger, editor (verified)",
+		route: "#/vol/plans",
+		act: async (page) => {
+			await openCopy(page);
+			await sheetStatus("Verified: ready to save")(page);
+		},
+	},
+	{
+		name: "copy in the ledger, problems at the field and the summary toast",
+		route: "#/vol/plans",
+		act: async (page) => {
+			await openCopy(page);
+			await typed(
+				"[data-test=ledger-copy-tier][data-tier=glow] [data-field=name]",
+				"",
+			)(page);
+			await page.waitForSelector(
+				"[data-test=ledger-copy-tier][data-tier=glow] [data-test=inline-error] div",
+			);
+			await page.waitForSelector("[data-test=toast]");
+		},
+	},
+	{
+		name: "copy in the ledger, someone changed it (stale_etag)",
+		route: "#/vol/plans?config=stale",
+		act: async (page) => {
+			await openCopy(page);
+			await page.waitForSelector("[data-test=ledger-copy-conflict]");
+		},
+	},
+	{
+		name: "copy in the ledger, step-up required",
+		route: "#/vol/plans?config=step-up",
+		act: async (page) => {
+			await openCopy(page);
+			await sheetStatus("Verified: ready to save")(page);
+			await clicked(
+				"[data-test=ledger-copy-save]",
+				"[data-test=ledger-copy-step-up]",
+			)(page);
+		},
+	},
+	{ name: "copy in the ledger, owner only (an admin)", route: "#/b4u/plans" },
+	{ name: "promos, list", route: "#/vol/promos" },
+	{ name: "promos, an admin's view", route: "#/vol/promos?as=admin" },
+	{ name: "promos, previewing public", route: "#/vol/promos?as=public" },
+	{
+		name: "promos, create dialog",
+		route: "#/vol/promos",
+		act: clicked("[data-test=promo-new]", "[data-test=dialog]"),
+	},
 	{ name: "dashboard, owner members", route: "#/vol/dashboard?view=members" },
 	{ name: "dashboard, finance money", route: "#/b4u/dashboard" },
 	{
 		name: "dashboard, PIN locked",
 		route: "#/b4u/dashboard?as=governance&pin=locked",
 	},
+	{ name: "ledger, rows", route: "#/vol/ledger" },
+	{
+		name: "ledger, filtered with a row's details open",
+		route: "#/vol/ledger?type=payment",
+		act: clicked("[data-test=ledger-row][data-event=vol-e5]"),
+	},
+	{ name: "ledger, drill-down chip", route: "#/vol/ledger?drill=refund" },
+	{ name: "ledger, lock panel", route: "#/b4u/ledger?as=public" },
+	{
+		name: "ledger, PIN locked",
+		route: "#/b4u/ledger?as=finance&pin=locked",
+	},
+	{ name: "ledger, no events", route: "#/nw/ledger" },
+	{ name: "reports, finance statement", route: "#/vol/reports" },
+	{
+		name: "reports, compared with the previous period",
+		route: "#/vol/reports?compare=1",
+	},
+	{
+		name: "reports, governance document",
+		route: "#/b4u/reports?as=governance&month=2026-06",
+	},
+	{
+		name: "reports, public document",
+		route: "#/b4u/reports?as=public&month=2026-06",
+	},
+	{ name: "reports, member document", route: "#/vol/reports?as=member" },
+	{ name: "reports, PIN locked", route: "#/vol/reports?pin=locked" },
 	{ name: "all schools", route: "#/all/all" },
 	{
 		name: "settings sheet",

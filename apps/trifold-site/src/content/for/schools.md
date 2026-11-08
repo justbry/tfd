@@ -4,7 +4,9 @@
 
 Families in education savings and tax-credit programs need itemised receipts: the child, the hours, the dates, the school's EIN. Building those by hand each month is slow, and a hand-made PDF proves nothing.
 
-**How Trifold answers it** (chapter 03, Proof): every Stripe payment gets a receipt signed with your school's key. The itemised lines come from your Stripe invoice; the signed record links the payment to one exact entry in your books. A family can check it on the verify page, without an account. Receipts are designed against each program's published rules and reviewed with CPAs; until a program confirms, we say "designed for", not "accepted by".
+**How Trifold answers it today** (chapter 03, Proof): every Stripe payment gets a receipt signed with your school's key. It carries the amount, the date, the Stripe invoice and a hash that links the payment to one exact entry in your books, with no names. A family can check it on the verify page, without an account. Stripe's own invoice, with its lines, stays beside it.
+
+**Next: the compliance pack.** The signed receipt is a proof of payment, not yet an itemised one. The receipt a state program asks for (provider, expense, amount, date and who paid, per child) is the compliance pack, which isn't built. It is being designed against each program's published rules, with a CPA's review; until a program confirms, we say "designed for", not "accepted by".
 
 ### 2. A month that closes from a spreadsheet
 

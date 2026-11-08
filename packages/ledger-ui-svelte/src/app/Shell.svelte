@@ -4,6 +4,10 @@
 		dashboard: () => import("./dashboard/Dashboard.svelte"),
 		bookings: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.bookings()),
 		members: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.members()),
+		plans: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.plans()),
+		promos: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.promos()),
+		ledger: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.ledger()),
+		reports: () => import("./panes/loaders.ts").then(({ loaders }) => loaders.reports()),
 		allSchools: () => import("./AllSchools.svelte"),
 	};
 </script>
@@ -74,6 +78,9 @@
 	const app = useApp();
 	const { today } = app.calendar;
 	let settingsOpen = $state(false);
+	/** Whether each school's Plans draft differs from its live menu, as the Plans tab says once it has worked it out: the
+	 * tabs row's draft badge follows it (the school's own count is the answer before the tab was opened). */
+	const draftChanges = $state<Record<string, boolean>>({});
 	let topBarHeight = $state(0);
 	let topBar = $state<HTMLElement | null>(null);
 	let tabsList = $state<HTMLElement | null>(null);
@@ -231,7 +238,7 @@
 			data-test="tabs"
 		>
 			{#each schoolTabs as tab (tab)}
-				{@const badge = tabBadge(tab, school)}
+				{@const badge = tabBadge(tab, school, draftChanges[school.id])}
 				<Tabs.Trigger
 					value={tab}
 					class={tabClass}
@@ -290,7 +297,15 @@
 							/>
 						{:else}
 							{@const paneProps = viewing
-								? { route, school, viewing, navigate, onRendered: onPaneRendered }
+								? {
+										route,
+										school,
+										viewing,
+										navigate,
+										onRendered: onPaneRendered,
+										onOpenSettings: () => (settingsOpen = true),
+										onDraftChange: (schoolId: string, changed: boolean) => (draftChanges[schoolId] = changed),
+									}
 								: null}
 							<LazyPane load={() => chunks[tab]()} props={paneProps} onFailed={chunkFailed} />
 						{/if}

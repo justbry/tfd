@@ -33,7 +33,7 @@ We publish our own claim rules. What we may say depends on what has shipped.
 | We say today | We don't say yet | Why not |
 |---|---|---|
 | Double-entry, append-only, replayable books | "Tamper-evident books" | That needs a hash chain per event, which is next |
-| Signed receipts and sealed months | "Triple-entry accounting" | That also needs daily matching to Stripe, which is next |
+| Signed receipts and sealed months | "Itemised receipts" | The signed receipt is a proof of payment with no items or names; the receipt itemised per child, for state programs, is next |
 | Anyone can verify a receipt or a seal, free | "Independently witnessed" | Trifold as a witness is next |
 | Reconciled against Stripe on request | "Matched every day" | Daily matching is next |
 | Designed against each program's published rules | "Accepted by" any state program | Until a program confirms in writing |
@@ -67,4 +67,4 @@ The verifier and receipt format are Apache-2.0, and the test vectors are public 
 
 ## Verify us yourself
 
-Load the sample receipt on the [verify page](/verify), then the tampered copy. Run the simulator and read what the end-to-end check found on the [proof page](/proof). Read the [engine's source](https://github.com/justbry/atm/tree/dev/packages/atm). Ask us anything at the address on the [about page](/about).
+Load the sample receipt on the [verify page](/verify), then the tampered copy. Run the simulator and read what the end-to-end check found on the [proof page](/proof). Read the [engine's source](https://github.com/justbry/tfd/tree/dev/packages/atm). Ask us anything at the address on the [about page](/about).

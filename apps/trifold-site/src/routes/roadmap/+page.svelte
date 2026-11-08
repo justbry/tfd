@@ -62,6 +62,7 @@
 				{ text: "Verifier in the browser and in the CLI", state: "lit" },
 				{ text: "Key rotation that keeps old receipts verifying", state: "lit" },
 				{ text: "A hash chain per event", state: "ember" },
+				{ text: "Receipts itemised per child for state programs (the compliance pack)", state: "ember" },
 			],
 		},
 		{

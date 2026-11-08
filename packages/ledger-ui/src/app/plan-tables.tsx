@@ -177,7 +177,8 @@ function EditButton({
 	);
 }
 
-type RowProps = { menu: Menu; changed: boolean; onOpen: () => void };
+/** `onOpen` is null on a demo school: its rows open nothing and have no pencil. */
+type RowProps = { menu: Menu; changed: boolean; onOpen: (() => void) | null };
 
 function TierRow({
 	view,
@@ -201,7 +202,7 @@ function TierRow({
 			data-test="plan-row"
 			data-plan={tier.id}
 			data-kind="tiers"
-			onClick={onOpen}
+			onClick={onOpen ?? undefined}
 		>
 			<td>
 				<b data-test="plan-name">{tier.name}</b>{" "}
@@ -243,7 +244,7 @@ function TierRow({
 			<td class="r">{members}</td>
 			<td class="r">{monthly}</td>
 			<td class="r">
-				<EditButton name={tier.name} onOpen={onOpen} />
+				{onOpen && <EditButton name={tier.name} onOpen={onOpen} />}
 			</td>
 		</tr>
 	);
@@ -261,7 +262,7 @@ function AddonRow({
 			data-test="plan-row"
 			data-plan={addon.id}
 			data-kind="addons"
-			onClick={onOpen}
+			onClick={onOpen ?? undefined}
 		>
 			<td>
 				<b data-test="plan-name">{addon.name}</b>
@@ -277,7 +278,7 @@ function AddonRow({
 			<td class="r" />
 			<td class="r" />
 			<td class="r">
-				<EditButton name={addon.name} onOpen={onOpen} />
+				{onOpen && <EditButton name={addon.name} onOpen={onOpen} />}
 			</td>
 		</tr>
 	);
@@ -310,6 +311,8 @@ type PlanTablesProps = {
 	full: Record<PlanKind, boolean>;
 	/** The signed-in person owns the school: admins are told that owners publish. */
 	owner: boolean;
+	/** A demo school: no Add buttons, no pencils, and its rows open nothing. */
+	readOnly: boolean;
 	onOpen: (kind: PlanKind, id: string | null) => void;
 	onMembers: (tierId: string) => void;
 };
@@ -324,31 +327,35 @@ export function PlanTables({
 	removedNames,
 	full,
 	owner,
+	readOnly,
 	onOpen,
 	onMembers,
 }: PlanTablesProps): JSX.Element {
-	const add = (kind: PlanKind, label: string): JSX.Element => (
-		<div class="add-row">
-			<button
-				type="button"
-				class="btn s"
-				data-test="plan-add"
-				data-kind={kind}
-				title={
-					view.preview
-						? exitPreviewTitle
-						: full[kind]
-							? `Up to ${planLimits[kind]}${kind === "tiers" ? " memberships" : ""}`
-							: undefined
-				}
-				disabled={view.preview || full[kind]}
-				onClick={() => onOpen(kind, null)}
-			>
-				<Icon name="plus" />
-				{label}
-			</button>
-		</div>
-	);
+	const opener = (kind: PlanKind, id: string): (() => void) | null =>
+		readOnly ? null : () => onOpen(kind, id);
+	const add = (kind: PlanKind, label: string): JSX.Element | null =>
+		readOnly ? null : (
+			<div class="add-row">
+				<button
+					type="button"
+					class="btn s"
+					data-test="plan-add"
+					data-kind={kind}
+					title={
+						view.preview
+							? exitPreviewTitle
+							: full[kind]
+								? `Up to ${planLimits[kind]}${kind === "tiers" ? " memberships" : ""}`
+								: undefined
+					}
+					disabled={view.preview || full[kind]}
+					onClick={() => onOpen(kind, null)}
+				>
+					<Icon name="plus" />
+					{label}
+				</button>
+			</div>
+		);
 	const them = removedNames.length === 1 ? "it" : "them";
 	return (
 		<>
@@ -388,7 +395,7 @@ export function PlanTables({
 									tier={tier}
 									count={tierCount(summary, tier.id)}
 									changed={view.admin && changedIds.has(tier.id)}
-									onOpen={() => onOpen("tiers", tier.id)}
+									onOpen={opener("tiers", tier.id)}
 									onMembers={() => onMembers(tier.id)}
 								/>
 							))
@@ -421,7 +428,7 @@ export function PlanTables({
 									menu={menu}
 									addon={addon}
 									changed={view.admin && changedIds.has(addon.id)}
-									onOpen={() => onOpen("addons", addon.id)}
+									onOpen={opener("addons", addon.id)}
 								/>
 							))
 						: emptyRow("addons", "None yet.")}
@@ -431,7 +438,7 @@ export function PlanTables({
 			<p class="mut plan-note" data-test="plan-note">
 				<Icon name="info" /> A change starts a new version for new purchases.
 				Members keep the version they bought.
-				{owner ? "" : " Admins edit the draft; owners publish."}
+				{owner || readOnly ? "" : " Admins edit the draft; owners publish."}
 			</p>
 		</>
 	);

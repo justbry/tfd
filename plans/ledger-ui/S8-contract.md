@@ -23,7 +23,7 @@ The browser gets the token from `POST /school-admin/ledger-token` and refreshes 
 
 The Worker, on every request:
 
-1. Verifies the token against `/.well-known/ledger-jwks.json` (cached for its `max-age`, `kid` looked up there, never a key the token carries): `alg` is `EdDSA`, `iss` is this environment's `API_BASE`, `aud` is exactly the string `atm-ledger`, `iat` present and not in the future, `exp - iat <= 300`, `nbf` and `exp` valid. `src/ledger/jwt.ts` `verifyJwt` and `test/ledger-jwt.test.ts` in buzz-school are the reference and the case list.
+1. Verifies the token against `/.well-known/ledger-jwks.json` (cached for its `max-age`, `kid` looked up there, never a key the token carries): `alg` is `EdDSA`, `iss` is this environment's `API_BASE`, `aud` is exactly the string `atm-ledger` (the rename to `tfd-ledger` is pending: once the Worker checks it with `isLedgerTokenAudience` from `tfd/worker`, it accepts exactly `tfd-ledger` or `atm-ledger`; until that Worker is deployed, a token must carry `atm-ledger`; `plans/tfd-rename.md`, step 3), `iat` present and not in the future, `exp - iat <= 300`, `nbf` and `exp` valid. `src/ledger/jwt.ts` `verifyJwt` and `test/ledger-jwt.test.ts` in buzz-school are the reference and the case list.
 2. Refuses a school that is not in `schools[]` (same 404 as an unknown school).
 3. Serves **raw books data** (ledger rows, income statement lines, members' money, donor rows, payment history) only when the school's entry has `finance: true`. These objects live under `schools/<id>/views/finance/`.
 4. Serves a **KPI document** for any listed school, computed on the server from aggregates at an audience no finer than the caller may view (section 4). The Worker reads finance aggregates to build a coarser document; what it returns, never what it reads, is what the audience gate limits. A `finance:false` caller therefore cannot get a row or an exact figure, only the document of their level.
@@ -210,7 +210,7 @@ On staging (`LEDGER_DEMO_SCHOOLS=on`, set only in the staging env of `wrangler.j
 ### Conventions for every endpoint
 
 - **Request.** `GET`, `Authorization: Bearer <ledger token>`. Dates are `YYYY-MM-DD` in the school's time zone. `:school` is the id in the token's `schools[]`.
-- **Success.** `200`, `Cache-Control: private, no-store`, body `{ "asOf": string | null, "lagMinutes": number | null, "data": <shape> }`. `asOf` is the views manifest's `asOf` (ISO instant); `lagMinutes` is now minus `asOf`, rounded up; both are `null` only on the `no_data` error. `data` is the `Reader` method's return type, except where a row says otherwise.
+- **Success.** `200`, `Cache-Control: private, no-store` (a stored answer: see "Stored answers" below), body `{ "asOf": string | null, "lagMinutes": number | null, "data": <shape> }`. `asOf` is the views manifest's `asOf` (ISO instant); `lagMinutes` is now minus `asOf`, rounded up; both are `null` only on the `no_data` error. `data` is the `Reader` method's return type, except where a row says otherwise.
 - **Missing figures.** A field with no source is `null` in `data` (D11); a whole answer with no source is `501 not_available` (D12). **No endpoint answers 0, an empty list or `none` for something it cannot know.** The adapter turns `null` and `not_available` into the UI's "not available" state; the contract types allow the `null`s listed below.
 - **Errors.** `{ "error": { "code": string, "message": string, "field"?: string, "retryAfterSeconds"?: number } }`, `Cache-Control: private, no-store`:
 
@@ -230,6 +230,16 @@ On staging (`LEDGER_DEMO_SCHOOLS=on`, set only in the staging env of `wrangler.j
 | 403 | `owner_only`, `step_up_required` | A config verify or put by someone who is not the school's owner; a config put whose token has no `su` claim within the last 10 minutes (D22; until buzz-school sends `su`, every put). |
 | 412 | `stale_etag` | A config put whose `If-Match` is not the object's current sha256, or `If-None-Match: *` for an object that exists. |
 | 422 | `invalid_config` | A config put whose value fails its validator (`error.problems[]`: `{path, message, hint}`), or whose `verifiedHash` is not the hash of the canonical value (problem path `verifiedHash`). |
+
+### Stored answers, the cache and ETags (2026-11-08)
+
+A cold isolate read a school's whole log to answer: `disclosure` and `kpi` took 5 to 6.3 s cold on staging (0.2 to 0.5 s warm), the ledger and income statement the same, and `GET /v1/schools` 1 to 1.7 s every time; the demo Dashboard's first figure came after 8.8 s cold. Now (`packages/ledger-worker/README.md`, "Stored answers"):
+
+- **Stored with the views.** After each school's views the views job (and `seed:demo`) writes, under `schools/<id>/views/answers/`: `log.jsonl` (the events up to `asOf`, one object), `answers.jsonl` (the finished `data` of `disclosure` for each admin audience and of `kpi` for each audience and PIN state, worked out by the endpoints' own functions for the school-local day of the run) and `current.json` (the pointer: generation, `asOf`, time zone, day; written last). The generation is a hash of the manifest's `asOf` and `generatedFrom`.
+- **Read first.** `kpi`, `disclosure` and `audience-report` (the stored `kpi` document read at `from`) read the manifest and the pointer at once; when the pointer names the manifest's generation and the request's local day, the answer comes from the isolate, the data centre's cache or `answers.jsonl`, and the log is not read. Otherwise the endpoint computes as before, from `log.jsonl` when the pointer names it, else from the day files; so do the other endpoints. The answers are byte for byte what the endpoint computes (`stored-answers.test.ts`).
+- **The cache key** is school, generation, day and the answer's name (`kpi/<audience>-<pin>`, `disclosure/<adminAudience>`), never the caller. Every check of this section (token, the school in the token, the finance gate, the audience gate, the query) runs before the key is built, and the name comes from the checked audience or the caller's grant, so the cache cannot hand a caller an audience or a school they may not read.
+- **Headers.** A stored answer carries `ETag: "v<version>-<generation>-<day>-<endpoint>-<audience>[-…]"`; `If-None-Match` naming it is a `304` after the checks. A real school's is `Cache-Control: private, max-age=0, must-revalidate`; a demo school's `public, max-age=60` (fictional, the same for every caller). The envelope is not stored: `asOf` is the generation's and `lagMinutes` is worked out at request time (for a demo answer kept by the browser it may be up to a minute old). A computed answer stays `private, no-store`.
+- **`GET /v1/schools`** reads the demo index `schools/_demo-index.json` (each demo school's `asOf` and facts; `seed:demo` writes it, the views job keeps it current) and the token's schools' manifests, at once: no bucket listing. The index names demo schools only; the answer is the same as before.
 
 ### Endpoints
 

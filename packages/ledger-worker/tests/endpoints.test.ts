@@ -54,7 +54,10 @@ const get = (path: string) => call(harness, token, `/v1${path}`);
 const lagOf = (asOf: string): number =>
 	Math.ceil((Date.parse(harness.clock.now()) - Date.parse(asOf)) / 60_000);
 
-describe("every success carries asOf, lagMinutes and no-store", () => {
+/** The endpoints served from a generation's stored answers (`routes/stored.ts`), revalidated by ETag. */
+const STORED_ENDPOINT = /\/(kpi|disclosure|audience-report)(\?|$)/;
+
+describe("every success carries asOf, lagMinutes and its cache-control", () => {
 	for (const preset of PRESETS)
 		test(preset, async () => {
 			const school = harness.seeded[preset];
@@ -78,7 +81,9 @@ describe("every success carries asOf, lagMinutes and no-store", () => {
 				expect(reply.body.asOf, path).toBe(school.asOf);
 				expect(reply.body.lagMinutes, path).toBe(lagOf(school.asOf));
 				expect(reply.headers.get("cache-control"), path).toBe(
-					"private, no-store",
+					STORED_ENDPOINT.test(path)
+						? "private, max-age=0, must-revalidate"
+						: "private, no-store",
 				);
 			}
 		});

@@ -9,6 +9,7 @@ import {
 	createState,
 	createSubjectFor,
 } from "../../balance-engine/tests/unit/engineFixtures.js";
+import { readEnvironmentVariable } from "../src/environment.js";
 import { deterministicUlid } from "../src/index.js";
 import { readEvents } from "../src/ledger/files.js";
 import { membersOf } from "../src/ledger/summary.js";
@@ -16,8 +17,8 @@ import { buildViews } from "../src/ledger/views.js";
 import type { AtmCatalogRow } from "../src/types.js";
 
 /**
- * Builds dist into an empty directory and uses it the way a consumer outside this workspace would. With `ATM_DIST`
- * set (the release script does), it tests that already-built directory instead of building one.
+ * Builds dist into an empty directory and uses it the way a consumer outside this workspace would. With `TFD_DIST`
+ * (or the old `ATM_DIST`) set (the release script does), it tests that already-built directory instead of building one.
  */
 let dir: string;
 const command = createCheckCommand();
@@ -49,8 +50,9 @@ const WORKER_EXPORTS = [
 
 beforeAll(async () => {
 	dir = await mkdtemp(join(tmpdir(), "atm-consumer-"));
-	if (process.env.ATM_DIST) {
-		cpSync(process.env.ATM_DIST, join(dir, "dist"), { recursive: true });
+	const builtDist = readEnvironmentVariable(process.env, "TFD_DIST");
+	if (builtDist) {
+		cpSync(builtDist, join(dir, "dist"), { recursive: true });
 	} else {
 		const build = Bun.spawnSync([
 			"bun",
@@ -135,6 +137,55 @@ describe("built library", () => {
 			require.resolve("typescript/bin/tsc"),
 			"-p",
 			"tsconfig.json",
+		]);
+	}, 60_000);
+
+	test("the Tfd* type names typecheck, and each deprecated Atm* alias is the same type", async () => {
+		const declarations = readFileSync(join(dir, "dist/types.d.ts"), "utf8");
+		const current = [
+			...declarations.matchAll(/^export (?:type|interface) Tfd(\w+)/gm),
+		].map((match) => match[1] as string);
+		expect(current.length).toBeGreaterThan(40);
+		for (const name of current)
+			expect(declarations).toContain(
+				`/** @deprecated Use {@link Tfd${name}}. */\nexport type Atm${name}`,
+			);
+		await writeFile(
+			join(dir, "typed-names.ts"),
+			[
+				'import { runEngineCommand, validateEvent, type AtmCommandType, type AtmEvent, type AtmResultFor, type TfdCheckResult, type TfdCommand, type TfdCommandType, type TfdEvent, type TfdResultFor, type TfdSubject, type TfdValidation } from "./dist/index.js";',
+				"declare const subject: TfdSubject;",
+				'declare const check: TfdCommand & { type: "check" };',
+				"const decision: TfdCheckResult = runEngineCommand({ subject, command: check });",
+				"declare const events: TfdEvent[];",
+				"const checked: TfdValidation = validateEvent(events[0]);",
+				"const old: AtmEvent[] = events;",
+				"const back: TfdEvent[] = old;",
+				'const kind: AtmCommandType = "check" satisfies TfdCommandType;',
+				'declare const result: TfdResultFor<"check">;',
+				'const same: AtmResultFor<"check"> = result;',
+				"export { decision, checked, back, kind, same };",
+			].join("\n"),
+		);
+		await writeFile(
+			join(dir, "tsconfig-names.json"),
+			JSON.stringify({
+				compilerOptions: {
+					strict: true,
+					module: "nodenext",
+					moduleResolution: "nodenext",
+					target: "es2022",
+					types: [],
+					noEmit: true,
+				},
+				files: ["typed-names.ts"],
+			}),
+		);
+		run([
+			process.execPath,
+			require.resolve("typescript/bin/tsc"),
+			"-p",
+			"tsconfig-names.json",
 		]);
 	}, 60_000);
 

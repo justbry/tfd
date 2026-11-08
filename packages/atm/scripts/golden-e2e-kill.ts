@@ -4,18 +4,27 @@
  * operation. It exists for the crash drill (`tests/golden-e2e-check.test.ts`, S4), which needs to stop `atm ship` and
  * `atm inputs ship` at an exact point instead of at a lucky moment.
  *
- *   ATM_KILL_OP     put or delete: which store operation to count (default put)
- *   ATM_KILL_AT     the 1-based count of that operation at which to die (0 or unset: never)
- *   ATM_KILL_PHASE  before: die as the operation begins; after: die as it has finished and before the shipper marks its rows
+ *   TFD_KILL_OP     put or delete: which store operation to count (default put)
+ *   TFD_KILL_AT     the 1-based count of that operation at which to die (0 or unset: never)
+ *   TFD_KILL_PHASE  before: die as the operation begins; after: die as it has finished and before the shipper marks its rows
+ *
+ * Each is also read by its old name (`ATM_KILL_*`) when the `TFD_KILL_*` one is not set.
  *
  * Usage: bun scripts/golden-e2e-kill.ts <atm arguments>, for example `inputs ship --db ... --school ... --env live --root ...`.
  */
 import { program } from "../src/cli.js";
+import { readEnvironmentVariable } from "../src/environment.js";
 import { FolderStore } from "../src/store/folder-store.js";
 
-const operation = process.env.ATM_KILL_OP === "delete" ? "delete" : "put";
-const at = Number(process.env.ATM_KILL_AT ?? 0);
-const phase = process.env.ATM_KILL_PHASE === "before" ? "before" : "after";
+const operation =
+	readEnvironmentVariable(process.env, "TFD_KILL_OP") === "delete"
+		? "delete"
+		: "put";
+const at = Number(readEnvironmentVariable(process.env, "TFD_KILL_AT") ?? 0);
+const phase =
+	readEnvironmentVariable(process.env, "TFD_KILL_PHASE") === "before"
+		? "before"
+		: "after";
 let seen = 0;
 
 const original = {

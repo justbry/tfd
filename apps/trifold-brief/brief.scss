@@ -1,0 +1,429 @@
+/*-- scss:defaults --*/
+// Brand kit colours (docs/brand/trifold-brand-and-messaging.md, "Colour"). Text pairs meet WCAG AA:
+// ink on paper 12.7:1; muted 5.6:1; green text uses a darker ledger green (6.4:1, #2F7D5B is 4.4:1 on
+// paper); saffron is never text on paper, only fills, rules and text on ink (6.6:1); white on green 5.2:1.
+$ink: #1e2a44;
+$paper: #f6f1e7;
+$card: #fffdf8;
+$green: #2f7d5b;
+$green-text: #246249;
+$saffron: #e8a33d;
+$saffron-text: #8a5a12;
+$clay: #b5533c;
+$clay-text: #9a4532;
+$muted: #55607a;
+$line: #dcd3c1;
+
+$body-bg: $paper;
+$body-color: $ink;
+$presentation-heading-color: $ink;
+$link-color: $green-text;
+$presentation-font-size-root: 32px;
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+$presentation-heading-font: "Fraunces", "Iowan Old Style", Georgia, serif;
+$font-family-monospace: "JetBrains Mono", ui-monospace, Menlo, monospace;
+$code-color: $ink;
+$code-bg: #efe8d9;
+
+/*-- scss:rules --*/
+:root {
+  // Each deck sets its own path colour in its header (see the decks' front matter).
+  --path: #{$ink};
+  --path-text: #{$ink};
+}
+
+.reveal-viewport,
+.reveal,
+.reveal .slide-background,
+.reveal .slide-background-content { background: $paper !important; }
+.reveal { color: $ink; }
+.reveal .slides section { text-align: left; }
+// Titles sit at one fixed height on every slide, below the path navigation.
+.reveal .slides > section, .reveal .slides > section > section { padding-top: 78px; }
+
+.reveal h1, .reveal h2, .reveal h3 {
+  font-family: "Fraunces", "Iowan Old Style", Georgia, serif;
+  font-weight: 580;
+  color: $ink !important;
+  letter-spacing: -0.005em;
+  text-transform: none;
+}
+.reveal h2 { font-size: 1.22em; line-height: 1.14; margin: 0 0 0.35em; max-width: 30em; }
+.reveal p, .reveal li { line-height: 1.38; }
+.reveal a { color: $green-text; text-decoration: underline; text-underline-offset: 0.15em; }
+.reveal a:focus-visible, .brief-nav a:focus-visible, .brief-nav summary:focus-visible {
+  outline: 3px solid $ink;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+.reveal .progress { color: $saffron; }
+.reveal .progress span { background: $saffron; }
+.reveal .footer {
+  font-size: 14px;
+  color: $muted;
+  bottom: 12px;
+  left: 70px;
+  right: 110px;
+  text-align: center;
+}
+.reveal .slide-number {
+  right: 14px;
+  bottom: 10px;
+  background: transparent;
+  font: 500 15px/1 "JetBrains Mono", ui-monospace, monospace;
+}
+.reveal .slide-number a { color: $ink; text-decoration: none; }
+.reveal .slide-menu-button { left: 10px; bottom: 8px; }
+.reveal .slide-menu-button .fas, .reveal .slide-menu-button a { color: $ink; }
+.reveal code {
+  font-size: 0.9em;
+  background: $code-bg !important;
+  color: $ink !important;
+  padding: 0.05em 0.3em;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.kicker {
+  display: block;
+  color: var(--path-text);
+  font-size: 0.5em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin: 0 0 0.45em;
+}
+.reveal .lede { font-size: 0.7em; max-width: 34em; margin: 0.5em 0 0; }
+.reveal .fine { font-size: 0.54em; color: $muted; margin: 0.6em 0 0; max-width: 56em; }
+.reveal .assume-note { font-size: 0.54em; color: $muted; margin: 0.6em 0 0; max-width: 56em; }
+.assume-note .tag { margin-right: 0.45em; font-size: 0.85em; }
+
+/* status and assumption tags */
+.tag {
+  display: inline-block;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 0.7em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.3;
+  padding: 0.1em 0.55em;
+  border-radius: 99px;
+  vertical-align: 0.12em;
+  white-space: nowrap;
+}
+.tag--built { background: $green; color: #ffffff; }
+.tag--next { background: $ink; color: $paper; }
+.tag--later { color: $ink; border: 1.5px solid $ink; }
+.tag--assume { background: #fbe8c6; color: $ink; border: 1.5px dashed #9a6a1c; }
+.tag--rec { background: $saffron; color: $ink; }
+
+/* cards: an h3 title, then a short line */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.55em; margin-top: 0.5em; }
+.cards--2 { grid-template-columns: repeat(2, 1fr); }
+.cards--4 { grid-template-columns: repeat(4, 1fr); }
+.card {
+  background: $card;
+  border: 1px solid $line;
+  border-top: 5px solid $saffron;
+  border-radius: 12px;
+  padding: 0.55em 0.7em 0.6em;
+  font-size: 0.7em;
+  line-height: 1.36;
+}
+.card--green { border-top-color: $green; }
+.card--ink { border-top-color: $ink; }
+.card--clay { border-top-color: $clay; }
+.card--quiet { border-top-color: $line; }
+.reveal .card h3 { font-size: 1.1em; line-height: 1.2; margin: 0 0 0.25em; }
+.card p { margin: 0.25em 0 0; }
+.card ul { margin: 0.2em 0 0 1.05em; padding: 0; }
+.reveal .card li { margin: 0.1em 0; font-size: 1em; }
+.card .big {
+  display: block;
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.55em;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+/* ticked list */
+.reveal ul.ticks { list-style: none; margin: 0.4em 0 0; padding: 0; font-size: 0.7em; }
+.reveal ul.ticks li { position: relative; padding: 0.22em 0 0.22em 1.5em; }
+.reveal ul.ticks li::before {
+  content: "";
+  position: absolute;
+  left: 0.15em;
+  top: 0.62em;
+  width: 0.62em;
+  height: 0.34em;
+  border-left: 3px solid $green;
+  border-bottom: 3px solid $green;
+  transform: rotate(-45deg);
+}
+
+/* the folded-receipt strip: three panels, saffron, ink and green, joined by fold lines */
+.strip { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 0.6em; font-size: 0.7em; }
+.strip > div {
+  position: relative;
+  min-height: 7.2em;
+  padding: 0.7em 1.2em 0.8em 1.6em;
+  clip-path: polygon(0 0, calc(100% - 1.1em) 0, 100% 50%, calc(100% - 1.1em) 100%, 0 100%, 1.1em 50%);
+}
+.strip > div:first-child { clip-path: polygon(0 0, calc(100% - 1.1em) 0, 100% 50%, calc(100% - 1.1em) 100%, 0 100%); padding-left: 0.9em; }
+.strip .step { display: block; font: 700 0.8em/1 "JetBrains Mono", monospace; letter-spacing: 0.08em; margin-bottom: 0.4em; }
+.reveal .strip h3 { color: inherit !important; font-size: 1.15em; margin: 0 0 0.2em; }
+.strip p { margin: 0; }
+.strip .fold-a { background: $saffron; color: $ink; }
+.reveal .strip .fold-a h3 { color: $ink !important; }
+.strip .fold-b { background: $ink; color: $paper; }
+.reveal .strip .fold-b h3 { color: $paper !important; }
+.strip .fold-c { background: $green; color: #ffffff; }
+.reveal .strip .fold-c h3 { color: #ffffff !important; }
+.pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5em; margin-top: 0.6em; font: 600 0.6em/1.2 "JetBrains Mono", monospace; }
+.pills span { text-align: center; padding: 0.45em 0.6em; border-radius: 99px; background: $card; border: 1.5px solid $green; }
+.pills .soon { border: 1.5px dashed $muted; color: $muted; }
+
+/* stepped price ladder: five cards, each a step higher */
+.ladder { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.45em; align-items: end; margin-top: 0.3em; }
+.rung {
+  background: $card;
+  border: 1px solid $line;
+  border-top: 5px solid $line;
+  border-radius: 12px;
+  padding: 0.5em 0.6em 0.6em;
+  font-size: 0.62em;
+  line-height: 1.32;
+}
+.rung:nth-child(1) { min-height: 7.6em; }
+.rung:nth-child(2) { min-height: 8.6em; border-top-color: $green; }
+.rung:nth-child(3) { min-height: 9.6em; border-top-color: $saffron; }
+.rung:nth-child(4) { min-height: 10.6em; border-top-color: $ink; border-width: 2px; border-top-width: 5px; border-color: $ink; }
+.rung:nth-child(5) { min-height: 11.6em; border-top-color: $green; border-style: dashed; border-top-style: solid; }
+.reveal .rung h3 { font-size: 1.05em; margin: 0 0 0.15em; }
+.rung .price { display: block; font: 650 1.6em/1.1 "JetBrains Mono", monospace; margin: 0.1em 0 0.25em; }
+.rung .price small { font-size: 0.5em; font-weight: 500; }
+.rung p { margin: 0.2em 0 0; }
+.rung .limit { color: $muted; }
+
+/* horizontal bars: one figure, numbers written beside each bar */
+.bars { margin: 0.5em 0 0; font-size: 0.62em; }
+.bar-row { display: grid; grid-template-columns: 9.5em 1fr; gap: 0.3em 0.8em; align-items: center; margin: 0.55em 0; }
+.bar-row > .label { font-weight: 650; text-align: right; }
+.track { position: relative; height: 1.7em; }
+.fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--from, 0%);
+  width: var(--w);
+  border-radius: 6px;
+  background: $ink;
+}
+.fill--list { background: repeating-linear-gradient(135deg, #d9cdb3 0 6px, #ece3cf 6px 12px); border: 1.5px dashed #9a8a68; }
+.fill--green { background: $green; }
+.fill--clay { background: $clay; }
+.fill--saffron { background: $saffron; }
+.value {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: calc(var(--at) + 0.5em);
+  font: 650 0.95em/1 "JetBrains Mono", monospace;
+  white-space: nowrap;
+}
+.bars--zero .track::after { content: ""; position: absolute; left: 15%; top: -0.3em; bottom: -0.3em; border-left: 2px solid #55607a; }
+.bars figcaption, .stack figcaption { font-size: 0.86em; color: $muted; margin-top: 0.4em; }
+.legend { display: flex; gap: 1.2em; font-size: 0.86em; color: $muted; margin-top: 0.3em; }
+.legend i { display: inline-block; width: 1.1em; height: 0.8em; border-radius: 3px; margin-right: 0.35em; vertical-align: -0.05em; background: $ink; }
+.legend i.list { background: repeating-linear-gradient(135deg, #d9cdb3 0 4px, #ece3cf 4px 8px); border: 1px dashed #9a8a68; }
+
+/* 100%-stacked bar */
+.stack { margin: 0.5em 0 0; font-size: 0.62em; }
+.stack-bar { display: flex; height: 3.2em; border-radius: 10px; overflow: hidden; border: 1px solid $line; }
+.stack-bar > div { display: flex; flex-direction: column; justify-content: center; padding: 0 0.6em; font-weight: 650; line-height: 1.2; white-space: nowrap; }
+.stack-bar small { font-weight: 500; font-size: 0.85em; }
+.seg-a { background: #fbe8c6; color: $ink; }
+.seg-b { background: $saffron; color: $ink; }
+.seg-c { background: $ink; color: $paper; }
+.seg-d { background: $green; color: #ffffff; }
+
+/* staircase for tiers: the threshold on the riser, the price or rate on the tread */
+.tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5em; align-items: end; margin-top: 0.4em; font-size: 0.66em; }
+.tier { display: flex; flex-direction: column; }
+.tier:nth-child(1) .tread { min-height: 6.4em; }
+.tier:nth-child(2) .tread { min-height: 8.2em; }
+.tier:nth-child(3) .tread { min-height: 10em; }
+.riser { font: 650 0.9em/1.2 "JetBrains Mono", monospace; color: $muted; margin-bottom: 0.3em; }
+.tread {
+  background: $card;
+  border: 1px solid $line;
+  border-top: 5px solid var(--path);
+  border-radius: 12px 12px 0 0;
+  padding: 0.5em 0.7em;
+  line-height: 1.34;
+}
+.reveal .tread h3 { font-size: 1.1em; margin: 0; }
+.tread .rate { display: block; font: 650 1.25em/1.2 "JetBrains Mono", monospace; margin: 0.15em 0 0.25em; }
+.tread p { margin: 0; }
+
+/* horizontal timeline: three stages, a dot and a line */
+.timeline { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8em; margin-top: 0.6em; font-size: 0.66em; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 0.5em; right: 0.5em; top: 0.55em; border-top: 3px solid $line; }
+.stage { position: relative; padding-top: 1.6em; }
+.stage::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 50%;
+  background: var(--dot, #{$ink});
+  box-shadow: 0 0 0 4px $paper;
+}
+.stage--built { --dot: #{$green}; }
+.stage--next { --dot: #{$ink}; }
+.stage--later { --dot: #{$paper}; }
+.stage--later::before { border: 3px solid $ink; box-sizing: border-box; }
+.stage .when { display: block; font: 650 0.85em/1.2 "JetBrains Mono", monospace; color: $muted; margin-bottom: 0.15em; }
+.reveal .stage h3 { font-size: 1.1em; margin: 0 0 0.3em; }
+.stage ul { margin: 0 0 0 1.05em; padding: 0; }
+.reveal .stage li { font-size: 1em; margin: 0.12em 0; }
+
+/* hero */
+.reveal .slides section.hero { text-align: left; }
+.hero .wordmark { display: flex; align-items: center; gap: 0.3em; margin: 0 0 0.5em; font: 600 0.9em/1 "Fraunces", Georgia, serif; }
+.reveal .hero > h2:empty { display: none; }
+.hero .wordmark svg { width: 1.3em; height: 1.3em; }
+.reveal .hero h1.headline { font-size: 2.05em; line-height: 1.05; margin: 0 0 0.35em; max-width: 13em; }
+.reveal .hero .hero-lede { font-size: 0.7em; max-width: 30em; margin: 0; }
+.reveal .hero .for { font-size: 0.7em; max-width: 30em; margin: 0.9em 0 0; padding-left: 0.7em; border-left: 5px solid var(--path); }
+.reveal .hero .for strong { display: block; font-size: 0.8em; letter-spacing: 0.1em; text-transform: uppercase; color: var(--path-text); }
+.reveal .hero .meta { font-size: 0.54em; color: $muted; margin-top: 0.9em; }
+.reveal .hero .hero-mark { position: absolute; right: 10px; top: 140px; width: 300px; height: 300px; }
+
+/* other paths, the last slide of each deck */
+.paths { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5em; margin-top: 0.4em; }
+.paths a {
+  display: block;
+  text-decoration: none;
+  background: $card;
+  border: 1px solid $line;
+  border-top: 5px solid var(--card-path, #{$ink});
+  border-radius: 12px;
+  padding: 0.5em 0.7em;
+  font-size: 0.62em;
+  color: $ink;
+}
+.paths a strong { display: block; font-family: "Fraunces", Georgia, serif; font-size: 1.2em; }
+.paths a span { color: $muted; }
+.paths a:hover { border-color: $ink; }
+
+/* placeholders the owner fills in */
+.placeholder {
+  border: 2px dashed $clay;
+  border-radius: 12px;
+  padding: 0.5em 0.75em;
+  background: #fbf3ee;
+  font-size: 0.66em;
+  margin-top: 0.5em;
+}
+.placeholder strong { color: $clay-text; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8em; display: block; margin-bottom: 0.15em; }
+
+/* fixed path navigation (nav.html): on every slide, never in print */
+.brief-nav {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 600 15px/1 "Inter", system-ui, sans-serif;
+  color: $ink;
+  pointer-events: none;
+}
+.brief-nav > * { pointer-events: auto; }
+.brief-nav a, .brief-nav summary, .brief-nav__here {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 99px;
+  line-height: 1;
+}
+.brief-nav a, .brief-nav summary {
+  color: $ink;
+  text-decoration: none;
+  background: rgba(255, 253, 248, 0.94);
+  border: 1px solid $line;
+  cursor: pointer;
+}
+.brief-nav a:hover, .brief-nav summary:hover { border-color: $ink; }
+.brief-nav svg { width: 18px; height: 18px; flex: none; }
+.brief-nav__here { border: 2px solid var(--path); background: $card; color: $ink; font-weight: 600; }
+.brief-nav__here:empty { display: none; }
+.brief-nav details { position: relative; }
+.brief-nav summary { list-style: none; }
+.brief-nav summary::-webkit-details-marker { display: none; }
+.brief-nav summary::after { content: "▾"; font-size: 12px; }
+.brief-nav details ul {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  min-width: 300px;
+  background: $card;
+  border: 1px solid $line;
+  border-radius: 12px;
+  box-shadow: 0 14px 30px -18px rgba(30, 42, 68, 0.45);
+}
+.brief-nav details li a { display: flex; height: auto; border: 0; border-radius: 8px; background: transparent; padding: 9px 10px; font-weight: 500; line-height: 1.3; }
+.brief-nav details li a:hover, .brief-nav details li a:focus-visible { background: #f1ebde; }
+.brief-nav details li a[aria-current="page"] { font-weight: 700; }
+.brief-nav details li a[aria-current="page"]::after { content: " · you are here"; color: $muted; font-weight: 500; }
+.brief-nav .brief-nav__print { margin-left: auto; }
+html.print-pdf .brief-nav, html.reveal-print .brief-nav { display: none; }
+@media print { .brief-nav { display: none; } }
+
+/* market rings as nested bars (not to scale): each ring sits inside the one before */
+.rings { margin: 0.4em 0 0; font-size: 0.62em; }
+.ring { border-radius: 12px; padding: 0.55em 0.8em; margin-top: 0.35em; line-height: 1.3; }
+.ring b { font-family: "JetBrains Mono", monospace; font-weight: 650; margin-right: 0.3em; }
+.ring em {
+  font-style: normal;
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-left: 0.5em;
+  padding: 0.05em 0.5em;
+  border-radius: 99px;
+  border: 1.5px dashed currentColor;
+}
+.ring--outer { width: 100%; background: #efe8d9; color: $ink; }
+.ring--tam { width: 88%; margin-left: 4%; background: #fbe8c6; color: $ink; }
+.ring--sam { width: 68%; margin-left: 8%; background: $ink; color: $paper; }
+.ring--som { width: 44%; margin-left: 12%; background: $green; color: #ffffff; }
+
+/* narrow screens: reveal switches to its scroll view (nav.html) and the grids stack */
+@media (max-width: 700px) {
+  .cards, .cards--2, .cards--4, .paths, .strip, .pills, .ladder, .tiers, .timeline { grid-template-columns: 1fr; }
+  .rung, .tier .tread { min-height: 0 !important; }
+  .strip > div, .strip > div:first-child { clip-path: none; border-radius: 10px; margin-bottom: 0.3em; }
+  .timeline::before { display: none; }
+  .reveal .hero .hero-mark { display: none; }
+  .brief-nav { font-size: 13px; gap: 6px; }
+  .brief-nav__here, .brief-nav__print { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal .slides section, .reveal .slides section .fragment { transition: none !important; }
+}

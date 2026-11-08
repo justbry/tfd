@@ -10,7 +10,7 @@ import { createFixtureReader } from "$contract/fixtures/reader.ts";
 import { createFixtureWriter } from "$contract/fixtures/writer.ts";
 import { mountApp } from "../../src/app/mount.ts";
 import { appLayer } from "../../src/effect/app-layer.ts";
-import { calendar } from "../helpers.ts";
+import { calendar, noConfig } from "../helpers.ts";
 
 /**
  * Gate C4 (protocol §5) on the Svelte Dashboard, with the Preact package's own check (its test/consistency-checks.ts,
@@ -52,7 +52,11 @@ const reachable = (document: KpiDocument): boolean =>
 /** The Preact mount's signature over the Svelte app: the given Reader and Writer as the app's layer. */
 const mountSvelte: Mount = (root, options) => {
 	const app = mountApp(root, {
-		layer: appLayer({ reader: options.reader, writer: options.writer }),
+		layer: appLayer({
+			reader: options.reader,
+			writer: options.writer,
+			config: noConfig,
+		}),
 		calendar: options.clock,
 	});
 	return {

@@ -18,8 +18,6 @@ import { AGENT_PROMPT } from "../src/lib/content/agents";
 import { ANNUAL_MONTHS_CHARGED, PLANS } from "../src/lib/pricing/data";
 
 const TRIPLE_ENTRY = /triple[- ]entry/i;
-/** The trust page's claims table, where it sits in the "We don't say yet" column. */
-const NOT_CLAIMED = /^\| [^|]+ \| “Triple-entry accounting” \|/;
 const AGENT_NOTE = "Every page here is clean markdown";
 
 describe("converter", () => {
@@ -125,7 +123,7 @@ describe("build output", () => {
 		}
 	});
 
-	test('"triple-entry" only describes a competitor, or what Trifold does not claim', () => {
+	test('"triple-entry" only describes a competitor, never Trifold', () => {
 		const words = COMPETITORS.flatMap((competitor) => [
 			competitor.name,
 			competitor.tagline,
@@ -135,8 +133,7 @@ describe("build output", () => {
 			for (const line of read(file)
 				.split("\n")
 				.filter((text) => TRIPLE_ENTRY.test(text))) {
-				const allowed =
-					NOT_CLAIMED.test(line) || words.some((word) => line.includes(word));
+				const allowed = words.some((word) => line.includes(word));
 				expect({ file, line, allowed }).toEqual({ file, line, allowed: true });
 			}
 		}

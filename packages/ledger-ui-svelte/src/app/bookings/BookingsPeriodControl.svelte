@@ -19,6 +19,7 @@
 		today,
 		moneyPeriod,
 		timeZone,
+		opensOffset,
 		onNavigate,
 	}: {
 		route: Route;
@@ -26,6 +27,8 @@
 		/** The money period, which comes back when the tab is left. */
 		moneyPeriod: Period;
 		timeZone: string;
+		/** The weeks from this one that a week with no `offset` is (a demo school opens on its latest booking). */
+		opensOffset: number;
 		onNavigate: (route: Route) => void;
 	} = $props();
 
@@ -38,7 +41,7 @@
 	let open = $state(false);
 	let wrapper = $state<HTMLElement | null>(null);
 	const panelId = $props.id();
-	const period = $derived(readBookingsPeriod(route.query));
+	const period = $derived(readBookingsPeriod(route.query, opensOffset));
 	const days = $derived(bookingsDays(period, today));
 	const name = $derived(bookingsLabel(period, days.from));
 	const dates = $derived(
@@ -73,7 +76,7 @@
 			// The option that was picked is gone with the panel: focus goes back to the button.
 			wrapper?.querySelector<HTMLElement>("#pb")?.focus();
 		}
-		onNavigate(bookingsPeriodRoute(route, chosen));
+		onNavigate(bookingsPeriodRoute(route, chosen, opensOffset));
 	};
 </script>
 

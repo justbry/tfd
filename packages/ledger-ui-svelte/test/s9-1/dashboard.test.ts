@@ -15,7 +15,7 @@ import { manualClock } from "../../src/effect/clock.ts";
 import { memoryLog } from "../../src/effect/log.ts";
 import type { LogEntry } from "../../src/effect/services.ts";
 import { click, query, queryAll, textOf, until } from "../app-harness.ts";
-import { calendar } from "../helpers.ts";
+import { calendar, noConfig } from "../helpers.ts";
 
 /** The Dashboard's states the golden file does not reach: a missing figure or document, a failed read, View as and
  * the period limits it brings, the preview banner, a refused PIN, and All schools' figures per viewer. */
@@ -50,6 +50,7 @@ async function open(
 			appLayer({
 				reader: change.reader?.(reader) ?? reader,
 				writer: change.writer?.(writer) ?? writer,
+				config: noConfig,
 				clockLayer: manualClock().layer,
 			}),
 			log.layer,

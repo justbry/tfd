@@ -337,13 +337,14 @@
 			<p class="label-mono">Built for schools first</p>
 			<h2 class="display-2 mt-[18px] max-w-[18ch]" use:reveal>Receipts your families can use. Books your CPA can sign.</h2>
 			<p class={body} use:reveal={1}>
-				We're starting with microschools and private schools in Idaho and Utah. Families need itemised receipts: the child,
-				the hours, the dates, the school's EIN. Owners need a month that closes without a spreadsheet. CPAs need numbers
-				that trace to payments. One record does all three.
+				We're starting with microschools and private schools in Idaho and Utah. Families need receipts they can use.
+				Owners need a month that closes without a spreadsheet. CPAs need numbers that trace to payments. Today every
+				payment gets a signed receipt and every month a seal; the receipt itemised per child for state programs, the
+				compliance pack, is next.
 			</p>
 			<p class="my-6 max-w-[58ch] border-l-2 border-line-strong px-4 py-3.5 text-[15px] text-muted-foreground" use:reveal={2}>
-				Receipts are designed against each program's published rules and reviewed with CPAs. Until a program confirms, we
-				say "designed for", not "accepted by".
+				The compliance pack is being designed against each program's published rules, with a CPA's review. Until a
+				program confirms, we say "designed for", not "accepted by".
 			</p>
 			<div class="flex flex-wrap items-center gap-4">
 				<Button href="/early-access?role=school">Get early access</Button>
