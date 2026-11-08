@@ -1,3 +1,5 @@
+import { earlyAccess, type Mailer, type RateLimiter } from "./early-access";
+
 export type ApexEnv = {
 	/** The canonical host, e.g. trifold.app. */
 	APEX: string;
@@ -5,7 +7,14 @@ export type ApexEnv = {
 	ORIGIN: string;
 	/** The receipt verifier's host, e.g. verify.trifold.app. Until its own app ships it points at the site's /verify. */
 	VERIFY: string;
+	/** The early-access form's destination: a verified Email Routing address, kept as a secret (not in this public repo). */
+	EARLY_ACCESS_TO?: string;
+	/** Per-IP limit on early-access posts (Workers Rate Limiting). */
+	EARLY_ACCESS_LIMIT?: RateLimiter;
 };
+
+/** The early-access form's endpoint on the apex (apps/trifold-site/src/routes/early-access). */
+export const EARLY_ACCESS_PATH = "/api/early-access";
 
 type Fetcher = (request: Request) => Promise<Response>;
 
@@ -18,6 +27,8 @@ const DROPPED_REQUEST_HEADERS = [
 ];
 
 /**
+ * Plain http on any host: 301 to https, before anything else (verify.<apex> keeps its host, so its own 302 still
+ * decides where it goes). POST /api/early-access on the apex: the early-access form, sent on by email.
  * verify.<apex>: 302 to the site's /verify, for now. www.<apex> and any other host: 301 to the same path on the apex.
  * The apex: the same request against the Pages origin, answered as is (status, headers and body), with redirects passed
  * back to the browser rather than followed, and any redirect to the origin's own host rewritten to https on the apex.
@@ -26,8 +37,16 @@ export const handle = async (
 	request: Request,
 	env: ApexEnv,
 	upstream: Fetcher = fetch,
+	mailer?: Mailer,
 ): Promise<Response> => {
 	const url = new URL(request.url);
+	if (url.protocol === "http:") {
+		const host = url.hostname === env.VERIFY ? env.VERIFY : env.APEX;
+		return Response.redirect(
+			`https://${host}${url.pathname}${url.search}`,
+			301,
+		);
+	}
 	if (url.hostname === env.VERIFY) {
 		// No production keys are published yet, so there is no keys file to serve.
 		if (url.pathname.startsWith("/.well-known/")) {
@@ -52,6 +71,14 @@ export const handle = async (
 			301,
 		);
 	}
+	if (url.pathname === EARLY_ACCESS_PATH)
+		return earlyAccess(request, {
+			origin: `https://${env.APEX}`,
+			from: `early-access@${env.APEX}`,
+			to: env.EARLY_ACCESS_TO,
+			mailer,
+			limiter: env.EARLY_ACCESS_LIMIT,
+		});
 	const target = new URL(url.pathname + url.search, `https://${env.ORIGIN}`);
 	const headers = new Headers(request.headers);
 	for (const name of DROPPED_REQUEST_HEADERS) headers.delete(name);
@@ -72,9 +99,4 @@ export const handle = async (
 	const out = new Response(response.body, response);
 	out.headers.set("location", rewritten.toString());
 	return out;
-};
-
-export default {
-	fetch: (request: Request, env: ApexEnv): Promise<Response> =>
-		handle(request, env),
 };

@@ -17,8 +17,8 @@ export const SCENARIO_ORGS_URL = `${GITHUB_URL}/blob/dev/packages/atm/docs/scena
 
 /** The demo orgs' dashboards, one static page each, and their gallery (static/demo/orgs/). */
 export type DemoOrg = "school" | "studio" | "church" | "saas" | "creator";
-export const dashboardPath = (org: DemoOrg) => `/demo/orgs/${org}.html`;
-export const DASHBOARDS_GALLERY = "/demo/orgs/index.html";
+export const dashboardPath = (org: DemoOrg) => `/demo/orgs/${org}`;
+export const DASHBOARDS_GALLERY = "/demo/orgs/";
 
 /** One verified preset run. `hash` is the KPI hash, first eight and last four characters. */
 export type Preset = {

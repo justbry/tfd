@@ -99,7 +99,7 @@ describe("org KPI demos", () => {
 		expect(html).toContain("demo, synthetic data");
 		const links = [
 			...html.matchAll(
-				/class="card( featured)?"><a class="go" href="(\w+)\.html"/g,
+				/class="card( featured)?"><a class="go" href="(\w+)"/g,
 			),
 		];
 		expect(links.map((link) => link[2])).toEqual([...ORG_KINDS]);

@@ -92,17 +92,23 @@ which reads the plans, prices and limits from Trifold's tfd catalog in `catalog/
 
 ## The early-access form
 
-`/early-access` is static. Set `PUBLIC_FORM_ENDPOINT` at build time to any form service URL that accepts a POST of form
-fields (Formspree, Basin, a Cloudflare Worker, ...):
+`/early-access` is static. It posts the form to `PUBLIC_FORM_ENDPOINT`, set at build time; CI reads the repo
+variable, which is `https://trifold.app/api/early-access`:
 
 ```sh
-PUBLIC_FORM_ENDPOINT=https://example.com/f/abc bun run build
+PUBLIC_FORM_ENDPOINT=https://trifold.app/api/early-access bun run build
 ```
+
+That endpoint is the apex Worker (`apps/trifold-apex`): it takes the form only from `https://trifold.app`, checks it,
+drops it if the hidden `website` field is filled, limits each IP to five posts a minute, and emails it to the owner
+through Cloudflare Email Routing, with Reply-To set to the submitter. Nothing is stored. If the send fails it answers
+503, and the page asks the visitor to email `CONTACT_EMAIL`. It is same-origin, so `connect-src`/`form-action` in
+`static/_headers` are `'self'`; a preview on `*.tfd-ledger.pages.dev` can't post to it (the endpoint refuses other
+origins, and the CSP blocks the request).
 
 When it is unset, submitting opens the visitor's email app with the fields filled in, addressed to `CONTACT_EMAIL`.
 `?role=school|church|nonprofit|studio|saas|creator|accountant|developer|network` preselects the role; `?src=` is passed through as a hidden
-`source` field for tracking outreach links. Once an endpoint is chosen, narrow `connect-src`/`form-action` in
-`static/_headers` to its origin.
+`source` field for tracking outreach links.
 
 ## Deploy to Cloudflare Pages
 
