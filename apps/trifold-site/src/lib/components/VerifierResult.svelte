@@ -80,6 +80,38 @@
 					</p>
 					<p>The receipt names a key this school hasn't published.</p>
 				</div>
+			{:else if outcome.kind === "key_revoked"}
+				<div class={fail}>
+					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> Signed with a revoked key.</p>
+					<p>
+						The key that signed this, <code class={code}>{outcome.keyId}</code>, was revoked. Ask the issuer for a
+						re-signed receipt.
+					</p>
+				</div>
+			{:else if outcome.kind === "key_wrong_purpose"}
+				<div class={fail}>
+					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> Signed with the wrong key.</p>
+					<p>
+						The key <code class={code}>{outcome.keyId}</code> isn't one the school uses for receipts, so it can't vouch
+						for this one.
+					</p>
+				</div>
+			{:else if outcome.kind === "outside_key_window"}
+				<div class={fail}>
+					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> Signed outside the key's dates.</p>
+					<p>
+						The receipt says it was signed at a time the key <code class={code}>{outcome.keyId}</code> wasn't in use.
+						Ask the issuer for a re-signed receipt.
+					</p>
+				</div>
+			{:else if outcome.kind === "key_requires_v2"}
+				<div class={fail}>
+					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> Old receipt format.</p>
+					<p>
+						This receipt uses the old format, which the key <code class={code}>{outcome.keyId}</code> doesn't accept.
+						Ask the issuer for a current receipt.
+					</p>
+				</div>
 			{:else}
 				<div class={fail}>
 					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> This isn't a Trifold receipt.</p>

@@ -9,7 +9,7 @@ import type {
 	SealReport,
 } from "../types.js";
 import { sealSchema } from "./schemas.js";
-import { shapeCheck, signBytes, verifyBytes } from "./sign.js";
+import { keyUse, shapeCheck, signBytes, verifyBytes } from "./sign.js";
 import { canonicalize, sha256Hex } from "./util.js";
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -117,10 +117,14 @@ const textOr = (value: unknown, key: string): string => {
 
 /**
  * A school's seal chain, in the order the seals were made, against its events (one per `idem`). For each seal: its shape
- * and signature, then its link to the seal before it (a missing or reordered seal is `broken_link`), then the events it
- * names, by id, hashed and counted again (an edit or a deletion is `events_changed`). A month event not named by the
- * month's latest seal with a good signature (its own verdict aside) is listed in `unsealedLate`, not counted as
- * tampering: atm cannot tell a late delivery from an insertion. Never throws on a bad seal.
+ * and signature, then whether its key vouches for it (`keyUse`: purpose `seal`, `sealed_at` in the key's window, never
+ * revoked; a revoked key's seal is `key_revoked` even when its link is broken too), then its link to the seal before it
+ * (a missing or reordered seal is `broken_link`), then the events it names,
+ * by id, hashed and counted again (an edit or a deletion is `events_changed`). A seal signed by a revoked key is
+ * `superseded`, not a failure, once a later `ok` seal of the same month exists (the revocation runbook appends one under
+ * the current key); either way the next seal links to it by its hash, so the chain holds. A month event not named by the
+ * month's latest seal with a good signature and a key that vouches for it (its own verdict aside) is listed in
+ * `unsealedLate`, not counted as tampering: atm cannot tell a late delivery from an insertion. Never throws on a bad seal.
  */
 export const verifySeals = (
 	seals: readonly unknown[],
@@ -129,27 +133,41 @@ export const verifySeals = (
 ): SealReport => {
 	const months = eventsByMonth(events);
 	const latest = new Map<string, AtmSeal>();
-	const rows = seals.map((raw, index) => {
-		const row = (verdict: Verdict) => ({
-			month: textOr(raw, "month"),
-			sealed_at: textOr(raw, "sealed_at"),
-			verdict,
-		});
-		if (!isSignedSeal(raw)) return row("malformed");
+	const verdicts = seals.map((raw, index): Verdict => {
+		if (!isSignedSeal(raw)) return "malformed";
 		const { seal, key_id, sig } = raw;
 		const signature = verifyBytes(canonicalize(seal), key_id, sig, keys);
-		if (signature !== "ok") return row(signature);
+		if (signature !== "ok") return signature;
+		const use = keyUse(keys, key_id, "seal", seal.sealed_at);
+		if (use !== "ok") return use;
 		latest.set(seal.month, seal);
 		const expected = index === 0 ? null : sealHash(seals[index - 1]);
-		if (seal.prev_seal_hash !== expected) return row("broken_link");
+		if (seal.prev_seal_hash !== expected) return "broken_link";
 		const inMonth = months.get(seal.month);
 		const covered = seal.event_ids.map((id) => inMonth?.get(id));
-		if (covered.some((e) => e === undefined)) return row("events_changed");
+		if (covered.some((e) => e === undefined)) return "events_changed";
 		const again = counted(covered as AtmEvent[]);
 		const same =
 			again.transactions === seal.transactions &&
 			again.events_hash === seal.events_hash;
-		return row(same ? "ok" : "events_changed");
+		return same ? "ok" : "events_changed";
+	});
+	const sealMonths = seals.map((raw) => textOr(raw, "month"));
+	const rows = verdicts.map((verdict, index) => {
+		const month = sealMonths[index] as string;
+		const resealed =
+			verdict === "key_revoked" &&
+			verdicts.some(
+				(later, laterIndex) =>
+					laterIndex > index &&
+					later === "ok" &&
+					sealMonths[laterIndex] === month,
+			);
+		return {
+			month,
+			sealed_at: textOr(seals[index], "sealed_at"),
+			verdict: resealed ? ("superseded" as const) : verdict,
+		};
 	});
 	const unsealedLate = [...latest.values()]
 		.flatMap((seal) => {
@@ -172,7 +190,7 @@ export const verifySeals = (
 					: 1,
 		);
 	return {
-		ok: rows.every((r) => r.verdict === "ok"),
+		ok: rows.every((r) => r.verdict === "ok" || r.verdict === "superseded"),
 		seals: rows,
 		unsealedLate,
 	};

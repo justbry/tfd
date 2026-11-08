@@ -1,0 +1,28 @@
+{
+	"trifold-test-2026-10": {
+		"spki_sha256": "a570fa55b688743e990ae6d14ffdf2d9a2e118fbe229867051720f8681354e9c",
+		"purpose": "receipt",
+		"not_before": "2026-10-01T00:00:00Z",
+		"not_after": "2026-11-01T00:00:00Z",
+		"revoked_at": "2026-11-05T00:00:00Z"
+	},
+	"trifold-test-2026-11": {
+		"spki_sha256": "c0f900fe1c8185e6aba34dcc499d8e93d1eca9b3f2177c2b7222fc874954cd87",
+		"purpose": "receipt",
+		"not_before": "2026-11-01T00:00:00Z",
+		"not_after": null
+	},
+	"trifold-test-seal-2026-10": {
+		"spki_sha256": "35581d96ab7453cfc0834a28407daf88dbe655dd19a983caf781d6c0a7bd5df5",
+		"purpose": "seal",
+		"not_before": "2026-10-01T00:00:00Z",
+		"not_after": "2026-11-01T00:00:00Z",
+		"revoked_at": "2026-11-05T00:00:00Z"
+	},
+	"trifold-test-seal-2026-11": {
+		"spki_sha256": "4f0d6ce2659093f2e922b032c17484a78a17720daa54a6d056e97463c674d801",
+		"purpose": "seal",
+		"not_before": "2026-11-01T00:00:00Z",
+		"not_after": null
+	}
+}

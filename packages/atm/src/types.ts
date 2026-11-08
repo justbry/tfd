@@ -508,8 +508,18 @@ export type TfdReceipt = {
 	event_hash: string;
 };
 
+/**
+ * Receipt v2: v1's fields plus `issued_at`, the time Trifold signed it, inside the signature. A verifier checks it against
+ * the signing key's window (`TfdKeyEntry`); v1 has no signing time, so its key's window is never checked.
+ */
+export type TfdReceiptV2 = Omit<TfdReceipt, "v"> & {
+	v: 2;
+	/** RFC 3339 UTC (`…Z`), passed in by the signer (atm reads no clock). */
+	issued_at: string;
+};
+
 export type TfdSignedReceipt = {
-	receipt: TfdReceipt;
+	receipt: TfdReceipt | TfdReceiptV2;
 	/** Which public key verifies `sig`, e.g. `trifold-2026-11`. */
 	key_id: string;
 	/** Ed25519 over `canonicalize(receipt)`, base64url without padding. */
@@ -519,12 +529,50 @@ export type TfdSignedReceipt = {
 /** The key a receipt or a seal is signed with: an Ed25519 private key as PKCS#8 PEM, and the id its public key is published under. */
 export type TfdSigner = { keyId: string; privateKeyPem: string };
 
-/** Published public keys: key id to an Ed25519 SPKI PEM. Old keys stay, so old receipts keep verifying. */
-export type TfdPublicKeys = Record<string, string>;
+/** What a published key may sign: receipts, seals, or the org directory's documents. */
+export type TfdKeyPurpose = "receipt" | "seal" | "directory";
+
+/**
+ * A published key with its purpose and window. A document it signs must be of its purpose, and a v2 receipt's `issued_at`
+ * or a seal's `sealed_at` must be at or after `not_before` and before `not_after` (`null`: still open). Once `revoked_at`
+ * is set the key fails everything it ever signed, whatever time the document claims: a thief can backdate it.
+ */
+export type TfdKeyEntry = {
+	pem: string;
+	purpose: TfdKeyPurpose;
+	not_before: string;
+	not_after: string | null;
+	revoked_at?: string;
+};
+
+/**
+ * Published public keys: key id to an Ed25519 SPKI PEM (the first form: any purpose, no window, never revoked) or to a
+ * `TfdKeyEntry`. Old keys stay, so old receipts keep verifying.
+ */
+export type TfdPublicKeys = Record<string, string | TfdKeyEntry>;
+
+/** Why a well-signed document's key does not vouch for it: see `TfdKeyEntry`. */
+export type KeyUseVerdict =
+	| "key_revoked"
+	| "key_wrong_purpose"
+	| "outside_key_window";
+
+/**
+ * A v1 receipt (no signed time) under a key with a window: its window cannot be checked, so a key with dates vouches for
+ * v2 receipts only.
+ */
+export type ReceiptKeyUseVerdict = KeyUseVerdict | "key_requires_v2";
 
 export type ReceiptVerdict =
 	| { ok: true }
-	| { ok: false; reason: "malformed" | "unknown_key" | "bad_signature" };
+	| {
+			ok: false;
+			reason:
+				| "malformed"
+				| "unknown_key"
+				| "bad_signature"
+				| ReceiptKeyUseVerdict;
+	  };
 
 /** A signed receipt against the school's events: does the books' event still make the same receipt. */
 export type LedgerVerdict =
@@ -563,7 +611,11 @@ export type SealOfInput = {
 	previous: TfdSignedSeal | null;
 };
 
-/** What `verifySeals` found, one verdict per seal in chain order. `ok` is false when any seal is not `ok`; late events alone leave it true. */
+/**
+ * What `verifySeals` found, one verdict per seal in chain order. `ok` is false when any seal is neither `ok` nor
+ * `superseded`; late events alone leave it true. `superseded`: signed by a revoked key, with a later `ok` seal of the
+ * same month (the revocation runbook's re-seal).
+ */
 export type SealReport = {
 	ok: boolean;
 	seals: {
@@ -575,7 +627,9 @@ export type SealReport = {
 			| "bad_signature"
 			| "unknown_key"
 			| "broken_link"
-			| "events_changed";
+			| "events_changed"
+			| KeyUseVerdict
+			| "superseded";
 	}[];
 	/** Month events that month's latest seal does not name: late deliveries, or insertions. */
 	unsealedLate: { month: string; event_id: string; ingest_time: string }[];
@@ -3815,6 +3869,10 @@ export type AtmIdentity = TfdIdentity;
 export type AtmJournalBuild = TfdJournalBuild;
 /** @deprecated Use {@link TfdJournalFiles}. */
 export type AtmJournalFiles = TfdJournalFiles;
+/** @deprecated Use {@link TfdKeyEntry}. */
+export type AtmKeyEntry = TfdKeyEntry;
+/** @deprecated Use {@link TfdKeyPurpose}. */
+export type AtmKeyPurpose = TfdKeyPurpose;
 /** @deprecated Use {@link TfdLapsedRow}. */
 export type AtmLapsedRow = TfdLapsedRow;
 /** @deprecated Use {@link TfdLedgerEventInput}. */
@@ -3827,6 +3885,8 @@ export type AtmPosting = TfdPosting;
 export type AtmPublicKeys = TfdPublicKeys;
 /** @deprecated Use {@link TfdReceipt}. */
 export type AtmReceipt = TfdReceipt;
+/** @deprecated Use {@link TfdReceiptV2}. */
+export type AtmReceiptV2 = TfdReceiptV2;
 /** @deprecated Use {@link TfdReplayResult}. */
 export type AtmReplayResult = TfdReplayResult;
 /** @deprecated Use {@link TfdResult}. */

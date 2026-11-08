@@ -33,10 +33,12 @@ import p29 from "../../schema/payload/share.reversed.v1.json";
 import p30 from "../../schema/payload/share.settled.v1.json";
 import p31 from "../../schema/payload/subject.erased.v1.json";
 import receipt from "../../schema/receipt.v1.json";
+import receiptV2 from "../../schema/receipt.v2.json";
 import seal from "../../schema/seal.v1.json";
 
 export const envelopeSchema: Record<string, unknown> = envelope;
 export const receiptSchema: Record<string, unknown> = receipt;
+export const receiptV2Schema: Record<string, unknown> = receiptV2;
 export const sealSchema: Record<string, unknown> = seal;
 export const payloadSchemas: Record<string, Record<string, unknown>> = {
 	"catalog.published": p0,
