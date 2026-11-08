@@ -1,3 +1,5 @@
+import type { Database } from "bun:sqlite";
+import type { R2BucketBinding } from "../../../packages/atm/src/cloud.ts";
 import type { CloudEnv, D1Database, R2Bucket } from "../src/env";
 
 type Stored = {
@@ -200,5 +202,103 @@ export const fakeEnv = (
 		ENVIRONMENT: "staging",
 		LEDGER_HOST: "staging-ledger.trifold.app",
 		API_HOST: "staging-api.trifold.app",
+	};
+};
+
+/** An in-memory bucket with the binding shape tfd's `R2BindingStore` calls (conditional puts, prefix lists). */
+export const memoryR2Binding = () => {
+	const objects = new Map<
+		string,
+		{ bytes: Uint8Array; etag: string; customMetadata?: Record<string, string> }
+	>();
+	let version = 0;
+	const meta = (key: string) => {
+		const stored = objects.get(key);
+		return stored
+			? {
+					key,
+					size: stored.bytes.length,
+					etag: stored.etag,
+					customMetadata: stored.customMetadata,
+				}
+			: null;
+	};
+	const bucket: R2BucketBinding = {
+		get: async (key) => {
+			const stored = objects.get(key);
+			if (!stored) return null;
+			return {
+				...(meta(key) as NonNullable<ReturnType<typeof meta>>),
+				arrayBuffer: async () => stored.bytes.slice().buffer as ArrayBuffer,
+			};
+		},
+		head: async (key) => meta(key),
+		put: async (key, value, options) => {
+			const existing = objects.get(key);
+			if (options.onlyIf?.etagDoesNotMatch === "*" && existing) return null;
+			if (
+				options.onlyIf?.etagMatches !== undefined &&
+				existing?.etag !== options.onlyIf.etagMatches
+			)
+				return null;
+			version += 1;
+			objects.set(key, {
+				bytes: new Uint8Array(value),
+				etag: `e${version}`,
+				customMetadata: options.customMetadata,
+			});
+			return meta(key);
+		},
+		delete: async (key) => {
+			objects.delete(key);
+		},
+		list: async ({ prefix = "", limit = 1000, cursor }) => {
+			const keys = [...objects.keys()]
+				.filter((key) => key.startsWith(prefix))
+				.sort()
+				.filter((key) => cursor === undefined || key > cursor);
+			const page = keys.slice(0, limit);
+			return {
+				objects: page.map(
+					(key) => meta(key) as NonNullable<ReturnType<typeof meta>>,
+				),
+				delimitedPrefixes: [],
+				truncated: keys.length > limit,
+				cursor: keys.length > limit ? page.at(-1) : undefined,
+			};
+		},
+	};
+	return {
+		bucket,
+		objects,
+		text: (key: string) =>
+			new TextDecoder().decode(objects.get(key)?.bytes ?? new Uint8Array()),
+	};
+};
+
+/**
+ * A Durable Object state over bun:sqlite with the `sql.exec`, `transactionSync` and `setAlarm` shapes the DO uses.
+ * Like DO SQLite, `exec` runs one statement; `alarms` records each alarm set.
+ */
+export const durableState = (db: Database) => {
+	const alarms: number[] = [];
+	return {
+		alarms,
+		storage: {
+			sql: {
+				exec: (query: string, ...bindings: unknown[]) => {
+					const rows = db.query(query).all(...(bindings as never[])) as Record<
+						string,
+						unknown
+					>[];
+					return { toArray: () => rows };
+				},
+			},
+			transactionSync: <T>(work: () => T): T => db.transaction(work)(),
+			setAlarm: async (at: number) => {
+				alarms.push(at);
+			},
+		},
+		blockConcurrencyWhile: async <T>(work: () => Promise<T>) => work(),
 	};
 };

@@ -10,6 +10,8 @@ public API and Stripe webhooks), one Worker routed by `Host`. The plan, the mile
 | `src/org-do.ts` | `OrgDO`, one SQLite-backed Durable Object per organization (handler, inbox and alarm in M3) |
 | `src/backup.ts`, `src/prune.ts`, `src/cron.ts` | The hourly cron: copies each new version of every books object into the locked backup bucket, resuming across runs |
 | `migrations/` | D1 migrations (`bun run migrate:staging`) |
+| `src/billing/` | Trifold's own billing (PLAN.md section 5), staging only: checkout, the billing webhook, the plans pages |
+| `scripts/publish-plans.ts` | Publishes `catalog/trifold`'s menus to Stripe test mode with tfd's `menuToStripe`; writes `src/published-plans.json` |
 
 ## Environments
 
@@ -23,6 +25,37 @@ Only `staging` is bound. The top level of `wrangler.jsonc` is production and sta
 | R2 | `trifold-staging-books`; `trifold-staging-backups` (below) |
 | Cron | `17 * * * *`, the backup (hourly; `BACKUP_SUBREQUEST_BUDGET` per run, 900 by default, raise toward 9,000 on the Paid plan) |
 | Signing keys | Secrets Store `TRIFOLD_STAGING_SIGNING_RECEIPT`, `_SEAL`, `_DIRECTORY` (Ed25519, key ids `trifold-staging-2026-11-<purpose>`); `/healthz` proves they import. Public halves: `apps/trifold-verify/public/.well-known/trifold-keys.json`. The private PEMs live only in Secrets Store and `~/.config/trifold/keys/staging/` (mode 600) |
+
+## Trifold's own billing (staging, Stripe test mode)
+
+Trifold sells its plans through Stripe Checkout and keeps the paid invoices in its own books, with the tfd engine, as
+any school would. One Durable Object, `OrgDO` named `trifold`, is those books: its SQLite holds tfd's handler tables
+(`HANDLER_DDL`, migration 2).
+
+| Route | What it does |
+|---|---|
+| `GET staging-ledger…/billing/plans` | Starter and Audited (Pro is a draft), standard or non-profit, monthly or yearly; calls checkout |
+| `GET staging-ledger…/billing/success`, `/billing/cancel` | Checkout's return pages |
+| `POST staging-api…/v1/billing/checkout` | `{ tier, interval, org: std\|np, email? }` → `{ id, url }`: a subscription Checkout Session made with tfd's `checkoutParams` (metadata `b4u_school` = `tf-std`/`tf-np`, `family_id` = a minted `tfa_…` id, never an email). CORS for the ledger host only; 10 a minute per address |
+| `POST staging-api…/webhooks/billing` | Verifies Stripe's signature on the raw body (WebCrypto, 5 minutes), hands the event to the `trifold` DO, which runs tfd's `handleStripeWebhook` and ships the outbox to `schools/<tf-std\|tf-np>/events/…` in the books bucket. 2xx only after the DO committed; a failed ship retries by alarm |
+| `GET staging-api…/v1/billing/books` | Counts only: claims by outcome, outbox rows shipped and not, batch keys |
+
+Checkout, its pages and the books counts answer 404 outside staging; production stays unbound.
+
+The Worker imports tfd through `packages/atm/src/cloud.ts`, a Worker-safe entry (no `node:fs`; Ajv is bundled but
+never compiled because the menu is validated and the policy resolved when publishing).
+
+Secrets (Worker secrets on `trifold-cloud-staging`, put from files under `~/.config/trifold/`, mode 600):
+
+| Secret | File | |
+|---|---|---|
+| `STRIPE_BILLING_WEBHOOK_SECRET` | `stripe-test-billing-webhook.secret` | endpoint `we_1UZSkmDsfMqSNUOEcATOUMeH` (test mode): `invoice.paid`, `invoice_payment.paid`, `customer.subscription.*`, `charge.refunded` |
+| `STRIPE_SECRET_KEY` | `stripe-test-checkout.key` | a restricted TEST key; checkout answers 503 without it |
+
+```sh
+bun scripts/publish-plans.ts --dry-run   # then without --dry-run; commit src/published-plans.json and deploy
+env -u CLOUDFLARE_API_TOKEN bunx wrangler@4.90.0 secret put STRIPE_SECRET_KEY --env staging < ~/.config/trifold/stripe-test-checkout.key
+```
 
 ## Backups
 
