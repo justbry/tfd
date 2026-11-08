@@ -291,9 +291,15 @@
 		onDownload: downloadHistory,
 	});
 	const handlers: Handlers = {
-		onQuantity: () => (dialog = "quantity"),
-		onCancel: () => (dialog = "cancel"),
-		onResume: () => (dialog = "resume"),
+		onQuantity: () => {
+			dialog = "quantity";
+		},
+		onCancel: () => {
+			dialog = "cancel";
+		},
+		onResume: () => {
+			dialog = "resume";
+		},
 		onCard: () => notify(app, { tone: "info", title: "Opens Stripe's billing portal. Card details stay with Stripe." }),
 		onBuy: (addonId) => {
 			const addon = portal?.addons.find(({ id }) => id === addonId);
