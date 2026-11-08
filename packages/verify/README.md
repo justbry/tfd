@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # tfd-verify
 
-Check a Trifold receipt or seal anywhere WebCrypto runs: a browser, Bun, Deno, Node 20+ or a Worker. It is tfd's own
-receipt and seal checks (`packages/atm/src/ledger/{receipt,seal,sign,util}.ts`), ported line for line, so a receipt
-verifies here exactly when it verifies with tfd. No `node:*` imports, no network: nothing leaves the page.
+Check a Trifold receipt or seal anywhere WebCrypto runs: a browser, Bun, Deno, Node 20+ or a Worker. It ships its
+TypeScript source (`exports` point at `src/*.ts`), so a browser, Node or a Worker needs a bundler or build step. It is
+tfd's own receipt and seal checks (`packages/atm/src/ledger/{receipt,seal,sign,util}.ts`), ported line for line, so a
+receipt verifies here exactly when it verifies with tfd. No `node:*` imports, no network: nothing leaves the page.
 
 Apache-2.0 (`LICENSE`), so that anyone can check a receipt forever. It imports nothing from tfd itself (FSL-1.1-ALv2);
 its one dependency is `@noble/ed25519` (MIT). Not on npm yet (`private: true`).

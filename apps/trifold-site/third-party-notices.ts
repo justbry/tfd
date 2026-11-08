@@ -15,6 +15,14 @@ export const NOTICES_FILE = "licenses.txt";
 /** The last node_modules/<name>/ in a module id: the package that owns it (scoped names included). */
 const PACKAGE_DIRECTORY = /^(.*\/node_modules\/((?:@[^/]+\/)?[^/]+))\//;
 const LICENSE_FILE = /^(licen[cs]e|copying)(\.(md|txt))?$/i;
+/** Rollup's prefix for virtual module ids. */
+const VIRTUAL_PREFIX = /^\0/;
+
+const byName = (a: { name: string }, b: { name: string }): number => {
+	if (a.name < b.name) return -1;
+	if (a.name > b.name) return 1;
+	return 0;
+};
 
 type BundledPackage = {
 	name: string;
@@ -41,10 +49,8 @@ const packageOf = (directory: string): BundledPackage => {
 };
 
 /** The text of licenses.txt for the packages in these package directories. */
-export const noticesFor = (directories: Iterable<string>): string => {
-	const packages = [...new Set(directories)]
-		.map(packageOf)
-		.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+const noticesFor = (directories: ReadonlySet<string>): string => {
+	const packages = [...directories].map(packageOf).sort(byName);
 	const sections = packages.map(
 		(bundled) =>
 			`${bundled.name} ${bundled.version} (${bundled.license})\n\n${bundled.text}`,
@@ -81,9 +87,12 @@ export const thirdPartyNotices = ({
 		for (const output of Object.values(bundle)) {
 			if (output.type !== "chunk") continue;
 			for (const id of output.moduleIds) {
-				const match = PACKAGE_DIRECTORY.exec(id.replace(/^\0/, ""));
-				if (match?.[1] && existsSync(join(match[1], "package.json")))
-					directories.add(match[1]);
+				const directory = PACKAGE_DIRECTORY.exec(
+					id.replace(VIRTUAL_PREFIX, ""),
+				)?.[1];
+				if (!directory || directories.has(directory)) continue;
+				if (existsSync(join(directory, "package.json")))
+					directories.add(directory);
 			}
 		}
 		this.emitFile({

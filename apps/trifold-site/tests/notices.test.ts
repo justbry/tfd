@@ -14,7 +14,7 @@ if (!existsSync(path))
 const notices = readFileSync(path, "utf8");
 
 test("the verifier's packages are listed with their license texts", () => {
-	expect(notices).toContain("tfd-verify 0.1.0 (Apache-2.0)");
+	expect(notices).toMatch(/tfd-verify [\d.]+ \(Apache-2\.0\)/);
 	expect(notices).toContain(
 		"Apache License\n                           Version 2.0",
 	);

@@ -128,7 +128,6 @@ describe("the vectors, byte for byte", () => {
 	});
 
 	test("the test key is the pinned one", async () => {
-		expect(toHex(await spkiOf(testSeed))).not.toBe("");
 		const digest = new Uint8Array(
 			await crypto.subtle.digest("SHA-256", await spkiOf(testSeed)),
 		);

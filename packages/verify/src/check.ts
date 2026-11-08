@@ -61,15 +61,17 @@ export const checkReceipt = async (
 	// The month's latest seal decides, as in tfd's verifySeals.
 	let seal: Extract<Outcome, { kind: "signed" }>["seal"] = null;
 	for (const [index, raw] of books.seals.entries()) {
+		// Untrusted: a seal may be null or have any shape, so read it defensively.
 		const candidate = raw as {
-			seal?: { month?: string; event_ids?: string[] };
-		};
-		if (candidate.seal?.month !== month) continue;
+			seal?: { month?: unknown; event_ids?: unknown };
+		} | null;
+		if (candidate?.seal?.month !== month) continue;
+		const eventIds = candidate.seal.event_ids;
 		seal = {
 			month,
 			verdict: verdicts[index] ?? "malformed",
 			covers:
-				candidate.seal.event_ids?.includes(value.receipt.event_id) ?? false,
+				Array.isArray(eventIds) && eventIds.includes(value.receipt.event_id),
 		};
 	}
 	return { kind: "signed", signed: value, books: booksVerdict, seal };
