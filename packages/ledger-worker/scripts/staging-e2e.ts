@@ -68,6 +68,10 @@ const FIXTURE_SCHOOL_PATTERN =
 	/\bid:\s*"([^"]+)",\s*name:\s*"([^"]+)",\s*timeZone:/g;
 const PROD_API_PATTERN = /(?<![\w-])api\.b4uni\.com/;
 const JS_ASSET_PATTERN = /\.m?js(\?|$)/;
+/** A lazy chunk a bundle imports by relative path (`import("./DemoBanner-ab12.js")`): the bundle checks follow these, since the
+ * Svelte build keeps the signed-out alert's words out of the entry. */
+const CHUNK_IMPORT_PATTERN = /["'`](\.{1,2}\/[\w./-]+\.m?js)["'`]/g;
+const MAX_LAZY_CHUNKS = 60;
 const STRING_QUOTES = ['"', "'", "`"] as const;
 
 /** Names that are also the product's own words ("The school uses the B4 Uni file"): only a whole string literal counts. */
@@ -979,11 +983,30 @@ export const stage1 = async (context: Context): Promise<void> => {
 			else if (JS_ASSET_PATTERN.test(url))
 				bundles.push({ url, text: reply.text });
 		}
+		const seen = new Set(bundles.map((bundle) => bundle.url));
+		let lazyChunks = 0;
+		for (
+			let index = 0;
+			index < bundles.length && lazyChunks < MAX_LAZY_CHUNKS;
+			index++
+		) {
+			const bundle = bundles[index];
+			if (bundle === undefined) continue;
+			for (const match of bundle.text.matchAll(CHUNK_IMPORT_PATTERN)) {
+				const url = new URL(match[1] ?? "", bundle.url).href;
+				if (seen.has(url) || !url.startsWith(`${worker}/`)) continue;
+				seen.add(url);
+				const reply = await send(url);
+				if (reply.status !== 200) continue;
+				bundles.push({ url, text: reply.text });
+				lazyChunks++;
+			}
+		}
 		return {
 			status: problems.length === 0 ? "PASS" : "FAIL",
 			why:
 				problems.length === 0
-					? `${assets.length} asset(s) load 200 (${bundles.length} script)`
+					? `${assets.length} asset(s) load 200 (${bundles.length - lazyChunks} script, ${lazyChunks} lazy chunk(s) followed)`
 					: problems.join("; "),
 		};
 	});
