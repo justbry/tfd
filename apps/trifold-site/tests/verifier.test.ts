@@ -5,6 +5,8 @@
  */
 import { describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
 	type BooksEvent,
 	canonicalize,
@@ -12,7 +14,7 @@ import {
 	verifyReceipt,
 	verifySealChain,
 } from "tfd-verify";
-import { checkReceipt } from "tfd-verify/check";
+import { checkReceipt, type Outcome } from "tfd-verify/check";
 import { decodeReceiptParam, encodeReceiptParam } from "tfd-verify/link";
 import {
 	checkReceiptAgainstEvents as atmCheckAgainstEvents,
@@ -202,4 +204,21 @@ test("?r= links carry a receipt intact", () => {
 	const json = JSON.stringify(sample);
 	expect(decodeReceiptParam(encodeReceiptParam(json))).toBe(json);
 	expect(decodeReceiptParam("%%%")).toBeNull();
+});
+
+test('the result card words every failing outcome; only a malformed file is "This isn\'t a Trifold receipt"', () => {
+	const card = readFileSync(
+		join(import.meta.dir, "../src/lib/components/VerifierResult.svelte"),
+		"utf8",
+	);
+	const worded: Record<Exclude<Outcome["kind"], "malformed">, true> = {
+		signed: true,
+		bad_signature: true,
+		unknown_key: true,
+		key_revoked: true,
+		key_wrong_purpose: true,
+		outside_key_window: true,
+	};
+	for (const kind of Object.keys(worded))
+		expect(card).toContain(`outcome.kind === "${kind}"`);
 });

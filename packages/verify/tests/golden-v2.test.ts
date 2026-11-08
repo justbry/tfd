@@ -199,6 +199,25 @@ describe("receipts under windowed keys", () => {
 		expect(await verifyReceipt(resigned, keys)).toBe("ok");
 	});
 
+	test("the window is [not_before, not_after): its start is in, its end is out", async () => {
+		const unrevoked: PublicKeys = {
+			...keys,
+			"trifold-test-2026-10": {
+				...(keys["trifold-test-2026-10"] as KeyEntry),
+				revoked_at: undefined,
+			},
+		};
+		const at = async (issuedAt: string) =>
+			verifyReceipt(
+				await signReceipt(await v2(issuedAt), "trifold-test-2026-10"),
+				unrevoked,
+			);
+		expect(await at("2026-10-01T00:00:00Z")).toBe("ok");
+		expect(await at("2026-10-31T23:59:59.999Z")).toBe("ok");
+		expect(await at("2026-11-01T00:00:00Z")).toBe("outside_key_window");
+		expect(await at("2026-09-30T23:59:59Z")).toBe("outside_key_window");
+	});
+
 	test("v1 receipts: purpose and revocation count, the window cannot", async () => {
 		const v1 = (await receiptOf(event)) as Receipt;
 		expect(
@@ -227,7 +246,14 @@ describe("receipts under windowed keys", () => {
 			{ ...entry, purpose: "anything" },
 			{ ...entry, not_before: "soon" },
 			{ ...entry, not_after: undefined },
+			// revoked_at is absent or a time: null is not "not revoked".
 			{ ...entry, revoked_at: null },
+			// A time without Z would be read in the verifier's own zone, so its verdict would depend on where it runs.
+			{ ...entry, not_before: "2026-11-01T00:00:00" },
+			{ ...entry, not_before: "2026-11-01" },
+			{ ...entry, not_before: "2026-11-01T00:00:00+00:00" },
+			{ ...entry, not_after: "2026-12-01T00:00:00" },
+			{ ...entry, revoked_at: "2026-12-01T00:00:00" },
 		])
 			expect(
 				await verifyReceipt(signed, {

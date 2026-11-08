@@ -10,7 +10,13 @@ import type {
 	TfdReceiptV2,
 } from "../types.js";
 import { receiptSchema, receiptV2Schema } from "./schemas.js";
-import { keyUse, shapeCheck, signBytes, verifyBytes } from "./sign.js";
+import {
+	keyUse,
+	shapeCheck,
+	signBytes,
+	UTC_INSTANT,
+	verifyBytes,
+} from "./sign.js";
 import { canonicalize, sha256Hex } from "./util.js";
 
 /**
@@ -76,9 +82,6 @@ export const receiptOf = (event: AtmEvent): AtmReceipt | null => {
 		event_hash: sha256Hex(canonicalize(event)),
 	};
 };
-
-/** RFC 3339 UTC, as `schema/receipt.v2.json` takes `issued_at`. */
-const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
 
 /**
  * Receipt v2 of an event: `receiptOf`'s fields with `v: 2` and `issuedAt`, the time it is signed (the caller's clock).

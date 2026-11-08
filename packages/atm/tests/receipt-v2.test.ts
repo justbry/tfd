@@ -314,6 +314,12 @@ describe("verifyReceipt, v2 and windowed keys", () => {
 			{ ...entry, not_after: 0 },
 			{ ...entry, revoked_at: "never" },
 			{ ...entry, revoked_at: null },
+			// A time without `Z` would be read in the verifier's own zone, so its verdict would depend on where it runs.
+			{ ...entry, not_before: "2026-11-01T00:00:00" },
+			{ ...entry, not_before: "2026-11-01" },
+			{ ...entry, not_before: "2026-11-01T00:00:00+00:00" },
+			{ ...entry, not_after: "2026-12-01T00:00:00" },
+			{ ...entry, revoked_at: "2026-12-01T00:00:00" },
 		];
 		for (const value of broken)
 			expect(

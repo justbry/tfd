@@ -26,15 +26,20 @@ export const signBytes = (text: string, signer: AtmSigner): string => {
 
 const PURPOSES: readonly string[] = ["receipt", "seal", "directory"];
 
+/** RFC 3339 UTC with `Z`: a key window or `issued_at` read the same in every verifier's time zone. */
+export const UTC_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?Z$/;
+
 const isInstant = (value: unknown): value is string =>
-	typeof value === "string" && !Number.isNaN(Date.parse(value));
+	typeof value === "string" &&
+	UTC_INSTANT.test(value) &&
+	!Number.isNaN(Date.parse(value));
 
 /** A keys-file entry in either form; an object that is not a whole `TfdKeyEntry` is not a key. */
 type KeyEntry = { pem: string; use: TfdKeyEntry | null };
 
 /**
  * The key published as `keyId`: its PEM, and its purpose and window when the entry is the object form (`use: null` for
- * the first form, a bare PEM). An entry missing a field, or with a field of the wrong type or an unreadable time, is
+ * the first form, a bare PEM). An entry missing a field, or with a field of the wrong type or a time that is not RFC 3339 UTC (`…Z`), is
  * `null` (the verifiers call that `unknown_key`). Never throws.
  */
 export const keyEntryOf = (

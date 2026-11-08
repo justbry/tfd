@@ -358,12 +358,15 @@ export const ed25519FromPem = async (
 
 const PURPOSES: readonly string[] = ["receipt", "seal", "directory"];
 
+/** RFC 3339 UTC with Z only: a time without Z is read in the verifier's own zone, so its verdict would depend on it. */
 const isTime = (value: unknown): value is string =>
-	typeof value === "string" && !Number.isNaN(Date.parse(value));
+	typeof value === "string" &&
+	INSTANT.test(value) &&
+	!Number.isNaN(Date.parse(value));
 
 /**
  * tfd's keyEntryOf: the key published as `keyId`, its PEM and, for the object form, its purpose and window (`use: null`
- * for a bare PEM). An object missing a field or with a bad one is null, which the checks call unknown_key.
+ * for a bare PEM). An object missing a field or with a bad one (a time not RFC 3339 UTC with Z included) is null, which the checks call unknown_key.
  */
 export const keyEntryOf = (
 	keys: PublicKeys,
