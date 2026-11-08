@@ -44,7 +44,7 @@ export const PLANS: Plan[] = [
 			"Signed receipts on every plan, even Free",
 			"Sealed months",
 			"Reports and on-demand reconcile",
-			"1 Pricing Lab forecast a month",
+			{ text: "1 Pricing Lab forecast a month", soon: true },
 			{
 				text: "Countersigned receipts free for non-profits under $50K a year",
 				np: true,
@@ -85,9 +85,9 @@ export const PLANS: Plan[] = [
 		features: [
 			"Everything in Starter",
 			"Up to 3 organizations",
-			"Pricing Lab: forecasts and saved scenarios",
-			"Daily reconcile with alerts",
-			"Scheduled monthly close",
+			{ text: "Pricing Lab: forecasts and saved scenarios", soon: true },
+			{ text: "Daily reconcile with alerts", soon: true },
+			{ text: "Scheduled monthly close", soon: true },
 			"Roles, approvals and Google sign-in",
 			{ text: "Bank-statement import (CSV/OFX)", soon: true },
 			{
@@ -274,7 +274,11 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 				"",
 				[false, true, true, true, true, "+ data residency"],
 			],
-			["Scheduled monthly close", "", [false, false, false, true, true, true]],
+			[
+				"Scheduled monthly close",
+				"",
+				[false, false, false, S(true), S(true), S(true)],
+			],
 			[
 				"Month-end package for your CPA",
 				"",
@@ -350,7 +354,7 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			[
 				"Daily automatic reconcile with alerts",
 				"",
-				[false, false, false, true, true, true],
+				[false, false, false, S(true), S(true), S(true)],
 			],
 			[
 				"Daily matching to Stripe payouts",
@@ -370,17 +374,17 @@ export const MATRIX: [string, [string, string, Cell[]][]][] = [
 			[
 				"Forecast revenue under new prices",
 				"",
-				[false, "1 a month", "1 a month", true, true, true],
+				[false, S("1 a month"), S("1 a month"), S(true), S(true), S(true)],
 			],
 			[
 				"Saved, shareable scenarios",
 				"Side by side, for an owner or board",
-				[false, false, false, true, true, true],
+				[false, false, false, S(true), S(true), S(true)],
 			],
 			[
 				"Hosted CI check and staged rollouts",
 				"",
-				[false, false, false, true, true, true],
+				[false, false, false, S(true), S(true), S(true)],
 			],
 			[
 				"Network-wide pricing tests",
@@ -604,7 +608,7 @@ export const PRICING_FAQ = [
 	},
 	{
 		q: "Who qualifies for non-profit & co-op pricing?",
-		a: "US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). The plan for non-profits with gross receipts of $50,000 or less is Trifold's witness free on the Free plan, up to about 66 countersigned receipts a month (Free's 200 credits at 3 each), once the witness ships.",
+		a: "US 501(c) organizations (we check your IRS determination letter or EIN), and cooperatives (we check your articles or bylaws). Non-profits with gross receipts of $50,000 or less get Trifold's witness free on the Free plan, up to about 66 countersigned receipts a month (Free's 200 credits at 3 each), once the witness ships.",
 	},
 	{
 		q: "Do the annual and non-profit discounts stack?",

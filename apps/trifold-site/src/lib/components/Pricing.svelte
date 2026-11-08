@@ -103,7 +103,7 @@
 	<p class="mx-auto mt-1.5 min-h-[22px] max-w-[720px] text-center text-sm text-muted-foreground" aria-live="polite">
 		{#if org === "np"}
 			<strong class="text-foreground">Non-profit &amp; co-op pricing</strong> for verified 501(c) organizations and cooperatives.
-			Under $50K a year? The plan is Trifold's witness free on the Free plan, once the witness ships.
+			Under $50K a year? You get Trifold's witness free on the Free plan, once it ships.
 		{/if}
 	</p>
 

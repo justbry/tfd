@@ -343,8 +343,8 @@
 				compliance pack, is next.
 			</p>
 			<p class="my-6 max-w-[58ch] border-l-2 border-line-strong px-4 py-3.5 text-[15px] text-muted-foreground" use:reveal={2}>
-				Receipts are designed against each program's published rules and reviewed with CPAs. Until a program confirms, we
-				say "designed for", not "accepted by".
+				The compliance pack is being designed against each program's published rules, with a CPA's review. Until a
+				program confirms, we say "designed for", not "accepted by".
 			</p>
 			<div class="flex flex-wrap items-center gap-4">
 				<Button href="/early-access?role=school">Get early access</Button>
