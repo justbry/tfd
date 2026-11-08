@@ -86,12 +86,15 @@ export type KeyUseVerdict =
 	| "key_wrong_purpose"
 	| "outside_key_window";
 
+/** A v1 receipt (no signed time) under a key with a window: a key with dates vouches for v2 receipts only. */
+export type ReceiptKeyUseVerdict = KeyUseVerdict | "key_requires_v2";
+
 export type SignatureVerdict =
 	| "ok"
 	| "malformed"
 	| "unknown_key"
 	| "bad_signature"
-	| KeyUseVerdict;
+	| ReceiptKeyUseVerdict;
 export type BooksVerdict =
 	| "ok"
 	| "missing_event"
@@ -392,25 +395,38 @@ export const keyEntryOf = (
 
 /**
  * tfd's keyUse, after a good signature: a revoked key never vouches (whatever `at` says, as a thief can backdate it), then
- * the purpose, then `at` (null for a v1 receipt) in [not_before, not_after). A bare PEM vouches for anything.
+ * the purpose, then `at` in [not_before, not_after). `at` is null for a v1 receipt, which has no signed time: a key with a
+ * window never vouches for one (key_requires_v2). A bare PEM vouches for anything.
  */
-export const keyUse = (
+export function keyUse(
+	keys: PublicKeys,
+	keyId: string,
+	purpose: KeyPurpose,
+	at: string,
+): "ok" | KeyUseVerdict;
+export function keyUse(
 	keys: PublicKeys,
 	keyId: string,
 	purpose: KeyPurpose,
 	at: string | null,
-): "ok" | KeyUseVerdict => {
+): "ok" | ReceiptKeyUseVerdict;
+export function keyUse(
+	keys: PublicKeys,
+	keyId: string,
+	purpose: KeyPurpose,
+	at: string | null,
+): "ok" | ReceiptKeyUseVerdict {
 	const use = keyEntryOf(keys, keyId)?.use;
 	if (!use) return "ok";
 	if (use.revoked_at !== undefined) return "key_revoked";
 	if (use.purpose !== purpose) return "key_wrong_purpose";
-	if (at === null) return "ok";
+	if (at === null) return "key_requires_v2";
 	const time = Date.parse(at);
 	const inWindow =
 		time >= Date.parse(use.not_before) &&
 		(use.not_after === null || time < Date.parse(use.not_after));
 	return inWindow ? "ok" : "outside_key_window";
-};
+}
 
 /** tfd's verifyBytes: the key by id, then the one base64url spelling of 64 bytes, then strict Ed25519. Never throws. */
 export const verifyBytes = async (
@@ -619,7 +635,7 @@ export const receiptOfV2 = async (
 	return v1 ? { ...v1, v: 2, issued_at: issuedAt } : null;
 };
 
-/** tfd's verifyReceipt: shape, then key id, then signature, then the key's revocation, purpose and window. Never throws. */
+/** tfd's verifyReceipt: shape, then key id, then signature, then the key's revocation, purpose and window (v2 only under a key with a window). Never throws. */
 export const verifyReceipt = async (
 	signed: unknown,
 	keys: PublicKeys,
@@ -669,8 +685,8 @@ const sealHash = (signed: unknown): Promise<string> =>
 
 /**
  * tfd's verifySeals verdicts for a school's seal chain (in the order made) against its events: shape and signature, the
- * key's revocation, purpose and window by sealed_at, the link to the seal before, then the named events hashed and counted
- * again. A revoked key's seal is superseded once a later ok seal of the same month exists; the next seal links to it by
+ * key's revocation, purpose and window by sealed_at (a revoked key's seal is key_revoked even when its link is broken
+ * too), the link to the seal before, then the named events hashed and counted again. A revoked key's seal is superseded once a later ok seal of the same month exists; the next seal links to it by
  * its hash either way.
  */
 export const verifySealChain = async (
@@ -705,17 +721,13 @@ export const verifySealChain = async (
 			continue;
 		}
 		const use = keyUse(keys, raw.key_id, "seal", raw.seal.sealed_at);
-		if (use !== "ok" && use !== "key_revoked") {
+		if (use !== "ok") {
 			verdicts.push(use);
 			continue;
 		}
 		const expected = index === 0 ? null : await sealHash(seals[index - 1]);
 		if (raw.seal.prev_seal_hash !== expected) {
 			verdicts.push("broken_link");
-			continue;
-		}
-		if (use === "key_revoked") {
-			verdicts.push(use);
 			continue;
 		}
 		const inMonth = byMonth.get(raw.seal.month);

@@ -45,5 +45,12 @@
 		"verdict": {
 			"ok": true
 		}
+	},
+	{
+		"file": "v1-windowed-key.signed.canonical.jsonl",
+		"verdict": {
+			"ok": false,
+			"reason": "key_requires_v2"
+		}
 	}
 ]

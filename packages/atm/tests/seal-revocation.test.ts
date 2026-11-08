@@ -119,13 +119,28 @@ describe("verifySeals with windowed keys", () => {
 		]);
 	});
 
-	test("a revoked line that does not link to the seal before it is broken_link, not superseded", () => {
+	test("a revoked line that does not link to the seal before it is key_revoked, not broken_link, and superseded by a later re-seal", () => {
 		const first = seal("2026-10", OCTOBER_SEALED_AT, null, revokedSeal);
 		const misplaced = seal("2026-10", OCTOBER_SEALED_AT, null, revokedSeal);
+		expect(verdicts([first, misplaced])).toEqual([
+			"key_revoked",
+			"key_revoked",
+		]);
 		const resealed = seal("2026-10", RESEALED_AT, misplaced, currentSeal);
 		expect(verdicts([first, misplaced, resealed])).toEqual([
 			"superseded",
-			"broken_link",
+			"superseded",
+			"ok",
+		]);
+	});
+
+	test("a seal after a revoked line with a broken link still links to that line by its hash", () => {
+		const first = seal("2026-10", OCTOBER_SEALED_AT, null, revokedSeal);
+		const misplaced = seal("2026-11", NOVEMBER_SEALED_AT, null, revokedSeal);
+		const next = seal("2026-12", RESEALED_AT, misplaced, currentSeal);
+		expect(verdicts([first, misplaced, next])).toEqual([
+			"key_revoked",
+			"key_revoked",
 			"ok",
 		]);
 	});

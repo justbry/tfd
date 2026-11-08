@@ -218,6 +218,7 @@ test('the result card words every failing outcome; only a malformed file is "Thi
 		key_revoked: true,
 		key_wrong_purpose: true,
 		outside_key_window: true,
+		key_requires_v2: true,
 	};
 	for (const kind of Object.keys(worded))
 		expect(card).toContain(`outcome.kind === "${kind}"`);

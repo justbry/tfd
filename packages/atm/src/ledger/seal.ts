@@ -118,7 +118,8 @@ const textOr = (value: unknown, key: string): string => {
 /**
  * A school's seal chain, in the order the seals were made, against its events (one per `idem`). For each seal: its shape
  * and signature, then whether its key vouches for it (`keyUse`: purpose `seal`, `sealed_at` in the key's window, never
- * revoked), then its link to the seal before it (a missing or reordered seal is `broken_link`), then the events it names,
+ * revoked; a revoked key's seal is `key_revoked` even when its link is broken too), then its link to the seal before it
+ * (a missing or reordered seal is `broken_link`), then the events it names,
  * by id, hashed and counted again (an edit or a deletion is `events_changed`). A seal signed by a revoked key is
  * `superseded`, not a failure, once a later `ok` seal of the same month exists (the revocation runbook appends one under
  * the current key); either way the next seal links to it by its hash, so the chain holds. A month event not named by the
@@ -138,11 +139,10 @@ export const verifySeals = (
 		const signature = verifyBytes(canonicalize(seal), key_id, sig, keys);
 		if (signature !== "ok") return signature;
 		const use = keyUse(keys, key_id, "seal", seal.sealed_at);
-		if (use !== "ok" && use !== "key_revoked") return use;
-		if (use === "ok") latest.set(seal.month, seal);
+		if (use !== "ok") return use;
+		latest.set(seal.month, seal);
 		const expected = index === 0 ? null : sealHash(seals[index - 1]);
 		if (seal.prev_seal_hash !== expected) return "broken_link";
-		if (use === "key_revoked") return use;
 		const inMonth = months.get(seal.month);
 		const covered = seal.event_ids.map((id) => inMonth?.get(id));
 		if (covered.some((e) => e === undefined)) return "events_changed";

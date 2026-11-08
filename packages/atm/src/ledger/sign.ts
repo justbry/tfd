@@ -5,6 +5,7 @@ import type {
 	AtmPublicKeys,
 	AtmSigner,
 	KeyUseVerdict,
+	ReceiptKeyUseVerdict,
 	TfdKeyEntry,
 	TfdKeyPurpose,
 } from "../types.js";
@@ -66,26 +67,40 @@ export const keyEntryOf = (
 
 /**
  * Whether the key that made a good signature vouches for the document: never once revoked (whatever `at` says), then the
- * purpose, then `at` (the document's signed time, `null` for a v1 receipt, which has none) in `[not_before, not_after)`.
- * The first-form key vouches for anything, as before windows. Call it only after the signature verified.
+ * purpose, then `at` (the document's signed time) in `[not_before, not_after)`. `at` is `null` for a v1 receipt, which
+ * has no signed time: a key with a window never vouches for one (`key_requires_v2`), or an expired, unrevoked key could
+ * still sign v1 receipts that pass. The first-form key vouches for anything, as before windows. Call it only after the
+ * signature verified.
  */
-export const keyUse = (
+export function keyUse(
+	keys: AtmPublicKeys,
+	keyId: string,
+	purpose: TfdKeyPurpose,
+	at: string,
+): "ok" | KeyUseVerdict;
+export function keyUse(
 	keys: AtmPublicKeys,
 	keyId: string,
 	purpose: TfdKeyPurpose,
 	at: string | null,
-): "ok" | KeyUseVerdict => {
+): "ok" | ReceiptKeyUseVerdict;
+export function keyUse(
+	keys: AtmPublicKeys,
+	keyId: string,
+	purpose: TfdKeyPurpose,
+	at: string | null,
+): "ok" | ReceiptKeyUseVerdict {
 	const use = keyEntryOf(keys, keyId)?.use;
 	if (!use) return "ok";
 	if (use.revoked_at !== undefined) return "key_revoked";
 	if (use.purpose !== purpose) return "key_wrong_purpose";
-	if (at === null) return "ok";
+	if (at === null) return "key_requires_v2";
 	const time = Date.parse(at);
 	const inWindow =
 		time >= Date.parse(use.not_before) &&
 		(use.not_after === null || time < Date.parse(use.not_after));
 	return inWindow ? "ok" : "outside_key_window";
-};
+}
 
 /**
  * Whether `sig` is an Ed25519 signature of `text` by the key published as `keyId`. A key id `keys` does not hold, or holds

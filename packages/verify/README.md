@@ -23,6 +23,7 @@ import { verifyReceipt } from "tfd-verify";
 
 const verdict = await verifyReceipt(JSON.parse(text), { "key-id": "-----BEGIN PUBLIC KEY-----…" });
 // "ok" | "malformed" | "unknown_key" | "bad_signature" | "key_revoked" | "key_wrong_purpose" | "outside_key_window"
+// | "key_requires_v2"
 ```
 
 Every check is async (WebCrypto) and never throws for untrusted input.
@@ -46,8 +47,10 @@ Receipts are v1 or v2; v2 adds a signed `issued_at` (RFC 3339 UTC). A keys file 
 `{ pem, purpose: "receipt" | "seal" | "directory", not_before, not_after, revoked_at? }` (`not_after: null` is still
 open). With the object form a key of another purpose fails (`key_wrong_purpose`), a v2 receipt's `issued_at` or a seal's
 `sealed_at` outside `[not_before, not_after)` fails (`outside_key_window`), and a revoked key fails everything it ever
-signed, whatever time the document claims (`key_revoked`). A v1 receipt has no signing time, so only purpose and
-revocation apply to it. In a seal chain, a revoked key's seal is `superseded` once a later `ok` seal of the same month
+signed, whatever time the document claims (`key_revoked`). A v1 receipt has no signing time, so a key with dates never
+vouches for one: it fails `key_requires_v2` (after `key_revoked` and `key_wrong_purpose`). A v1 receipt under a bare
+PEM verifies as before. In a seal chain, a seal's key verdicts come before its link, so a revoked key's seal is
+`key_revoked` even when its `prev_seal_hash` is broken too; it is `superseded` once a later `ok` seal of the same month
 follows it, and the next seal still links to it by its hash.
 
 ## Tests

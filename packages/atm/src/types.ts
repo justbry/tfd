@@ -557,11 +557,21 @@ export type KeyUseVerdict =
 	| "key_wrong_purpose"
 	| "outside_key_window";
 
+/**
+ * A v1 receipt (no signed time) under a key with a window: its window cannot be checked, so a key with dates vouches for
+ * v2 receipts only.
+ */
+export type ReceiptKeyUseVerdict = KeyUseVerdict | "key_requires_v2";
+
 export type ReceiptVerdict =
 	| { ok: true }
 	| {
 			ok: false;
-			reason: "malformed" | "unknown_key" | "bad_signature" | KeyUseVerdict;
+			reason:
+				| "malformed"
+				| "unknown_key"
+				| "bad_signature"
+				| ReceiptKeyUseVerdict;
 	  };
 
 /** A signed receipt against the school's events: does the books' event still make the same receipt. */

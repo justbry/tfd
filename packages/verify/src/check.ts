@@ -14,6 +14,7 @@ import {
 	type KeyUseVerdict,
 	keyUse,
 	type PublicKeys,
+	type ReceiptKeyUseVerdict,
 	type SealVerdict,
 	type SignatureVerdict,
 	type SignedReceipt,
@@ -32,8 +33,11 @@ export type Outcome =
 	| { kind: "malformed" }
 	| { kind: "unknown_key"; keyId: string }
 	| { kind: "bad_signature" }
-	/** Signed by the key, but the key does not vouch for it: revoked, another purpose, or issued_at outside its window. */
-	| { kind: KeyUseVerdict; keyId: string }
+	/**
+	 * Signed by the key, but the key does not vouch for it: revoked, another purpose, issued_at outside its window, or a
+	 * v1 receipt under a key with a window (key_requires_v2).
+	 */
+	| { kind: ReceiptKeyUseVerdict; keyId: string }
 	| {
 			kind: "signed";
 			signed: SignedReceipt;
@@ -44,8 +48,8 @@ export type Outcome =
 	  };
 
 /**
- * The verdicts of a seal whose shape and signature are good, as tfd's verifySeals counts a month's latest seal (its key
- * must also vouch for it: a revoked key's seal never decides).
+ * The verdicts of a seal whose shape and signature are good and whose key vouches for it, as tfd's verifySeals counts a
+ * month's latest seal (the key's verdicts come before the link, so a revoked key's seal is never one of these).
  */
 const WELL_SIGNED: readonly SealVerdict[] = [
 	"ok",
@@ -95,11 +99,7 @@ export const checkReceipt = async (
 	let latest: MonthSeal = null;
 	for (const [index, raw] of seals.entries()) {
 		const verdict = verdicts[index] ?? "malformed";
-		const vouched =
-			isSignedSeal(raw) &&
-			WELL_SIGNED.includes(verdict) &&
-			keyUse(keys, raw.key_id, "seal", raw.seal.sealed_at) === "ok";
-		if (vouched) {
+		if (isSignedSeal(raw) && WELL_SIGNED.includes(verdict)) {
 			if (raw.seal.month !== month) continue;
 			wellSigned = {
 				month,

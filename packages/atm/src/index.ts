@@ -1280,7 +1280,7 @@ export const signReceipt = (
 /**
  * Checks an untrusted signed receipt: its shape (`schema/receipt.v1.json` or `receipt.v2.json`), its key id in `keys`, its
  * signature, then the key's purpose, window (v2's `issued_at`) and revocation (`key_revoked` whatever `issued_at` says).
- * Never throws.
+ * A key with a window never vouches for a v1 receipt, which has no signed time (`key_requires_v2`). Never throws.
  */
 export const verifyReceipt = (
 	signed: unknown,

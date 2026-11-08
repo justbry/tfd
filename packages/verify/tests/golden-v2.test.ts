@@ -141,7 +141,10 @@ describe("the v2 vectors", () => {
 			file: string;
 			verdict: { ok: true } | { ok: false; reason: string };
 		}[];
-		expect(cases.length).toBeGreaterThanOrEqual(7);
+		expect(cases.length).toBeGreaterThanOrEqual(8);
+		expect(cases.map(({ file }) => file)).toContain(
+			"v1-windowed-key.signed.canonical.jsonl",
+		);
 		for (const { file, verdict } of cases) {
 			const signed = JSON.parse(await readVector(file)) as unknown;
 			const expected = verdict.ok ? "ok" : verdict.reason;
@@ -218,11 +221,11 @@ describe("receipts under windowed keys", () => {
 		expect(await at("2026-09-30T23:59:59Z")).toBe("outside_key_window");
 	});
 
-	test("v1 receipts: purpose and revocation count, the window cannot", async () => {
+	test("a key with a window never vouches for a v1 receipt; revocation and purpose are named first", async () => {
 		const v1 = (await receiptOf(event)) as Receipt;
 		expect(
 			await verifyReceipt(await signReceipt(v1, "trifold-test-2026-11"), keys),
-		).toBe("ok");
+		).toBe("key_requires_v2");
 		expect(
 			await verifyReceipt(
 				await signReceipt(v1, "trifold-test-seal-2026-11"),
@@ -232,6 +235,34 @@ describe("receipts under windowed keys", () => {
 		expect(
 			await verifyReceipt(await signReceipt(v1, "trifold-test-2026-10"), keys),
 		).toBe("key_revoked");
+		const unrevoked: PublicKeys = {
+			...keys,
+			"trifold-test-2026-10": {
+				...(keys["trifold-test-2026-10"] as KeyEntry),
+				revoked_at: undefined,
+			},
+		};
+		const forged = { ...v1, amount: 99_000 };
+		expect(
+			await verifyReceipt(
+				await signReceipt(forged, "trifold-test-2026-10"),
+				unrevoked,
+			),
+		).toBe("key_requires_v2");
+	});
+
+	test("checkReceipt and checkReceiptInSeal name key_requires_v2", async () => {
+		const v1 = await signReceipt(
+			(await receiptOf(event)) as Receipt,
+			"trifold-test-2026-11",
+		);
+		expect(await checkReceipt(v1, keys, async () => null)).toEqual({
+			kind: "key_requires_v2",
+			keyId: "trifold-test-2026-11",
+		});
+		expect(await checkReceiptInSeal(v1, null, keys)).toBe(
+			"receipt_key_requires_v2",
+		);
 	});
 
 	test("a misshapen keys entry is unknown_key; misshapen v2 input is malformed; never an exception", async () => {
@@ -385,6 +416,46 @@ describe("verifySealChain with windowed keys", () => {
 		expect(
 			await verifySealChain([october, november, byRevoked], [event], keys),
 		).toEqual(["key_revoked", "ok", "key_revoked"]);
+	});
+
+	test("a revoked line with a broken link is key_revoked, superseded by a later re-seal, and still a link", async () => {
+		const first = await sealOver(
+			"2026-10",
+			OCTOBER_SEALED_AT,
+			null,
+			"trifold-test-seal-2026-10",
+		);
+		const misplaced = await sealOver(
+			"2026-10",
+			OCTOBER_SEALED_AT,
+			null,
+			"trifold-test-seal-2026-10",
+		);
+		expect(await verifySealChain([first, misplaced], [event], keys)).toEqual([
+			"key_revoked",
+			"key_revoked",
+		]);
+		const resealed = await sealOver(
+			"2026-10",
+			RESEALED_AT,
+			misplaced,
+			"trifold-test-seal-2026-11",
+		);
+		expect(
+			await verifySealChain([first, misplaced, resealed], [event], keys),
+		).toEqual(["superseded", "superseded", "ok"]);
+		const books = async () => ({
+			school: event.school,
+			events: [event],
+			seals: [first, misplaced, resealed] as unknown[],
+		});
+		const receipt = await signReceipt(
+			await v2(ISSUED_AT),
+			"trifold-test-2026-11",
+		);
+		expect(await checkReceipt(receipt, keys, books)).toMatchObject({
+			seal: { month: "2026-10", verdict: "ok", covers: true },
+		});
 	});
 
 	test("checkReceipt does not let a revoked key's seal decide the month", async () => {

@@ -104,6 +104,14 @@
 						Ask the issuer for a re-signed receipt.
 					</p>
 				</div>
+			{:else if outcome.kind === "key_requires_v2"}
+				<div class={fail}>
+					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> Old receipt format.</p>
+					<p>
+						This receipt uses the old format, which the key <code class={code}>{outcome.keyId}</code> doesn't accept.
+						Ask the issuer for a current receipt.
+					</p>
+				</div>
 			{:else}
 				<div class={fail}>
 					<p class={title}><span class="text-alert-text" aria-hidden="true">✗</span> This isn't a Trifold receipt.</p>

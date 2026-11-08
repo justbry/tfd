@@ -122,6 +122,15 @@ const CASES: Case[] = [
 		verdict: { ok: true },
 		make: () => sign(v2(RESIGNED_AT), windowedSigners["trifold-test-2026-11"]),
 	},
+	{
+		name: "v1-windowed-key",
+		verdict: { ok: false, reason: "key_requires_v2" },
+		make: () =>
+			sign(
+				receiptOf(event) as AtmReceipt,
+				windowedSigners["trifold-test-2026-11"],
+			),
+	},
 ];
 
 describe("golden: receipt v2 vectors", () => {
@@ -254,14 +263,14 @@ describe("verifyReceipt, v2 and windowed keys", () => {
 			});
 	});
 
-	test("v1 receipts under windowed keys: purpose and revocation count, the window cannot (v1 has no signing time)", () => {
+	test("a key with a window never vouches for a v1 receipt (no signing time to check); revocation and purpose are named first", () => {
 		const v1 = receiptOf(event) as AtmReceipt;
 		expect(
 			verifyReceipt(
 				sign(v1, windowedSigners["trifold-test-2026-11"]),
 				windowedKeys,
 			),
-		).toEqual({ ok: true });
+		).toEqual({ ok: false, reason: "key_requires_v2" });
 		expect(
 			verifyReceipt(
 				sign(v1, windowedSigners["trifold-test-seal-2026-11"]),
@@ -274,6 +283,29 @@ describe("verifyReceipt, v2 and windowed keys", () => {
 				windowedKeys,
 			),
 		).toEqual({ ok: false, reason: "key_revoked" });
+	});
+
+	test("an expired, unrevoked key cannot mint v1 receipts that pass", () => {
+		const october = windowedSigners["trifold-test-2026-10"];
+		const unrevoked: AtmPublicKeys = {
+			...windowedKeys,
+			"trifold-test-2026-10": {
+				...(windowedKeys["trifold-test-2026-10"] as object),
+				revoked_at: undefined,
+			} as AtmPublicKeys[string],
+		};
+		const v1 = { ...(receiptOf(event) as AtmReceipt), amount: FORGED_AMOUNT };
+		expect(verifyReceipt(sign(v1, october), unrevoked)).toEqual({
+			ok: false,
+			reason: "key_requires_v2",
+		});
+	});
+
+	test("v1 receipts under a first-form key verify as before", () => {
+		const signed = sign(receiptOf(event) as AtmReceipt, testSigner);
+		expect(verifyReceipt(signed, { ...testKeys, ...windowedKeys })).toEqual({
+			ok: true,
+		});
 	});
 
 	test("revocation, then re-signing with the current key and a fresh issued_at, verifies", () => {

@@ -125,8 +125,9 @@ const isSignedReceipt = (signed: unknown): signed is AtmSignedReceipt =>
 /**
  * A signed receipt from anyone (a family's file is untrusted): its shape against `schema/receipt.v1.json` or
  * `schema/receipt.v2.json` (by its `v`), then its key id, then its signature, then whether the key vouches for it: a
- * revoked key never does, a key of another purpose never does, and a v2 receipt's `issued_at` must be in the key's
- * window (`keyUse`). Never throws.
+ * revoked key never does, a key of another purpose never does, a key with a window never vouches for a v1 receipt
+ * (`key_requires_v2`: v1 has no signed time to check), and a v2 receipt's `issued_at` must be in the key's window
+ * (`keyUse`). Never throws.
  */
 export const verifyReceipt = (
 	signed: unknown,
