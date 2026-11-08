@@ -1,7 +1,7 @@
 /**
  * The JWKS the tokens are checked against, cached in the isolate: for the response's `max-age` (default 300 s), and
  * refetched when a token names a `kid` the cache lacks. Either refetch happens at most once every 30 s, so a flood of
- * tokens with made-up `kid`s costs one fetch per 30 s.
+ * tokens with made-up `kid`s costs one fetch per 30 s. The cache holds finished values only, never a fetch in progress.
  */
 import type { Jwk, Jwks } from "./jwt.js";
 
@@ -34,7 +34,6 @@ export class JwksCache {
 	private keys: Jwks | null = null;
 	private fetchedAt = Number.NEGATIVE_INFINITY;
 	private expiresAt = Number.NEGATIVE_INFINITY;
-	private inFlight: Promise<Jwks> | null = null;
 
 	constructor(
 		private readonly url: string,
@@ -65,15 +64,14 @@ export class JwksCache {
 		}
 	}
 
+	/**
+	 * Each caller fetches for itself: a fetch belongs to the request that started it and workerd cancels it when that
+	 * request ends, so a shared fetch could leave a later request waiting for an answer that never comes. Requests of one
+	 * isolate may fetch twice at once; the cache keeps only what a fetch finished.
+	 */
 	private fetchFresh(now: number): Promise<Jwks> {
-		if (this.inFlight !== null) return this.inFlight;
 		this.fetchedAt = now;
-		// `finally` runs after `inFlight` is set, even when `fetchJwks` throws before its first await
-		const pending = this.loadKeys(now).finally(() => {
-			this.inFlight = null;
-		});
-		this.inFlight = pending;
-		return pending;
+		return this.loadKeys(now);
 	}
 
 	/** The keys: the cached set while it is fresh, else a refetch (a stale set stands in if the refetch is too soon or fails). */

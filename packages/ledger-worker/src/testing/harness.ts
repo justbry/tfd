@@ -109,6 +109,11 @@ export type LedgerHarness = {
 	/** The JWKS endpoint: how many times the Worker fetched it, and the keys it serves (replace to rotate). */
 	jwks: {
 		fetches(): number;
+		/**
+		 * Holds the answer to the next fetch until `release()`: `arrived` settles when that fetch reaches the endpoint, so a
+		 * test can end the request that started it with the answer still to come.
+		 */
+		holdNext(): { arrived: Promise<void>; release(): void };
 		setKeys(keys: readonly TestJwk[]): void;
 		keys(): readonly TestJwk[];
 	};
@@ -158,16 +163,28 @@ export const startLedgerWorker = async (
 	const signer = await testSigner(DEFAULT_KEY_FILL);
 	let keys: readonly TestJwk[] = [signer.jwk];
 	let jwksFetches = 0;
+	let jwksHold: { arrive(): void; released: Promise<void> } | null = null;
 	let now = Date.now();
 
 	const server = createServer((request, response) => {
 		if (request.url === "/jwks.json") {
 			jwksFetches += 1;
-			response.writeHead(200, {
-				"content-type": "application/json",
-				"cache-control": "max-age=300",
-			});
-			response.end(JSON.stringify({ keys }));
+			const answer = () => {
+				response.writeHead(200, {
+					"content-type": "application/json",
+					"cache-control": "max-age=300",
+				});
+				response.end(JSON.stringify({ keys }));
+			};
+			const hold = jwksHold;
+			jwksHold = null;
+			if (hold === null) answer();
+			else {
+				hold.arrive();
+				// the Worker may have given up on this fetch by now; the socket then closes under the write
+				response.on("error", () => undefined);
+				hold.released.then(answer, () => undefined);
+			}
 			return;
 		}
 		if (request.url === "/clock") {
@@ -280,6 +297,18 @@ export const startLedgerWorker = async (
 			},
 			jwks: {
 				fetches: () => jwksFetches,
+				holdNext: () => {
+					let arrive = () => {};
+					let release = () => {};
+					const arrived = new Promise<void>((resolve) => {
+						arrive = resolve;
+					});
+					const released = new Promise<void>((resolve) => {
+						release = resolve;
+					});
+					jwksHold = { arrive, released };
+					return { arrived, release };
+				},
 				setKeys: (next) => {
 					keys = next;
 				},
