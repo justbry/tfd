@@ -154,37 +154,44 @@ function PlanCard({
 					minutes.
 				</div>
 			)}
-			<div class="mp-acts">
-				<ActionButton
-					action="quantity"
-					icon="sliders"
-					label="Change amount"
-					reason={quantityReason}
-					preview={preview}
-					onClick={handlers.onQuantity}
-				/>
-				{plan.ended ? (
+			{/* A demo school refuses every write: its member's view offers no change. */}
+			{!school.demo && (
+				<div class="mp-acts">
 					<ActionButton
-						action="resume"
-						icon="undo"
-						label="Resume membership"
-						tone="p"
-						reason={plan.waiting ? "A change is already on its way" : undefined}
+						action="quantity"
+						icon="sliders"
+						label="Change amount"
+						reason={quantityReason}
 						preview={preview}
-						onClick={handlers.onResume}
+						onClick={handlers.onQuantity}
 					/>
-				) : (
-					<ActionButton
-						action="cancel"
-						icon="ban"
-						label="Cancel membership"
-						tone="d"
-						reason={plan.waiting ? "A change is already on its way" : undefined}
-						preview={preview}
-						onClick={handlers.onCancel}
-					/>
-				)}
-			</div>
+					{plan.ended ? (
+						<ActionButton
+							action="resume"
+							icon="undo"
+							label="Resume membership"
+							tone="p"
+							reason={
+								plan.waiting ? "A change is already on its way" : undefined
+							}
+							preview={preview}
+							onClick={handlers.onResume}
+						/>
+					) : (
+						<ActionButton
+							action="cancel"
+							icon="ban"
+							label="Cancel membership"
+							tone="d"
+							reason={
+								plan.waiting ? "A change is already on its way" : undefined
+							}
+							preview={preview}
+							onClick={handlers.onCancel}
+						/>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }
@@ -430,14 +437,17 @@ function BookingStatus({
 	waiting,
 	clock,
 	preview,
+	readOnly,
 	onCancel,
 }: {
 	booking: PortalBooking;
 	waiting: boolean;
 	clock: Clock;
 	preview: boolean;
+	/** A demo school: no Cancel booking. */
+	readOnly: boolean;
 	onCancel: () => void;
-}): JSX.Element {
+}): JSX.Element | null {
 	if (waiting)
 		return (
 			<span class="mp-pill w" data-test="portal-booking-status">
@@ -463,6 +473,7 @@ function BookingStatus({
 				Contact the school to cancel
 			</span>
 		);
+	if (readOnly) return null;
 	return (
 		<ActionButton
 			action="cancel-booking"
@@ -518,6 +529,7 @@ export function BookingsTab({
 								waiting={pendingBookings.has(booking.id)}
 								clock={clock}
 								preview={preview}
+								readOnly={school.demo}
 								onCancel={() => handlers.onCancelBooking(booking)}
 							/>
 						</div>

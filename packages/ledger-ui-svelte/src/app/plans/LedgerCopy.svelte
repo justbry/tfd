@@ -5,14 +5,15 @@
 	import { Button } from "$lib/components/ui/button/index.ts";
 	import { Input } from "$lib/components/ui/input/index.ts";
 	import * as Sheet from "$lib/components/ui/sheet/index.ts";
-	import { messageFor } from "../../effect/messages.ts";
+	import ConfigConflict from "../config/ConfigConflict.svelte";
+	import ConfigStepUp from "../config/ConfigStepUp.svelte";
 	import Icon from "../Icon.svelte";
 	import LoadFailed from "../LoadFailed.svelte";
 	import PaneIcon from "../PaneIcon.svelte";
 	import InlineError from "../toasts/InlineError.svelte";
 	import type { LedgerCopy } from "./ledger-copy.svelte.ts";
 	import { audienceChoice, audienceChoices } from "./drawer-model.ts";
-	import { control, error as errorText, footer, heading, hint, muted, selectControl } from "./styles.ts";
+	import { control, footer, heading, hint, muted, selectControl } from "./styles.ts";
 
 	/** The Plans tab's copy in the ledger as a sheet: the `plans-draft` config object, tier by tier in the order members
 	 * read them (names, descriptions, on sale, audience; never prices). Problems from the Worker's verify show at their
@@ -25,9 +26,6 @@
 	}: { school: School; root: HTMLElement; copy: LedgerCopy; onClose: () => void } = $props();
 
 	const ids = $props.id();
-	let pin = $state("");
-	let pinProblem = $state<string | null>(null);
-	let confirming = $state(false);
 	let content = $state<HTMLElement | null>(null);
 
 	const problemsAt = (path: string) => copy.problems.filter((problem) => problem.path === path);
@@ -63,20 +61,10 @@
 			next.splice(target, 0, moved);
 			return { ...value, tierOrder: next };
 		});
-	const confirm = async (): Promise<void> => {
-		confirming = true;
-		pinProblem = await copy.confirm(pin);
-		confirming = false;
-		if (pinProblem === null) pin = "";
-	};
 	/** Where each problem is drawn: at its field, or in the list below for a path no field here carries (an id, the
 	 * tiers list, the features), so that every problem the toast counts is on screen. */
 	const atAField = /^(tiers\[\d+\]\.(name|blurb|audience|public)|tierOrder.*|purchaseLinkShared)$/;
 	const elsewhere = $derived(copy.problems.filter((problem) => !atAField.test(problem.path)));
-	let pinField = $state<HTMLInputElement | null>(null);
-	$effect(() => {
-		if (copy.stepUp) pinField?.focus();
-	});
 </script>
 
 <Sheet.Root open onOpenChange={(open) => !open && onClose()}>
@@ -212,46 +200,8 @@
 					<InlineError id={fieldId("other-problems")} problems={elsewhere.map((problem) => ({ ...problem, message: `${problem.path}: ${problem.message}` }))} />
 				</div>
 			{/if}
-			{#if copy.conflict}
-				<div class="mt-3 rounded-[10px] border border-warning p-2.5" role="alert" data-test="ledger-copy-conflict">
-					<b class="text-warning"><Icon name="alert" class="mr-1 inline align-[-2px]" />Someone changed this. Review their change</b>
-					<div class={muted}>Saving would change the stored copy like this:</div>
-					<ul class="m-0 mt-1 list-none p-0 font-mono text-[10.5px]">
-						{#each copy.conflict.diff as entry (entry.path)}
-							<li data-test="ledger-copy-diff">
-								{entry.path}: {JSON.stringify(entry.before) ?? "(none)"} → {JSON.stringify(entry.after) ?? "(none)"}
-							</li>
-						{:else}
-							<li>Nothing differs from your copy, but the stored copy moved.</li>
-						{/each}
-					</ul>
-					<Button variant="tool" size="tool-small" class="mt-1.5" data-test="ledger-copy-reload" onclick={() => copy.reload()}>
-						<PaneIcon name="undo" />Reload their copy
-					</Button>
-				</div>
-			{/if}
-			{#if copy.stepUp}
-				<div class="mt-3 rounded-[10px] border border-warning p-2.5" role="alert" data-test="ledger-copy-step-up">
-					<b class="text-warning"><Icon name="lock" class="mr-1 inline align-[-2px]" />Confirm it is you</b>
-					<div class={muted}>Saving needs your family PIN from the last 10 minutes.</div>
-					<div class="mt-1.5 flex items-center gap-1.5">
-						<input
-							class={[control, "w-32 rounded-md border border-border bg-card px-2 py-1"]}
-							type="password"
-							inputmode="numeric"
-							maxlength={6}
-							autocomplete="off"
-							aria-label="Your family PIN"
-							aria-invalid={pinProblem !== null}
-							data-test="ledger-copy-pin"
-							bind:this={pinField}
-							bind:value={pin}
-						/>
-						<Button variant="primary" size="tool" data-test="ledger-copy-confirm" disabled={pin.length < 4 || confirming} onclick={confirm}>Confirm it is you</Button>
-					</div>
-					{#if pinProblem}<div class={[errorText, "mt-1"]} role="alert">{pinProblem}</div>{/if}
-				</div>
-			{/if}
+			<ConfigConflict editor={copy} prefix="ledger-copy" />
+			<ConfigStepUp editor={copy} prefix="ledger-copy" />
 			<div class={hint} aria-live="polite" data-test="ledger-copy-status">{copy.state.status}</div>
 			<div class={footer}>
 				<Button variant="tool" size="tool" data-test="ledger-copy-cancel" onclick={onClose}>Close</Button>

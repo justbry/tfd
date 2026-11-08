@@ -1,0 +1,83 @@
+didkey.A-rdfc                              verified=true status=valid proof eddsa-rdfc-2022: verified
+webpath.G-A-vm-swap                        verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+    issuerKey: verification_method_not_authorised: did:web:localhost%3A8443:issuers:webpath#key-2 is not an assertionMethod of did:web:localhost%3A8443:issuers:webpath
+webpath.B-jcs                              verified=true status=valid proof eddsa-jcs-2022: verified
+webpath.G-A-field                          verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+didkey.G-A-field                           verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+didkey.E-suspended                         verified=true status=suspended proof eddsa-rdfc-2022: verified
+webpath.A-rdfc                             verified=true status=valid proof eddsa-rdfc-2022: verified
+didkey.B-jcs                               verified=true status=valid proof eddsa-jcs-2022: verified
+didkey.A-rdfc-escapes                      verified=true status=valid proof eddsa-rdfc-2022: verified
+didkey.G-C-rogue-rdfc                      verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_not_issuer); proof eddsa-jcs-2022: verified
+    issuerKey: verification_method_not_issuer: did:key:z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4#z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4 belongs to did:key:z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4, not the issuer did:key:z6
+didkey.G-A-unmapped-term                   verified=false status=unchecked proof eddsa-rdfc-2022: failed (term_undefined)
+    signature: term_undefined: Safe mode validation error.
+didkey.E-revoked                           verified=true status=revoked proof eddsa-rdfc-2022: verified
+webpath.E-revoked                          verified=true status=revoked proof eddsa-rdfc-2022: verified
+webpath.G-C-field                          verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid); proof eddsa-jcs-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+didkey.G-C-field                           verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid); proof eddsa-jcs-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+didkey.G-C-bad-jcs                         verified=false status=unchecked proof eddsa-rdfc-2022: verified; proof eddsa-jcs-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+didkey.G-C-strip-rdfc                      verified=true status=valid proof eddsa-jcs-2022: verified
+webpath.C-set-jcs-first                    verified=true status=valid proof eddsa-jcs-2022: verified; proof eddsa-rdfc-2022: verified
+didkey.C-set-jcs-first                     verified=true status=valid proof eddsa-jcs-2022: verified; proof eddsa-rdfc-2022: verified
+didkey.E-expired                           verified=false status=valid proof eddsa-rdfc-2022: verified
+    validity: expired: valid until 2025-12-31T00:00:00Z
+webpath.E-expired                          verified=false status=valid proof eddsa-rdfc-2022: verified
+    validity: expired: valid until 2025-12-31T00:00:00Z
+webpath.A-rdfc-escapes                     verified=true status=valid proof eddsa-rdfc-2022: verified
+webpath.G-C-strip-jcs                      verified=true status=valid proof eddsa-rdfc-2022: verified
+didkey.G-A-unmapped-subject-term           verified=false status=unchecked proof eddsa-rdfc-2022: failed (term_undefined)
+    signature: term_undefined: Safe mode validation error.
+didkey.G-C-strip-jcs                       verified=true status=valid proof eddsa-rdfc-2022: verified
+webpath.G-A-unmapped-subject-term          verified=false status=unchecked proof eddsa-rdfc-2022: failed (term_undefined)
+    signature: term_undefined: Safe mode validation error.
+webroot.A-rdfc                             verified=true status=valid proof eddsa-rdfc-2022: verified
+didkey.G-A-vm-swap                         verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+    issuerKey: verification_method_not_issuer: did:key:z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4#z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4 belongs to did:key:z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4, not the issuer did:key:z6
+didkey.G-A-no-proof                        verified=false status=unchecked 
+    signature: proof_missing: no proof
+    issuerKey: proof_missing: no proof
+webpath.A-rdfc-nostatus                    verified=true status=unchecked proof eddsa-rdfc-2022: verified
+webpath.E-suspended                        verified=true status=suspended proof eddsa-rdfc-2022: verified
+webpath.G-C-bad-rdfc                       verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid); proof eddsa-jcs-2022: verified
+    signature: signature_invalid: the signature does not match the document
+webpath.G-A-unmapped-term                  verified=false status=unchecked proof eddsa-rdfc-2022: failed (term_undefined)
+    signature: term_undefined: Safe mode validation error.
+didkey.A-rdfc-nostatus                     verified=true status=unchecked proof eddsa-rdfc-2022: verified
+didkey.G-C-bad-rdfc                        verified=false status=unchecked proof eddsa-rdfc-2022: failed (signature_invalid); proof eddsa-jcs-2022: verified
+    signature: signature_invalid: the signature does not match the document
+webpath.C-set                              verified=true status=valid proof eddsa-rdfc-2022: verified; proof eddsa-jcs-2022: verified
+didkey.G-A-context-copy                    verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+webpath.G-C-bad-jcs                        verified=false status=unchecked proof eddsa-rdfc-2022: verified; proof eddsa-jcs-2022: failed (signature_invalid)
+    signature: signature_invalid: the signature does not match the document
+didkey.C-set                               verified=true status=valid proof eddsa-rdfc-2022: verified; proof eddsa-jcs-2022: verified
+webpath.G-A-rogue-key                      verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_not_authorised)
+    issuerKey: verification_method_not_authorised: did:web:localhost%3A8443:issuers:webpath#key-2 is not an assertionMethod of did:web:localhost%3A8443:issuers:webpath
+didkey.G-A-context-302                     verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+didkey.G-A-rogue-key                       verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_not_issuer)
+    issuerKey: verification_method_not_issuer: did:key:z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4#z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4 belongs to did:key:z6MkimNiRUma6Wkvg9k76MFZ5iEKXY8kJR6GEmA1tp4G2cH4, not the issuer did:key:z6
+webpath.G-C-strip-rdfc                     verified=true status=valid proof eddsa-jcs-2022: verified
+webpath.E-standing-ok                      verified=true status=valid proof eddsa-rdfc-2022: verified
+webpath.G-A-no-proof                       verified=false status=unchecked 
+    signature: proof_missing: no proof
+    issuerKey: proof_missing: no proof
+didkey.E-standing-ok                       verified=true status=valid proof eddsa-rdfc-2022: verified
+webpath.G-A-context-copy                   verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json
+webpath.G-C-rogue-rdfc                     verified=false status=unchecked proof eddsa-rdfc-2022: failed (verification_method_not_authorised); proof eddsa-jcs-2022: verified
+    issuerKey: verification_method_not_authorised: did:web:localhost%3A8443:issuers:webpath#key-2 is not an assertionMethod of did:web:localhost%3A8443:issuers:webpath
+webpath.G-A-context-302                    verified=false status=unchecked 
+    structure: context_invalid: 1 structural issue(s)
+    issue context @context[1]: must be https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.3.json

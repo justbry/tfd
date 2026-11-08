@@ -136,3 +136,45 @@ test("any other failure is not hidden behind the demo: the app offers Try again"
 	expect(page.querySelector("[data-test=demo-banner]")).toBeNull();
 	expect(page.textContent).toContain("Could not load your schools.");
 });
+
+test("signed out: the demo schools and the demo school's disclosure are read while the token's 401 is on its way, and the token is asked once", async () => {
+	const events: string[] = [];
+	let answerToken: () => void = () => undefined;
+	globalThis.fetch = (async (url: string) => {
+		const path = String(url).replace(workerBase, "/v1");
+		events.push(`start ${path}`);
+		if (!String(url).startsWith(workerBase)) {
+			await new Promise<void>((resolve) => {
+				answerToken = resolve;
+			});
+			events.push("token answered");
+			return answer({ error: "unauthenticated" }, 401);
+		}
+		if (path === "/v1/schools")
+			return answer({
+				asOf: null,
+				lagMinutes: null,
+				data: { schools: [demoRow] },
+			});
+		return answer({ error: { code: "no_data", message: "none" } }, 404);
+	}) as unknown as typeof fetch;
+	window.location.hash = "#/demo-monthly-members/dashboard";
+	root = document.createElement("div");
+	document.body.append(root);
+	mountHttpApp(root, {
+		apiBase: "https://api-staging.b4uni.com",
+		workerBase,
+		webBase: "https://staging.b4uni.com",
+	});
+	await settle();
+	// The token has not answered yet, and both Worker reads have started.
+	expect(events).toContain("start /v1/schools");
+	expect(events).toContain("start /v1/schools/demo-monthly-members/disclosure");
+	expect(events).not.toContain("token answered");
+	answerToken();
+	await settle();
+	expect(
+		events.filter((event) => event.endsWith("/school-admin/ledger-token")),
+	).toHaveLength(1);
+	expect(root.querySelector("[data-test=demo-banner]")).not.toBeNull();
+});

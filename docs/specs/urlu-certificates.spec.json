@@ -1,0 +1,295 @@
+{
+	"title": "URLU certificates: portable, self-verifiable credentials",
+	"revision": 1,
+	"status": "draft",
+	"approvedRevision": null,
+	"revisions": [
+		{
+			"rev": 1,
+			"at": "2026-11-08T09:00:00Z",
+			"summary": "First draft from the credentials library work and the validator spike"
+		}
+	],
+	"clarity": {
+		"score": 7.2,
+		"weakest": [
+			{
+				"section": "Users & scenarios",
+				"why": "four sketches, no real user research yet"
+			},
+			{
+				"section": "Edge cases",
+				"why": "nothing on key loss, DID changes or a holder who loses the file"
+			}
+		]
+	},
+	"questions": [
+		{
+			"id": "Q1",
+			"question": "What proofs should a certifiable URLU credential carry?",
+			"options": [
+				"rdfc only",
+				"rdfc first, JCS second",
+				"JCS (main entry) with rdfc optional"
+			],
+			"default": 0,
+			"why": "The 1EdTech validator checks only the first proof, and JCS is not on its allowed list.",
+			"answer": null
+		},
+		{
+			"id": "Q2",
+			"question": "Where does the issuer DID live?",
+			"options": [
+				"A did:web on URLU's own domain, with did:web:trifold.app:orgs:urlu as an alias",
+				"did:web:trifold.app:orgs:urlu only",
+				"did:key (no hosting, no rotation)"
+			],
+			"default": 0,
+			"why": "A DID on URLU's domain lets URLU leave Trifold; the alias covers orgs with no domain.",
+			"answer": null
+		},
+		{
+			"id": "Q3",
+			"question": "Should our verifier accept other issuers' Open Badges?",
+			"options": [
+				"No, URLU profile only",
+				"Opt-in looser profile (more contexts, subject without id)",
+				"General verifier by default"
+			],
+			"default": 1,
+			"why": "Only 3 of 67 external samples verify today; Buzz clients may need to read other badges.",
+			"answer": null
+		},
+		{
+			"id": "Q4",
+			"question": "Which license should tfd-credentials carry?",
+			"options": [
+				"Apache-2.0 (matches the repository LICENSE)",
+				"FSL",
+				"Private, no license field"
+			],
+			"default": 0,
+			"why": "The Buzz repo imports it, so it needs a clear license; the repo's own LICENSE is Apache-2.0.",
+			"answer": null
+		},
+		{
+			"id": "Q5",
+			"question": "Pursue 1EdTech certification?",
+			"options": [
+				"Request a dues quote now, certify when a buyer asks",
+				"Certify now",
+				"Do not pursue"
+			],
+			"default": 0,
+			"why": "Dues depend on annual revenue and are unknown; the quote request costs nothing.",
+			"answer": null
+		}
+	],
+	"assumptions": [
+		{
+			"id": "A1",
+			"text": "1EdTech's public validator uses the same checks as the official conformance suite.",
+			"status": "open"
+		},
+		{
+			"id": "A2",
+			"text": "The 1EdTech validator verifies only the first proof in a proof set (inferred from results, source not read).",
+			"status": "open"
+		},
+		{
+			"id": "A3",
+			"text": "A did:web on a real domain (no port) resolves in 1EdTech's validator; only localhost was tested.",
+			"status": "open"
+		},
+		{
+			"id": "A4",
+			"text": "The OB3 3.0.3 context copy at purl.imsglobal.org is authentic; no published digest exists to check it.",
+			"status": "open"
+		}
+	],
+	"scope": [
+		{
+			"id": "S1",
+			"text": "Achievement credentials for Participant, Coach, Mediator",
+			"in": true
+		},
+		{ "id": "S2", "text": "Yearly standing credential", "in": true },
+		{
+			"id": "S3",
+			"text": "Bitstring status lists for revocation and suspension",
+			"in": true
+		},
+		{ "id": "S4", "text": "Public verify projection", "in": true },
+		{ "id": "S5", "text": "Holder wallet that holds keys", "in": false },
+		{ "id": "S6", "text": "PDF and PNG badge baking", "in": false },
+		{ "id": "S7", "text": "Nostr NIP-58 pointer award", "in": false },
+		{ "id": "S8", "text": "KERI identifiers", "in": false },
+		{ "id": "S9", "text": "ecdsa-sd-2023 and OpenID4VCI", "in": false }
+	],
+	"acceptance": [
+		{
+			"id": "AC-1",
+			"text": "An achievement credential issued with issueCertifiable passes 1EdTech's public validator with no errors (an unreachable-issuer-URL warning is allowed)."
+		},
+		{
+			"id": "AC-2",
+			"text": "issueCertifiable attaches an eddsa-rdfc-2022 proof by default and never lists eddsa-jcs-2022 first."
+		},
+		{
+			"id": "AC-3",
+			"text": "Changing any signed field, the context, the proof or the verification method is rejected by our verifier, the 1EdTech validator and DCC verifier-core."
+		},
+		{
+			"id": "AC-4",
+			"text": "Setting the revocation bit with put-if-match, then re-verifying, reports revoked in our verifier and the DCC verifier, and the 1EdTech validator raises a fatal revoked."
+		},
+		{
+			"id": "AC-5",
+			"text": "Verifying with no status resolver returns unchecked, never valid."
+		},
+		{
+			"id": "AC-6",
+			"text": "The public view omits the subject name unless the caller passes includeName."
+		},
+		{
+			"id": "AC-7",
+			"text": "The in-memory store and the ObjectStore adapter both pass the shared contract suites."
+		},
+		{
+			"id": "AC-8",
+			"text": "A suspended credential is reported suspended by our verifier and the DCC verifier; the 1EdTech validator's lack of suspension is documented."
+		},
+		{
+			"id": "AC-9",
+			"text": "The official 1EdTech conformance suite passes for an issuer using a real did:web domain."
+		},
+		{
+			"id": "AC-10",
+			"text": "A browser or Buzz client verifies a certificate using only the file, the issuer key document and an optional status list fetch."
+		},
+		{
+			"id": "AC-11",
+			"text": "The opt-in looser profile verifies the DCC and 1EdTech did:key sample credentials (3 of 67 verify today)."
+		},
+		{
+			"id": "AC-12",
+			"text": "buzz-school's SQLite or Durable Object store passes statusListStoreContract."
+		},
+		{
+			"id": "AC-13",
+			"text": "The package declares a license and the Buzz repo can install it from a release tarball."
+		}
+	],
+	"risks": [
+		{
+			"id": "K1",
+			"text": "The official 1EdTech suite differs from the public validator and fails us",
+			"severity": "high",
+			"mitigation": "Run the official suite early on a real did:web domain"
+		},
+		{
+			"id": "K2",
+			"text": "Children's data on a public verify page",
+			"severity": "high",
+			"mitigation": "Level, date and status only; counsel review before launch"
+		},
+		{
+			"id": "K3",
+			"text": "Signing key lost or leaked",
+			"severity": "high",
+			"mitigation": "Key rotation with kept key_ids; decide custody and key-revocation procedure"
+		},
+		{
+			"id": "K4",
+			"text": "Suspension invisible in 1EdTech's validator",
+			"severity": "medium",
+			"mitigation": "Use revocation for anything that must show there"
+		},
+		{
+			"id": "K5",
+			"text": "A replayed old status list looks current",
+			"severity": "medium",
+			"mitigation": "Add validUntil to status lists or serve them with a short cache lifetime"
+		}
+	],
+	"progress": {
+		"overrides": {
+			"AC-1": {
+				"build": {
+					"status": "done",
+					"note": "issueCertifiable in tfd-credentials/rdfc",
+					"evidence": [
+						{ "kind": "note", "label": "bun test 155 pass (2026-11-08)" }
+					]
+				},
+				"test": {
+					"status": "done",
+					"note": "1EdTech public validator run locally in Docker: rdfc-no-status VALID, with-status WARNING (issuer URL unreachable)",
+					"evidence": [
+						{
+							"kind": "note",
+							"label": "packages/tfd-credentials/spikes/validators/FINDINGS.md"
+						}
+					]
+				}
+			},
+			"AC-2": {
+				"build": {
+					"status": "done",
+					"note": "issueCertifiable defaults to rdfc per the library README; the rule that rdfc is listed first in a proof set is not yet enforced in code"
+				}
+			},
+			"AC-3": {
+				"build": {
+					"status": "done",
+					"note": "verifier rejects tampering, context and key swaps"
+				},
+				"test": {
+					"status": "progress",
+					"note": "all three verifiers reject the tampered set except two cases: DCC accepts a copied context, 1EdTech/DCC miss a corrupted second JCS proof",
+					"evidence": [
+						{ "kind": "note", "label": "FINDINGS.md findings 3 and 5" }
+					]
+				}
+			},
+			"AC-4": {
+				"build": { "status": "done", "note": "revoke() with put-if-match" },
+				"test": {
+					"status": "done",
+					"note": "revoked reported by our verifier, DCC verifier-core; FATAL revoked in 1EdTech validator",
+					"evidence": [{ "kind": "note", "label": "FINDINGS.md finding 4" }]
+				}
+			},
+			"AC-5": {
+				"build": {
+					"status": "done",
+					"note": "verifyCredential returns unchecked without a status resolver"
+				},
+				"test": {
+					"status": "done",
+					"note": "A-rdfc-nostatus verified=true status=unchecked in the spike run",
+					"evidence": [{ "kind": "note", "label": "results/ours-run.txt" }]
+				}
+			},
+			"AC-6": {
+				"build": {
+					"status": "done",
+					"note": "publicView(result) with includeName flag per README; test not inspected"
+				}
+			},
+			"AC-7": {
+				"build": {
+					"status": "done",
+					"note": "memory and ObjectStore adapters plus contract suites; the agent reported them passing against FolderStore; not individually inspected"
+				}
+			},
+			"AC-8": {
+				"test": {
+					"status": "progress",
+					"note": "suspended seen in our verifier and DCC; 1EdTech shows no suspension flag (documented in FINDINGS.md)"
+				}
+			}
+		},
+		"next": null
+	}
+}
