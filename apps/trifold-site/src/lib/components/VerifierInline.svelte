@@ -1,12 +1,13 @@
 <script lang="ts">
-	/** Chapter 03's verifier: the sample card, two buttons, the result. Nothing leaves the browser. */
-	import { Button } from "#lib/components/ui/button";
-	import { TAMPERED_CENTS, VerifierSession } from "#lib/verify/session.svelte";
-	import ProofLimits from "./ProofLimits.svelte";
-	import ReceiptCard from "./ReceiptCard.svelte";
-	import VerifierResult from "./VerifierResult.svelte";
+/** Chapter 03's verifier: the sample card, two buttons, the result. Nothing leaves the browser. */
+import { Button } from "#lib/components/ui/button";
+import { TAMPERED_CENTS, VerifierSession } from "#lib/verify/session.svelte";
+import ProofLimits from "./ProofLimits.svelte";
+import ReceiptCard from "./ReceiptCard.svelte";
 
-	const session = new VerifierSession();
+const session = new VerifierSession();
+/** The result UI loads with the first check, so the homepage pays nothing for it up front. */
+const loadResult = () => import("./VerifierResult.svelte");
 </script>
 
 <div class="max-w-[620px]">
@@ -26,7 +27,11 @@
 		Sample data. Names and amounts are invented. The signature is real and verifies against the sample's demo key, right
 		here in your browser. Nothing is sent anywhere.
 	</p>
-	<VerifierResult {session} />
+	{#if session.started}
+		{#await loadResult() then { default: VerifierResult }}
+			<VerifierResult {session} variant="compact" class="mt-4" />
+		{/await}
+	{/if}
 	<details class="mt-4">
 		<summary class="mb-3 cursor-pointer text-[15px] font-semibold">What a pass proves, and what it doesn't</summary>
 		<ProofLimits />
