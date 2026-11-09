@@ -21,6 +21,9 @@
  * It also returns the opening events (D12 T3): the engine command that makes the subject with exactly these rows, so a
  * log that starts at the import replays (without them a member's log has no subject until the next invoice).
  *
+ * What it does not do is exempt anything from the rollover cap: a rollover above the menu's `rollover.max` is trimmed at the
+ * first renewal after the import, with the new cycle's leftover (decision 1, owner ruling 2026-11-08: no grandfathered cycle).
+ *
  * Pure: no I/O, no clock (`now` is passed). The same input always gives the same output.
  */
 import { deterministicUlid } from "../ledger/ids.js";
@@ -31,6 +34,7 @@ import type {
 	AtmEvent,
 	BillingRow,
 	CallerCreditLotRow,
+	CallerInvoicePayment,
 	CallerMembershipRow,
 	CallerRowsImport,
 	CallerRowsInput,
@@ -193,6 +197,10 @@ export const grantsStateFromCallerRows = (
 
 	// ---- no lots: the subscription is known, nothing has been paid for yet -------------------------------------
 	if (lots.length === 0) {
+		for (const payment of input.payments ?? [])
+			problem(
+				`${label} has no lots, so invoice ${payment.invoiceId} cannot have a payment recorded`,
+			);
 		throwIfAny(problems);
 		const state: GrantsState = {
 			...structuredClone(EMPTY_GRANTS_STATE),
@@ -614,6 +622,11 @@ export const grantsStateFromCallerRows = (
 		};
 		state.invoices[invoiceId] = record;
 	}
+	recordPayments({
+		payments: input.payments ?? [],
+		invoices: state.invoices,
+		label,
+	});
 	return opened({
 		state,
 		engineRows,
@@ -742,6 +755,56 @@ const rolloverExpiresAtOf = ({
 }): number | null => {
 	if (current) return rolloverExpiry(rollover, boundary, zone);
 	return rollover ? lot.expires_at : null;
+};
+
+/** The currency a payment is booked in; any other is never booked (`paymentEvents`), so its refund is not either. */
+const BOOKED_CURRENCY = "usd";
+
+/**
+ * Records what the caller collected for each imported invoice (`CallerRowsInput.payments`) on the invoice's record: the
+ * amount (`paid`, USD and more than 0 only, as the handler's own `payment.succeeded` is) and the payment refs. Throws,
+ * naming every problem, on an invoice no lot names, a repeated invoice, an amount that is not a whole number of 0 or more, or an empty ref.
+ */
+const recordPayments = ({
+	payments,
+	invoices,
+	label,
+}: {
+	payments: readonly CallerInvoicePayment[];
+	invoices: Record<string, InvoiceRecord>;
+	label: string;
+}): void => {
+	const problems: string[] = [];
+	const seen = new Set<string>();
+	for (const payment of payments) {
+		const where = `${label}: the payment of invoice ${JSON.stringify(payment.invoiceId)}`;
+		const record = invoices[payment.invoiceId];
+		if (seen.has(payment.invoiceId)) problems.push(`${where} is given twice`);
+		else if (!record)
+			problems.push(
+				`${where} is for an invoice no lot of the membership names`,
+			);
+		seen.add(payment.invoiceId);
+		if (!Number.isInteger(payment.amount) || payment.amount < 0)
+			problems.push(
+				`${where} has amount ${payment.amount}, not a whole number from 0`,
+			);
+		if (
+			(payment.paymentRefs ?? []).some(
+				(ref) => typeof ref !== "string" || ref === "",
+			)
+		)
+			problems.push(`${where} names an empty payment ref`);
+	}
+	throwIfAny(problems);
+	for (const payment of payments) {
+		const record = invoices[payment.invoiceId] as InvoiceRecord;
+		const currency = (payment.currency ?? BOOKED_CURRENCY).toLowerCase();
+		if (currency === BOOKED_CURRENCY && payment.amount > 0)
+			record.paid = payment.amount;
+		const refs = [...new Set(payment.paymentRefs ?? [])];
+		if (refs.length > 0) record.paymentRefs = refs;
+	}
 };
 
 const throwIfAny = (problems: readonly string[]): void => {

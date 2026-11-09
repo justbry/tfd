@@ -104,7 +104,11 @@ export type Step =
 			membership: CallerMembershipRow;
 			lots: CallerCreditLotRow[];
 			eventIds?: string[];
-			invoices?: { invoiceId: string; paymentRefs: string[] }[];
+			invoices?: {
+				invoiceId: string;
+				paymentRefs: string[];
+				paid?: { amount: number; currency?: string };
+			}[];
 	  }
 	| {
 			/** An admin adjusts a family's balance of one feature. */

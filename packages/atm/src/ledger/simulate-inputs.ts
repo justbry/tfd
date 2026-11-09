@@ -21,6 +21,7 @@ import { mappingFor } from "../billing/normalize.js";
 import {
 	applyRowChanges,
 	type BillingRow,
+	grantsFromRows,
 	rowChangesFromMutation,
 	stateFromRows,
 	subjectKey,
@@ -256,6 +257,17 @@ export const replayInputs = (
 	const holders = new Map<string, Holder>();
 	const invoiceIndex = new Map<string, string>();
 	const paymentIndex = new Map<string, string>();
+	// An invoice paid before an import has no `invoice.paid` input, so the handler's index (`seedHandlerIndexes`) is not
+	// rebuilt from the inputs: the import left the payment refs on the invoice's record in the holder's seed.
+	for (const [key, seed] of inputs.seeds)
+		for (const [invoiceId, record] of Object.entries(
+			grantsFromRows(seed.rows).invoices,
+		)) {
+			if (!record.paymentRefs?.length || invoiceIndex.has(invoiceId)) continue;
+			invoiceIndex.set(invoiceId, key);
+			for (const ref of record.paymentRefs)
+				if (!paymentIndex.has(ref)) paymentIndex.set(ref, invoiceId);
+		}
 	const seen = new Set<string>();
 	const byInput = new Map<string, ReplayedInput>();
 	const produced: AtmEvent[] = [];
