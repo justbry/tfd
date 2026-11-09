@@ -6,6 +6,7 @@ import { rowsFromState, stateFromRows } from "../billing/rows.js";
 import type {
 	AtmBalance,
 	AtmCatalogRow,
+	AtmCatalogsByVersion,
 	AtmEvent,
 	AtmEventContext,
 	AtmHold,
@@ -50,6 +51,70 @@ export class ReplayGapError extends ReplayError {
 
 type Catalog = ReturnType<typeof toCatalog>;
 
+/**
+ * The catalog the log was written under: one catalog for every event, or one per menu version (`catalogs`, keyed by the
+ * version a credit event labels as `labels.menu_version`). A log whose members bought on different versions holds both,
+ * and a version's grant amounts live in its catalog.
+ */
+export type CatalogInput =
+	| { catalog: readonly AtmCatalogRow[]; catalogs?: undefined }
+	| { catalogs: AtmCatalogsByVersion; catalog?: undefined };
+
+export type CatalogSet = {
+	/** The catalog an event's engine command runs under. Throws a `ReplayError` when its menu version has none. */
+	forEvent: (e: AtmEvent) => Catalog;
+	/** The features of every catalog together: what a balance reads to name a feature. */
+	features: Pick<Catalog, "features">;
+};
+
+/** Reads the one-catalog or the per-version form. Throws a plain `Error` when neither or both are given. */
+export const catalogSetOf = (input: {
+	catalog?: readonly AtmCatalogRow[];
+	catalogs?: AtmCatalogsByVersion;
+}): CatalogSet => {
+	if (input.catalog !== undefined && input.catalogs !== undefined)
+		throw new Error(
+			"give catalog or catalogs (one per menu version), not both",
+		);
+	if (input.catalogs === undefined) {
+		if (input.catalog === undefined)
+			throw new Error("give catalog or catalogs (one per menu version)");
+		const only = toCatalog(input.catalog);
+		return { forEvent: () => only, features: only };
+	}
+	const versions = Object.keys(input.catalogs).sort();
+	if (versions.length === 0) throw new Error("catalogs holds no menu version");
+	const byVersion = new Map<string, Catalog>();
+	const features: Catalog["features"] = {};
+	for (const version of versions) {
+		const catalog = toCatalog(input.catalogs[version] ?? []);
+		byVersion.set(version, catalog);
+		Object.assign(features, catalog.features);
+	}
+	const named = versions.map((v) => `"${v}"`).join(", ");
+	return {
+		features: { features },
+		forEvent: (e) => {
+			const version = e.labels.menu_version;
+			if (version === undefined) {
+				const [first] = byVersion.values();
+				if (byVersion.size === 1 && first) return first;
+				throw new ReplayError(
+					e.id,
+					`the event has no labels.menu_version, so none of the catalogs given (menu versions ${named}) can be chosen for its command`,
+				);
+			}
+			const catalog = byVersion.get(version);
+			if (!catalog)
+				throw new ReplayError(
+					e.id,
+					`no catalog for menu version "${version}" (labels.menu_version); catalogs given for ${named}`,
+				);
+			return catalog;
+		},
+	};
+};
+
 /** Available balance per holder and feature as the engine counts it at `asOfMs`: grants and rollovers not yet past their expiry. */
 export const balancesOf = ({
 	states,
@@ -59,7 +124,7 @@ export const balancesOf = ({
 }: {
 	states: Record<string, AtmSubjectState>;
 	holds: Record<string, AtmHold>;
-	catalog: Catalog;
+	catalog: Pick<Catalog, "features">;
 	asOfMs: number;
 }): AtmBalance[] => {
 	const out = new Map<string, AtmBalance>();
@@ -403,17 +468,17 @@ type Cached = {
 export const replayEvents = ({
 	events,
 	catalog: catalogRows,
+	catalogs,
 	snapshot,
 	lastEventId,
 	asOf,
 }: {
 	events: readonly AtmEvent[];
-	catalog: readonly AtmCatalogRow[];
 	snapshot?: AtmSnapshot;
 	lastEventId?: string;
 	asOf?: string;
-}): AtmReplayResult => {
-	const catalog = toCatalog(catalogRows);
+} & CatalogInput): AtmReplayResult => {
+	const catalogSet = catalogSetOf({ catalog: catalogRows, catalogs });
 	const states: Record<string, AtmSubjectState> = clone(snapshot?.states ?? {});
 	const holds: Record<string, AtmHold> = clone(snapshot?.holds ?? {});
 	const from = snapshot?.lastEventId ?? null;
@@ -443,7 +508,12 @@ export const replayEvents = ({
 				: 0;
 		return {
 			snapshot: { states, holds, lastEventId: last ? last.id : from },
-			balances: balancesOf({ states, holds, catalog, asOfMs }),
+			balances: balancesOf({
+				states,
+				holds,
+				catalog: catalogSet.features,
+				asOfMs,
+			}),
 			asOf: asOf ?? (last ? last.event_time : null),
 			applied,
 			lastEventId: last ? last.id : from,
@@ -537,6 +607,7 @@ export const replayEvents = ({
 						? { ...current, revision: recorded.revision.before }
 						: current;
 				const before = start ? clone(start) : null;
+				const catalog = catalogSet.forEvent(e);
 				let run: ReturnType<typeof runOnState>;
 				try {
 					run = runOnState({

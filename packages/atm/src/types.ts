@@ -269,6 +269,14 @@ export type MrrMovement = "new" | "expansion" | "contraction" | "churned";
 
 export type TfdCatalogRow = { table: string; row: Record<string, unknown> };
 
+/**
+ * Catalog rows by menu version (`"1"`, `"2"`, the `labels.menu_version` of the credit events). A log whose members bought
+ * on different versions replays with these: a command runs under the catalog of its own event's version.
+ */
+export type TfdCatalogsByVersion = Readonly<
+	Record<string, readonly TfdCatalogRow[]>
+>;
+
 /** The engine's `SubjectState`: one subject's rows, revisioned by its mutation log. */
 export type TfdSubjectState = {
 	schemaVersion: 1;
@@ -375,8 +383,13 @@ export type TfdSimulatePostingChange = {
 
 export type TfdSimulateInput = {
 	events: readonly TfdEvent[];
-	/** The catalog rows the log was written under. Give these or `menu`. */
+	/** The catalog rows the log was written under. Give these, `catalogs` or `menu`. */
 	catalog?: readonly TfdCatalogRow[];
+	/**
+	 * The catalog rows per menu version, instead of `catalog`, for a log whose members bought on different versions: a
+	 * command runs under the catalog of its event's `labels.menu_version`.
+	 */
+	catalogs?: TfdCatalogsByVersion;
 	/** The menu the log was written under, instead of `catalog` (its rows come from `menuCatalogRows`). */
 	menu?: Menu;
 	/** The school id the menus' rows are made for; default the first event's. */
@@ -387,6 +400,8 @@ export type TfdSimulateInput = {
 	 */
 	candidate: {
 		catalog?: readonly TfdCatalogRow[];
+		/** Per menu version, as the input's `catalogs`; the candidate's commands choose their catalog by `labels.menu_version` too. */
+		catalogs?: TfdCatalogsByVersion;
 		menu?: Menu;
 		policy?: BillingPolicy;
 	};
@@ -4006,6 +4021,8 @@ export type CatalogPublishedInput = {
 export type AtmBalance = TfdBalance;
 /** @deprecated Use {@link TfdCatalogRow}. */
 export type AtmCatalogRow = TfdCatalogRow;
+/** @deprecated Use {@link TfdCatalogsByVersion}. */
+export type AtmCatalogsByVersion = TfdCatalogsByVersion;
 /** @deprecated Use {@link TfdCheckResult}. */
 export type AtmCheckResult = TfdCheckResult;
 /** @deprecated Use {@link TfdCommand}. */
