@@ -43,7 +43,7 @@ The candidates: `upgradeGrant` prorated, full and none; every tier's prices 10% 
 | Scenario | What | Result |
 |---|---|---|
 | S1 | 46 bundles through ship, inputs ship, journal, report, reconcile, simulate; goldens of the matrix; balances | 44 PASS, 2 FINDING (F1), under both time zones |
-| S1 | the 9 `credits-*` bundles (D12 T9, 2026-11-08, default time zone only) through the same commands | 8 PASS, 1 FINDING (F6); F5 was fixed (menu-versions PR) |
+| S1 | the 9 `credits-*` bundles (D12 T9, 2026-11-08, default time zone only) through the same commands | 8 PASS, 1 FINDING (F6); F5 was fixed (PR #98) |
 | S1 | 8 golden what-ifs (`golden/simulate/inputs-*.json`) through `atm simulate --inputs` | PASS (46 checks) |
 | S2 | `vibes-year` and `vibes-multi`: ship, journal, report, reconcile against `golden/{journal,reports,multi}` | PASS (69 and 40 checks) |
 | S3 | erasure drill, three families, one erased | PASS on the fixtures; FINDING F2 (erased facts stay in the `-wal` until a checkpoint) |

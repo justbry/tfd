@@ -16,7 +16,7 @@ Merged to `dev` after `tfd-v0.11.0`.
 
 | PR | Merge commit | What |
 |---|---|---|
-| this PR (menu versions, plan §13 item 10) | | `replayEvents` takes `catalogs`, the catalog rows per menu version, beside `catalog`: a command runs under the catalog of its event's `labels.menu_version`, so a log whose members are on different versions replays in one call (the ledger summary, `simulate` and `tfd simulate --inputs` with it). An event whose version has no catalog is a `ReplayError` that names it; one `catalog` works exactly as before. `balancesOf`, `simulate` (current and candidate `catalogs`), `SummaryOptions.catalogs` take it too; `tfd simulate --current-catalog` and `--catalog` read an object of lists by version, and `--inputs` takes each version's catalog from the menu its stored inputs were decided under. The golden-e2e finding F5 is gone; `credits-menu-version` replays whole |
+| #98 (menu versions, plan §13 item 10) | | `replayEvents` takes `catalogs`, the catalog rows per menu version, beside `catalog`: a command runs under the catalog of its event's `labels.menu_version`, so a log whose members are on different versions replays in one call (the ledger summary, `simulate` and `tfd simulate --inputs` with it). An event whose version has no catalog is a `ReplayError` that names it; one `catalog` works exactly as before. `balancesOf`, `simulate` (current and candidate `catalogs`), `SummaryOptions.catalogs` take it too; `tfd simulate --current-catalog` and `--catalog` read an object of lists by version, and `--inputs` takes each version's catalog from the menu its stored inputs were decided under. The golden-e2e finding F5 is gone; `credits-menu-version` replays whole |
 
 ## 0.11.0
 
