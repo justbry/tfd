@@ -564,6 +564,20 @@ const importMember = (
 		const imported = grantsStateFromCallerRows({
 			membership,
 			lots: step.lots,
+			payments: (step.invoices ?? []).flatMap((invoice) =>
+				invoice.paid
+					? [
+							{
+								invoiceId: invoice.invoiceId,
+								amount: invoice.paid.amount,
+								...(invoice.paid.currency
+									? { currency: invoice.paid.currency }
+									: {}),
+								paymentRefs: invoice.paymentRefs,
+							},
+						]
+					: [],
+			),
 			menu: menuOfVersion(scenario, String(membership.menu_version)),
 			now: step.atMs,
 			policy: endpoint.policy,

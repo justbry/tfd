@@ -1,0 +1,30 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-2": 26000,
+				"fees": 784,
+				"stripe": 25216,
+				"net": 25216,
+				"avail:family:fam_8k2:visit": 3
+			},
+			"reconcile": {
+				"2026-03": []
+			}
+		}
+	],
+	"notes": [
+		"decision 1, owner ruling 2026-11-08: the cap trims at the first renewal after cutover; no cycle is grandfathered. Sparkle-2 grants 2 visits a month and the menu lets 1 be carried, for 2 months (rules version 2)",
+		"the family service imports a sparkle-2 member on 20 February: January's 2 (a rollover) and February's grant of 2 with 1 spent (1 left on the row). Opening events grant 3; the family service's sum at the import is 3",
+		"15 March: the renewal cuts the 3 unused (the imported rollover of 2 and the 1 on the row) to the cap of 1: credit.expired -2, 1 rolls over and 2 are granted: 3. The family service's lots, which never apply the cap, would hold 5 (January's 2, February's 1, March's 2)",
+		"money: only the renewal is in the log: 260.00, fee 7.84"
+	]
+}

@@ -1,0 +1,32 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"duplicate"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"refunds": 26000,
+				"stripe": -26000,
+				"net": -26000,
+				"avail:family:fam_8k2:visit": 0
+			},
+			"reconcile": {
+				"2026-02": []
+			}
+		}
+	],
+	"notes": [
+		"as credits-import-refund, but the import (grantsStateFromCallerRows) was given what the family service collected for in_old1: 260.00 in USD, with its payment refs. The grants state holds the invoice's paid amount, so its refund is the school's money",
+		"5 February: Stripe refunds the whole 260.00 (charge.refunded). The index finds the holder; the refund takes the invoice's 2 visits back (credit.adjusted -2) and books payment.refunded 260.00 (refunds 260.00, cash and net -260.00). The same event delivered again is a duplicate",
+		"the January payment is not in the log (the family service booked it before the import), so January is not reconciled; February agrees with Stripe"
+	]
+}

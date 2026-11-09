@@ -63,7 +63,8 @@ const ERASED_FACT_IN_WAL =
 /**
  * F5 and F6: `tfd simulate --inputs` refuses to answer (exit 2) for these bundles, so each of its six checks reports it.
  * F5: members on different menu versions (one catalog cannot decide them all); F6: a refund of an invoice paid before the
- * import (the stored inputs hold no such invoice, so the replay decides it differently from the log).
+ * import whose import recorded no payment refs (the stored inputs hold no such invoice, so the replay decides it differently
+ * from the log; with `payments` the refs are in the holder's seed and `credits-import-refund-paid` has no finding).
  */
 const SIMULATE_REFUSES = [
 	"simulate identity sch_vol: exit 0, baseline identical, no change",

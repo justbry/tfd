@@ -84,6 +84,22 @@ const menuV2: Menu = {
 	),
 };
 
+/** Sparkle-2 grants 2 visits a month and may carry only 1 over, for 2 months: the cap of decision 1, owner ruling 2026-11-08. */
+const trimMenu: Menu = {
+	...baseMenu,
+	tiers: baseMenu.tiers.map((tier) =>
+		tier.id === "sparkle-2"
+			? {
+					...tier,
+					grants: tier.grants.map((grant) => ({
+						...grant,
+						rollover: { max: 1, months: 2 },
+					})),
+				}
+			: tier,
+	),
+};
+
 const FAMILY_B = "fam_b2";
 const MEMBER_A_CYCLE_3 = { start: ms(MAR15), end: ms(APR15) };
 const B_JOIN = ms("2026-02-20T18:00:00Z");
@@ -423,6 +439,162 @@ export const CASES: Case[] = [
 			"the family service imports a sparkle-2 member on 1 February with its January lot (2 visits, invoice in_old1 paid on 15 January, before the import). seedHandlerIndexes indexes the invoice and its payment refs",
 			"5 February: Stripe refunds the whole 260.00 (charge.refunded). The index finds the holder, the full refund takes the invoice's 2 visits back (credit.adjusted -2): 0 left. Without the seed the refund would wait for ever (409 unmatched_payment)",
 			"DISCREPANCY D8: the handler never booked the invoice's payment, so it books no payment.refunded. The hand numbers are what a refund should do (refunds 260.00, cash and net -260.00); pinned is today's 0. Reconcile prints missing_in_log refund re_1 and amount_differs net",
+		],
+	},
+	{
+		id: "credits-import-rollover-trim",
+		title:
+			"import then renewal under a rollover cap (decision 1): the cap trims an imported rollover at the first renewal, with no grandfathered cycle",
+		path: "grantsStateFromCallerRows + opening events + seeded claims, then invoice.paid (subscription_cycle) under a cap below the carried credits",
+		policy: { rulesVersion: 2 },
+		menu: trimMenu,
+		menus: { "1": trimMenu },
+		fees: { in_new: FEE_SPARKLE_2 },
+		steps: [
+			(() => {
+				const { member, lots } = importedLots(trimMenu);
+				return {
+					kind: "import" as const,
+					at: IMPORT_AT,
+					membership: member,
+					lots,
+					eventIds: ["evt_in_old1", "evt_in_old2"],
+					invoices: [refs("in_old1"), refs("in_old2")],
+				};
+			})(),
+			applied(
+				ms(MAR15),
+				tierInvoice({
+					id: "in_new",
+					at: ms(MAR15),
+					reason: "subscription_cycle",
+					cycle: FEB,
+					next: MAR,
+					tier: "sparkle-2",
+					amount: SPARKLE_2,
+				}),
+			),
+			{ kind: "ship", at: ms("2026-03-15T19:00:00Z") },
+		],
+		verdict: "OK",
+		books: [
+			{
+				school: SCHOOL,
+				hand: {
+					"income:membership:sparkle-2": SPARKLE_2,
+					fees: FEE_SPARKLE_2,
+					stripe: SPARKLE_2 - FEE_SPARKLE_2,
+					net: SPARKLE_2 - FEE_SPARKLE_2,
+					[visits(FAMILY)]: 3,
+				},
+				stripe: stripeOfPayments([
+					{
+						id: "in_new",
+						amount: SPARKLE_2,
+						fee: FEE_SPARKLE_2,
+						at: ms(MAR15),
+					},
+				]),
+				reconcile: { "2026-03": [] },
+			},
+		],
+		notes: [
+			"decision 1, owner ruling 2026-11-08: the cap trims at the first renewal after cutover; no cycle is grandfathered. Sparkle-2 grants 2 visits a month and the menu lets 1 be carried, for 2 months (rules version 2)",
+			"the family service imports a sparkle-2 member on 20 February: January's 2 (a rollover) and February's grant of 2 with 1 spent (1 left on the row). Opening events grant 3; the family service's sum at the import is 3",
+			"15 March: the renewal cuts the 3 unused (the imported rollover of 2 and the 1 on the row) to the cap of 1: credit.expired -2, 1 rolls over and 2 are granted: 3. The family service's lots, which never apply the cap, would hold 5 (January's 2, February's 1, March's 2)",
+			"money: only the renewal is in the log: 260.00, fee 7.84",
+		],
+	},
+	{
+		id: "credits-import-refund-paid",
+		title:
+			"import then refund of a pre-import invoice whose paid amount the import recorded: the refund takes the credits back and books the money",
+		path: "grantsStateFromCallerRows (payments) + seedHandlerIndexes, then charge.refunded of an invoice the handler never saw",
+		menus: { "1": baseMenu },
+		steps: [
+			(() => {
+				const member = membership({ menuVersion: 1, periodEnd: ms(FEB15) });
+				const lots = callerGrant({
+					membership: member,
+					menu: baseMenu,
+					invoice: {
+						id: "in_old1",
+						reason: "subscription_create",
+						periodStart: ms(JAN15),
+						periodEnd: ms(FEB15),
+						atMs: ms(JAN15),
+					},
+					existing: [],
+				});
+				return {
+					kind: "import" as const,
+					at: ms("2026-02-01T12:00:00Z"),
+					membership: member,
+					lots,
+					eventIds: ["evt_in_old1"],
+					invoices: [{ ...refs("in_old1"), paid: { amount: SPARKLE_2 } }],
+				};
+			})(),
+			{
+				at: ms("2026-02-05T12:00:00Z"),
+				event: refundOf({
+					id: "evt_re_1",
+					invoiceId: "in_old1",
+					amount: SPARKLE_2,
+					charged: SPARKLE_2,
+					at: ms("2026-02-05T12:00:00Z"),
+				}),
+				answer: [200, "applied"],
+			},
+			// Stripe sends the same refund again: the claim makes it a duplicate, and the refund is booked once
+			{
+				at: ms("2026-02-05T12:30:00Z"),
+				event: refundOf({
+					id: "evt_re_1",
+					invoiceId: "in_old1",
+					amount: SPARKLE_2,
+					charged: SPARKLE_2,
+					at: ms("2026-02-05T12:00:00Z"),
+				}),
+				answer: [200, "duplicate"],
+			},
+			{ kind: "ship", at: ms("2026-02-05T13:00:00Z") },
+		],
+		verdict: "OK",
+		books: [
+			{
+				school: SCHOOL,
+				// the refund hands 260.00 back: Stripe's balance falls by it, and the member's 2 visits go
+				hand: {
+					refunds: SPARKLE_2,
+					stripe: -SPARKLE_2,
+					net: -SPARKLE_2,
+					[visits(FAMILY)]: 0,
+				},
+				stripe: {
+					invoices: [stripeInvoice("in_old1", SPARKLE_2, JAN15)],
+					refunds: [
+						stripeRefund("re_1", SPARKLE_2, "2026-02-05T12:00:00Z", "in_old1"),
+					],
+					disputes: [],
+					payouts: [],
+					balanceTransactions: [
+						stripeBalance(
+							"txn_re_1",
+							"refund",
+							-SPARKLE_2,
+							0,
+							"2026-02-05T12:00:00Z",
+						),
+					],
+				},
+				reconcile: { "2026-02": [] },
+			},
+		],
+		notes: [
+			"as credits-import-refund, but the import (grantsStateFromCallerRows) was given what the family service collected for in_old1: 260.00 in USD, with its payment refs. The grants state holds the invoice's paid amount, so its refund is the school's money",
+			"5 February: Stripe refunds the whole 260.00 (charge.refunded). The index finds the holder; the refund takes the invoice's 2 visits back (credit.adjusted -2) and books payment.refunded 260.00 (refunds 260.00, cash and net -260.00). The same event delivered again is a duplicate",
+			"the January payment is not in the log (the family service booked it before the import), so January is not reconciled; February agrees with Stripe",
 		],
 	},
 ];

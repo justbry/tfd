@@ -26,7 +26,7 @@ Sources: the D12 research findings of 2026-11-08 (three read-only reports), re-c
 | 5 | Credit events to the ledger: ship the outbox, the views build | M | ledger UI only | yes (stop shipping) |
 | 6 | Retire the lot engine | M | no | by redeploy only |
 
-**What changes for members** (details in §9): a rollover cap the school already set starts to apply (one cycle grandfathered), upgrades grant at once instead of at renewal, credits from an unpaid cycle stop at cycle end as today, and the expiry hour can move up to an hour across DST. Balances on the day of cutover do not change.
+**What changes for members** (details in §9): a rollover cap the school already set starts to apply at the first renewal after cutover (no cycle is grandfathered), upgrades grant at once instead of at renewal, credits from an unpaid cycle stop at cycle end as today, and the expiry hour can move up to an hour across DST. Balances on the day of cutover do not change.
 
 **Owner decisions needed first** (§12, [`decisions.md`](decisions.md)): seven rule differences, the production state, E2/D-3 for credit events, acacia vs clover, and when to announce.
 
@@ -267,7 +267,7 @@ When an endpoint keeps failing, Stripe emails the **account owner, who is the sc
 
 | Excused reason | Matches when |
 |---|---|
-| `rollover_cap` | tfd is lower by at most what the cap removed at a renewal since import |
+| `rollover_cap` | tfd is lower by at most what the cap removed at a renewal since import, the first one included (the owner ruled on 2026-11-08 that no cycle is grandfathered, so an imported rollover above the cap is trimmed at the first renewal after cutover) |
 | `upgrade_grant` | tfd is higher after a mid-cycle tier change or quantity raise |
 | `expiry_dst` | a lot expires within 1 hour of tfd's expiry, across a DST change |
 | `unrenewed_cycle` | the cycle ended unpaid: lots read 0, tfd still holds it until the lapse job |
@@ -355,7 +355,7 @@ The B20 gap is why cutover must come before booking spending: once members spend
 
 | Change | Today (bs) | After (tfd) | Who notices | Plan |
 |---|---|---|---|---|
-| Rollover cap | `rollover.max` stored but not enforced (bs `menu.ts`) | leftover above `max` is lost at renewal | members with large balances at schools that set a max | imported rows are uncapped: the first renewal after cutover is grandfathered; the cap applies from the second. Tell admins before cutover; they may raise or remove the max |
+| Rollover cap | `rollover.max` stored but not enforced (bs `menu.ts`) | leftover above `max` is lost at renewal | members with large balances at schools that set a max | the cap trims at the first renewal after cutover; no cycle is grandfathered (owner, 2026-11-08), so a member whose balance is above the max loses the excess at that renewal. Tell admins before cutover; they may raise or remove the max |
 | Mid-cycle upgrade | credits at the next renewal | credits at once | upgraders, who gain | release note |
 | Expiry zone | `addMonthsInZone` in the school's zone (bs `time.ts:15`) | `addUtcMonths` (T8 moves it to the menu's zone) | up to 1 hour, across DST | not announced; T8 removes it |
 | Lapse | an expired lot reads 0; nothing is booked | the row stays until the next invoice or cancel; B17's `recordLapse` job books it | nobody, if B17 runs | B17 must ship with stage 4 |
@@ -364,7 +364,7 @@ The B20 gap is why cutover must come before booking spending: once members spend
 | Menu version | the member keeps the version they bought | the same, with T5 | nobody | — |
 | `granted` bar (ledger `members-list`) | `grantedFrom`: the sum of the cycle's lots | the credit row's allowance for the current cycle, plus one-time grants dated in the cycle; rollovers and adjustments are not "granted" | admins | say so in the ledger UI's help text |
 
-**Announcement plan.** Per school, before its stage 4: an email to the school's admins at least 14 days ahead (decision 11) naming its cutover date, the rollover cap if it set one, the Stripe warning email they may see, and the new upgrade behavior. A release note when the first school moves. Members of capped schools get a notice before their first post-cutover renewal, which is grandfathered, so they lose nothing they were not told about.
+**Announcement plan.** Per school, before its stage 4: an email to the school's admins at least 14 days ahead (decision 11) naming its cutover date, the rollover cap if it set one, the Stripe warning email they may see, and the new upgrade behavior. A release note when the first school moves. Members of capped schools get a notice before their first post-cutover renewal, which already trims the cap, so they lose nothing they were not told about.
 
 ## 10. Ops and safeguarding constraints
 
@@ -380,7 +380,7 @@ The B20 gap is why cutover must come before booking spending: once members spend
 
 | Test | Where | What it proves |
 |---|---|---|
-| Golden bundles (T9) | tfd `packages/atm/fixtures/scenarios/` (55 now: 46 and the nine `credits-*` bundles) | one bundle per rule decision (rollover cap and the grandfathered cycle, immediate upgrade, menu-zone expiry across DST, lapse, gift expiry, per-member menu version, never-expiring adjust); import then renewal; import then refund of a pre-import invoice |
+| Golden bundles (T9) | tfd `packages/atm/fixtures/scenarios/` (57 now: 46 and the eleven `credits-*` bundles) | one bundle per rule decision (rollover cap and the first-renewal trim of an imported rollover, immediate upgrade, menu-zone expiry across DST, lapse, gift expiry, per-member menu version, never-expiring adjust); import then renewal (and the rollover trim); import then refund of a pre-import invoice (with and without the paid amount) |
 | Import property test | tfd | for generated bs members (tiers, add-ons, raises, partial refunds, adjustments, expired lots, both intervals), import never throws on a valid member, sums equal `balancesFrom`, and one renewal after import equals bs's renewal under the agreed rules |
 | Opening-events replay | tfd | a log of opening events replays to the imported balances; a money-only log followed by opening events replays (open question 3) |
 | Conformance extension | bs `test/ledger-money-conformance.test.ts` (16 vendored bundles) | the same bundles through lots and through the shadow give equal balances, apart from the excused reasons |
@@ -393,7 +393,7 @@ The B20 gap is why cutover must come before booking spending: once members spend
 
 Details and reasons in [`decisions.md`](decisions.md). Recommended defaults:
 
-1. **Rollover cap:** enforce it, with the first renewal after cutover grandfathered.
+1. **Rollover cap:** enforce it from the first renewal after cutover; no grandfathered cycle (owner ruling, 2026-11-08, which replaced the default).
 2. **Mid-cycle upgrade:** grant at once (tfd's rule).
 3. **Expiry zone:** the menu's zone (T8), behind a policy version.
 4. **Lapse:** credits stop at cycle end as today, via B17's `recordLapse` job.
@@ -403,7 +403,7 @@ Details and reasons in [`decisions.md`](decisions.md). Recommended defaults:
 8. **Production state:** the owner runs O2, a read-only query, and confirms whether `school_billing` is on in production. Sources disagree, so this plan assumes nothing.
 9. **E2/D-3 for credit events:** write always, ship in production only after D-3 allows family-keyed credit events.
 10. **Acacia vs clover:** bs moves to clover.
-11. **Announcement timing:** admins 14 days before their school's cutover; members of capped schools before their first non-grandfathered renewal.
+11. **Announcement timing:** admins 14 days before their school's cutover; members of capped schools before their first renewal after cutover.
 12. **Stage 3 length:** 14 nights of only excused diffs, covering one renewal of every member (up to 31 nights).
 
 ## 13. Open questions and unverified items
@@ -417,8 +417,8 @@ Details and reasons in [`decisions.md`](decisions.md). Recommended defaults:
 | 5 | Do schools' restricted keys allow payout reads and balance-transaction reads? Today's key has no payout permission; balance transactions are unverified | the connect flow's permission list; a test-mode key | `payout.*` events, `prefetchFee` |
 | 6 | Production member and school counts | O2 | sizing stage 3 and 4 |
 | 7 | Decision 4 needs more than `recordLapse`. It books `credit.expired` only for rows and rollovers whose `expires_at` has passed; a tier row whose cycle ended unpaid has no `expires_at` (it waits for its next invoice), so it keeps its balance and nothing is booked. A bs lot of that cycle lapses at the cycle's end plus the grant's rollover months (no rollover: at the cycle's end). Matching it needs a tfd command that dates the unpaid cycle's refilling rows as `subscriptionEndedToCommands` does at a cancel, and that a late payment's invoice undoes (found in T8, 2026-11-08) | tfd design, then a golden bundle: renewal unpaid, lapse, late payment | B17, stage 4 |
-| 8 | Decision 1's grandfathered cycle is not what the engine does (found in T9, 2026-11-08). The engine's `reset` cuts all of a row's rollovers together to `rollover.max`: an imported rollover above the cap is trimmed at the first renewal, not the second. Example: cap 1 for 2 months, an imported rollover of 2 and 1 left on the row: after the first renewal tfd holds 3 (2 granted, 1 rolled), bs's lots hold 5. The importer comment and `UPGRADING.md` call the one grandfathered cycle "buzz-school's side", but nothing on the bs side can keep the engine from trimming | tfd design: a policy or an importer mark that exempts imported rollovers from the first reset, or an owner ruling that the trim is fine; then a golden bundle (the import-then-renewal bundle avoids a cap below the carried credits, so it does not pin the trim) | stage 3's excused reasons (`rollover_cap` is wider than "second renewal on"), stage 4 |
-| 9 | A refund of an invoice paid before the import takes the credits back but books no `payment.refunded` (D8, `docs/e2e-reconciliation.md`): the handler holds no payment for an invoice it never booked. `UPGRADING.md` says bs's own money booking must stop for a school the handler serves | tfd: record the paid amount of a seeded invoice; or bs keeps booking refunds of pre-import invoices. Bundle `credits-import-refund` pins today's behavior as D8 | stage 4 (money books across the flip) |
+| 8 | **Settled by the owner, 2026-11-08: the rollover cap trims at the first renewal after cutover; no grandfathered cycle.** Decision 1's grandfathered cycle was not what the engine does (found in T9, 2026-11-08): the engine's `reset` cuts all of a row's rollovers together to `rollover.max`, so an imported rollover above the cap is trimmed at the first renewal, not the second. Example: cap 1 for 2 months, an imported rollover of 2 and 1 left on the row: after the first renewal tfd holds 3 (2 granted, 1 rolled), bs's lots hold 5 | Settled by the ruling; no engine change. Bundle `credits-import-rollover-trim` pins the trim. `decisions.md` decision 1 and 11, §9, `UPGRADING.md` and the importer's comments now say so | nothing now; stage 3's `rollover_cap` excused reason covers every renewal after cutover, the first included |
+| 9 | **Fixed in tfd (0.11.1).** A refund of an invoice paid before the import took the credits back but booked no `payment.refunded` (D8, `docs/e2e-reconciliation.md`): the handler held no payment for an invoice it never booked. `UPGRADING.md` says bs's own money booking must stop for a school the handler serves | `grantsStateFromCallerRows` takes `payments` (the paid amount, currency and payment refs of each pre-import invoice) and records them on the invoice's record in the grants state (`paid`, `paymentRefs`), so the refund books as for a payment the handler booked. An import without them keeps D8 (bundle `credits-import-refund`); bundle `credits-import-refund-paid` pins the fix. `tfd simulate` indexes seeded invoices from the holders' seeds (F6 fixed for imports with `payments`). bs must pass `payments` at import: the amount `in_*` collected, which the lots do not carry | stage 4 (money books across the flip): bs passes `payments` for every invoice it seeds, else keeps booking refunds of pre-import invoices |
 | 10 | A log whose members are on different menu versions does not replay with one catalog: `replayEvents` (the ledger's summary and what-if reads) throws `ReplayError` for the members not on the catalog's version, because a version's grant amounts are in its catalog. The bundle `credits-menu-version` replays holder by holder, each under the catalog of the version its credit events are labelled with | tfd: let `replayEvents` take a catalog per `labels.menu_version`, or keep the catalogs per version in the log | stage 5 (ledger credit screens) |
 
 ## 14. Rough timeline
