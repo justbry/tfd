@@ -14,15 +14,22 @@
 import type { SubjectState } from "@autumn/balance-engine";
 import { menuCatalogRows } from "../billing/grants.js";
 import type { Menu } from "../billing/types.js";
-import type { AtmCatalogRow, AtmEvent, AtmSubjectState } from "../types.js";
+import type {
+	AtmCatalogRow,
+	AtmCatalogsByVersion,
+	AtmEvent,
+	AtmSubjectState,
+} from "../types.js";
 import { byEventId, byText } from "./order.js";
 import {
+	type CatalogInput,
+	type CatalogSet,
+	catalogSetOf,
 	mutationRevision,
 	ReplayError,
 	ReplayGapError,
 	replayEvents,
 } from "./replay.js";
-import { toCatalog } from "./run.js";
 import { decimalToUnits, isoInstant } from "./util.js";
 
 /** What one feature holds for one member, in the feature's own units. */
@@ -79,6 +86,12 @@ export type SummaryOptions = {
 	 * event in `events`, which is what a log that records its own settings holds.
 	 */
 	catalog?: readonly AtmCatalogRow[];
+	/**
+	 * The catalog rows per menu version, instead of `catalog`, for a log whose members bought on different versions (each
+	 * command replays under the catalog of its event's `labels.menu_version`). Default: when the log's `catalog.published`
+	 * events carry two or more versions, one catalog per version from them.
+	 */
+	catalogs?: AtmCatalogsByVersion;
 };
 
 const SPENT_PREFIX = "credits:spent:";
@@ -121,21 +134,45 @@ const isMemberEvent = (event: AtmEvent) =>
 	event.event_type.startsWith("credit.") ||
 	event.event_type.startsWith("plan.");
 
+/**
+ * The catalog of the log's own `catalog.published` events: the latest event's menu, or, when menus of two or more versions
+ * were published, one catalog per version (the latest event of each), so that members on different versions replay.
+ */
 const catalogFromEvents = (
 	events: readonly AtmEvent[],
-): readonly AtmCatalogRow[] | null => {
+): CatalogInput | null => {
+	const latestByVersion = new Map<string, AtmEvent>();
 	let latest: AtmEvent | null = null;
-	for (const event of events)
-		if (event.event_type === "catalog.published")
-			if (latest === null || byEventId(latest, event) < 0) latest = event;
-	const menu = (latest?.payload as { menu?: unknown } | undefined)?.menu;
-	if (latest === null || typeof menu !== "object" || menu === null) return null;
-	try {
-		return menuCatalogRows({ menu: menu as Menu, school: latest.school });
-	} catch {
-		// a menu the commodity rules cannot turn into rows is no usable catalog; the caller answers no-catalog
-		return null;
+	for (const event of events) {
+		if (event.event_type !== "catalog.published") continue;
+		if (latest === null || byEventId(latest, event) < 0) latest = event;
+		const version = (event.payload as { version?: unknown }).version;
+		const known = latestByVersion.get(String(version));
+		if (known === undefined || byEventId(known, event) < 0)
+			latestByVersion.set(String(version), event);
 	}
+	const rowsOf = (event: AtmEvent): readonly AtmCatalogRow[] | null => {
+		const menu = (event.payload as { menu?: unknown }).menu;
+		if (typeof menu !== "object" || menu === null) return null;
+		try {
+			return menuCatalogRows({ menu: menu as Menu, school: event.school });
+		} catch {
+			// a menu the commodity rules cannot turn into rows is no usable catalog; the caller answers no-catalog
+			return null;
+		}
+	};
+	if (latest === null) return null;
+	if (latestByVersion.size < 2) {
+		const rows = rowsOf(latest);
+		return rows === null ? null : { catalog: rows };
+	}
+	const catalogs: Record<string, readonly AtmCatalogRow[]> = {};
+	for (const [version, event] of latestByVersion) {
+		const rows = rowsOf(event);
+		if (rows === null) return null;
+		catalogs[version] = rows;
+	}
+	return { catalogs };
 };
 
 const unitsUsed = (event: AtmEvent): number => {
@@ -156,7 +193,7 @@ const nextExpiries = ({
 	asOfMs,
 }: {
 	states: Record<string, AtmSubjectState>;
-	catalog: ReturnType<typeof toCatalog>;
+	catalog: CatalogSet["features"];
 	asOfMs: number;
 }): Map<string, number> => {
 	const out = new Map<string, number>();
@@ -207,8 +244,16 @@ export const membersOf = (
 	options: SummaryOptions = {},
 ): MembersResult => {
 	const events = eventsAsOf(allEvents, asOf);
-	const catalogRows = options.catalog ?? catalogFromEvents(events);
-	if (catalogRows === null)
+	if (options.catalog !== undefined && options.catalogs !== undefined)
+		throw new Error(
+			"give catalog or catalogs (one per menu version), not both",
+		);
+	const catalogSource: CatalogInput | null = options.catalogs
+		? { catalogs: options.catalogs }
+		: options.catalog
+			? { catalog: options.catalog }
+			: catalogFromEvents(events);
+	if (catalogSource === null)
 		return {
 			ok: false,
 			error: {
@@ -223,7 +268,7 @@ export const membersOf = (
 	try {
 		replay = replayEvents({
 			events,
-			catalog: catalogRows,
+			...catalogSource,
 			asOf: asOfIso,
 		});
 	} catch (error) {
@@ -271,7 +316,7 @@ export const membersOf = (
 	}
 	const expiries = nextExpiries({
 		states: replay.snapshot.states,
-		catalog: toCatalog(catalogRows),
+		catalog: catalogSetOf(catalogSource).features,
 		asOfMs,
 	});
 	for (const [slot, expiresAt] of expiries) {

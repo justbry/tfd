@@ -56,6 +56,7 @@ import {
 import { reconcile as reconcileImpl } from "./ledger/reconcile.js";
 import {
 	balancesOf as balancesOfImpl,
+	catalogSetOf,
 	ReplayError as ReplayErrorImpl,
 	ReplayGapError as ReplayGapErrorImpl,
 	replayEvents as replayEventsImpl,
@@ -102,6 +103,7 @@ import type {
 	AdjustCreditsResult,
 	AtmBalance,
 	AtmCatalogRow,
+	AtmCatalogsByVersion,
 	AtmCommand,
 	AtmCommandType,
 	AtmEnv,
@@ -392,14 +394,21 @@ export const deterministicUlid = (input: {
 export const validateEvent = (event: unknown): AtmValidation =>
 	validateEventImpl(event);
 
-/** Events back through the engine in replay order (each subject's commands by revision), each with its own time as `now`; throws an Error named `ReplayError` (with `eventId`) where the engine disagrees with the log. */
-export const replayEvents = (input: {
-	events: readonly AtmEvent[];
-	catalog: readonly AtmCatalogRow[];
-	snapshot?: AtmSnapshot;
-	lastEventId?: string;
-	asOf?: string;
-}): AtmReplayResult => replayEventsImpl(input);
+/**
+ * Events back through the engine in replay order (each subject's commands by revision), each with its own time as `now`; throws an Error named `ReplayError` (with `eventId`) where the engine disagrees with the log.
+ * Give `catalog` (one catalog for the whole log) or `catalogs` (one per menu version, keyed by the `labels.menu_version` of the credit events: a log whose members bought on different versions); a command runs under the catalog of its own event's version, and an event whose version has no catalog is a `ReplayError` that names it. Giving both or neither throws.
+ */
+export const replayEvents = (
+	input: {
+		events: readonly AtmEvent[];
+		snapshot?: AtmSnapshot;
+		lastEventId?: string;
+		asOf?: string;
+	} & (
+		| { catalog: readonly AtmCatalogRow[]; catalogs?: undefined }
+		| { catalogs: AtmCatalogsByVersion; catalog?: undefined }
+	),
+): AtmReplayResult => replayEventsImpl(input);
 
 /**
  * A what-if: the log's commands run again under a candidate catalog (or menu) and policy, set against the log. Returns
@@ -1302,13 +1311,22 @@ export type HledgerError = InstanceType<HledgerErrorConstructor>;
  * not yet past their expiry, `held` the units the open locks hold. Sorted by holder then feature. Pure. `catalog` is the
  * one `menuCatalogRows` makes. `replayEvents` returns the same list as `balances`.
  */
-export const balancesOf = (input: {
-	states: Record<string, AtmSubjectState>;
-	holds: Record<string, AtmHold>;
-	catalog: readonly AtmCatalogRow[];
-	asOfMs: number;
-}): AtmBalance[] =>
-	balancesOfImpl({ ...input, catalog: toCatalog(input.catalog) });
+export const balancesOf = (
+	input: {
+		states: Record<string, AtmSubjectState>;
+		holds: Record<string, AtmHold>;
+		asOfMs: number;
+	} & (
+		| { catalog: readonly AtmCatalogRow[]; catalogs?: undefined }
+		| { catalogs: AtmCatalogsByVersion; catalog?: undefined }
+	),
+): AtmBalance[] =>
+	balancesOfImpl({
+		states: input.states,
+		holds: input.holds,
+		asOfMs: input.asOfMs,
+		catalog: catalogSetOf(input).features,
+	});
 
 /** JSON with every object's keys sorted and `undefined` fields dropped, so the same value is always the same bytes: what an event's line and its hash are made from. */
 export const canonicalize = (value: unknown): string => canonicalizeImpl(value);

@@ -269,6 +269,14 @@ export type MrrMovement = "new" | "expansion" | "contraction" | "churned";
 
 export type TfdCatalogRow = { table: string; row: Record<string, unknown> };
 
+/**
+ * Catalog rows by menu version (`"1"`, `"2"`, the `labels.menu_version` of the credit events). A log whose members bought
+ * on different versions replays with these: a command runs under the catalog of its own event's version.
+ */
+export type TfdCatalogsByVersion = Readonly<
+	Record<string, readonly TfdCatalogRow[]>
+>;
+
 /** The engine's `SubjectState`: one subject's rows, revisioned by its mutation log. */
 export type TfdSubjectState = {
 	schemaVersion: 1;
@@ -375,8 +383,13 @@ export type TfdSimulatePostingChange = {
 
 export type TfdSimulateInput = {
 	events: readonly TfdEvent[];
-	/** The catalog rows the log was written under. Give these or `menu`. */
+	/** The catalog rows the log was written under. Give these, `catalogs` or `menu`. */
 	catalog?: readonly TfdCatalogRow[];
+	/**
+	 * The catalog rows per menu version, instead of `catalog`, for a log whose members bought on different versions: a
+	 * command runs under the catalog of its event's `labels.menu_version`.
+	 */
+	catalogs?: TfdCatalogsByVersion;
 	/** The menu the log was written under, instead of `catalog` (its rows come from `menuCatalogRows`). */
 	menu?: Menu;
 	/** The school id the menus' rows are made for; default the first event's. */
@@ -387,6 +400,8 @@ export type TfdSimulateInput = {
 	 */
 	candidate: {
 		catalog?: readonly TfdCatalogRow[];
+		/** Per menu version, as the input's `catalogs`; the candidate's commands choose their catalog by `labels.menu_version` too. */
+		catalogs?: TfdCatalogsByVersion;
 		menu?: Menu;
 		policy?: BillingPolicy;
 	};
@@ -1192,10 +1207,17 @@ export type InvoiceRecord = {
 	/**
 	 * The cents the books took for this invoice (its `payment.succeeded`). Absent when none was booked: an invoice handled
 	 * before payments were booked, one that paid nothing or paid in another currency (its `money.skipped` marker is not a
-	 * payment), or one a caller adopted. A refund of such an invoice makes no `payment.refunded`: there is no payment for
-	 * it to take back from.
+	 * payment), or one a caller adopted without telling the amount (`CallerRowsInput.payments`). A refund of such an invoice
+	 * makes no `payment.refunded`: there is no payment for it to take back from. An invoice paid before an import has it when
+	 * the caller gave the amount it paid in USD: its refund then books as for a payment the handler booked itself.
 	 */
 	paid?: number;
+	/**
+	 * The payment intent and charge ids that paid an invoice imported with `CallerRowsInput.payments`. The handler's payment
+	 * index (`atm_payment_index`) holds them too, but a replay of the stored inputs reads only the holders' seeds, so a refund
+	 * of the invoice finds its holder through these. Absent on every invoice the handler decided itself.
+	 */
+	paymentRefs?: string[];
 	/**
 	 * The revenue share accrued on this payment (`share.accrued`) and the part of it a refund has taken back
 	 * (`share.reversed`), in cents. Absent when no share was accrued (the school had no rate when the payment was booked,
@@ -2928,11 +2950,30 @@ export type CallerCreditLotRow = {
 	created_at: number;
 };
 
+/** What the caller's own billing collected for an invoice it handled before the import. */
+export type CallerInvoicePayment = {
+	/** The Stripe invoice id (`in_...`), one the membership's lots name. */
+	invoiceId: string;
+	/** Minor units collected (`amount_paid`): a whole number, 0 or more. */
+	amount: number;
+	/** The currency, as Stripe writes it. Default `usd`. Only a USD payment is recorded as paid, as the handler books only those. */
+	currency?: string;
+	/** The payment intent (`pi_...`) and charge (`ch_...`) ids that paid it, as `seedHandlerIndexes` takes them. */
+	paymentRefs?: readonly string[];
+};
+
 export type CallerRowsInput = {
 	/** The member's `school_memberships` row. */
 	membership: CallerMembershipRow;
 	/** Every `school_credit_lots` row of that membership, in any order. */
 	lots: readonly CallerCreditLotRow[];
+	/**
+	 * What each invoice the lots name collected, so that a later refund of one books a `payment.refunded` as for an invoice
+	 * the handler booked itself (the family service booked the payment, before the import). An invoice left out keeps the
+	 * old behaviour: its refund takes the credits back and books no money. The state then holds the amount (`InvoiceRecord.paid`)
+	 * and the payment refs, so a log and a replay of it see the same invoice. Throws on an invoice no lot names.
+	 */
+	payments?: readonly CallerInvoicePayment[];
 	/**
 	 * The menu of the membership's own `menu_version`, which the membership's invoices were granted against. The version is
 	 * kept in the grants state (`GrantsState.menuVersion`), so the handler asks for the same menu at the next renewal.
@@ -3884,8 +3925,15 @@ export type BundleStep =
 			lots: CallerCreditLotRow[];
 			/** Stripe event ids the caller already handled. */
 			eventIds?: string[];
-			/** Invoices paid before the import, so a later refund or dispute of one finds its holder. */
-			invoices?: { invoiceId: string; paymentRefs: string[] }[];
+			/**
+			 * Invoices paid before the import, so a later refund or dispute of one finds its holder. `paid` is what the family
+			 * service collected for it (`CallerRowsInput.payments`): left out, a refund of the invoice books no money.
+			 */
+			invoices?: {
+				invoiceId: string;
+				paymentRefs: string[];
+				paid?: { amount: number; currency?: string };
+			}[];
 	  }
 	| {
 			/** An admin adjusts a family's balance of one feature (`adjustCredits`). */
@@ -4088,6 +4136,8 @@ export type CatalogPublishedInput = {
 export type AtmBalance = TfdBalance;
 /** @deprecated Use {@link TfdCatalogRow}. */
 export type AtmCatalogRow = TfdCatalogRow;
+/** @deprecated Use {@link TfdCatalogsByVersion}. */
+export type AtmCatalogsByVersion = TfdCatalogsByVersion;
 /** @deprecated Use {@link TfdCheckResult}. */
 export type AtmCheckResult = TfdCheckResult;
 /** @deprecated Use {@link TfdCommand}. */

@@ -7,10 +7,10 @@ For [`plan.md`](plan.md). Each question has a recommended default and the reason
 ### 1. Rollover cap
 
 bs stores `rollover.max` on a menu grant but never applies it; tfd applies it at each renewal, and leftover above the cap is lost.
-- **Default: enforce, with one grandfathered cycle.** Imported rows are uncapped, so the first renewal after cutover takes nothing; the cap applies from the second. Schools set the max themselves, believing it worked. Tell admins before their cutover so they can raise or remove it.
+- **Default (replaced by the owner's ruling below): enforce, with one grandfathered cycle.** Imported rows are uncapped, so the first renewal after cutover takes nothing; the cap applies from the second. Schools set the max themselves, believing it worked. Tell admins before their cutover so they can raise or remove it.
 - Alternative: never enforce for bs schools (a T8 policy flag). Members keep everything, and the setting stays meaningless.
 
-**Answer:** Enforce, with one grandfathered cycle (default). Tell each school's admins before their cutover so they can raise or remove the cap.
+**Answer:** Enforce from the first renewal after cutover; no grandfathered cycle (owner, 2026-11-08). Tell each school's admins before their cutover so they can raise or remove the cap. This replaced the default above (enforce with one grandfathered cycle), which the engine cannot do: its `reset` cuts all of a row's rollovers together to the cap, imported ones included (plan §13, item 8; bundle `credits-import-rollover-trim`).
 
 ### 2. Mid-cycle upgrade
 
@@ -84,9 +84,9 @@ tfd reads only `2025-10-29.clover`; bs endpoints are at `2025-02-24.acacia`.
 
 ### 11. Announcement timing
 
-- **Default:** each school's admins hear at least 14 days before its cutover (date, rollover cap, a Stripe warning email they may see, faster upgrade grants). A release note when the first school moves. Members of schools with a rollover cap hear before their first non-grandfathered renewal.
+- **Default:** each school's admins hear at least 14 days before its cutover (date, rollover cap, a Stripe warning email they may see, faster upgrade grants). A release note when the first school moves. Members of schools with a rollover cap hear before their first renewal after cutover.
 
-**Answer:** Each school's admins at least 14 days before its cutover; a release note when the first school moves; members of capped schools before their first non-grandfathered renewal (default).
+**Answer:** Each school's admins at least 14 days before its cutover; a release note when the first school moves; members of capped schools before their first renewal after cutover (default).
 
 ### 12. Stage 3 length
 

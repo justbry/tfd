@@ -266,3 +266,51 @@ describe("credits-import-refund", () => {
 		).toBe(false);
 	});
 });
+
+describe("credits-import-rollover-trim (decision 1, owner ruling 2026-11-08)", () => {
+	test("the first renewal after the import trims the imported rollover to the cap: 3 held where the family service's lots hold 5", async () => {
+		const events = await eventsOf("credits-import-rollover-trim");
+		expect(creditLines(events)).toEqual([
+			// the import: January's 2 (a rollover) and February's 1 left on the row
+			["2026-02-20T12:00:00Z", "credit.granted", 3],
+			// 15 March: the 3 unused are cut to the cap of 1 (2 lost), 1 rolls over, 2 are granted
+			["2026-03-15T18:00:00.001Z", "credit.expired", -2],
+			["2026-03-15T18:00:00.001Z", "credit.granted", 2],
+		]);
+		const bundle = await loadScenarioBundle(
+			resolveBundleDirectory("credits-import-rollover-trim"),
+		);
+		const imported = bundle.steps.find((step) => step.kind === "import");
+		if (imported?.kind !== "import") throw new Error("no import step");
+		const march = callerGrant({
+			membership: imported.membership,
+			menu: bundle.scenario.menu,
+			invoice: {
+				id: "in_new",
+				reason: "subscription_cycle",
+				periodStart: Date.parse("2026-03-15T18:00:00Z"),
+				periodEnd: Date.parse("2026-04-15T18:00:00Z"),
+				atMs: Date.parse("2026-03-15T18:00:00Z"),
+			},
+			existing: imported.lots,
+		});
+		const at = "2026-03-15T19:00:00Z";
+		expect(availAt(events, at)).toBe(3);
+		expect(callerAvail([...imported.lots, ...march], Date.parse(at))).toBe(5);
+	});
+});
+
+describe("credits-import-refund-paid (D8 fixed: the import recorded the paid amount)", () => {
+	test("a refund of a pre-import invoice takes the credits back and books payment.refunded once", async () => {
+		const events = await eventsOf("credits-import-refund-paid");
+		expect(creditLines(events)).toEqual([
+			["2026-02-01T12:00:00Z", "credit.granted", 2],
+			["2026-02-05T12:00:00Z", "credit.adjusted", -2],
+		]);
+		const refunds = events.filter(
+			(event) => event.event_type === "payment.refunded",
+		);
+		expect(refunds.map((event) => event.payload.amount)).toEqual([26_000]);
+		expect(refunds.map((event) => event.payload.invoice)).toEqual(["in_old1"]);
+	});
+});

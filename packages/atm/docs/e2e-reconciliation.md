@@ -191,13 +191,13 @@ Options for the owner, with what each costs:
 - **Related:** `tests/scenario-order.test.ts` shuffles every bundle whose deliveries are all applied and checks that H4 to H8 do not change; eight bundles (renewal, upgrade, quantity-raise, quantity-decrease, the three dispute cases and duplicate-delivery) do change with the order and are pinned there as `ORDER_SENSITIVE`: a later invoice delivered before its first, or a dispute closing before its opening, makes the credit events cite another delivery as their cause.
 - **Fix:** hold a cycle invoice for a subscription whose create invoice has not been applied (answer 409 until it is), and cite the invoice's own event as the cause of its credits.
 
-### D8: a refund of an invoice paid before the import books no money
+### D8: a refund of an invoice paid before the import books no money (fixed for imports that pass `payments`; open without)
 
-- **Case:** `credits-import-refund` (a bundle outside the matrix: `fixtures/scenarios/credits-import-refund/`).
+- **Case:** `credits-import-refund` (a bundle outside the matrix: `fixtures/scenarios/credits-import-refund/`), the import that did not record the payment. `credits-import-refund-paid` is the same story with `payments` passed: no discrepancy.
 - **Where:** `src/billing/handle.ts` (`BillingRefund`: `ours` is true only when the grants state holds the invoice's `paid` amount, which `handleStripeEvent` sets when it books the invoice's `payment.succeeded`); `grantsStateFromCallerRows` records an imported invoice's credits but not its payment, because the family service booked the payment itself.
 - **Why:** "a refund takes back only a payment the books hold". The handler holds none for an invoice it never saw.
 - **Impact:** after an import, a refund of an old invoice is found (the index `seedHandlerIndexes` writes names its holder) and takes the credits back, but no `payment.refunded` is booked: refunds, `assets:stripe` and net income are 260.00 off in the case, and `tfd reconcile` prints `missing_in_log refund` and `amount_differs net`. If the family service stops booking money for a school the handler serves (`UPGRADING.md`, "Moving buzz-school's grants onto the handler (D12)", item 2), nobody books it.
-- **Fix:** record the paid amount of a seeded invoice (`seedHandlerIndexes`' `invoices` entry, or the import) so the refund is booked like any other, or keep the family service booking refunds of pre-import invoices.
+- **Fix (tfd 0.11.1, plan §13 item 9):** `grantsStateFromCallerRows` takes `payments` (each pre-import invoice's paid amount, currency and payment refs) and records them on the invoice's record (`paid`, `paymentRefs`), so `ours` is true and the refund is booked like any other, once, with the same checks as for a payment the handler booked (no clamp of an amount above the paid one, as there). An import without `payments` is unchanged, so D8 stays for it: the old logs and the bundle `credits-import-refund` replay as before. The other way out is to keep the family service booking refunds of those invoices.
 
 ### What is not a discrepancy but should be known
 

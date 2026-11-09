@@ -130,7 +130,7 @@ export const CASES: Case[] = [
 			"decision 1: sparkle-2 grants 2 visits a month and the menu lets 1 be carried for 1 month; the cap applies at every renewal",
 			"15 February: the 2 unused are cut to the cap, 1 is lost (credit.expired -1) and 1 rolls over; 2 are granted: 3. 15 March 18:00 the cron expires the rolled visit (2 left); the renewal five minutes later loses 1 more of the 2 unused, rolls 1 and grants 2: 3",
 			"credits granted 6, expired 3 (the cap twice, the lapsed rollover once), 3 left; money: 3 x 260.00 = 780.00, fees 3 x 7.84 = 23.52 (26,000 x 2.9% = 754 + 30), net and Stripe's balance 756.48",
-			"not here: the grandfathered cycle. The reset trims an imported rollover to the cap along with the new one (plan §13, item 8), so no bundle pins 'the first renewal after the import takes nothing'",
+			"not here: the trim of an imported rollover at the first renewal after the import (plan §13, item 8, settled by the owner's ruling of 2026-11-08: no grandfathered cycle); credits-import-rollover-trim pins it",
 		],
 	},
 	{

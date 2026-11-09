@@ -37,6 +37,7 @@ import type {
 	AtmEvent,
 	CallerCreditLotRow,
 	CallerMembershipRow,
+	CallerRowsInput,
 	GrantsState,
 	Menu,
 	StripeEventResult,
@@ -1625,5 +1626,147 @@ describe("D12 T3: the import's opening events replay to the imported rows, and t
 		});
 		expect(result.events).toEqual([]);
 		expect(result.revision).toBe(0);
+	});
+});
+
+describe("what an imported invoice collected, so its refund books the money (plan §13, item 9)", () => {
+	const membership = membershipRow();
+	const january = only(
+		callerGrant({ membership, menu: utcMenu, invoice: IN_1, existing: [] }),
+	);
+	const importedAt = D("2026-01-20T00:00:00Z");
+	const PAID = 26000;
+	const importWith = (payments?: CallerRowsInput["payments"]) =>
+		grantsStateFromCallerRows({
+			membership,
+			lots: [january],
+			menu: utcMenu,
+			now: importedAt,
+			...(payments ? { payments } : {}),
+		});
+	const refundOf = (store: ReturnType<typeof atmStore>, amount: number) =>
+		store.handle(
+			chargeRefunded({
+				eventId: "evt_refund_in_1",
+				chargeId: "ch_in_1",
+				invoiceId: "in_1",
+				amount,
+				chargeAmount: PAID,
+				at: importedAt + HOUR_MS,
+			}),
+			importedAt + HOUR_MS,
+		);
+	const refunded = (result: StripeEventResult) =>
+		result.events.filter((event) => event.event_type === "payment.refunded");
+	const known = { [paymentIntentOf("in_1")]: "in_1" };
+
+	test("the invoice's record holds the amount and the payment refs", () => {
+		const { state } = importWith([
+			{
+				invoiceId: "in_1",
+				amount: PAID,
+				paymentRefs: [paymentIntentOf("in_1"), "ch_in_1", "ch_in_1"],
+			},
+		]);
+		expect(state.invoices.in_1?.paid).toBe(PAID);
+		expect(state.invoices.in_1?.paymentRefs).toEqual([
+			paymentIntentOf("in_1"),
+			"ch_in_1",
+		]);
+	});
+
+	test("a refund of it books payment.refunded for what the event refunded, as for a payment the handler booked", () => {
+		const imported = importWith([
+			{ invoiceId: "in_1", amount: PAID, paymentRefs: ["ch_in_1"] },
+		]);
+		const result = refundOf(atmStore(utcMenu, imported.rows, known), 10000);
+		const [line] = refunded(result);
+		expect(refunded(result)).toHaveLength(1);
+		expect(line?.payload).toMatchObject({
+			amount: 10000,
+			amount_refunded: 10000,
+			invoice: "in_1",
+			charge: "ch_in_1",
+		});
+		expect(line?.idem).toBe("stripe:evt_refund_in_1");
+	});
+
+	test("a second refund books only what it adds, and the same event again makes the same line", () => {
+		const imported = importWith([{ invoiceId: "in_1", amount: PAID }]);
+		const store = atmStore(utcMenu, imported.rows, known);
+		const first = refundOf(store, 10000);
+		const again = refundOf(store, 10000);
+		expect(refunded(again).map((e) => e.idem)).toEqual(
+			refunded(first).map((e) => e.idem),
+		);
+		expect(refunded(again).map((e) => e.payload.amount)).toEqual([10000]);
+	});
+
+	test("a refund above the paid amount is booked as the handler books it for a payment of its own (no clamp)", () => {
+		const imported = importWith([{ invoiceId: "in_1", amount: PAID }]);
+		const result = refundOf(
+			atmStore(utcMenu, imported.rows, known),
+			PAID + 500,
+		);
+		expect(refunded(result).map((e) => e.payload.amount)).toEqual([PAID + 500]);
+	});
+
+	test("an import with no amount keeps the old behavior: the credits go, no payment.refunded", () => {
+		const imported = importWith();
+		const result = refundOf(atmStore(utcMenu, imported.rows, known), PAID);
+		expect(result.refused).toBeUndefined();
+		expect(result.events.length).toBeGreaterThan(0);
+		expect(refunded(result)).toEqual([]);
+		expect(imported.state.invoices.in_1?.paid).toBeUndefined();
+	});
+
+	test("a payment of 0 or in another currency is not recorded as paid, as the handler books neither; its refs are kept", () => {
+		const eur = importWith([
+			{
+				invoiceId: "in_1",
+				amount: PAID,
+				currency: "EUR",
+				paymentRefs: ["ch_in_1"],
+			},
+		]).state.invoices.in_1;
+		expect(eur?.paid).toBeUndefined();
+		expect(eur?.paymentRefs).toEqual(["ch_in_1"]);
+		expect(
+			importWith([{ invoiceId: "in_1", amount: 0 }]).state.invoices.in_1?.paid,
+		).toBeUndefined();
+		expect(
+			importWith([{ invoiceId: "in_1", amount: PAID, currency: "USD" }]).state
+				.invoices.in_1?.paid,
+		).toBe(PAID);
+	});
+
+	test("an invoice no lot names, a repeated one, a bad amount and an empty ref are refused", () => {
+		expect(() => importWith([{ invoiceId: "in_9", amount: PAID }])).toThrow(
+			/in_9.*no lot of the membership names/,
+		);
+		expect(() =>
+			importWith([
+				{ invoiceId: "in_1", amount: PAID },
+				{ invoiceId: "in_1", amount: PAID },
+			]),
+		).toThrow(/in_1.*given twice/);
+		expect(() => importWith([{ invoiceId: "in_1", amount: -1 }])).toThrow(
+			/not a whole number from 0/,
+		);
+		expect(() => importWith([{ invoiceId: "in_1", amount: 1.5 }])).toThrow(
+			/not a whole number from 0/,
+		);
+		expect(() =>
+			importWith([{ invoiceId: "in_1", amount: PAID, paymentRefs: [""] }]),
+		).toThrow(/empty payment ref/);
+		expect(() =>
+			grantsStateFromCallerRows({
+				membership,
+				lots: [],
+				menu: utcMenu,
+				now: importedAt,
+				payments: [{ invoiceId: "in_1", amount: PAID }],
+			}),
+		).toThrow(/has no lots/);
 	});
 });
