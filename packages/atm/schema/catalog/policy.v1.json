@@ -29,8 +29,8 @@
 		"noShow": { "enum": ["spend", "release"] },
 		"lateCancel": { "enum": ["spend", "release"] },
 		"rulesVersion": {
-			"description": "The grants' date rules. 1 (the default, and every policy stored without it): rollovers and one-time add-ons lapse on the UTC calendar. 2: on the menu's calendar (its timeZone).",
-			"enum": [1, 2]
+			"description": "The grants' date rules. 1 (the default, and every policy stored without it): rollovers and one-time add-ons lapse on the UTC calendar. 2: on the menu's calendar (its timeZone). 3: 2, and a member's cycle that ended unpaid can be lapsed (lapseUnpaidCycle).",
+			"enum": [1, 2, 3]
 		},
 		"revenueShare": {
 			"description": "B4 Uni's revenue share, negotiated per school: null (the default) for none, or a percentage of each payment collected, before Stripe's fee. 0 is no share.",

@@ -16,7 +16,11 @@ import type {
 	SubjectStateMutation,
 } from "@autumn/balance-engine";
 import { ULID_PATTERN } from "../ledger/ids.js";
-import { mutationToEvents, planChangedEvent } from "../ledger/postings.js";
+import {
+	lapseEvent,
+	mutationToEvents,
+	planChangedEvent,
+} from "../ledger/postings.js";
 import { runOnState, toCatalog } from "../ledger/run.js";
 import type {
 	AtmEnv,
@@ -120,6 +124,8 @@ type Decision =
 			reason: string;
 			/** The money lines of the event (`payment.succeeded`, `payment.refunded`), made with the decision. */
 			money: AtmEvent[];
+			/** The `credit.expired` of an unpaid cycle's rows that lapsed before this renewal was paid; the cron books the same ones by idem. */
+			lapses?: AtmEvent[];
 	  }
 	| { ok: false; refusal: StripeEventResult };
 
@@ -328,11 +334,31 @@ const decide = (
 				if (share.accrued > 0)
 					record.share = { accrued: share.accrued, reversed: 0 };
 			}
+			// A renewal paid after its unpaid cycle lapsed empties the lapsed rows (`invoiceToCommands`): their expiry is booked here
+			// with the cron's idem, so it is booked once whichever comes first.
+			const lapses = (result.lapsed ?? []).map((row) =>
+				lapseEvent({
+					row: {
+						table: "customerEntitlements",
+						id: row.rowId,
+						balance: row.balance,
+						expires_at: row.expiresAt,
+					},
+					holder: holder.customerId,
+					key: holder.customerId,
+					feature: row.feature,
+					school: holder.orgId,
+					tz: input.menu.timeZone,
+					revision: input.revision,
+					labels: result.labels,
+				}),
+			);
 			return {
 				ok: true,
 				result: { ...result, state: mrr.state },
 				reason: "invoice",
 				money,
+				...(lapses.length > 0 ? { lapses } : {}),
 			};
 		}
 		case "BillingRefund": {
@@ -533,7 +559,10 @@ const planOf = ({
 };
 
 /** What `eventsOf` and `planChangedOf` read of the caller's input: the menu, its version and the cause. */
-type EventInput = Pick<FactInput, "menu" | "menuVersion" | "eventId">;
+type EventInput = Pick<FactInput, "menu" | "menuVersion"> & {
+	/** The stored input event the events name as their cause; left out for a command a job issued. */
+	eventId?: string;
+};
 
 /**
  * The credit events one mutation makes. The engine's event rules take one feature at a time, so a mutation that
@@ -1055,5 +1084,8 @@ const decideAndRun = (
 			? credits
 			: [planChangedOf({ mutation, input, labels: result.labels })];
 	});
-	return { rowChanges, events: [...events, ...decision.money] };
+	return {
+		rowChanges,
+		events: [...events, ...(decision.lapses ?? []), ...decision.money],
+	};
 };

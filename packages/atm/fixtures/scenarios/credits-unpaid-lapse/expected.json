@@ -1,0 +1,41 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-2": 78000,
+				"fees": 2352,
+				"stripe": 75648,
+				"net": 75648,
+				"avail:family:fam_8k2:visit": 2
+			},
+			"reconcile": {
+				"2026-01": [],
+				"2026-02": [],
+				"2026-04": []
+			}
+		}
+	],
+	"notes": [
+		"decision 4, policy rulesVersion 3: a bs lot of an unpaid cycle lapses at the cycle's end plus the grant's rollover months. tfd dates the row with lapseUnpaidCycle (credit.expiration_changed, refills not ended) and the cron's recordLapse books it",
+		"15 February: 2 rolled over, 2 granted. No March payment. 16 March: the rolled 2 lapsed at 15 March 11:00 MDT (17:00 UTC) and are booked; the job then dates the tier row's 2 at 15 March 18:00 UTC + 1 month in Denver = 15 April 18:00 UTC; the second run finds the cycle dated and does nothing",
+		"16 April: the cron books the 2 with the instant 15 April 18:00 UTC; the second run books nothing (the same idem)",
+		"20 April: the March invoice is paid. The row's dating has passed, so the renewal empties the row (the lapse was booked: no second expiry, no credit.adjusted), clears the dating and grants 2 at the March cycle start (the instant a late renewal's reset has always had, 15 March 18:00:00.001 UTC). Credits granted 6, expired 4, 2 left",
+		"money: 3 x 260.00, fees 3 x 7.84; the March payment is booked in April"
+	]
+}

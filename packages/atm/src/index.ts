@@ -13,6 +13,7 @@ import * as raise from "./billing/raise.js";
 import * as rows from "./billing/rows.js";
 import * as status from "./billing/status.js";
 import * as stripeMenu from "./billing/stripe-menu.js";
+import * as unpaid from "./billing/unpaid.js";
 import { engineCommandTypes, runEngineCommand as run } from "./engine.js";
 import * as storedInputs from "./handler/inputs.js";
 import {
@@ -180,6 +181,8 @@ import type {
 	InvoiceGrantInput,
 	InvoiceLine,
 	JournalRun,
+	LapseUnpaidCycleInput,
+	LapseUnpaidCycleResult,
 	LedgerVerdict,
 	LineItem,
 	Mapping,
@@ -254,6 +257,8 @@ import type {
 	SubscriptionItem,
 	SubscriptionStatus,
 	TfdReceiptV2,
+	UnpaidCycleInput,
+	UnpaidCycleResult,
 	VerifySignatureInput,
 	WebhookDeps,
 	WebhookEndpointInfo,
@@ -579,6 +584,25 @@ export const subscriptionEndedToCommands = (
 export const subscriptionToCommands = (
 	input: SubscriptionEndInput,
 ): GrantResult => grants.subscriptionToCommands(input);
+
+/**
+ * A member's cycle that ended unpaid (D12 decision 4): dates the expiry of the credit rows that cycle's invoice refilled,
+ * at the cycle's end plus the grant's rollover months (no rollover: the cycle's end), so `recordLapse` books them when
+ * the date passes. Needs `policy.rulesVersion` 3. A renewal paid before the date takes the dating back; one paid after
+ * it finds the credits lapsed and grants the cycle's allowance. Pure; `lapseUnpaidCycle` is the one a job calls.
+ */
+export const unpaidCycleToCommands = (
+	input: UnpaidCycleInput,
+): UnpaidCycleResult => grants.unpaidCycleToCommands(input);
+
+/**
+ * `unpaidCycleToCommands` for the family service's lapse job, as one write for the member (the engine's rows and the grants
+ * row under one revision) and a `credit.expiration_changed` per dated row, like `adjustCredits`. Call it, write
+ * `rowChanges` and append `events` in one transaction, then `recordLapse`. The same cycle again is `replayed`.
+ */
+export const lapseUnpaidCycle = (
+	input: LapseUnpaidCycleInput,
+): LapseUnpaidCycleResult => unpaid.lapseUnpaidCycle(input);
 
 export const MAX_TIERS: number = menu.MAX_TIERS;
 export const MAX_ADDONS: number = menu.MAX_ADDONS;

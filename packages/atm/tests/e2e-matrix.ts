@@ -116,6 +116,14 @@ export type Step =
 			adjustKind: AdjustKind;
 			feature: string;
 			credits: number;
+	  }
+	| {
+			/** The lapse job dates the refilling rows of a family whose cycle ended unpaid at `cycleEnd`. */
+			kind: "unpaid";
+			at: number;
+			school?: string;
+			family: string;
+			cycleEnd: number;
 	  };
 
 /** The steps that deliver a Stripe event (the others are the family service's own). */
@@ -649,6 +657,14 @@ export const bundleOfCase = (c: Case): ScenarioBundle => {
 					feature: step.feature,
 					credits: step.credits,
 				};
+			if (step.kind === "unpaid")
+				return {
+					kind: "unpaid",
+					atMs: step.at,
+					...where,
+					family: step.family,
+					cycleEnd: step.cycleEnd,
+				};
 			return {
 				atMs: step.at,
 				...where,
@@ -759,6 +775,14 @@ export const loadCases = async (): Promise<Case[]> => {
 						adjustKind: step.adjustKind,
 						feature: step.feature,
 						credits: step.credits,
+					};
+				if (step.kind === "unpaid")
+					return {
+						kind: "unpaid",
+						at: step.atMs,
+						...where,
+						family: step.family,
+						cycleEnd: step.cycleEnd,
 					};
 				return {
 					at: step.atMs,

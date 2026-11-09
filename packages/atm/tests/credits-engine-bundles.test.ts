@@ -105,6 +105,53 @@ describe("credits-lapse (decision 4)", () => {
 	});
 });
 
+describe("credits-unpaid-lapse (decision 4, rules version 3)", () => {
+	test("an unpaid cycle's row is dated, lapses once at the cycle end plus a month, and a renewal paid after it grants only the allowance", async () => {
+		const events = await eventsOf("credits-unpaid-lapse");
+		expect(creditLines(events)).toEqual([
+			["2026-01-15T18:00:00Z", "credit.granted", 2],
+			// the 2 carried on 15 February lapse at 15 March 11:00 MDT
+			["2026-02-15T18:00:00.001Z", "credit.granted", 2],
+			["2026-03-15T17:00:00Z", "credit.expired", -2],
+			// the March invoice, paid on 20 April: its grant carries the instant a late renewal's reset has (the cycle's start)
+			["2026-03-15T18:00:00.001Z", "credit.granted", 2],
+			// the tier row's 2, dated on 16 March, lapse on 15 April 12:00 MDT: booked once (the cron ran twice)
+			["2026-04-15T18:00:00Z", "credit.expired", -2],
+		]);
+		const dating = events.filter(
+			(event) => event.event_type === "credit.expiration_changed",
+		);
+		expect(dating.map((event) => event.event_time)).toEqual([
+			"2026-03-16T12:01:00Z",
+		]);
+		expect(dating[0]?.payload).toMatchObject({
+			row_id: "ce_tier_visit_month",
+			previous_expires_at: null,
+			expires_at: Date.parse("2026-04-15T18:00:00Z"),
+			refills_ended: false,
+		});
+		// the late payment emptied the lapsed row without booking it again or as an adjustment
+		expect(
+			events.filter((event) => event.event_type === "credit.adjusted"),
+		).toEqual([]);
+		expect(availAt(events, "2026-04-21T12:00:00Z")).toBe(2);
+	});
+
+	test("a renewal paid before the lapse date takes the dating back: the 2 left roll over and lapse as in any renewal", async () => {
+		const events = await eventsOf("credits-unpaid-late-payment");
+		expect(creditLines(events)).toEqual([
+			["2026-01-15T18:00:00Z", "credit.granted", 2],
+			["2026-02-15T18:00:00.001Z", "credit.granted", 2],
+			["2026-03-15T17:00:00Z", "credit.expired", -2],
+			// paid on 20 March: the 2 left roll over, 2 are granted
+			["2026-03-15T18:00:00.001Z", "credit.granted", 2],
+			["2026-04-15T18:00:00Z", "credit.expired", -2],
+		]);
+		expect(availAt(events, "2026-03-20T12:00:00Z")).toBe(4);
+		expect(availAt(events, "2026-04-16T12:00:00Z")).toBe(2);
+	});
+});
+
 describe("credits-gift-expiry (decision 5, giftSessionMonths null)", () => {
 	test("a one-time add-on lapses after its 3 rollover months, a session gift with no rollover never does", async () => {
 		expect(creditLines(await eventsOf("credits-gift-expiry"))).toEqual([

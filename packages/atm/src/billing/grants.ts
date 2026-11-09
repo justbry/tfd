@@ -45,6 +45,7 @@ import type {
 	InvoiceGrantInput,
 	InvoiceLine,
 	InvoiceRecord,
+	LapsedUnpaidRow,
 	MembershipRecord,
 	Menu,
 	MenuGrant,
@@ -52,6 +53,8 @@ import type {
 	Rollover,
 	SubscriptionEndInput,
 	SubscriptionFact,
+	UnpaidCycleInput,
+	UnpaidCycleResult,
 	GrantVersions as Versions,
 } from "./types.js";
 
@@ -443,12 +446,12 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 /**
  * The zone a grant's expiry months are counted in under `policy.rulesVersion`: null (the UTC calendar) for rules
- * version 1 and a policy stored without one, the menu's zone for 2.
+ * version 1 and a policy stored without one, the menu's zone for 2 and 3.
  */
 export const expiryZoneOf = (
 	policy: Pick<BillingPolicy, "rulesVersion"> | undefined,
 	menu: Pick<Menu, "timeZone">,
-): string | null => (policy?.rulesVersion === 2 ? menu.timeZone : null);
+): string | null => ((policy?.rulesVersion ?? 1) >= 2 ? menu.timeZone : null);
 
 /** `ms` plus whole months on the UTC calendar (`zone` null) or on `zone`'s (`addZonedMonths`). */
 export const addExpiryMonths = (
@@ -903,6 +906,8 @@ export const invoiceToCommands = (input: InvoiceGrantInput): GrantResult => {
 	let created = false;
 	/** Rows this cycle invoice refills, and the Stripe end of the cycle they now run to. */
 	let cycleRows: { rowIds: string[]; end: number } | null = null;
+	/** Rows of an unpaid cycle that had lapsed before this renewal was paid. */
+	let lapsedByRenewal: LapsedUnpaidRow[] = [];
 
 	/** Remember what this invoice put into a row; `boundary` is the end of the cycle that refilled it. */
 	const grantRow = (s: RowSpec, units: number, boundary: number) => {
@@ -1032,6 +1037,15 @@ export const invoiceToCommands = (input: InvoiceGrantInput): GrantResult => {
 		// The renewal's tier line says how many units this cycle pays for (a decrease since takes effect here). Its proration
 		// lines, if any (a decrease made with create_prorations rides on the renewal), grant nothing.
 		const quantity = tierLine.quantity;
+		// A renewal paid after its cycle ended unpaid takes back the dating of that cycle's rows, so it grants as any renewal.
+		if (input.subject !== undefined)
+			lapsedByRenewal = undoUnpaidCycle({
+				state,
+				menu,
+				held: heldOf(input.subject),
+				now,
+				ops,
+			});
 		if (quantity !== state.quantity) ops.push(tierQuantityOp(quantity));
 		state.quantity = quantity;
 		if (tierId !== state.tierId || interval !== state.interval) {
@@ -1322,7 +1336,12 @@ export const invoiceToCommands = (input: InvoiceGrantInput): GrantResult => {
 	}
 	if (b.commands.length > 0 && state.identity === null) state.identity = who;
 	state.invoices[invoice.id] = record;
-	return { commands: b.commands, labels, state };
+	return {
+		commands: b.commands,
+		labels,
+		state,
+		...(lapsedByRenewal.length > 0 ? { lapsed: lapsedByRenewal } : {}),
+	};
 };
 
 /**
@@ -1588,6 +1607,137 @@ export const subscriptionEndedToCommands = (
 	const b = new Builder(fact.source, prior.identity, env);
 	b.plan(now, ops);
 	return { commands: b.commands, labels, state };
+};
+
+/** The rows a paid cycle refilled and the next cycle refills in its turn: the tier's and the recurring add-ons' on the plan's own interval. */
+const refillingSpecs = (state: GrantsState, menu: Menu): RowSpec[] =>
+	state.tierId === null || state.interval === null
+		? []
+		: [
+				...tierSpecs(menu, state.tierId, state.interval),
+				...state.addonIds.flatMap((id) => addonSpecs(menu, id)),
+			].filter((s) => s.interval === s.plan && s.rowId in state.rows);
+
+/**
+ * A refilling row that has an `expires_at` is one `unpaidCycleToCommands` dated: nothing else gives a row that still
+ * resets an expiry (a cancel dates its rows and ends their refills in the same write; the importer stops the refills of a
+ * row it dates). So the dating is the engine's own row, and a log that carries the command replays it with no help from the
+ * grants state.
+ */
+const isDated = (row: Held): boolean =>
+	row.expiresAt !== null && row.nextResetAt !== null;
+
+/**
+ * A member's cycle ended unpaid: dates the expiry of the credit rows that cycle's invoice refilled, so they lapse where
+ * a lot of that cycle lapses (the end of the cycle plus the grant's rollover months, in the menu's expiry zone
+ * (`expiryZoneOf`); with no rollover, the end of the cycle itself). A row's refill date is left alone, so a renewal paid
+ * late still resets it. `recordLapse` then books `credit.expired` when the date passes.
+ *
+ * The caller is the job that finds members past their cycle end, one call per member; `cycleEnd` is the end of the paid cycle on
+ * record (`state.cycleEnd`: a call for any other cycle, a later paid one included, dates nothing). Under `policy.rulesVersion` 1 and
+ * 2 it dates nothing. Only rows that hold credits and have no `expires_at` are dated; rollovers keep their own expiry, and
+ * so do the rows the plan moved off. A second call for the same cycle, a canceled subscription (which has dated its rows
+ * already) and a cycle that has not ended give no commands. The grants state does not change: the dated rows are the
+ * record, and the renewal invoice that undoes the dating finds them there (`invoiceToCommands`).
+ */
+export const unpaidCycleToCommands = (
+	input: UnpaidCycleInput,
+): UnpaidCycleResult => {
+	const env = resolveEnv(input.env);
+	const { cycleEnd, menu, state, now } = input;
+	const source: FactSource = {
+		eventId: `unpaid:${state.identity?.customerId ?? "none"}:${cycleEnd}`,
+		mapping: UNPAID_MAPPING,
+		stripeApiVersion: "none",
+	};
+	const labels = labelsOf(source, input);
+	const skip = (skipped: UnpaidCycleResult["skipped"]): UnpaidCycleResult => ({
+		commands: [],
+		labels,
+		state,
+		skipped,
+		dated: [],
+	});
+	if ((input.policy.rulesVersion ?? 1) < 3) return skip("rules_version");
+	if (
+		state.identity === null ||
+		state.tierId === null ||
+		state.interval === null
+	)
+		return skip("no_subscription");
+	if (state.endedAt !== null) return skip("ended");
+	if (state.cycleEnd !== cycleEnd) return skip("other_cycle");
+	if (now < cycleEnd) return skip("not_over");
+	const zone = expiryZoneOf(input.policy, menu);
+	const held = heldOf(input.subject);
+	const ops: Op[] = [];
+	const dated: string[] = [];
+	let already = false;
+	for (const s of refillingSpecs(state, menu)) {
+		const row = held.get(s.rowId);
+		if (!row) continue;
+		if (isDated(row)) already = true;
+		if (row.expiresAt !== null || row.balance <= 0) continue;
+		dated.push(s.rowId);
+		ops.push({
+			op: "update",
+			table: "customerEntitlements",
+			id: s.rowId,
+			set: {
+				expires_at: rolloverExpiry(s.rollover, cycleEnd, zone) ?? cycleEnd,
+			},
+		});
+	}
+	if (ops.length === 0) return skip(already ? "already_dated" : "nothing_held");
+	const b = new Builder(source, state.identity, env);
+	b.plan(now, ops);
+	return { commands: b.commands, labels, state, skipped: null, dated };
+};
+
+/** The mapping label of the events the lapse of an unpaid cycle makes: no Stripe event caused them, the job did. */
+const UNPAID_MAPPING = "atm/unpaid-lapse@v1";
+
+/**
+ * What a renewal paid after its cycle ended unpaid does with the rows `unpaidCycleToCommands` dated, as plan ops ahead of
+ * the renewal's refill. A dated row loses its date, and the renewal then rolls its credits over as it would have. A row
+ * whose date has passed (`expiresAt <= now`) has lapsed: its credits are not rolled over, so the row is emptied first and
+ * the refill gives the cycle's allowance and no more. Returns the lapsed rows that held credits: their `credit.expired` is
+ * the cron's or the handler's, by the same idem.
+ */
+const undoUnpaidCycle = ({
+	state,
+	menu,
+	held,
+	now,
+	ops,
+}: {
+	state: GrantsState;
+	menu: Menu;
+	held: Map<string, Held>;
+	now: number;
+	ops: Op[];
+}): LapsedUnpaidRow[] => {
+	const lapsed: LapsedUnpaidRow[] = [];
+	for (const s of refillingSpecs(state, menu)) {
+		const row = held.get(s.rowId);
+		if (!row || !isDated(row)) continue;
+		const expiresAt = row.expiresAt as number;
+		const gone = expiresAt <= now;
+		ops.push({
+			op: "update",
+			table: "customerEntitlements",
+			id: s.rowId,
+			set: gone ? { balance: 0, expires_at: null } : { expires_at: null },
+		});
+		if (gone && row.balance > 0)
+			lapsed.push({
+				rowId: s.rowId,
+				feature: s.feature,
+				balance: row.balance,
+				expiresAt,
+			});
+	}
+	return lapsed;
 };
 
 /** Who a subscription's credits belong to, from the checkout metadata it carries; null when it names neither school nor family. */

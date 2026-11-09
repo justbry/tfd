@@ -145,6 +145,8 @@ describe("the policy field", () => {
 		expect(expiryZoneOf({ rulesVersion: 1 }, menu)).toBeNull();
 		expect(expiryZoneOf(undefined, menu)).toBeNull();
 		expect(expiryZoneOf(ZONED, menu)).toBe("America/Denver");
+		// 3 is 2 and the unpaid-cycle lapse
+		expect(expiryZoneOf({ rulesVersion: 3 }, menu)).toBe("America/Denver");
 		expect(addExpiryMonths(FEB_BOUNDARY, 1, null)).toBe(
 			addUtcMonths(FEB_BOUNDARY, 1),
 		);
@@ -161,12 +163,13 @@ describe("the policy field", () => {
 		);
 	});
 
-	test("resolvePolicy takes rules version 2 and a null gift month count, and refuses anything else", () => {
+	test("resolvePolicy takes rules versions 2 and 3 and a null gift month count, and refuses anything else", () => {
 		expect(
 			resolvePolicy({ rulesVersion: 2, giftSessionMonths: null }),
 		).toMatchObject({ rulesVersion: 2, giftSessionMonths: null });
 		expect(resolvePolicy({ rulesVersion: 1 }).rulesVersion).toBe(1);
-		expect(() => resolvePolicy({ rulesVersion: 3 })).toThrow(
+		expect(resolvePolicy({ rulesVersion: 3 }).rulesVersion).toBe(3);
+		expect(() => resolvePolicy({ rulesVersion: 4 })).toThrow(
 			/rulesVersion must be equal to one of the allowed values/,
 		);
 		expect(() => resolvePolicy({ giftSessionMonths: 0 })).toThrow(

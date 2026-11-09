@@ -14,6 +14,7 @@ import {
 } from "../billing/rows.js";
 import { menuLineItems } from "../billing/stripe-menu.js";
 import type {
+	BillingPolicy,
 	Menu,
 	StripeEventInput,
 	StripeEventResult,
@@ -55,6 +56,7 @@ export const createStore = ({
 	profile,
 	menuVersion = 1,
 	policyVersion = 1,
+	policy = DEFAULT_POLICY,
 	start,
 	onHandled,
 	commandPrefix = "",
@@ -70,6 +72,8 @@ export const createStore = ({
 	profile?: string;
 	menuVersion?: number;
 	policyVersion?: number;
+	/** The school's policy; default `DEFAULT_POLICY`. */
+	policy?: BillingPolicy;
 	/** The stored rows and revision to carry on from (a subject written earlier). */
 	start?: { rows: BillingRow[]; revision: number };
 	/** Called with each input and its result, before the rows move on: a test checks another path against `handleStripeEvent`. */
@@ -146,7 +150,7 @@ export const createStore = ({
 				}),
 				menu,
 				menuVersion,
-				policy: DEFAULT_POLICY,
+				policy,
 				policyVersion,
 				rows,
 				revision,
