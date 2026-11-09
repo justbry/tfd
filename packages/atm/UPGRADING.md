@@ -2,6 +2,23 @@
 
 The sections for past releases keep the name the engine had then, `atm`.
 
+## On `dev` since 0.11.0
+
+Changes merged to `dev` after the `tfd-v0.11.0` tag. Nothing here is in a release yet.
+
+- **A log whose members are on different menu versions replays in one call (additive: a single `catalog` works as before).** A version's grant amounts live in its catalog, and a log that holds members on versions 1 and 2 (decision 6 of `plans/credits-engine/decisions.md` keeps each member on the version they bought) could not replay with one: `replayEvents`, the ledger's summary reads and `tfd simulate --inputs` threw `ReplayError` for the members not on the catalog's version. Now give the catalog rows per version, keyed by the string the credit events carry as `labels.menu_version`:
+
+  ```ts
+  replayEvents({
+    events,
+    catalogs: { "1": menuCatalogRows({ menu: menuV1, school }), "2": menuCatalogRows({ menu: menuV2, school }) },
+  });
+  ```
+
+  A command replays under the catalog of its event's version. An event whose version is not in `catalogs` throws a `ReplayError` that names it (`no catalog for menu version "2" (labels.menu_version); catalogs given for "1"`); an event with no label takes the only catalog when there is one, and is an error when there are several. Give `catalog` or `catalogs`, never both. The same pair is on `balancesOf` (`{ states, holds, asOfMs, catalog | catalogs }`), on `simulate` (the input's and the candidate's `catalogs`; a candidate `catalog` or `menu` over a mixed log puts every command under that one), and on the ledger readers (`membersOf`, `memberSummary` and the views take `catalogs` in their options). Default for the readers: when the log's own `catalog.published` events carry two or more versions, one catalog per version from them; with one version it is the latest menu, as before. The type is `AtmCatalogsByVersion` (`TfdCatalogsByVersion`).
+  - **Command line.** `tfd simulate --current-catalog` and `--catalog` take a JSON object of catalog-row lists by version (`{"1": [...], "2": [...]}`) where they took one list. `tfd simulate --inputs <db|folder>` needs nothing new: for a log whose credit commands carry two or more versions it takes each version's catalog from the menu the stored inputs of that version were decided under (`atm_input_contexts`); `--current-menu` still replaces the menu of every version.
+  - **What to change:** nothing, unless you replayed such a log holder by holder under each version's catalog as a workaround; one call does it now, with the same result.
+
 ## Moving to 0.11.0 from 0.10.0
 
 Everything merged to `dev` after the `atm-v0.10.0` tag is in 0.11.0, the first release named `tfd-v0.11.0` (asset `tfd-0.11.0.tgz`). A caller that verifies receipts under keys with dates must change (the first item); the package-name item says how to pin; the rest is additive or says what to do.

@@ -12,10 +12,11 @@ Newest first. The version history before 0.3.0 and what a caller has to change f
 
 ## Unreleased
 
-For 0.11.1.
+Merged to `dev` after `tfd-v0.11.0`.
 
 | PR | Merge commit | What |
 |---|---|---|
+| #98 (menu versions, plan §13 item 10) | | `replayEvents` takes `catalogs`, the catalog rows per menu version, beside `catalog`: a command runs under the catalog of its event's `labels.menu_version`, so a log whose members are on different versions replays in one call (the ledger summary, `simulate` and `tfd simulate --inputs` with it). An event whose version has no catalog is a `ReplayError` that names it; one `catalog` works exactly as before. `balancesOf`, `simulate` (current and candidate `catalogs`), `SummaryOptions.catalogs` take it too; `tfd simulate --current-catalog` and `--catalog` read an object of lists by version, and `--inputs` takes each version's catalog from the menu its stored inputs were decided under. The golden-e2e finding F5 is gone; `credits-menu-version` replays whole |
 | this PR (D12 plan §13 items 8, 9) | | item 8, settled by the owner on 2026-11-08, no engine change: the rollover cap trims at the first renewal after cutover and no cycle is grandfathered (`decisions.md` decisions 1 and 11, plan §9 and the stage 3 `rollover_cap` excused reason, `UPGRADING.md`); new golden bundle `credits-import-rollover-trim` (cap 1 for 2 months, an imported rollover of 2 and 1 left on the row: tfd holds 3 after the first renewal, the family service's lots 5). Item 9, a refund of a pre-import invoice books `payment.refunded` (D8): `grantsStateFromCallerRows` takes an optional `payments` (`CallerInvoicePayment`: `invoiceId`, `amount`, `currency?`, `paymentRefs?`) and records `paid` and `paymentRefs` on each invoice's record in the grants state, so the refund books as for a payment the handler booked (idempotent by the refund event's id, no clamp, as there); `tfd simulate --inputs` indexes the seeded invoices from the holders' seeds, which fixes F6 for such imports. Versioned by the data, not by a policy flag: an import without `payments`, and every log and stored seed made before this, decide and replay byte for byte as before (D8 and F6 stay for them, bundle `credits-import-refund`); the handler already booked a refund only for an invoice whose record holds `paid`. New bundle `credits-import-refund-paid`, 57 bundles in all |
 
 ## 0.11.0

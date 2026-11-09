@@ -55,6 +55,9 @@ import type {
 } from "../types.js";
 import {
 	balancesOf,
+	type CatalogInput,
+	type CatalogSet,
+	catalogSetOf,
 	compareChanges,
 	HANDLER_COMMAND,
 	type RecordedMutation,
@@ -1201,11 +1204,47 @@ export const simulateFromInputs = (
 			`no menu is stored for school ${school} (${env}) in ${inputs.origin}; give --current-menu`,
 		);
 	const currentRows = menuCatalogRows({ menu: recordedMenu, school, env });
+	// Members on different menu versions replay under the catalog of the version their credit events are labelled with.
+	const eventVersions = new Set<string>();
+	for (const e of events)
+		if (
+			(e.payload as { command?: unknown }).command !== undefined &&
+			e.labels.menu_version !== undefined
+		)
+			eventVersions.add(e.labels.menu_version);
+	let recordedSource: CatalogInput = { catalog: currentRows };
+	if (eventVersions.size > 1 && current?.menu === undefined) {
+		// each version's menu is the latest one an input of that version was decided under; a version no stored input names
+		// (history before the inputs were stored) keeps the latest menu of all, as a log of one version has it
+		const menuOfVersion = new Map<string, { menu: Menu; at: number }>();
+		for (const stored of [...inputs.inputs, ...inputs.refused]) {
+			const context =
+				stored.contextHash === null
+					? undefined
+					: inputs.contexts.get(stored.contextHash);
+			if (!context) continue;
+			const version = stored.menuVersion ?? context.menuVersion;
+			const known = menuOfVersion.get(version);
+			if (known === undefined || stored.stripeCreated >= known.at)
+				menuOfVersion.set(version, {
+					menu: context.menu,
+					at: stored.stripeCreated,
+				});
+		}
+		const catalogs: Record<string, ReturnType<typeof menuCatalogRows>> = {};
+		for (const version of eventVersions) {
+			const menu = menuOfVersion.get(version)?.menu;
+			catalogs[version] = menu
+				? menuCatalogRows({ menu, school, env })
+				: currentRows;
+		}
+		recordedSource = { catalogs };
+	}
 	let recorded: ReturnType<typeof replayEvents>;
 	try {
 		recorded = replayEvents({
 			events,
-			catalog: currentRows,
+			...recordedSource,
 			asOf: input.asOf,
 		});
 	} catch (error) {
@@ -1222,7 +1261,7 @@ export const simulateFromInputs = (
 	// ---- Balances: the log's, with the holders the run replayed taken from the run ----
 	const balancesOfRun = (
 		run: ReplayInputsResult,
-		catalog: ReturnType<typeof toCatalog>,
+		catalog: CatalogSet["features"],
 	): AtmBalance[] => {
 		const states: Record<string, AtmSubjectState> = clone(
 			recorded.snapshot.states,
@@ -1258,7 +1297,7 @@ export const simulateFromInputs = (
 	// The recorded side is the log; with a drift (allowed) it is the baseline replay, so a drift is reported and never counted.
 	const drifted = baseline.mismatches.length > 0;
 	const recordedBalances = drifted
-		? balancesOfRun(baseline, toCatalog(currentRows))
+		? balancesOfRun(baseline, catalogSetOf(recordedSource).features)
 		: recorded.balances;
 	const recordedEvents = drifted ? baseline.events : events;
 

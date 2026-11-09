@@ -72,6 +72,7 @@ import { FolderStore, hasErrorCode } from "./store/folder-store.js";
 import { R2Store } from "./store/r2-store.js";
 import type {
 	AtmCatalogRow,
+	AtmCatalogsByVersion,
 	AtmEnv,
 	AtmPublicKeys,
 	AtmSignedReceipt,
@@ -689,22 +690,41 @@ const menuFrom = async (flag: string, path: string): Promise<Menu> => {
 	return checked.menu;
 };
 
+const isCatalogRow = (row: unknown) =>
+	typeof row === "object" &&
+	row !== null &&
+	typeof (row as { table?: unknown }).table === "string" &&
+	typeof (row as { row?: unknown }).row === "object" &&
+	(row as { row?: unknown }).row !== null;
+
+const isCatalogRows = (rows: unknown): rows is AtmCatalogRow[] =>
+	Array.isArray(rows) && rows.every(isCatalogRow);
+
+/**
+ * A catalog file: a list of catalog rows (one catalog for the whole log), or an object that maps a menu version
+ * (`"1"`, the `labels.menu_version` of the credit events) to the rows of that version's catalog.
+ */
 const catalogFrom = async (
 	flag: string,
 	path: string,
-): Promise<AtmCatalogRow[]> => {
-	const rows = await readInputFile(flag, path);
-	const isRow = (row: unknown) =>
-		typeof row === "object" &&
-		row !== null &&
-		typeof (row as { table?: unknown }).table === "string" &&
-		typeof (row as { row?: unknown }).row === "object" &&
-		(row as { row?: unknown }).row !== null;
-	if (!Array.isArray(rows) || !rows.every(isRow))
-		throw new InputError(
-			`${flag} ${path} is not a list of catalog rows ({table, row}), as menuCatalogRows makes`,
-		);
-	return rows as AtmCatalogRow[];
+): Promise<
+	| { catalog: AtmCatalogRow[]; catalogs?: undefined }
+	| { catalogs: AtmCatalogsByVersion; catalog?: undefined }
+> => {
+	const content = await readInputFile(flag, path);
+	if (isCatalogRows(content)) return { catalog: content };
+	const byVersion =
+		typeof content === "object" && content !== null && !Array.isArray(content)
+			? Object.entries(content)
+			: [];
+	if (
+		byVersion.length > 0 &&
+		byVersion.every(([, rows]) => isCatalogRows(rows))
+	)
+		return { catalogs: Object.fromEntries(byVersion) as AtmCatalogsByVersion };
+	throw new InputError(
+		`${flag} ${path} is not a list of catalog rows ({table, row}), as menuCatalogRows makes, nor an object of such lists by menu version`,
+	);
 };
 
 const policyFrom = async (
@@ -924,9 +944,7 @@ const runSimulate = async (opts: SimulateOptions): Promise<void> => {
 		throw new InputError(`--month ${opts.month} is not YYYY-MM`);
 	const candidate = {
 		menu: opts.menu ? await menuFrom("--menu", opts.menu) : undefined,
-		catalog: opts.catalog
-			? await catalogFrom("--catalog", opts.catalog)
-			: undefined,
+		...(opts.catalog ? await catalogFrom("--catalog", opts.catalog) : {}),
 		policy: opts.policy ? await policyFrom(opts.policy) : undefined,
 	};
 	const currentMenu = opts.currentMenu
@@ -934,7 +952,7 @@ const runSimulate = async (opts: SimulateOptions): Promise<void> => {
 		: undefined;
 	const currentCatalog = opts.currentCatalog
 		? await catalogFrom("--current-catalog", opts.currentCatalog)
-		: undefined;
+		: {};
 	const { events } = await readEvents(opts.root, opts.school);
 	if (events.length === 0)
 		throw new InputError(
@@ -943,7 +961,7 @@ const runSimulate = async (opts: SimulateOptions): Promise<void> => {
 	const { events: _candidateEvents, ...result } = simulate({
 		events,
 		menu: currentMenu,
-		catalog: currentCatalog,
+		...currentCatalog,
 		school: opts.school,
 		candidate,
 		month: opts.month,
@@ -981,7 +999,7 @@ const simulateCommand = program
 	.option("--menu <file>", "the candidate menu (menu.v1 JSON)")
 	.option(
 		"--catalog <file>",
-		"the candidate catalog rows (JSON list of {table, row}, as menuCatalogRows makes), instead of --menu",
+		"the candidate catalog rows (JSON list of {table, row}, as menuCatalogRows makes, or an object of such lists by menu version), instead of --menu",
 	)
 	.option(
 		"--policy <file>",
@@ -990,7 +1008,7 @@ const simulateCommand = program
 	.option("--current-menu <file>", "the menu the log was written under")
 	.option(
 		"--current-catalog <file>",
-		"the catalog rows the log was written under, instead of --current-menu",
+		'the catalog rows the log was written under, instead of --current-menu: a JSON list of {table, row}, or, for a log whose members are on different menu versions, an object of such lists by version ({"1": [...], "2": [...]}, the credit events\' labels.menu_version)',
 	)
 	.option(
 		"--month <YYYY-MM>",
@@ -998,7 +1016,7 @@ const simulateCommand = program
 	)
 	.option(
 		"--inputs <sqlite file | folder>",
-		`the handler's SQLite database, or a folder \`${commandName} inputs ship\` shipped them to: decide the stored Stripe inputs again (the grant rules: upgradeGrant, what an invoice grants, a menu's prices and tiers) with the recorded menu and policy, which must reproduce the log, and then with the candidate. Opened read-only; writes nothing. Needs --env. --menu and --policy are optional (none is the identity); --current-menu and --current-policy replace the recorded ones; --catalog and --current-catalog are not used`,
+		`the handler's SQLite database, or a folder \`${commandName} inputs ship\` shipped them to: decide the stored Stripe inputs again (the grant rules: upgradeGrant, what an invoice grants, a menu's prices and tiers) with the recorded menu and policy, which must reproduce the log, and then with the candidate. Opened read-only; writes nothing. Needs --env. --menu and --policy are optional (none is the identity); --current-menu and --current-policy replace the recorded ones (--current-menu then applies to every menu version); --catalog and --current-catalog are not used. Members on different menu versions need nothing more: each version replays under the menu its stored inputs were decided with`,
 	)
 	.option("--env <live|test>", "with --inputs: the Stripe mode of the inputs")
 	.option(
