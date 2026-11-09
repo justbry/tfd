@@ -374,7 +374,7 @@ export const CASES: Case[] = [
 			"decision 4: a job calls recordLapse (the cron's lapse step here). It books a row whose expires_at has passed, once",
 			"15 February: 2 rolled over, 2 granted. No March payment. 16 March: the 2 rolled over lapsed at 15 March 18:00 and are booked with that instant (2 left); the tier row's 2 have no expires_at (the cycle ended unpaid) and are not booked; the second run of the cron books nothing",
 			"20 March the subscription is deleted: the tier row gets expires_at = the cycle end (15 March 18:00) + 1 rollover month = 15 April 18:00 (credit.expiration_changed); the cron on 20 April books its 2 with that instant. 0 left",
-			"open question 7 of the plan: bs lots of the unpaid cycle lapse at the cycle end plus the rollover months without a cancel; tfd has no command for that yet, which this bundle pins as it is",
+			"without a cancel an unpaid cycle's tier row stays undated under rules versions 1 and 2, as here; under rules version 3 the lapse job dates it (credits-unpaid-lapse, plan §13 item 7)",
 		],
 	},
 	{

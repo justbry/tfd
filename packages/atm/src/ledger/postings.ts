@@ -407,6 +407,9 @@ const balanceMoves = (
 			else if (c.op === "update") {
 				const a = (c.after as Row).balance;
 				const b = (c.before as Row).balance;
+				// A row past its expiry is not part of the balance, as a lapsed rollover is not: emptying it (a renewal paid
+				// after its unpaid cycle lapsed) moves nothing, and the lapse is booked once, by the cron or the handler.
+				if (!isLive((c.before as Row).expires_at, atMs)) continue;
 				if (typeof a === "number" && typeof b === "number") {
 					refilled += a;
 					replaced += b;

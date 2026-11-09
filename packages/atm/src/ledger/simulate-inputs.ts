@@ -253,6 +253,21 @@ export const replayInputs = (
 				(a.group[0] as AtmEvent).id.localeCompare((b.group[0] as AtmEvent).id),
 		);
 
+	/**
+	 * The lapses the cron booked: the outbox keeps the first event of an idem, so a renewal paid after the lapse (which books
+	 * the lapse of its emptied row under the cron's idem, `GrantResult.lapsed`) made no event of its own when the cron had
+	 * come first.
+	 */
+	const cronLapses = new Set(
+		events
+			.filter((e) => e.source === "cron" && e.event_type === "credit.expired")
+			.map((e) => e.idem),
+	);
+	const notBookedByCron = (made: readonly AtmEvent[]): AtmEvent[] =>
+		made.filter(
+			(e) => !(e.event_type === "credit.expired" && cronLapses.has(e.idem)),
+		);
+
 	// ---- State of the run ----
 	const holders = new Map<string, Holder>();
 	const invoiceIndex = new Map<string, string>();
@@ -738,7 +753,9 @@ export const replayInputs = (
 				for (const ref of input.paymentRefs ?? [])
 					if (!paymentIndex.has(ref)) paymentIndex.set(ref, invoiceId);
 		}
-		const made = fresh(carryFirstPayments(input, result.events, logged));
+		const made = fresh(
+			carryFirstPayments(input, notBookedByCron(result.events), logged),
+		);
 		byInput.set(input.eventId, {
 			appliedOrder: input.appliedOrder,
 			subjectKey: input.subjectKey,

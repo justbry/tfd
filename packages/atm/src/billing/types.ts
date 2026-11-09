@@ -55,6 +55,7 @@ export type {
 	InvoiceLine,
 	InvoicePaymentFact,
 	InvoiceRecord,
+	LapsedUnpaidRow,
 	LineItem,
 	Mapping,
 	MappingTarget,
@@ -100,4 +101,6 @@ export type {
 	SubscriptionStatus,
 	TierPrice,
 	Unit,
+	UnpaidCycleInput,
+	UnpaidCycleResult,
 } from "../types.js";

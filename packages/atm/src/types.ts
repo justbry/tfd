@@ -806,11 +806,12 @@ export type BillingPolicy = {
 	 * Which date rules the grants follow, so a log written under one replays under it unchanged. `1`, and absent (every
 	 * policy stored before 0.11.0, and the default): a rollover, a one-time add-on and a canceled membership's last credits
 	 * lapse on the UTC calendar. `2`: on the menu's calendar (`menu.timeZone`), the same wall-clock time some months on,
-	 * across clock changes (the engine's `reset` takes the zone as `org.config.rollover_time_zone`). Set it on a school's
-	 * policy before its first event, or at a context change (a new `policyVersion`); a log changes rules only where a
-	 * stored context says so.
+	 * across clock changes (the engine's `reset` takes the zone as `org.config.rollover_time_zone`). `3`: `2`, and a member's
+	 * cycle that ended unpaid can be lapsed with `lapseUnpaidCycle` (`unpaidCycleToCommands` gives no commands under `1` or
+	 * `2`). Set it on a school's policy before its first event, or at a context change (a new `policyVersion`); a log changes
+	 * rules only where a stored context says so.
 	 */
-	rulesVersion?: 1 | 2;
+	rulesVersion?: 1 | 2 | 3;
 };
 
 /**
@@ -1351,6 +1352,19 @@ export type GrantResult = {
 	commands: GrantCommand[];
 	labels: GrantLabels;
 	state: GrantsState;
+	/**
+	 * Only on a renewal paid after its unpaid cycle lapsed (`unpaidCycleToCommands`): the lapsed rows the renewal emptied,
+	 * whose `credit.expired` the handler books. Absent otherwise.
+	 */
+	lapsed?: LapsedUnpaidRow[];
+};
+
+/** A row of an unpaid cycle that had lapsed when a renewal was paid, with the credits it held and its expiry. */
+export type LapsedUnpaidRow = {
+	rowId: string;
+	feature: string;
+	balance: number;
+	expiresAt: number;
 };
 
 /** The menu and policy versions a decision is labelled with. */
@@ -1364,6 +1378,11 @@ export type InvoiceGrantInput = {
 	menu: Menu;
 	policy: BillingPolicy;
 	state: GrantsState;
+	/**
+	 * The engine subject as it stands (`subjectFromRows`), or null. Read only to undo an unpaid cycle's dating when a
+	 * renewal is paid (a refilling row that has an `expires_at`); left out, that renewal undoes nothing.
+	 */
+	subject?: TfdSubject | null;
 	/** The time of the event being handled, not the clock. */
 	now: number;
 	/**
@@ -1411,6 +1430,58 @@ export type SubscriptionEndInput = {
 	 */
 	env?: TfdEnv;
 } & GrantVersions;
+
+/** Why `unpaidCycleToCommands` dated nothing. */
+export type UnpaidCycleSkip =
+	| "rules_version"
+	| "no_subscription"
+	| "ended"
+	| "other_cycle"
+	| "not_over"
+	| "already_dated"
+	| "nothing_held";
+
+export type UnpaidCycleInput = {
+	/** The end (ms) of the paid cycle the member's credits come from, the instant it ended unpaid: it must be `state.cycleEnd`. */
+	cycleEnd: number;
+	menu: Menu;
+	policy: BillingPolicy;
+	state: GrantsState;
+	subject: TfdSubject | null;
+	/** The time of the call (ms), at or after `cycleEnd`; not the clock. */
+	now: number;
+	/** Stripe's mode for this subject, as `SubscriptionEndInput.env`. */
+	env?: TfdEnv;
+} & GrantVersions;
+
+/** `skipped` says why `commands` is empty; `dated` are the rows given an `expires_at`. */
+export type UnpaidCycleResult = GrantResult & {
+	skipped: UnpaidCycleSkip | null;
+	dated: string[];
+};
+
+/**
+ * A member whose cycle ended unpaid: the job that calls `recordLapse` calls `lapseUnpaidCycle` first. `holder` is whose
+ * credits these are when the subject has no rows yet (it has, for any member with a paid cycle); `cycleEnd` as
+ * `UnpaidCycleInput.cycleEnd`.
+ */
+export type LapseUnpaidCycleInput = BookingContext & {
+	holder: { orgId: string; customerId: string };
+	cycleEnd: number;
+};
+
+/**
+ * `rowChanges` is one write for the subject (the engine's rows and the grants row under one revision), null when nothing
+ * was dated. `events` are one `credit.expiration_changed` per dated row. `skipped` says why nothing was dated: `replayed` is
+ * true for `already_dated` (the same call again), which is no error.
+ */
+export type LapseUnpaidCycleResult = {
+	rowChanges: RowChanges | null;
+	events: TfdEvent[];
+	dated: string[];
+	skipped: UnpaidCycleSkip | null;
+	replayed: boolean;
+};
 
 // ---- Stripe menu and checkout ----
 
@@ -3874,6 +3945,17 @@ export type BundleStep =
 			adjustKind: AdjustKind;
 			feature: string;
 			credits: number;
+	  }
+	| {
+			/**
+			 * The family service's lapse job finds a member whose cycle ended unpaid at `cycleEnd` and calls `lapseUnpaidCycle`:
+			 * the cycle's refilling rows get their expiry, in one transaction.
+			 */
+			kind: "unpaid";
+			atMs: number;
+			school?: string;
+			family: string;
+			cycleEnd: number;
 	  };
 
 export type BundleVerdict = "OK" | "KNOWN" | "DISCREPANCY";

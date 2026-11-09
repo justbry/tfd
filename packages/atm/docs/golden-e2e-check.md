@@ -6,7 +6,7 @@ The golden fixtures put through the whole ledger pipeline with the real `atm` co
 
 No real school database was available and no credential was used: nothing here reads `~/.config`, calls Stripe or touches R2. The fixtures stand in for real data:
 
-- the 57 scenario bundles (`fixtures/scenarios/`: 39 of the matrix and 18 more, 11 of them the `credits-*` bundles of D12 T9 and its follow-up) are Stripe events written by hand from Stripe's documented shapes, or recorded in a Stripe sandbox (`recorded-*`, and the 8 `fixtures/billing/stripe/recorded/delivered` scenarios used by S1's what-ifs and S7), with a Stripe side written by hand;
+- the 59 scenario bundles (`fixtures/scenarios/`: 39 of the matrix and 20 more, 13 of them the `credits-*` bundles of D12 T9, its follow-up and the unpaid-lapse pair) are Stripe events written by hand from Stripe's documented shapes, or recorded in a Stripe sandbox (`recorded-*`, and the 8 `fixtures/billing/stripe/recorded/delivered` scenarios used by S1's what-ifs and S7), with a Stripe side written by hand;
 - `fixtures/vibes-year` and `fixtures/vibes-multi` are generated event logs (one school and a year; twelve families across a year boundary), not Stripe events.
 
 It proves that, for these inputs, the command line in this tree ships, journals, reports, reconciles and simulates as the committed goldens and the design say; that the commands do not write what they should not; that the shippers survive SIGKILL at every operation they make; that an erasure leaves no personal string and no fact in the shipped folder or the tables; and how the shippers scale on one machine. It does **not** prove anything about real data. See the last section.
@@ -17,7 +17,7 @@ All commands are `bun ./src/bin.ts ...` (the source entry), with `dist/atm.js` (
 
 ```
 bun test --timeout 60000 tests/golden-e2e-check.test.ts                 # a sample, about two minutes
-ATM_GOLDEN_E2E=full bun test --timeout 1200000 tests/golden-e2e-check.test.ts   # all 57 bundles, all kill points
+ATM_GOLDEN_E2E=full bun test --timeout 1200000 tests/golden-e2e-check.test.ts   # all 59 bundles, all kill points
 ATM_GOLDEN_E2E=full ATM_GOLDEN_E2E_SHARD=1/6 ...                         # a sixth of the run (six processes at once); CI splits the sample in two
 ATM_GOLDEN_E2E_TZ=Asia/Tokyo ...                                          # every process, the handler included, in that zone
 bun scripts/golden-e2e-scale.ts --copies 20,100,300 [--ship-index]        # S7
@@ -44,6 +44,7 @@ The candidates: `upgradeGrant` prorated, full and none; every tier's prices 10% 
 |---|---|---|
 | S1 | 46 bundles through ship, inputs ship, journal, report, reconcile, simulate; goldens of the matrix; balances | 44 PASS, 2 FINDING (F1), under both time zones |
 | S1 | the 11 `credits-*` bundles (D12 T9 and the rollover-trim and paid-refund follow-up, 2026-11-08, default time zone only) through the same commands | 10 PASS, 1 FINDING (F6); F5 was fixed (PR #98) |
+| S1 | the 2 `credits-unpaid-*` bundles (plan §13 item 7, `TFD_GOLDEN_E2E=full`, default time zone only) through the same commands | 2 PASS |
 | S1 | 8 golden what-ifs (`golden/simulate/inputs-*.json`) through `atm simulate --inputs` | PASS (46 checks) |
 | S2 | `vibes-year` and `vibes-multi`: ship, journal, report, reconcile against `golden/{journal,reports,multi}` | PASS (69 and 40 checks) |
 | S3 | erasure drill, three families, one erased | PASS on the fixtures; FINDING F2 (erased facts stay in the `-wal` until a checkpoint) |

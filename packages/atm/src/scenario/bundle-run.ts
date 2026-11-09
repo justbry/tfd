@@ -31,6 +31,7 @@ import {
 	subjectKey,
 } from "../billing/rows.js";
 import { menuLineItems } from "../billing/stripe-menu.js";
+import { lapseUnpaidCycle } from "../billing/unpaid.js";
 import { bunSqlite } from "../handler/bun-sqlite.js";
 import { inputCauseId, recordInput } from "../handler/inputs.js";
 import { HANDLER_DDL } from "../handler/schema.js";
@@ -656,6 +657,45 @@ const adjustFamily = (
 	});
 };
 
+/** The lapse job dates an unpaid cycle's refilling rows (`lapseUnpaidCycle`): the rows and the events in one transaction. */
+const lapseUnpaid = (
+	endpoint: Endpoint,
+	step: Extract<BundleStep, { kind: "unpaid" }>,
+	env: AtmEnv,
+): void => {
+	const holder = `family:${step.family}`;
+	const key = subjectKey({
+		orgId: endpoint.school,
+		env,
+		customerId: holder,
+		entityId: null,
+	});
+	endpoint.clock.now = step.atMs;
+	endpoint.db.transaction(() => {
+		const { rows, revision } = loadSubject(endpoint.db, key);
+		const context = endpoint.deps.context(endpoint.school, {
+			subjectKey: key,
+			menuVersion: grantsFromRows(rows).menuVersion ?? null,
+		});
+		if (!context) throw new Error(`no menu context for ${endpoint.school}`);
+		const result = lapseUnpaidCycle({
+			holder: { orgId: endpoint.school, customerId: holder },
+			cycleEnd: step.cycleEnd,
+			menu: context.menu,
+			menuVersion: context.menuVersion,
+			policy: context.policy,
+			policyVersion: context.policyVersion,
+			rows,
+			revision,
+			catalog: context.catalog,
+			now: step.atMs,
+			env,
+		});
+		if (result.rowChanges) writeRows(endpoint.db, result.rowChanges);
+		appendToOutbox(endpoint.db, result.events, env);
+	});
+};
+
 const eventsDirectory = (root: string, school: string, date: string): string =>
 	join(root, "schools", school, "events", `date=${date}`);
 
@@ -873,6 +913,8 @@ export const runBundle = async (
 				importMember(endpoint, step, scenario, env);
 			} else if (step.kind === "adjust") {
 				adjustFamily(endpoint, step, env);
+			} else if (step.kind === "unpaid") {
+				lapseUnpaid(endpoint, step, env);
 			} else if (step.kind === "lapse") {
 				const holder = `family:${step.family}`;
 				const subjectKey = `${endpoint.school}|${env}|${holder}`;

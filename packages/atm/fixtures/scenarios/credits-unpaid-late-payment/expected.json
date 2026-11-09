@@ -1,0 +1,39 @@
+{
+	"verdict": "OK",
+	"answers": [
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		],
+		[
+			200,
+			"applied"
+		]
+	],
+	"books": [
+		{
+			"school": "sch_vol",
+			"hand": {
+				"income:membership:sparkle-2": 78000,
+				"fees": 2352,
+				"stripe": 75648,
+				"net": 75648,
+				"avail:family:fam_8k2:visit": 2
+			},
+			"reconcile": {
+				"2026-01": [],
+				"2026-02": [],
+				"2026-03": []
+			}
+		}
+	],
+	"notes": [
+		"same story to 16 March: the unpaid cycle's row is dated 15 April 18:00 UTC",
+		"20 March: the March invoice is paid before that date. The renewal clears the dating (no event: an expiry cleared to none ends nothing), the 2 left roll over to expire 15 April 18:00 UTC, 2 are granted: 4",
+		"16 April: the cron books the rolled 2 (the instant 15 April 18:00 UTC); 2 left. Credits granted 6, expired 4"
+	]
+}
