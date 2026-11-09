@@ -135,7 +135,7 @@ test("stage 6 runs only when asked: not in the default, and --stage 6 takes it",
 	expect(parseArgs([]).stages).not.toContain(6);
 	expect(parseArgs(["--stage", "6"]).stages).toEqual([6]);
 	expect(parseArgs(["--stage", "1,6"]).stages).toEqual([1, 6]);
-	expect(() => parseArgs(["--stage", "7"])).toThrow("1 to 4 or 6");
+	expect(() => parseArgs(["--stage", "8"])).toThrow("1 to 4, 6 or 7");
 });
 
 test("--stage 6 without its inputs is BLOCKED on all seven checks, names them and signs in nowhere", async () => {

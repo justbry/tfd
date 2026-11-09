@@ -325,6 +325,24 @@ describe.skipIf(skip)("the HTTP Reader on the real ledger Worker", () => {
 		expect(typeof cents).toBe("number");
 	});
 
+	test("membersSummary on a school whose log holds credit events is the Worker's credits outstanding; with the school's own unit and currency", async () => {
+		const { reader } = httpAdaptersOn(worker, ownerGrants);
+		const summary = await reader.membersSummary({ schoolId: owned });
+		const raw = (await dataOf(`/schools/${owned}/members-credits`)) as {
+			hasCreditEvents: boolean;
+			creditsOutstanding: number;
+			members: unknown[];
+		};
+		expect(raw.hasCreditEvents).toBe(true);
+		expect(raw.members.length).toBeGreaterThan(0);
+		expect(summary.creditsOutstanding).toBe(raw.creditsOutstanding);
+		expect(summary.unit.other.length).toBeGreaterThan(0);
+		expect(summary.currency.length).toBe(3);
+		// nothing states gift codes or booking rules, so none are made up
+		expect(summary.expiringGifts).toEqual([]);
+		expect(summary.bookingRules).toBeNull();
+	});
+
 	test("member money: a member's payments and history from the Worker; an unknown key is not_found", async () => {
 		const { worker: source } = httpAdaptersOn(worker, ownerGrants);
 		const key = worker.seeded[owned]?.events.find(

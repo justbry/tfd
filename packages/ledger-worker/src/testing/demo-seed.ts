@@ -11,7 +11,12 @@ import { runViews } from "tfd/worker";
 import type { WriteAnswersOutcome } from "../data/answers.js";
 import { latestMenu } from "../data/menu.js";
 import { type DemoApiReport, writeDemoApi } from "../demo/demo-api-store.js";
-import { DEMO_PREFIX, type DemoFacts, demoNameOf } from "../demo.js";
+import {
+	DEMO_PREFIX,
+	DEMO_SCHOOL,
+	type DemoFacts,
+	demoNameOf,
+} from "../demo.js";
 import { storeAnswers } from "../routes/stored.js";
 import { presetEvents } from "./seed.js";
 
@@ -81,15 +86,7 @@ export type DemoSeedReport = {
 export const demoFactsOf = (
 	preset: string,
 	events: readonly AtmEvent[] = presetEvents(preset),
-): DemoFacts => {
-	const menu = latestMenu(events);
-	return {
-		name: demoNameOf(demoSchoolIdOf(preset)),
-		timeZone: menu?.timeZone ?? "America/Denver",
-		currency: (menu?.currency ?? "usd").toUpperCase(),
-		creditUnit: menu?.unit ?? { one: "credit", other: "credits" },
-	};
-};
+): DemoFacts => demoFactsOfLog(demoSchoolIdOf(preset), events);
 
 const keysUnder = async (store: Store, prefix: string): Promise<string[]> => {
 	const keys: string[] = [];
@@ -102,21 +99,34 @@ const keysUnder = async (store: Store, prefix: string): Promise<string[]> => {
 	}
 };
 
+/** The facts `GET /v1/schools` lists for a demo school with this log: its latest `catalog.published`, else the plain labels. */
+export const demoFactsOfLog = (
+	school: string,
+	events: readonly AtmEvent[],
+): DemoFacts => {
+	const menu = latestMenu(events);
+	return {
+		name: demoNameOf(school),
+		timeZone: menu?.timeZone ?? "America/Denver",
+		currency: (menu?.currency ?? "usd").toUpperCase(),
+		creditUnit: menu?.unit ?? { one: "credit", other: "credits" },
+	};
+};
+
 /**
- * Writes one preset as `demo-<preset>`: the batches it produces (a batch key carries the hash of its bytes, so one that
- * exists already holds them), then deletes every other object under its `events/`, then writes its `demo-api/` answers
- * and `demo.json` as of `now`, then (unless `views` is false) runs the views as of `now` and stores their answers. Refuses a preset that is not a
- * school preset.
+ * Writes `events` as demo school `school` (an id `demo-<name>`): the batches they produce (a batch key carries the hash of
+ * its bytes, so one that exists already holds them), then deletes every other object under its `events/`, then writes its
+ * `demo-api/` answers and `demo.json` as of `now`, then (unless `views` is false) runs the views as of `now` and stores
+ * their answers. Touches nothing outside `schools/<school>/`.
  */
-export const seedDemoSchool = async (
+export const seedDemoLog = async (
 	store: Store,
-	preset: string,
-	options: { now: Date; views?: boolean; events?: readonly AtmEvent[] },
+	school: string,
+	events: readonly AtmEvent[],
+	options: { now: Date; views?: boolean },
 ): Promise<DemoSeedReport> => {
-	if (!(DEMO_PRESETS as readonly string[]).includes(preset))
-		throw new Error(`${preset} is not one of the demo school presets`);
-	const school = demoSchoolIdOf(preset);
-	const events = options.events ?? presetEvents(preset);
+	if (!DEMO_SCHOOL.test(school))
+		throw new Error(`${school} is not a demo school id`);
 	const batches = planOutbox({
 		school,
 		rows: events.map((event) => ({
@@ -164,7 +174,7 @@ export const seedDemoSchool = async (
 		store,
 		school,
 		events,
-		demoFactsOf(preset, events),
+		demoFactsOfLog(school, events),
 		options.now,
 	);
 	if (options.views !== false) {
@@ -176,4 +186,22 @@ export const seedDemoSchool = async (
 		report.stored = await storeAnswers(store, school, options.now);
 	}
 	return report;
+};
+
+/**
+ * Writes one preset as `demo-<preset>` (`seedDemoLog`). Refuses a preset that is not a school preset.
+ */
+export const seedDemoSchool = async (
+	store: Store,
+	preset: string,
+	options: { now: Date; views?: boolean; events?: readonly AtmEvent[] },
+): Promise<DemoSeedReport> => {
+	if (!(DEMO_PRESETS as readonly string[]).includes(preset))
+		throw new Error(`${preset} is not one of the demo school presets`);
+	return seedDemoLog(
+		store,
+		demoSchoolIdOf(preset),
+		options.events ?? presetEvents(preset),
+		options,
+	);
 };

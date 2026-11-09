@@ -15,6 +15,9 @@
  *
  * Stage 6, S8d (buzz-school's own money and catalog routes to the ledger), is `scripts/staging-s8d.ts`; it moves test
  * money, so only `--stage 6` runs it.
+ *
+ * Stage 7, the credits engine's S8f (the views build for logs of credit events, two menu versions included), is
+ * `scripts/staging-credits.ts`; it seeds its own `demo-s8f-*` schools in the staging bucket, so only `--stage 7` runs it.
  */
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -270,7 +273,10 @@ const withDeadline = <Answer>(
 	return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 };
 
-const send = async (url: string, init: RequestInit = {}): Promise<Reply> => {
+export const send = async (
+	url: string,
+	init: RequestInit = {},
+): Promise<Reply> => {
 	const { response, text } = await withDeadline(
 		(async () => {
 			const answer = await Bun.fetch(url, { redirect: "manual", ...init });
@@ -1685,14 +1691,27 @@ const stage6 = async (context: Context): Promise<void> => {
 	await loaded.stage6(context);
 };
 
+/**
+ * Stage 7 (credit events, T12 of the credits engine) is loaded when it runs, like stage 6: it seeds three fixture schools
+ * under `demo-s8f-*` in the staging bucket and needs the bundles and the R2 key.
+ */
+const CREDITS_MODULE = "./staging-credits.js";
+const stage7 = async (context: Context): Promise<void> => {
+	const loaded = (await import(CREDITS_MODULE)) as {
+		stage7(context: Context): Promise<void>;
+	};
+	await loaded.stage7(context);
+};
+
 const STAGES: Record<number, (context: Context) => Promise<void>> = {
 	1: stage1,
 	2: stage2,
 	3: stage3,
 	4: stage4,
 	6: stage6,
+	7: stage7,
 };
-/** Stages 4 and 6 move (test) money, so only `--stage 4` or `--stage 6` runs them. */
+/** Stages 4 and 6 move (test) money and stage 7 writes fixture schools to the bucket, so only `--stage N` runs them. */
 export const DEFAULT_STAGES: readonly number[] = [1, 2, 3];
 /** packages/ledger-ui/scripts/staging-ui.ts. */
 const UI_STAGE = 5;
@@ -1727,7 +1746,7 @@ export const parseArgs = (
 					`stage ${UI_STAGE} (the ledger UI's HTTP adapters) runs from the UI package: bun run --cwd packages/ledger-ui staging-ui`,
 				);
 			if (stages.some((stage) => !STAGES[stage]))
-				throw new UsageError("--stage takes 1 to 4 or 6, e.g. --stage 1,2");
+				throw new UsageError("--stage takes 1 to 4, 6 or 7, e.g. --stage 1,2");
 		} else throw new UsageError(`unknown argument ${argument}`);
 	}
 	return { stages, json, strict };

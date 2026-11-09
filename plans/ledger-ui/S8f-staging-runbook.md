@@ -77,6 +77,16 @@ A check whose input did not pass is BLOCKED (`needs … (lines above)`); a missi
 
 **Cleanup.** Every run leaves: one more menu version, published, with the blurb `S8d run <time>` on the tier (publish again by hand to change it back; Stripe products and prices are unchanged because no price moved); `S8F_REFUND_CENTS` more refunded on the test charge (a second run needs what is left: 300 cents on `ch_3UZCWVDrNLsdrUCj2jydqvCG` before the first); two outbox rows and their batch file and watermark in the bucket (staging only, nothing deleted); the audit rows of the publish and the refund. Nothing is written locally.
 
+## Stage 7: credit events (credits engine T12)
+
+```
+bun run --cwd packages/ledger-worker staging-e2e --stage 7
+```
+
+Proves that the ledger views build for a school whose log holds credit events, a log on two menu versions included, and that the Worker's `members-credits` equals `membersOf` run on the same events. No staging school holds credit events yet, so the stage owns its data: it writes three fixture schools to the staging bucket (`schools/demo-s8f-credits-versions/`, `demo-s8f-credits-adjust/`, `demo-s8f-no-credits/`; the committed bundles `credits-menu-version` and `credits-adjust-never-expires`, and a money-only control) with the R2 key stage 6 reads, then reads them back through the deployed Worker with no token (demo schools). It writes only those three prefixes and refuses any other id; no real school's prefix is listed, read or written. It needs no QA account, no PIN and no Stripe. A rerun writes nothing new (batch keys carry their hashes) and rebuilds the views as of now. The schools stay and show in the staging UI as demo schools ("Demo · S8f credits versions"). Only `--stage 7` runs it.
+
+When the credit events of a real school reach the bucket (plan stage 5, B22), the same checks apply to it: `GET /v1/schools/<id>/members-credits` answers the members' credits, and the ledger UI's Members summary shows "credits outstanding".
+
 ## Owner steps (nobody else can do these)
 
 1. **The bucket's S3 key.** Create an R2 API token scoped to `b4uni-stg-ledger` only (Object Read & Write) and write `~/.config/b4uni/r2-stg-ledger-s3.env` with `R2_LEDGER_ENDPOINT`, `R2_LEDGER_BUCKET`, `R2_LEDGER_ACCESS_KEY_ID`, `R2_LEDGER_SECRET_ACCESS_KEY` (`chmod 600`). The steps are in buzz-school `docs/features/ledger-export.md`, "Pending: the bucket's S3 key (owner)". Do not paste the values anywhere.
@@ -125,6 +135,7 @@ The Worker's cron runs every 5 minutes and the shipper every 10 (`R2_LEDGER_EVER
 - **Stage 2**: `qa-link-login`, `pin-verify`, `ledger-token` (token prefix, `expiresAt`, `schools[]` size), `school`, `schools-envelope` (200, `{asOf,lagMinutes,data}`; `asOf` is `null` before data), `tampered-token` and `expired-looking-token` (401), and with the second account `finance-ledger`, `finance-income-statement` (403 `finance_required`) and `audience-finance` (403 `audience_not_allowed`).
 - **Stage 3**: `views-present` (`asOf` set, `stale false`), `kpi-owner`, `ledger-month`.
 - **Stage 4**: `stripe-connected`, `step-up`, `refund` (Stripe's `status`), `refund-replay` (the same refund id), `ledger-refund` (a `payment.refunded` entry with `asOf` after the refund), `booking-cancel` (state `cancelled`).
+- **Stage 7**: `seed`, then `versions-views`, `versions-members`, `versions-history`, `adjust-views`, `adjust-members`, `adjust-history`, `control-views`, `control-members`, all PASS. BLOCKED on every line when the R2 key is missing.
 - **Stage 6**: the sign-in lines, then `menu-publish`, `refund`, `outbox-shipped`, `r2-events`, `watermark`, `worker-ledger`, `worker-catalog`, all PASS.
 
 ## Reading BLOCKED and FAIL
