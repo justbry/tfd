@@ -16,6 +16,7 @@ import {
 } from "../../../packages/atm/src/cloud.ts";
 import { invoicePaidFee } from "./billing/fees";
 import { SCHOOL_IDS, webhookContext } from "./billing/plans";
+import { disputeForeignSchool } from "./billing/webhook";
 import { type DurableSqlStorage, durableSqlDatabase } from "./do-sql";
 import type { CloudEnv } from "./env";
 
@@ -192,7 +193,22 @@ export class OrgDO {
 	 */
 	private async billing(request: Request): Promise<Response> {
 		const payload = await request.text();
-		const fee = await invoicePaidFee(JSON.parse(payload), {
+		const event: unknown = JSON.parse(payload);
+		const foreign = await disputeForeignSchool(event, {
+			key: this.env.STRIPE_SECRET_KEY,
+			fetcher: this.fetcher,
+		});
+		// Another business's dispute on the shared account: answered 200 and booked nothing (`foreignSchoolOf`).
+		if (foreign)
+			return Response.json({
+				school: foreign,
+				handler: {
+					status: 200,
+					body: { outcome: "ignored", reason: "other_school" },
+				},
+				shipped: null,
+			});
+		const fee = await invoicePaidFee(event, {
 			key: this.env.STRIPE_SECRET_KEY,
 			fetcher: this.fetcher,
 		});
