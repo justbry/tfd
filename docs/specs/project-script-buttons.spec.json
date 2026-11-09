@@ -1,0 +1,24 @@
+{
+ "title": "Project-script buttons for the atm project",
+ "revision": 1, "status": "draft", "approvedRevision": null,
+ "revisions": [{"rev": 1, "at": "2026-11-08T08:40:00Z", "summary": "First draft from the setup request"}],
+ "clarity": {"score": 7.0, "weakest": [{"section": "Edge cases", "why": "worktree URL mismatch has no settled fix"}]},
+ "questions": [{"id": "Q1", "question": "How should previewUrls map onto worktree folders, where pages land under the worktree name?",
+                "options": ["Symlink ~/.claude/pr-previews/atm to the checkout that ran last", "Run buttons only from ~/repos/atm", "Per-thread URLs edited by hand"], "default": 0,
+                "why": "The URL is fixed per button but the page folder is named after the checkout", "answer": null}],
+ "assumptions": [{"id": "A1", "text": "Buttons run in the thread's checkout, not the project root.", "status": "open"},
+                 {"id": "A2", "text": "T3 Code will eventually fix project-script writes (pingdotgg/t3code#14991).", "status": "open"}],
+ "scope": [{"id": "S1", "text": "Four buttons on atm", "in": true},
+           {"id": "S2", "text": "LAN or NetBird exposure of port 8765", "in": false},
+           {"id": "S3", "text": "NetBird check button", "in": false}],
+ "acceptance": [
+  {"id": "AC-1", "text": "Spec progress, Preview PR, Deploy status and Ship pre-flight each exist in the atm project's scripts menu."},
+  {"id": "AC-2", "text": "Each command runs under env -i with PATH=/usr/bin:/bin:/usr/sbin:/sbin without \"command not found\"."},
+  {"id": "AC-3", "text": "lsof shows port 8765 listening on 127.0.0.1 only, and the Mac's LAN address refuses the connection."},
+  {"id": "AC-4", "text": "Each button's previewUrl returns HTTP 200 after the button has run in the same checkout."},
+  {"id": "AC-5", "text": "Preview PR and Ship produce screenshots, not \"screenshots failed\"."},
+  {"id": "AC-6", "text": "Spec progress renders a page for this spec."}],
+ "risks": [{"id": "K1", "text": "Port 8765 exposed by a stray default bind", "severity": "high", "mitigation": "PR_PREVIEW_BIND=127.0.0.1 in every command; check with lsof"},
+           {"id": "K2", "text": "Stale pages mistaken for fresh ones", "severity": "medium", "mitigation": "Open the page from the checkout that ran it; check its timestamp"}],
+ "progress": {"overrides": {}}
+}
