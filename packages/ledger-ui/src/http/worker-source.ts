@@ -118,6 +118,18 @@ export type WorkerMemberMoney = {
 	history: HistoryEvent[];
 };
 
+/** `GET /v1/schools/:school/members-credits`: what the credit events say the members hold. A school whose log holds no
+ * credit event answers `hasCreditEvents: false` and nothing else. */
+export type WorkerMembersCredits =
+	| { hasCreditEvents: false }
+	| {
+			hasCreditEvents: true;
+			unit: { one: string; other: string } | null;
+			/** Available plus held, over every member and feature. */
+			creditsOutstanding: number;
+			members: Array<{ key: string }>;
+	  };
+
 export interface WorkerSource {
 	/** `anonymous`: with no bearer, and without waiting for a token: the demo schools alone (signed out). */
 	schools(options?: {
@@ -145,6 +157,9 @@ export interface WorkerSource {
 		school: string;
 		key: string;
 	}): Promise<WorkerAnswer<WorkerMemberMoney>>;
+	memberCredits(query: {
+		school: string;
+	}): Promise<WorkerAnswer<WorkerMembersCredits>>;
 	/** `GET /v1/schools/:school/demo-api/<route>`: a demo school's answer to a buzz-school read, shaped as that route's
 	 * (`route` is the path after `/school-admin/schools/<id>/`, e.g. `billing/members-list`). */
 	demoApi(query: {
@@ -173,6 +188,7 @@ export function notConnectedWorker(): WorkerSource {
 		incomeStatement: reject("incomeStatement"),
 		membersIncome: reject("membersIncome"),
 		memberMoney: reject("memberMoney"),
+		memberCredits: reject("memberCredits"),
 		demoApi: reject("demoApi"),
 	};
 }
@@ -364,6 +380,7 @@ export function createFetchWorkerSource(options: {
 			read(id, "/members-income", { from, to }),
 		memberMoney: ({ school: id, key }) =>
 			read(id, `/members/${encodeURIComponent(key)}/money`),
+		memberCredits: ({ school: id }) => read(id, "/members-credits"),
 		demoApi: ({ school: id, route, query }) =>
 			read(id, `/demo-api/${route}`, query),
 	};

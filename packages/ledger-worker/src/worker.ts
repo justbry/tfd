@@ -70,6 +70,7 @@ import {
 } from "./routes/kpi.js";
 import { ledgerRoute } from "./routes/ledger.js";
 import { memberMoneyRoute } from "./routes/member-money.js";
+import { membersCreditsRoute } from "./routes/members-credits.js";
 import { dayRange, oneOf } from "./routes/query.js";
 import { demoSchoolsRoute, schoolsRoute } from "./routes/schools.js";
 import {
@@ -236,6 +237,10 @@ const routes: Record<string, Route> = {
 	fundraising: {
 		gate: "finance",
 		handle: ({ snapshot, query }) => fundraisingRoute(snapshot, query),
+	},
+	"members-credits": {
+		gate: "any",
+		handle: ({ snapshot }) => membersCreditsRoute(snapshot),
 	},
 };
 

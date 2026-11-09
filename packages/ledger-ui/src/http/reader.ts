@@ -417,11 +417,39 @@ export function createHttpReader(options: {
 			return reads.demoPeople(members.members);
 		},
 		membersSummary: async ({ schoolId }) => {
-			if (!isDemoSchool(schoolId))
-				return unavailable(
+			if (!isDemoSchool(schoolId)) {
+				// A school whose log holds credit events: the Worker's members-credits (the summary readers over the log, each
+				// member under the menu version they bought on). Any other school has no source, as before.
+				const noSource = unavailable(
 					"membersSummary",
-					"no route (build list group 1, ledger/members-summary)",
-				)();
+					"no route (build list group 1, ledger/members-summary), and the school's log holds no credit event",
+				);
+				// A school the Worker has no views for yet, or cannot read, keeps the answer it had: not available.
+				const credits = seen(
+					schoolId,
+					await worker
+						.memberCredits({ school: schoolId })
+						.catch(() => noSource()),
+				);
+				if (!credits.hasCreditEvents) return noSource();
+				const facts = schoolFactsOf(
+					await clientFor(schoolId).get(routes.school(schoolId)),
+				);
+				const unit = credits.unit ?? facts.creditUnit;
+				if (unit === null || facts.currency === null)
+					throw notAvailable(
+						"membersSummary",
+						"the school's menu names no credit unit or currency",
+					);
+				// No source states the gift codes (Promos) or the booking rules (D11): none are made up.
+				return {
+					unit,
+					creditsOutstanding: credits.creditsOutstanding,
+					currency: facts.currency,
+					expiringGifts: [],
+					bookingRules: null,
+				};
+			}
 			const [members, facts, reads] = await Promise.all([
 				demoMembers(schoolId),
 				clientFor(schoolId).get(routes.school(schoolId)),

@@ -15,6 +15,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { watermarkKey } from "../src/data/watermark.js";
+import type { BucketConnection } from "./seed-r2.js";
 import {
 	asArray,
 	asRecord,
@@ -479,7 +480,9 @@ export const parseEnvFile = (text: string): Record<string, string> => {
  * The R2 key: the four `R2_LEDGER_*` variables from the environment, else from `~/.config/b4uni/r2-stg-ledger-s3.env`.
  * seed:r2's `connectionOf` refuses every bucket but `b4uni-stg-ledger` and every host outside R2. No value is printed.
  */
-const openLiveBucket: S8dDependencies["openBucket"] = async () => {
+export const openLiveConnection = async (): Promise<
+	{ connection: BucketConnection } | { blocked: string }
+> => {
 	let values: Record<string, string | undefined> = process.env;
 	if (R2_NAMES.some((name) => !process.env[name]))
 		try {
@@ -490,7 +493,7 @@ const openLiveBucket: S8dDependencies["openBucket"] = async () => {
 			};
 		}
 	const { connectionOf } = await import("./seed-r2.js");
-	let connection: ReturnType<typeof connectionOf>;
+	let connection: BucketConnection;
 	try {
 		connection = connectionOf(values);
 	} catch (error) {
@@ -498,7 +501,13 @@ const openLiveBucket: S8dDependencies["openBucket"] = async () => {
 	}
 	registerSecret(connection.accessKeyId);
 	registerSecret(connection.secretAccessKey);
-	const client = new Bun.S3Client({ ...connection, region: "auto" });
+	return { connection };
+};
+
+const openLiveBucket: S8dDependencies["openBucket"] = async () => {
+	const opened = await openLiveConnection();
+	if ("blocked" in opened) return opened;
+	const client = new Bun.S3Client({ ...opened.connection, region: "auto" });
 	return {
 		bucket: {
 			list: (options) => client.list(options),
