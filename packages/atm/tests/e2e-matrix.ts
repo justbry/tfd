@@ -474,9 +474,9 @@ export const eventsCsv = (events: readonly AtmEvent[]): string =>
 	].join("\n")}\n`;
 
 /**
- * The credit balances a log replays to. Members on different menu versions (`menus`) cannot be decided by one catalog (a
- * version's grants are in its catalog), so each holder's events replay under the catalog of the version their decisions are
- * labelled with.
+ * The credit balances a log replays to. Members on different menu versions (`menus`) replay in one call: a command runs
+ * under the catalog of the version its event is labelled with (a version's grants are in its catalog). A version the
+ * events are labelled with that `menus` does not have takes `menu`.
  */
 export const replayBalances = (
 	events: readonly AtmEvent[],
@@ -488,33 +488,25 @@ export const replayBalances = (
 	balances: ReturnType<typeof replayEvents>["balances"];
 	asOf: string | null;
 } => {
-	const replay = (replayed: readonly AtmEvent[], under: Menu) =>
-		replayEvents({
-			events: replayed,
-			catalog: menuCatalogRows({
-				menu: under,
-				school,
-				...(env ? { env } : {}),
-			}),
-		});
+	const rowsOf = (under: Menu) =>
+		menuCatalogRows({ menu: under, school, ...(env ? { env } : {}) });
 	if (menus === undefined) {
-		const { balances, asOf } = replay(events, menu);
+		const { balances, asOf } = replayEvents({
+			events,
+			catalog: rowsOf(menu),
+		});
 		return { balances, asOf };
 	}
-	const balances: ReturnType<typeof replayEvents>["balances"] = [];
-	let asOf: string | null = null;
-	for (const key of [...new Set(events.map((event) => event.key))].sort()) {
-		const own = events.filter((event) => event.key === key);
-		const version = own.find((event) => event.labels.menu_version)?.labels
-			.menu_version;
-		const result = replay(
-			own,
-			version === undefined ? menu : (menus[version] ?? menu),
-		);
-		balances.push(...result.balances);
-		if (result.asOf !== null && (asOf === null || result.asOf > asOf))
-			asOf = result.asOf;
-	}
+	const versions = new Set([
+		...Object.keys(menus),
+		...events.flatMap((event) => event.labels.menu_version ?? []),
+	]);
+	const { balances, asOf } = replayEvents({
+		events,
+		catalogs: Object.fromEntries(
+			[...versions].map((version) => [version, rowsOf(menus[version] ?? menu)]),
+		),
+	});
 	return { balances, asOf };
 };
 

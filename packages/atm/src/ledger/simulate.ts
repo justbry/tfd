@@ -19,6 +19,8 @@ import { buildJournal } from "./journal.js";
 import { lapsedRows, lapseEvent, mutationToEvents } from "./postings.js";
 import {
 	balancesOf,
+	type CatalogInput,
+	catalogSetOf,
 	compareChanges,
 	contextFromEvent,
 	HANDLER_COMMAND,
@@ -28,7 +30,7 @@ import {
 	replayEvents,
 	replayOrder,
 } from "./replay.js";
-import { runOnState, toCatalog } from "./run.js";
+import { runOnState } from "./run.js";
 import { canonicalize, decimalToUnits, unitsToDecimal } from "./util.js";
 
 const MAX_LISTED = 20;
@@ -441,11 +443,20 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 	const { events, candidate } = input;
 	if (input.month !== undefined && !MONTH.test(input.month))
 		throw new Error(`month must be YYYY-MM, got ${input.month}`);
-	if (input.catalog !== undefined && input.menu !== undefined)
-		throw new Error("give the current catalog or the current menu, not both");
-	if (candidate.catalog !== undefined && candidate.menu !== undefined)
+	const given = (side: {
+		catalog?: unknown;
+		catalogs?: unknown;
+		menu?: unknown;
+	}) =>
+		[side.catalog, side.catalogs, side.menu].filter((v) => v !== undefined)
+			.length;
+	if (given(input) > 1)
 		throw new Error(
-			"give the candidate catalog or the candidate menu, not both",
+			"give the current catalog or the current menu, not both (catalogs per menu version stand alone too)",
+		);
+	if (given(candidate) > 1)
+		throw new Error(
+			"give the candidate catalog or the candidate menu, not both (catalogs per menu version stand alone too)",
 		);
 	const school = input.school ?? events[0]?.school;
 	const rowsOf = (
@@ -459,19 +470,25 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 			);
 		return menuCatalogRows({ menu, school });
 	};
-	const currentRows = input.catalog ?? rowsOf(input.menu, "the current side");
-	const candidateRows =
-		candidate.catalog ??
-		(candidate.menu ? rowsOf(candidate.menu, "the candidate") : currentRows);
+	const currentSource: CatalogInput = input.catalogs
+		? { catalogs: input.catalogs }
+		: { catalog: input.catalog ?? rowsOf(input.menu, "the current side") };
+	const candidateSource: CatalogInput = candidate.catalogs
+		? { catalogs: candidate.catalogs }
+		: candidate.catalog
+			? { catalog: candidate.catalog }
+			: candidate.menu
+				? { catalog: rowsOf(candidate.menu, "the candidate") }
+				: currentSource;
 
 	const current = replayEvents({
 		events,
-		catalog: currentRows,
+		...currentSource,
 		asOf: input.asOf,
 	});
 	const asOfMs = current.asOf ? Date.parse(current.asOf) : 0;
 
-	const catalog = toCatalog(candidateRows);
+	const catalogSet = catalogSetOf(candidateSource);
 	const ordered = replayOrder(events);
 	const whole = recordedMutations(events);
 	const states: Record<string, SubjectState> = {};
@@ -482,7 +499,7 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 	const refused: (AtmSimulateRefusal & { date: string })[] = [];
 
 	/** Where the log's own commands leave the subject: what the candidate's rows are compared with where a row lapses. */
-	const currentCatalog = toCatalog(currentRows);
+	const currentCatalogSet = catalogSetOf(currentSource);
 	const logStates: Record<string, SubjectState> = {};
 	/** The `credit.expired` events of a lapse the candidate's books have (the cron's, carried, or booked here): one each. */
 	const lapseIdems = new Set<string>();
@@ -580,13 +597,14 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 		const rowKey = (row: ReturnType<typeof lapsedRows>[number]) =>
 			[row.table, row.id, row.expires_at].join("\u0000");
 		const inLog = new Set(
-			lapsedOf(logStates[key], (id) => currentCatalog.features[id]?.id).map(
-				({ row }) => rowKey(row),
-			),
+			lapsedOf(
+				logStates[key],
+				(id) => currentCatalogSet.features.features[id]?.id,
+			).map(({ row }) => rowKey(row)),
 		);
 		for (const { feature, row } of lapsedOf(
 			state,
-			(id) => catalog.features[id]?.id,
+			(id) => catalogSet.features.features[id]?.id,
 		)) {
 			if (inLog.has(rowKey(row))) continue;
 			const sibling = [...ordered].reverse().find((e) => e.key === key);
@@ -621,6 +639,7 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 	 * Returns the state the command ran on.
 	 */
 	const advanceLog = (
+		event: AtmEvent,
 		command: CommandShape,
 		atMs: number,
 		recorded: RecordedMutation,
@@ -636,7 +655,7 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 		try {
 			const run = runOnState({
 				state: start ? clone(start) : null,
-				catalog: currentCatalog,
+				catalog: currentCatalogSet.forEvent(event),
 				command: { ...command, occurredAt: atMs },
 			});
 			if (run.state) logStates[subject] = inStoredOrder(run.state);
@@ -667,7 +686,7 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 		const subject = command.identity.customerId;
 		const atMs = Date.parse(e.event_time);
 		bookLapses(subject, atMs);
-		const logStart = advanceLog(command, atMs, recorded);
+		const logStart = advanceLog(e, command, atMs, recorded);
 		const before = states[subject] ?? null;
 		if (before !== null && before.revision >= recorded.revision.after) {
 			for (const g of group) carry(g);
@@ -696,7 +715,7 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 		try {
 			run = runOnState({
 				state: start ? clone(start) : null,
-				catalog,
+				catalog: catalogSet.forEvent(e),
 				command: {
 					...withPolicy(command, candidate.policy),
 					occurredAt: Date.parse(e.event_time),
@@ -776,7 +795,7 @@ export const simulate = (input: AtmSimulateInput): AtmSimulation => {
 	const candidateBalances = balancesOf({
 		states: states as unknown as Record<string, AtmSubjectState>,
 		holds,
-		catalog,
+		catalog: catalogSet.features,
 		asOfMs,
 	});
 	const postingChanges = postingChangesOf(events, candidateEvents).filter(
