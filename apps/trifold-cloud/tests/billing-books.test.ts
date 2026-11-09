@@ -7,7 +7,7 @@ import {
 } from "../../../packages/atm/src/cloud.ts";
 import { invoicePaid } from "../../../packages/atm/src/scenario/stripe-events.ts";
 import { PUBLISHED } from "../src/billing/plans";
-import { schoolHintOf } from "../src/billing/webhook";
+import { foreignSchoolOf, schoolHintOf } from "../src/billing/webhook";
 import { durableSqlDatabase, splitStatements } from "../src/do-sql";
 import worker from "../src/index";
 import {
@@ -464,6 +464,120 @@ describe("POST /webhooks/billing", () => {
 		).toBeNull();
 		expect(state.alarms.length).toBe(1);
 		books.bucket.put = put;
+	});
+
+	test("an event that names another business's school is answered 200 and never reaches the books", async () => {
+		const { raw, books, deliver, stripe } = wired();
+		const response = await deliver(starterPaid("uruleu-institute"));
+		expect(response.status).toBe(200);
+		expect(await response.json()).toEqual({
+			outcome: "ignored",
+			reason: "other_school",
+			school: "uruleu-institute",
+		});
+		expect(stripe.calls).toEqual([]);
+		expect(count(raw, "SELECT COUNT(*) AS n FROM atm_event_claims")).toBe(0);
+		expect(books.objects.size).toBe(0);
+	});
+
+	test("a refund carries its charge's metadata: another school's refund is answered 200 and not applied", async () => {
+		const { raw, deliver } = wired();
+		const refund = {
+			id: "evt_refund_other",
+			object: "event",
+			type: "charge.refunded",
+			livemode: false,
+			created: Math.floor(T0 / 1000),
+			data: {
+				object: {
+					id: "ch_other",
+					object: "charge",
+					payment_intent: "pi_other",
+					amount_refunded: 3900,
+					metadata: { b4u_school: "uruleu-institute" },
+				},
+			},
+		};
+		const response = await deliver(JSON.stringify(refund));
+		expect(response.status).toBe(200);
+		expect(((await response.json()) as { reason: string }).reason).toBe(
+			"other_school",
+		);
+		expect(count(raw, "SELECT COUNT(*) AS n FROM atm_event_claims")).toBe(0);
+	});
+
+	test("a dispute is matched to its school through its charge; a Trifold charge or a failed lookup goes to the handler", async () => {
+		const dispute = (charge: string) =>
+			JSON.stringify({
+				id: `evt_dispute_${charge}`,
+				object: "event",
+				type: "charge.dispute.created",
+				livemode: false,
+				created: Math.floor(T0 / 1000),
+				data: {
+					object: {
+						id: `dp_${charge}`,
+						object: "dispute",
+						charge,
+						payment_intent: `pi_${charge}`,
+						amount: 3900,
+						currency: "usd",
+						status: "needs_response",
+						metadata: {},
+					},
+				},
+			});
+		const { env, raw, stripe } = wired();
+		const routes = fakeStripeApi(({ url }) => {
+			if (url.pathname === "/v1/charges/ch_other")
+				return {
+					body: {
+						id: "ch_other",
+						object: "charge",
+						livemode: false,
+						metadata: { b4u_school: "uruleu-institute" },
+					},
+				};
+			if (url.pathname === "/v1/charges/ch_ours")
+				return {
+					body: {
+						id: "ch_ours",
+						object: "charge",
+						livemode: false,
+						metadata: {},
+					},
+				};
+			return null;
+		});
+		const object = new OrgDO(durableState(raw), env, routes.fetcher);
+		const post = (payload: string) =>
+			object.fetch(
+				new Request("https://org.internal/billing/stripe", {
+					method: "POST",
+					body: payload,
+				}),
+			);
+		const other = (await (await post(dispute("ch_other"))).json()) as {
+			school: string;
+			handler: { body: { reason: string } };
+		};
+		expect(other.school).toBe("uruleu-institute");
+		expect(other.handler.body.reason).toBe("other_school");
+		expect(count(raw, "SELECT COUNT(*) AS n FROM atm_event_claims")).toBe(0);
+		// Ours, and a charge Stripe can't find: the handler decides (a dispute with no linked payment waits, 409).
+		expect((await post(dispute("ch_ours"))).status).toBe(409);
+		expect((await post(dispute("ch_missing"))).status).toBe(409);
+		expect(stripe.calls).toEqual([]);
+	});
+
+	test("foreignSchoolOf names only a school that is not Trifold's", () => {
+		expect(foreignSchoolOf(JSON.parse(starterPaid("tf-std")))).toBeNull();
+		expect(foreignSchoolOf({ data: { object: { metadata: {} } } })).toBeNull();
+		expect(
+			foreignSchoolOf({
+				data: { object: { metadata: { b4u_school: "uruleu-institute" } } },
+			}),
+		).toBe("uruleu-institute");
 	});
 
 	test("the school hint comes from the subscription's metadata on the invoice, or the subscription itself", () => {

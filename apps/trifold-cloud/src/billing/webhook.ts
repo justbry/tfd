@@ -2,6 +2,7 @@ import { verifyStripeSignature } from "../../../../packages/atm/src/cloud.ts";
 import type { CloudEnv } from "../env";
 import { TRIFOLD_BOOKS } from "../org-do";
 import { SCHOOL_IDS } from "./plans";
+import { stripeApi } from "./stripe";
 
 /** Stripe's events are small; anything larger is not one of them (PLAN.md section 3.3). */
 export const MAX_WEBHOOK_BYTES = 256 * 1024;
@@ -9,15 +10,14 @@ export const MAX_WEBHOOK_BYTES = 256 * 1024;
 const reply = (status: number, body: unknown): Response =>
 	Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 
-const metadataSchool = (metadata: unknown): string | null => {
+/** The `b4u_school` a metadata object names, whichever school it is. */
+const namedSchool = (metadata: unknown): string | null => {
 	const school = (metadata as { b4u_school?: unknown } | null)?.b4u_school;
-	return typeof school === "string" && SCHOOL_IDS.includes(school)
-		? school
-		: null;
+	return typeof school === "string" && school !== "" ? school : null;
 };
 
-/** The Trifold school an event names, from the metadata checkout put on the subscription (and so on its invoices). */
-export const schoolHintOf = (event: unknown): string | null => {
+/** The school an event's object names: its own metadata, or the subscription's (on an invoice, or the subscription). */
+const eventSchool = (event: unknown): string | null => {
 	const object = (event as { data?: { object?: Record<string, unknown> } })
 		?.data?.object;
 	if (!object) return null;
@@ -26,13 +26,67 @@ export const schoolHintOf = (event: unknown): string | null => {
 		| null
 		| undefined;
 	return (
-		metadataSchool(object.metadata) ??
-		metadataSchool(parent?.subscription_details?.metadata) ??
-		metadataSchool(
+		namedSchool(object.metadata) ??
+		namedSchool(parent?.subscription_details?.metadata) ??
+		namedSchool(
 			(object.subscription_details as { metadata?: unknown } | undefined)
 				?.metadata,
 		)
 	);
+};
+
+/** The Trifold school an event names, from the metadata checkout put on the subscription (and so on its invoices). */
+export const schoolHintOf = (event: unknown): string | null => {
+	const school = eventSchool(event);
+	return school && SCHOOL_IDS.includes(school) ? school : null;
+};
+
+/**
+ * The school an event names when it is not one of Trifold's: another business billing through the same Stripe account
+ * (a demo, or a school that has not moved to its own connected account yet). Its events are not Trifold's money, so the
+ * endpoint answers them 200 and books nothing, instead of letting the handler refuse them and Stripe retry for days. A
+ * refund carries its charge's metadata, which Stripe copies from the payment intent, so a business that puts
+ * `b4u_school` in `payment_intent_data.metadata` keeps its refunds out too.
+ */
+export const foreignSchoolOf = (event: unknown): string | null => {
+	const school = eventSchool(event);
+	return school && !SCHOOL_IDS.includes(school) ? school : null;
+};
+
+/**
+ * A dispute names its charge by id and carries no metadata of its own, so the school is read from the charge. Null when
+ * the charge names a Trifold school or none, or when Stripe can't be asked: the handler then decides as before.
+ */
+export const disputeForeignSchool = async (
+	event: unknown,
+	input: { key: string | undefined; fetcher: typeof fetch },
+): Promise<string | null> => {
+	const { type, data } = event as {
+		type?: unknown;
+		data?: { object?: { charge?: unknown } };
+	};
+	const charge = data?.object?.charge;
+	if (
+		typeof type !== "string" ||
+		!type.startsWith("charge.dispute.") ||
+		typeof charge !== "string"
+	)
+		return null;
+	try {
+		const found = await stripeApi({
+			key: input.key,
+			fetcher: input.fetcher,
+			method: "GET",
+			path: `/v1/charges/${charge}`,
+		});
+		const school = namedSchool(found.metadata);
+		return school && !SCHOOL_IDS.includes(school) ? school : null;
+	} catch (error) {
+		console.warn(
+			`billing webhook: could not read ${charge} for its school: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return null;
+	}
 };
 
 /**
@@ -77,6 +131,13 @@ export const billingWebhookRoute = async (
 	const live = env.ENVIRONMENT === "production";
 	if (event.livemode !== live)
 		return reply(200, { outcome: "ignored", reason: "other_mode" });
+	const foreign = foreignSchoolOf(event);
+	if (foreign)
+		return reply(200, {
+			outcome: "ignored",
+			reason: "other_school",
+			school: foreign,
+		});
 	const stub = env.ORG.get(env.ORG.idFromName(TRIFOLD_BOOKS));
 	try {
 		const response = await stub.fetch(

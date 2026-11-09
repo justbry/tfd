@@ -87,7 +87,10 @@ The endpoint sends exactly what Trifold's books take: `invoice.paid`, `invoice_p
 invoice, so refunds and disputes find it), `customer.subscription.created/updated/deleted`, `charge.refunded`, and
 `charge.dispute.created/closed` (the dispute and its fee). Not `payout.paid/failed`, which tfd's `STRIPE_WEBHOOK_EVENTS`
 also lists: this Stripe account is shared, so its payouts hold money that is not Trifold's, and tfd would book a payout
-(which names no school) into the first school tried. The fee needs no event: it is read from the API.
+(which names no school) into the first school tried. The fee needs no event: it is read from the API. An event whose object (or its subscription) names a `b4u_school` that is not Trifold's is another business on the same
+account: it is answered 200 `other_school` and books nothing. A refund is matched by its charge's metadata (Stripe copies
+it from the payment intent, so such a business sets `payment_intent_data.metadata.b4u_school`), and a dispute by reading
+its charge.
 
 ```sh
 bun scripts/publish-plans.ts --dry-run   # then without --dry-run; commit src/published-plans.json and deploy
