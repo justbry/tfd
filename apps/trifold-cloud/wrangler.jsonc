@@ -9,9 +9,15 @@
 	"workers_dev": false,
 	"observability": { "enabled": true },
 	"durable_objects": {
-		"bindings": [{ "name": "ORG", "class_name": "OrgDO" }]
+		"bindings": [
+			{ "name": "ORG", "class_name": "OrgDO" },
+			{ "name": "NOTE", "class_name": "NoteDO" }
+		]
 	},
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrgDO"] }],
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["OrgDO"] },
+		{ "tag": "v2", "new_sqlite_classes": ["NoteDO"] }
+	],
 	"env": {
 		"staging": {
 			"name": "trifold-cloud-staging",
@@ -21,7 +27,10 @@
 				{ "pattern": "staging-api.trifold.app", "custom_domain": true }
 			],
 			"durable_objects": {
-				"bindings": [{ "name": "ORG", "class_name": "OrgDO" }]
+				"bindings": [
+					{ "name": "ORG", "class_name": "OrgDO" },
+					{ "name": "NOTE", "class_name": "NoteDO" }
+				]
 			},
 			"d1_databases": [
 				{

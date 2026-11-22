@@ -64,5 +64,9 @@
 		"borrower_overdue_minor": "1197693",
 		"lender_days_overdue": 40,
 		"borrower_days_overdue": 9
+	},
+	"state": {
+		"terms": "proposed",
+		"closed": false
 	}
 }

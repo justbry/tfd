@@ -169,6 +169,7 @@ describe("tfd note statement", () => {
 		);
 		const gap = note(["statement", open, "--as-of", AS_OF]);
 		expect(gap.exitCode).toBe(0);
+		expect(gap.stdout).toContain("Terms: proposed. Closed: no.");
 		expect(gap.stdout).toContain("Lender view");
 		expect(gap.stdout).toContain("Borrower view");
 		expect(gap.stdout).toContain("Payoff gap");

@@ -40,9 +40,11 @@ describe("production stays unbound until the launch gate", () => {
 		expect(Object.keys(config).sort()).toEqual([...CLOUD_TOP_LEVEL].sort());
 		expect(config.workers_dev).toBe(false);
 		expect(Object.keys(config.env)).toEqual(["staging"]);
-		// The org Durable Object is SQLite-backed (its storage is the tfd handler's database, PLAN.md section 3.1).
+		// The org Durable Object is SQLite-backed (its storage is the tfd handler's database, PLAN.md section 3.1); so is
+		// the per-note one (`src/notes/note-do.ts`), added in its own migration step.
 		expect(config.migrations).toEqual([
 			{ tag: "v1", new_sqlite_classes: ["OrgDO"] },
+			{ tag: "v2", new_sqlite_classes: ["NoteDO"] },
 		]);
 	});
 

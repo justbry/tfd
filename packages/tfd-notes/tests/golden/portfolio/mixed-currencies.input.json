@@ -1,0 +1,378 @@
+{
+ "notes": [
+  {
+   "note_id": "loan-a",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "a",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "USD",
+      "exponent": 2,
+      "principal_minor": "30000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 3,
+       "first_due": "2026-04-15"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "a",
+     "seq": 2,
+     "entered_at": "2026-03-16T09:00:00Z",
+     "entered_by": "borrower",
+     "type": "terms.accepted"
+    }
+   ]
+  },
+  {
+   "note_id": "loan-b",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "b",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "USD",
+      "exponent": 2,
+      "principal_minor": "30000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 3,
+       "first_due": "2026-04-15"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "b",
+     "seq": 2,
+     "entered_at": "2026-03-16T09:00:00Z",
+     "entered_by": "borrower",
+     "type": "terms.accepted"
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-3",
+     "note_id": "b",
+     "seq": 3,
+     "entered_at": "2026-04-16T10:00:00Z",
+     "entered_by": "lender",
+     "type": "payment.recorded",
+     "kind": "payment",
+     "amount_minor": "10000",
+     "value_date": "2026-04-15"
+    }
+   ]
+  },
+  {
+   "note_id": "eur-1",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "e",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "EUR",
+      "exponent": 2,
+      "principal_minor": "5000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 1,
+       "first_due": "2026-06-20"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "note_id": "jpy-1",
+   "role": "borrower",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "j",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "JPY",
+      "exponent": 0,
+      "principal_minor": "3000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 1,
+       "first_due": "2026-06-01"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "j",
+     "seq": 2,
+     "entered_at": "2026-03-16T09:00:00Z",
+     "entered_by": "borrower",
+     "type": "terms.accepted"
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-3",
+     "note_id": "j",
+     "seq": 3,
+     "entered_at": "2026-06-02T10:00:00Z",
+     "entered_by": "borrower",
+     "type": "payment.recorded",
+     "kind": "payment",
+     "amount_minor": "3000",
+     "value_date": "2026-06-01"
+    }
+   ]
+  },
+  {
+   "note_id": "closed-1",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "c",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "USD",
+      "exponent": 2,
+      "principal_minor": "20000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 2,
+       "first_due": "2026-05-01"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "c",
+     "seq": 2,
+     "entered_at": "2026-06-20T09:00:00Z",
+     "entered_by": "lender",
+     "type": "release.drafted"
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-3",
+     "note_id": "c",
+     "seq": 3,
+     "entered_at": "2026-06-21T09:00:00Z",
+     "entered_by": "lender",
+     "type": "release.confirmed",
+     "target": "evt-2"
+    }
+   ]
+  },
+  {
+   "note_id": "disputed-1",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "d",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "USD",
+      "exponent": 2,
+      "principal_minor": "12000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 1,
+       "first_due": "2026-07-15"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "d",
+     "seq": 2,
+     "entered_at": "2026-03-16T09:00:00Z",
+     "entered_by": "borrower",
+     "type": "terms.accepted"
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-3",
+     "note_id": "d",
+     "seq": 3,
+     "entered_at": "2026-06-11T10:00:00Z",
+     "entered_by": "lender",
+     "type": "payment.recorded",
+     "kind": "payment",
+     "amount_minor": "4000",
+     "value_date": "2026-06-10"
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-4",
+     "note_id": "d",
+     "seq": 4,
+     "entered_at": "2026-06-12T10:00:00Z",
+     "entered_by": "borrower",
+     "type": "payment.disputed",
+     "target": "evt-3",
+     "counter_amount_minor": "3000",
+     "reason": "I paid thirty dollars, not forty"
+    }
+   ]
+  },
+  {
+   "note_id": "=SUM(1,2)",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "s",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "USD",
+      "exponent": 2,
+      "principal_minor": "1000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 1,
+       "first_due": "2026-06-30"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "s",
+     "seq": 2,
+     "entered_at": "2026-06-01T09:00:00Z",
+     "entered_by": "lender",
+     "type": "annotation.added",
+     "text": "call the borrower at 555-0100"
+    }
+   ]
+  },
+  {
+   "note_id": "bad",
+   "role": "lender",
+   "events": [
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-1",
+     "note_id": "x",
+     "seq": 1,
+     "entered_at": "2026-03-15T09:00:00Z",
+     "entered_by": "lender",
+     "type": "note.created",
+     "terms": {
+      "currency": "USD",
+      "exponent": 2,
+      "principal_minor": "1000",
+      "issue_date": "2026-03-15",
+      "annual_rate": "0",
+      "day_count": "actual/365",
+      "rounding": "half-up",
+      "timezone": "America/Denver",
+      "schedule": {
+       "type": "amortized",
+       "frequency": "monthly",
+       "count": 1,
+       "first_due": "2026-06-30"
+      }
+     }
+    },
+    {
+     "schema": "tfd.note-event.v1",
+     "id": "evt-2",
+     "note_id": "x",
+     "seq": 2,
+     "entered_at": "2026-06-02T10:00:00Z",
+     "entered_by": "lender",
+     "type": "payment.recorded",
+     "kind": "payment",
+     "amount_minor": "12.5",
+     "value_date": "2026-06-01"
+    }
+   ]
+  }
+ ],
+ "as_of": "2026-06-30"
+}

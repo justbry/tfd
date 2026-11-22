@@ -62,6 +62,9 @@ export interface ScheduleRow {
 /** Who states a backfilled payment. `both-agree` is derived from a confirmation (R-14) and is never recorded. */
 export type PaymentSource = "lender-states" | "borrower-states";
 
+/** How a party reached the system when the event was entered: a magic link sent to an email, or a signed-in account. */
+export type EventVia = "email-link" | "account";
+
 interface EventBase {
 	schema: typeof NOTE_EVENT_SCHEMA;
 	/** Unique event id (ULID or similar; opaque to the engine). */
@@ -72,6 +75,10 @@ interface EventBase {
 	/** UTC instant the event was entered, ISO 8601 with `Z`. */
 	entered_at: string;
 	entered_by: Role;
+	/** How the party reached the system. Absent on events entered before this field existed. */
+	via?: EventVia;
+	/** Opaque id of whoever acted for the party (non-empty, at most 128 characters). Never a name or an email. */
+	agent_ref?: string;
 }
 
 export interface NoteCreatedEvent extends EventBase {
@@ -123,13 +130,143 @@ export interface AnnotationAddedEvent extends EventBase {
 	target?: string;
 }
 
+/** The borrower accepts the terms as written. The last of `terms.accepted` and `terms.declined` decides `state.terms`. */
+export interface TermsAcceptedEvent extends EventBase {
+	type: "terms.accepted";
+	entered_by: "borrower";
+}
+
+/** The borrower says these are not their terms ("Not my loan"). */
+export interface TermsDeclinedEvent extends EventBase {
+	type: "terms.declined";
+	entered_by: "borrower";
+}
+
+/** The lender issued a payoff document for `as_of`. Carries no figures: the engine computes them, the hash names the document. */
+export interface PayoffIssuedEvent extends EventBase {
+	type: "payoff.issued";
+	entered_by: "lender";
+	as_of: CivilDate;
+	document_sha256: string;
+}
+
+export interface ReleaseDraftedEvent extends EventBase {
+	type: "release.drafted";
+	entered_by: "lender";
+}
+
+export interface ReleaseConfirmedEvent extends EventBase {
+	type: "release.confirmed";
+	entered_by: "lender";
+	/** The `id` of an earlier `release.drafted` event. */
+	target: string;
+}
+
+export type NoticeKind = "reminder" | "default";
+
+/** A notice is a record that one was sent; it changes no number and no status. */
+export interface NoticeSentEvent extends EventBase {
+	type: "notice.sent";
+	entered_by: "lender";
+	kind: NoticeKind;
+	/** Days the borrower has to cure, 0 to 365. Required when `kind` is `default`, forbidden for `reminder`. */
+	cure_days?: number;
+}
+
+/** A new contact commitment for `role`, confirmed by the other party (who is `entered_by`). Carries no email. */
+export interface PartyReboundEvent extends EventBase {
+	type: "party.rebound";
+	/** The party being rebound. */
+	role: Role;
+	/** 64 lowercase hex: a salted hash of the new contact, made elsewhere. */
+	contact_commitment: string;
+}
+
+export type GrantAudienceKind = "person" | "org" | "link";
+export type GrantLevel = "summary" | "statement" | "verify";
+
+export interface GrantAudience {
+	kind: GrantAudienceKind;
+	/** An opaque reference to the audience, non-empty. */
+	ref: string;
+}
+
+/** Why a carve-out disclosure is made: the person needs it for their own books, legal advice, enforcement or assignment. */
+export type GrantPurpose =
+	| "accountant"
+	| "lawyer"
+	| "court"
+	| "assignee"
+	| "other";
+
+export interface GrantProposedEvent extends EventBase {
+	type: "visibility.changed";
+	change: "grant.proposed";
+	grant_id: string;
+	audience: GrantAudience;
+	level: GrantLevel;
+	/** Required. UTC instant ending in Z, at most 365 days after `entered_at`. */
+	expires_at: string;
+	/** Required when `carve_out` is true. */
+	purpose?: GrantPurpose;
+	/**
+	 * The typed carve-out disclosure: either party may disclose to a person who needs it for their own books, legal
+	 * advice, enforcement or assignment. Only to a `person`, at `summary` or `statement` level.
+	 */
+	carve_out?: boolean;
+}
+
+/** Consent to, or revocation of, an earlier `grant.proposed` with the same `grant_id`. */
+export interface GrantAnsweredEvent extends EventBase {
+	type: "visibility.changed";
+	change: "grant.consented" | "grant.revoked";
+	grant_id: string;
+}
+
+export type VisibilityChangedEvent = GrantProposedEvent | GrantAnsweredEvent;
+
+export type ApprovalAction = "release.confirm" | "notice.default" | "waiver";
+
+export interface ApprovalRequestedEvent extends EventBase {
+	type: "approval.requested";
+	action: ApprovalAction;
+	/** The `id` of an earlier event the action is about. */
+	target: string;
+}
+
+export interface ApprovalGrantedEvent extends EventBase {
+	type: "approval.granted";
+	/** The `id` of an earlier `approval.requested` event. */
+	request: string;
+}
+
 export type NoteEvent =
 	| NoteCreatedEvent
 	| PaymentRecordedEvent
 	| PaymentConfirmedEvent
 	| PaymentDisputedEvent
 	| PaymentResolvedEvent
-	| AnnotationAddedEvent;
+	| AnnotationAddedEvent
+	| TermsAcceptedEvent
+	| TermsDeclinedEvent
+	| PayoffIssuedEvent
+	| ReleaseDraftedEvent
+	| ReleaseConfirmedEvent
+	| NoticeSentEvent
+	| PartyReboundEvent
+	| VisibilityChangedEvent
+	| ApprovalRequestedEvent
+	| ApprovalGrantedEvent;
+
+export type TermsState = "proposed" | "accepted" | "declined";
+
+/** What the events say about the note as a whole, apart from any balance. */
+export interface StatementState {
+	/** `proposed` until the borrower accepts or declines; the last of the two by seq decides. */
+	terms: TermsState;
+	/** True once a `release.confirmed` exists, until a later reversal dated after the release reopens the note. */
+	closed: boolean;
+}
 
 /** What one party's count of the loan is on a date. */
 export interface Balance {
@@ -191,4 +328,5 @@ export interface Statement {
 		lender_days_overdue: number;
 		borrower_days_overdue: number;
 	};
+	state: StatementState;
 }

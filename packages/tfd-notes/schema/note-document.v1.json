@@ -1,0 +1,248 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://b4uni.com/_schema/note-document.v1.json",
+	"title": "Promissory note document v1",
+	"description": "A document made from a note's events (docs/specs/promissory-notes.md, build step 3): a payment receipt, a payoff statement, a release or a chain-head seal. The root checks a body, with or without its signature block. $defs/signed_document checks a signed document: a body whose signature is present. The signature is Ed25519 over the UTF-8 bytes of the body's canonical JSON (keys sorted by UTF-16 code unit, no whitespace, the signature block left out); payment receipts, payoff statements and releases use purpose 'receipt', chain seals use purpose 'seal'. Money is a digit string of minor units. A document holds no name and no email: parties are opaque references.",
+	"oneOf": [
+		{
+			"title": "note.payment-receipt",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"type",
+				"engine_version",
+				"note_id",
+				"chain_head",
+				"issued_at",
+				"payment_event_id",
+				"event_hash",
+				"kind",
+				"amount_minor",
+				"currency",
+				"exponent",
+				"value_date",
+				"recorded_by",
+				"status",
+				"lender_payoff_minor",
+				"borrower_payoff_minor"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"type": { "const": "note.payment-receipt" },
+				"engine_version": { "$ref": "#/$defs/engine_version" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"chain_head": { "$ref": "#/$defs/chain_head" },
+				"issued_at": { "$ref": "#/$defs/instant" },
+				"parties": { "$ref": "#/$defs/parties" },
+				"payment_event_id": { "$ref": "#/$defs/text" },
+				"event_hash": { "$ref": "#/$defs/sha256" },
+				"kind": { "enum": ["payment", "reversal"] },
+				"amount_minor": { "$ref": "#/$defs/minor_unsigned" },
+				"currency": { "$ref": "#/$defs/currency" },
+				"exponent": { "$ref": "#/$defs/exponent" },
+				"value_date": { "$ref": "#/$defs/civil_date" },
+				"recorded_by": { "$ref": "#/$defs/role" },
+				"via": { "enum": ["email-link", "account"] },
+				"status": {
+					"enum": [
+						"confirmed by both parties",
+						"claimed by lender",
+						"claimed by borrower",
+						"disputed",
+						"resolved by agreement",
+						"reversed"
+					]
+				},
+				"lender_payoff_minor": { "$ref": "#/$defs/minor_unsigned" },
+				"borrower_payoff_minor": { "$ref": "#/$defs/minor_unsigned" },
+				"signature": { "$ref": "#/$defs/signature" }
+			}
+		},
+		{
+			"title": "note.payoff-statement",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"type",
+				"engine_version",
+				"note_id",
+				"chain_head",
+				"issued_at",
+				"as_of",
+				"currency",
+				"exponent",
+				"lender",
+				"borrower",
+				"payoff_gap_minor",
+				"wording"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"type": { "const": "note.payoff-statement" },
+				"engine_version": { "$ref": "#/$defs/engine_version" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"chain_head": { "$ref": "#/$defs/chain_head" },
+				"issued_at": { "$ref": "#/$defs/instant" },
+				"parties": { "$ref": "#/$defs/parties" },
+				"as_of": { "$ref": "#/$defs/civil_date" },
+				"currency": { "$ref": "#/$defs/currency" },
+				"exponent": { "$ref": "#/$defs/exponent" },
+				"lender": { "$ref": "#/$defs/view_balance" },
+				"borrower": { "$ref": "#/$defs/view_balance" },
+				"payoff_gap_minor": { "$ref": "#/$defs/minor_signed" },
+				"wording": {
+					"const": "Computed by tfd-notes from the recorded events. A record, not legal or tax advice."
+				},
+				"signature": { "$ref": "#/$defs/signature" }
+			}
+		},
+		{
+			"title": "note.release",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"type",
+				"engine_version",
+				"note_id",
+				"chain_head",
+				"issued_at",
+				"release_event_id",
+				"release_event_hash",
+				"as_of",
+				"currency",
+				"exponent",
+				"balance_at_release_minor",
+				"released_with_balance",
+				"wording"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"type": { "const": "note.release" },
+				"engine_version": { "$ref": "#/$defs/engine_version" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"chain_head": { "$ref": "#/$defs/chain_head" },
+				"issued_at": { "$ref": "#/$defs/instant" },
+				"parties": { "$ref": "#/$defs/parties" },
+				"release_event_id": { "$ref": "#/$defs/text" },
+				"release_event_hash": { "$ref": "#/$defs/sha256" },
+				"as_of": { "$ref": "#/$defs/civil_date" },
+				"currency": { "$ref": "#/$defs/currency" },
+				"exponent": { "$ref": "#/$defs/exponent" },
+				"balance_at_release_minor": { "$ref": "#/$defs/minor_unsigned" },
+				"released_with_balance": { "type": "boolean" },
+				"wording": { "const": "The lender states this note is released." },
+				"signature": { "$ref": "#/$defs/signature" }
+			}
+		},
+		{
+			"title": "note.chain-seal",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"type",
+				"note_id",
+				"head_seq",
+				"head_hash",
+				"sealed_at"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"type": { "const": "note.chain-seal" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"head_seq": { "$ref": "#/$defs/seq" },
+				"head_hash": { "$ref": "#/$defs/sha256" },
+				"sealed_at": { "$ref": "#/$defs/instant" },
+				"signature": { "$ref": "#/$defs/signature" }
+			}
+		}
+	],
+	"$defs": {
+		"signed_document": {
+			"title": "Signed note document",
+			"description": "Any of the four documents with its signature block present.",
+			"$ref": "#",
+			"type": "object",
+			"required": ["signature"],
+			"properties": { "signature": { "$ref": "#/$defs/signature" } }
+		},
+		"schema": { "const": "tfd.note-document.v1" },
+		"engine_version": { "const": "tfd-notes/1" },
+		"text": { "type": "string", "minLength": 1 },
+		"seq": {
+			"type": "integer",
+			"minimum": 1,
+			"maximum": 9007199254740991
+		},
+		"role": { "enum": ["lender", "borrower"] },
+		"currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+		"exponent": { "type": "integer", "minimum": 0, "maximum": 4 },
+		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+		"civil_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+		"instant": {
+			"description": "An ISO 8601 UTC instant ending in Z.",
+			"type": "string",
+			"pattern": "^\\d{4}-\\d{2}-\\d{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z$"
+		},
+		"minor_unsigned": {
+			"description": "A non-negative integer count of minor units as digits, no leading zero.",
+			"type": "string",
+			"pattern": "^(0|[1-9][0-9]*)$"
+		},
+		"minor_signed": {
+			"description": "An integer count of minor units as digits with an optional minus: lender payoff minus borrower payoff.",
+			"type": "string",
+			"pattern": "^(0|-?[1-9][0-9]*)$"
+		},
+		"chain_head": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["seq", "head_hash"],
+			"properties": {
+				"seq": { "$ref": "#/$defs/seq" },
+				"head_hash": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		"parties": {
+			"description": "Opaque references the caller chose: letters, digits and ._:-. Never a name or an email.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"lender_ref": { "$ref": "#/$defs/opaque_ref" },
+				"borrower_ref": { "$ref": "#/$defs/opaque_ref" }
+			}
+		},
+		"opaque_ref": {
+			"type": "string",
+			"pattern": "^[A-Za-z0-9._:-]{1,128}$"
+		},
+		"view_balance": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["principal_minor", "interest_minor", "payoff_minor"],
+			"properties": {
+				"principal_minor": { "$ref": "#/$defs/minor_unsigned" },
+				"interest_minor": { "$ref": "#/$defs/minor_unsigned" },
+				"payoff_minor": { "$ref": "#/$defs/minor_unsigned" }
+			}
+		},
+		"signature": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["key_id", "purpose", "alg", "sig"],
+			"properties": {
+				"key_id": { "$ref": "#/$defs/text" },
+				"purpose": { "enum": ["receipt", "seal"] },
+				"alg": { "const": "Ed25519" },
+				"sig": {
+					"description": "Ed25519 over the body's canonical JSON, base64url without padding.",
+					"type": "string",
+					"pattern": "^[A-Za-z0-9_-]{86}$"
+				}
+			}
+		}
+	}
+}

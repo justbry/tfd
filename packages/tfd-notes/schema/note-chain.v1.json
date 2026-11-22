@@ -1,0 +1,47 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://b4uni.com/_schema/note-chain.v1.json",
+	"title": "Promissory note hash chain v1",
+	"description": "The per-note hash chain (docs/specs/promissory-notes.md, build step 3): one link per event in recording order (seq), and the head that a note.chain-seal signs. event_hash is sha256 of the event's canonical JSON; prev_hash is the genesis hash (sha256 of 'tfd.note-chain.v1:' and the note id) on link 1, else sha256 of the previous link's canonical JSON ({event_hash, event_id, prev_hash, seq}). The chain orders by seq only; value_date and entered_at are never read. Whether the hashes are right is checked in code (src/chain.ts, verifyChain), not by this schema.",
+	"oneOf": [{ "$ref": "#/$defs/link" }, { "$ref": "#/$defs/head" }],
+	"$defs": {
+		"sha256": {
+			"type": "string",
+			"pattern": "^[0-9a-f]{64}$"
+		},
+		"seq": {
+			"type": "integer",
+			"minimum": 1,
+			"maximum": 9007199254740991
+		},
+		"link": {
+			"title": "Chain link",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["seq", "event_id", "event_hash", "prev_hash"],
+			"properties": {
+				"seq": { "$ref": "#/$defs/seq" },
+				"event_id": { "type": "string", "minLength": 1 },
+				"event_hash": { "$ref": "#/$defs/sha256" },
+				"prev_hash": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		"head": {
+			"title": "Chain head",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["seq", "head_hash"],
+			"properties": {
+				"seq": { "$ref": "#/$defs/seq" },
+				"head_hash": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		"chain": {
+			"title": "Chain",
+			"description": "All links of one note, link n at index n - 1.",
+			"type": "array",
+			"minItems": 1,
+			"items": { "$ref": "#/$defs/link" }
+		}
+	}
+}

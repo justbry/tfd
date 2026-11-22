@@ -1,0 +1,134 @@
+{
+	"events": [
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-1",
+			"note_id": "note-demo-1",
+			"seq": 1,
+			"entered_at": "2026-01-01T09:00:00Z",
+			"entered_by": "lender",
+			"type": "note.created",
+			"terms": {
+				"currency": "USD",
+				"exponent": 2,
+				"principal_minor": "100000",
+				"issue_date": "2026-01-01",
+				"annual_rate": "0.0365",
+				"day_count": "actual/365",
+				"rounding": "half-up",
+				"timezone": "America/Denver",
+				"schedule": {
+					"type": "none"
+				}
+			}
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-2",
+			"note_id": "note-demo-1",
+			"seq": 2,
+			"entered_at": "2026-01-02T10:00:00Z",
+			"entered_by": "borrower",
+			"type": "terms.accepted",
+			"via": "email-link"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-3",
+			"note_id": "note-demo-1",
+			"seq": 3,
+			"entered_at": "2026-01-12T10:00:00Z",
+			"entered_by": "borrower",
+			"type": "payment.recorded",
+			"kind": "payment",
+			"amount_minor": "30000",
+			"value_date": "2026-01-11",
+			"method": "transfer",
+			"reference": "TX-1",
+			"via": "email-link"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-4",
+			"note_id": "note-demo-1",
+			"seq": 4,
+			"entered_at": "2026-01-14T10:00:00Z",
+			"entered_by": "lender",
+			"type": "payment.confirmed",
+			"target": "evt-3",
+			"via": "account"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-5",
+			"note_id": "note-demo-1",
+			"seq": 5,
+			"entered_at": "2026-01-15T08:00:00Z",
+			"entered_by": "borrower",
+			"type": "annotation.added",
+			"text": "Café payment — thank you",
+			"via": "email-link"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-6",
+			"note_id": "note-demo-1",
+			"seq": 6,
+			"entered_at": "2026-01-21T10:00:00Z",
+			"entered_by": "borrower",
+			"type": "payment.recorded",
+			"kind": "payment",
+			"amount_minor": "20000",
+			"value_date": "2026-01-20",
+			"via": "email-link"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-7",
+			"note_id": "note-demo-1",
+			"seq": 7,
+			"entered_at": "2026-02-01T10:00:00Z",
+			"entered_by": "lender",
+			"type": "payment.recorded",
+			"kind": "payment",
+			"amount_minor": "50000",
+			"value_date": "2026-01-05",
+			"source": "lender-states",
+			"via": "account"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-8",
+			"note_id": "note-demo-1",
+			"seq": 8,
+			"entered_at": "2026-03-01T09:00:00Z",
+			"entered_by": "lender",
+			"type": "release.drafted",
+			"via": "account"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-9",
+			"note_id": "note-demo-1",
+			"seq": 9,
+			"entered_at": "2026-03-02T10:00:00Z",
+			"entered_by": "lender",
+			"type": "release.confirmed",
+			"target": "evt-8",
+			"via": "account"
+		}
+	],
+	"payment_event_id": "evt-6",
+	"as_of": "2026-03-31",
+	"release_event_id": "evt-9",
+	"issued_at": "2026-03-05T12:00:00Z",
+	"sealed_at": "2026-03-05T12:00:01Z",
+	"parties": {
+		"lender_ref": "party-lender-1",
+		"borrower_ref": "party-borrower-1"
+	},
+	"test_keys": {
+		"receipt": "note-test-1",
+		"seal": "note-test-seal-1"
+	}
+}

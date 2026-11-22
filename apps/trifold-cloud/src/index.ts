@@ -3,6 +3,7 @@ import type { CloudEnv } from "./env";
 import { withSecurityHeaders } from "./headers";
 import { route } from "./router";
 
+export { NoteDO } from "./notes/note-do";
 export { OrgDO } from "./org-do";
 
 export default {

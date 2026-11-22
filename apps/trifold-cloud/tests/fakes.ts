@@ -1,6 +1,14 @@
 import type { Database } from "bun:sqlite";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { R2BucketBinding } from "../../../packages/atm/src/cloud.ts";
-import type { CloudEnv, D1Database, R2Bucket } from "../src/env";
+import { splitStatements } from "../src/do-sql";
+import type {
+	CloudEnv,
+	D1Database,
+	D1PreparedStatement,
+	R2Bucket,
+} from "../src/env";
 
 type Stored = {
 	bytes: string;
@@ -138,6 +146,7 @@ export const memoryD1 = (fail = false) => {
 					}
 					return { one: 1 } as T;
 				},
+				all: async <T>() => ({ results: [] as T[] }),
 				run: async () => {
 					if (query.startsWith("INSERT INTO backup_superseded")) {
 						superseded.set(values[0] as string, values[1] as string);
@@ -155,6 +164,45 @@ export const memoryD1 = (fail = false) => {
 		},
 	};
 	return { db, meta, superseded };
+};
+
+/**
+ * D1's prepare/bind/first/all/run shapes over bun:sqlite, so code written for D1 runs here against real SQL. Pair it with
+ * `applyD1Migrations` to build the schema from the `migrations/` files themselves.
+ */
+export const sqliteD1 = (db: Database): D1Database => ({
+	prepare: (query) => {
+		let values: unknown[] = [];
+		const statement: D1PreparedStatement = {
+			bind: (...bound) => {
+				values = bound;
+				return statement;
+			},
+			first: async <T>() =>
+				(db.query(query).get(...(values as never[])) ?? null) as T | null,
+			all: async <T>() => ({
+				results: db.query(query).all(...(values as never[])) as T[],
+			}),
+			run: async () => {
+				db.query(query).run(...(values as never[]));
+				return {};
+			},
+		};
+		return statement;
+	},
+});
+
+/** Runs every file of `migrations/` in name order, the way `wrangler d1 migrations apply` would. */
+export const applyD1Migrations = (db: Database): string[] => {
+	const directory = join(import.meta.dir, "..", "migrations");
+	const files = readdirSync(directory)
+		.filter((file) => file.endsWith(".sql"))
+		.sort();
+	for (const file of files) {
+		const text = readFileSync(join(directory, file), "utf8");
+		for (const statement of splitStatements(text)) db.run(statement);
+	}
+	return files;
 };
 
 /** A fresh Ed25519 private key as PKCS8 PEM, as Secrets Store would hand it over. */
@@ -193,6 +241,10 @@ export const fakeEnv = (
 			: books,
 		BACKUPS: memoryBucket().bucket,
 		ORG: {
+			idFromName: (name) => name,
+			get: () => ({ fetch: async () => new Response("unused") }),
+		},
+		NOTE: {
 			idFromName: (name) => name,
 			get: () => ({ fetch: async () => new Response("unused") }),
 		},
