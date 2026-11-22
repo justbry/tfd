@@ -1,0 +1,33 @@
+{
+	"name": "tfd-verify-notes",
+	"version": "0.1.0",
+	"private": true,
+	"license": "Apache-2.0",
+	"type": "module",
+	"description": "Verify the signed documents and hash chain of a Trifold promissory note offline, from the files and the public keys. Browser-safe, no node:* imports.",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"types": "./src/notes.ts",
+			"default": "./src/notes.ts"
+		}
+	},
+	"files": [
+		"src",
+		"LICENSE",
+		"README.md"
+	],
+	"scripts": {
+		"test": "bun test tests",
+		"ts": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@noble/ed25519": "^3.2.0",
+		"tfd-notes": "workspace:*",
+		"tfd-verify": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/bun": "1.4.2",
+		"typescript": "5.8.3"
+	}
+}

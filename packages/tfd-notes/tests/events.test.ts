@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "bun:test";
 import schema from "../schema/note-event.v1.json";
-import { parseNoteEvent, validateStream } from "../src/events.js";
-import type { NoteEvent } from "../src/types.js";
+import {
+	MAX_CARVE_OUT_DAYS,
+	MAX_GRANT_DAYS,
+	parseNoteEvent,
+	validateStream,
+} from "../src/events";
+import type { NoteEvent } from "../src/types";
 
 type Fields = Record<string, unknown>;
 
@@ -1077,6 +1082,765 @@ describe("validateStream rejects", () => {
 	}
 });
 
+describe("the event vocabulary for terms, payoff, release, notice, rebind, visibility and approval", () => {
+	const HASH = "c".repeat(64);
+	const termsAccepted = (seq = 2, enteredBy = "borrower"): Fields =>
+		make(seq, "terms.accepted", enteredBy, {});
+	const termsDeclined = (seq = 2, enteredBy = "borrower"): Fields =>
+		make(seq, "terms.declined", enteredBy, {});
+	const payoff = (seq = 2, fields: Fields = {}): Fields =>
+		make(seq, "payoff.issued", "lender", {
+			as_of: "2026-03-01",
+			document_sha256: HASH,
+			...fields,
+		});
+	const drafted = (seq = 2, enteredBy = "lender"): Fields =>
+		make(seq, "release.drafted", enteredBy, {});
+	const releaseConfirmed = (
+		seq = 3,
+		target = "evt-2",
+		enteredBy = "lender",
+	): Fields => make(seq, "release.confirmed", enteredBy, { target });
+	const notice = (seq = 2, fields: Fields = {}): Fields =>
+		make(seq, "notice.sent", "lender", { kind: "reminder", ...fields });
+	const rebound = (
+		seq = 2,
+		role = "borrower",
+		enteredBy = "lender",
+		fields: Fields = {},
+	): Fields =>
+		make(seq, "party.rebound", enteredBy, {
+			role,
+			contact_commitment: HASH,
+			...fields,
+		});
+	const proposal = (seq = 2, fields: Fields = {}): Fields =>
+		make(seq, "visibility.changed", "borrower", {
+			change: "grant.proposed",
+			grant_id: "grant-1",
+			audience: { kind: "person", ref: "person-ref-1" },
+			level: "summary",
+			expires_at: "2026-03-01T12:00:00Z",
+			...fields,
+		});
+	const grantAnswer = (
+		seq: number,
+		change: string,
+		enteredBy = "lender",
+		grantId = "grant-1",
+	): Fields =>
+		make(seq, "visibility.changed", enteredBy, { change, grant_id: grantId });
+	const approvalRequested = (seq = 3, fields: Fields = {}): Fields =>
+		make(seq, "approval.requested", "lender", {
+			action: "release.confirm",
+			target: "evt-2",
+			...fields,
+		});
+	const approvalGranted = (
+		seq = 4,
+		request = "evt-3",
+		enteredBy = "borrower",
+	): Fields => make(seq, "approval.granted", enteredBy, { request });
+
+	describe("parseNoteEvent accepts", () => {
+		const valid: [string, Fields][] = [
+			["terms.accepted", termsAccepted()],
+			["terms.declined", termsDeclined()],
+			["payoff.issued", payoff()],
+			["release.drafted", drafted()],
+			["release.confirmed", releaseConfirmed()],
+			["notice.sent reminder", notice()],
+			[
+				"notice.sent default with 30 cure days",
+				notice(2, { kind: "default", cure_days: 30 }),
+			],
+			[
+				"notice.sent default with 0 cure days",
+				notice(2, { kind: "default", cure_days: 0 }),
+			],
+			[
+				"notice.sent default with 365 cure days",
+				notice(2, { kind: "default", cure_days: 365 }),
+			],
+			["party.rebound of the borrower, confirmed by the lender", rebound()],
+			[
+				"party.rebound of the lender, confirmed by the borrower",
+				rebound(2, "lender", "borrower"),
+			],
+			["visibility.changed proposing to a person", proposal()],
+			[
+				"visibility.changed proposing to an org at statement level",
+				proposal(2, {
+					audience: { kind: "org", ref: "org-1" },
+					level: "statement",
+				}),
+			],
+			[
+				"visibility.changed proposing a verify link with an expiry",
+				proposal(2, {
+					audience: { kind: "link", ref: "link-1" },
+					level: "verify",
+					expires_at: "2027-01-01T00:00:00Z",
+				}),
+			],
+			[
+				"visibility.changed proposing with an email-shaped ref (the engine does not judge refs)",
+				proposal(2, {
+					audience: { kind: "person", ref: "someone@example.com" },
+				}),
+			],
+			[
+				"visibility.changed consented by the lender",
+				grantAnswer(3, "grant.consented"),
+			],
+			[
+				"visibility.changed revoked by the borrower",
+				grantAnswer(3, "grant.revoked", "borrower"),
+			],
+			["approval.requested for release.confirm", approvalRequested()],
+			[
+				"approval.requested for notice.default",
+				approvalRequested(3, { action: "notice.default", cure_days: 30 }),
+			],
+			[
+				"approval.requested for waiver",
+				approvalRequested(3, { action: "waiver" }),
+			],
+			["approval.granted by the borrower", approvalGranted()],
+			["approval.granted by the lender", approvalGranted(4, "evt-3", "lender")],
+			[
+				"a payment with via email-link",
+				recorded(2, "borrower", { via: "email-link" }),
+			],
+			[
+				"a payment with via account and an agent_ref",
+				recorded(2, "lender", { via: "account", agent_ref: "agent-7" }),
+			],
+			[
+				"note.created with via and agent_ref",
+				created({ via: "account", agent_ref: "a" }),
+			],
+			["terms.accepted with via", { ...termsAccepted(), via: "email-link" }],
+			[
+				"an agent_ref of 128 characters",
+				recorded(2, "lender", { agent_ref: "a".repeat(128) }),
+			],
+			[
+				"an agent_ref of 128 code points beyond the BMP",
+				recorded(2, "lender", { agent_ref: "\u{1F600}".repeat(128) }),
+			],
+		];
+		for (const [name, event] of valid) {
+			it(name, () => {
+				const parsed = parseNoteEvent(event);
+				expect(parsed.type).toBe(event.type as NoteEvent["type"]);
+				expect(parsed).toEqual(event as unknown as NoteEvent);
+			});
+		}
+	});
+
+	describe("parseNoteEvent rejects", () => {
+		const invalid: [string, unknown, string][] = [
+			[
+				"terms.accepted by the lender",
+				termsAccepted(2, "lender"),
+				'terms.accepted: entered_by must be "borrower", got "lender"',
+			],
+			[
+				"terms.declined by the lender",
+				termsDeclined(2, "lender"),
+				'terms.declined: entered_by must be "borrower", got "lender"',
+			],
+			[
+				"terms.accepted with an extra field",
+				{ ...termsAccepted(), reason: "ok" },
+				"terms.accepted: reason is not allowed",
+			],
+			[
+				"terms.declined with an extra field",
+				{ ...termsDeclined(), reason: "no" },
+				"terms.declined: reason is not allowed",
+			],
+			[
+				"payoff.issued by the borrower",
+				{ ...payoff(), entered_by: "borrower" },
+				'payoff.issued: entered_by must be "lender", got "borrower"',
+			],
+			[
+				"payoff.issued without as_of",
+				without(payoff(), "as_of"),
+				"payoff.issued: as_of is required",
+			],
+			[
+				"payoff.issued without a hash",
+				without(payoff(), "document_sha256"),
+				"payoff.issued: document_sha256 is required",
+			],
+			[
+				"payoff.issued with an impossible date",
+				payoff(2, { as_of: "2026-02-30" }),
+				"payoff.issued: as_of must be a calendar date",
+			],
+			[
+				"payoff.issued with an uppercase hash",
+				payoff(2, { document_sha256: "A".repeat(64) }),
+				"payoff.issued: document_sha256 must be 64 lowercase hex",
+			],
+			[
+				"payoff.issued with a payoff amount",
+				payoff(2, { payoff_minor: "100" }),
+				"payoff.issued: payoff_minor is not allowed",
+			],
+			[
+				"payoff.issued with any money field",
+				payoff(2, { amount_minor: "100" }),
+				"payoff.issued: amount_minor is not allowed",
+			],
+			[
+				"release.drafted by the borrower",
+				drafted(2, "borrower"),
+				'release.drafted: entered_by must be "lender", got "borrower"',
+			],
+			[
+				"release.drafted with a target",
+				{ ...drafted(), target: "evt-1" },
+				"release.drafted: target is not allowed",
+			],
+			[
+				"release.confirmed by the borrower",
+				releaseConfirmed(3, "evt-2", "borrower"),
+				'release.confirmed: entered_by must be "lender", got "borrower"',
+			],
+			[
+				"release.confirmed without a target",
+				without(releaseConfirmed(), "target"),
+				"release.confirmed: target is required",
+			],
+			[
+				"release.confirmed with an empty target",
+				releaseConfirmed(3, ""),
+				"release.confirmed: target must be a non-empty string",
+			],
+			[
+				"notice.sent by the borrower",
+				{ ...notice(), entered_by: "borrower" },
+				'notice.sent: entered_by must be "lender", got "borrower"',
+			],
+			[
+				"notice.sent without a kind",
+				without(notice(), "kind"),
+				"notice.sent: kind is required",
+			],
+			[
+				"notice.sent of an unknown kind",
+				notice(2, { kind: "final" }),
+				'notice.sent: kind must be "reminder" or "default", got "final"',
+			],
+			[
+				"notice.sent default without cure_days",
+				notice(2, { kind: "default" }),
+				"notice.sent: cure_days is required when kind is default",
+			],
+			[
+				"notice.sent reminder with cure_days",
+				notice(2, { cure_days: 10 }),
+				"notice.sent: cure_days is not allowed when kind is reminder",
+			],
+			[
+				"notice.sent with negative cure_days",
+				notice(2, { kind: "default", cure_days: -1 }),
+				"notice.sent: cure_days must be an integer from 0 to 365, got -1",
+			],
+			[
+				"notice.sent with 366 cure_days",
+				notice(2, { kind: "default", cure_days: 366 }),
+				"notice.sent: cure_days must be an integer from 0 to 365, got 366",
+			],
+			[
+				"notice.sent with fractional cure_days",
+				notice(2, { kind: "default", cure_days: 1.5 }),
+				"notice.sent: cure_days must be an integer from 0 to 365, got 1.5",
+			],
+			[
+				"notice.sent with a string cure_days",
+				notice(2, { kind: "default", cure_days: "30" }),
+				'notice.sent: cure_days must be an integer from 0 to 365, got "30"',
+			],
+			[
+				"notice.sent with a body",
+				notice(2, { text: "pay up" }),
+				"notice.sent: text is not allowed",
+			],
+			[
+				"party.rebound confirmed by the party being rebound (borrower)",
+				rebound(2, "borrower", "borrower"),
+				'party.rebound: entered_by must be "lender" (the other party) when role is "borrower", got "borrower"',
+			],
+			[
+				"party.rebound confirmed by the party being rebound (lender)",
+				rebound(2, "lender", "lender"),
+				'party.rebound: entered_by must be "borrower" (the other party) when role is "lender", got "lender"',
+			],
+			[
+				"party.rebound without a role",
+				without(rebound(), "role"),
+				"party.rebound: role is required",
+			],
+			[
+				"party.rebound with a bad role",
+				rebound(2, "guarantor"),
+				'party.rebound: role must be "lender" or "borrower", got "guarantor"',
+			],
+			[
+				"party.rebound without a commitment",
+				without(rebound(), "contact_commitment"),
+				"party.rebound: contact_commitment is required",
+			],
+			[
+				"party.rebound with a short commitment",
+				rebound(2, "borrower", "lender", { contact_commitment: "abc" }),
+				"party.rebound: contact_commitment must be 64 lowercase hex",
+			],
+			[
+				"party.rebound with an email",
+				rebound(2, "borrower", "lender", { email: "a@b.co" }),
+				"party.rebound: email is not allowed",
+			],
+			[
+				"visibility.changed without a change",
+				without(proposal(), "change"),
+				"visibility.changed: change must be",
+			],
+			[
+				"visibility.changed with an unknown change",
+				proposal(2, { change: "grant.widened" }),
+				'visibility.changed: change must be "grant.proposed", "grant.consented" or "grant.revoked", got "grant.widened"',
+			],
+			[
+				"visibility.changed without a grant_id",
+				without(proposal(), "grant_id"),
+				"visibility.changed: grant_id is required",
+			],
+			[
+				"visibility.changed with an empty grant_id",
+				proposal(2, { grant_id: "" }),
+				"visibility.changed: grant_id must be a non-empty string",
+			],
+			[
+				"visibility.changed proposal without an audience",
+				without(proposal(), "audience"),
+				"visibility.changed: audience is required",
+			],
+			[
+				"visibility.changed proposal without a level",
+				without(proposal(), "level"),
+				"visibility.changed: level is required",
+			],
+			[
+				"visibility.changed with a string audience",
+				proposal(2, { audience: "everyone" }),
+				'visibility.changed: audience must be an object, got "everyone"',
+			],
+			[
+				"visibility.changed with a public audience kind",
+				proposal(2, { audience: { kind: "public", ref: "x" } }),
+				'visibility.changed: audience.kind must be "person", "org" or "link", got "public"',
+			],
+			[
+				"visibility.changed with an empty audience ref",
+				proposal(2, { audience: { kind: "person", ref: "" } }),
+				"visibility.changed: audience.ref must be a non-empty string",
+			],
+			[
+				"visibility.changed with a missing audience ref",
+				proposal(2, { audience: { kind: "person" } }),
+				"visibility.changed: audience.ref is required",
+			],
+			[
+				"visibility.changed with an audience email field",
+				proposal(2, {
+					audience: { kind: "person", ref: "x", email: "a@b.co" },
+				}),
+				"visibility.changed: audience.email is not allowed",
+			],
+			[
+				"visibility.changed with an audience name field",
+				proposal(2, { audience: { kind: "person", ref: "x", name: "Ann" } }),
+				"visibility.changed: audience.name is not allowed",
+			],
+			[
+				"visibility.changed with a bad level",
+				proposal(2, { level: "full" }),
+				'visibility.changed: level must be "summary", "statement" or "verify", got "full"',
+			],
+			[
+				"visibility.changed with an expiry that is not UTC",
+				proposal(2, { expires_at: "2027-01-01T00:00:00+02:00" }),
+				"visibility.changed: expires_at must be an ISO 8601 UTC instant ending in Z",
+			],
+			[
+				"visibility.changed with a date-only expiry",
+				proposal(2, { expires_at: "2027-01-01" }),
+				"visibility.changed: expires_at must be an ISO 8601 UTC instant ending in Z",
+			],
+			[
+				"visibility.changed consent carrying an audience",
+				{
+					...grantAnswer(3, "grant.consented"),
+					audience: { kind: "person", ref: "x" },
+				},
+				"visibility.changed: audience is not allowed",
+			],
+			[
+				"visibility.changed revoke carrying a level",
+				{ ...grantAnswer(3, "grant.revoked"), level: "summary" },
+				"visibility.changed: level is not allowed",
+			],
+			[
+				"visibility.changed consent carrying an expiry",
+				{
+					...grantAnswer(3, "grant.consented"),
+					expires_at: "2027-01-01T00:00:00Z",
+				},
+				"visibility.changed: expires_at is not allowed",
+			],
+			[
+				"approval.requested without an action",
+				without(approvalRequested(), "action"),
+				"approval.requested: action is required",
+			],
+			[
+				"approval.requested with an unknown action",
+				approvalRequested(3, { action: "release.draft" }),
+				'approval.requested: action must be "release.confirm", "notice.default" or "waiver", got "release.draft"',
+			],
+			[
+				"approval.requested without a target",
+				without(approvalRequested(), "target"),
+				"approval.requested: target is required",
+			],
+			[
+				"approval.requested with an empty target",
+				approvalRequested(3, { target: "" }),
+				"approval.requested: target must be a non-empty string",
+			],
+			[
+				"approval.granted without a request",
+				without(approvalGranted(), "request"),
+				"approval.granted: request is required",
+			],
+			[
+				"approval.granted with an empty request",
+				approvalGranted(4, ""),
+				"approval.granted: request must be a non-empty string",
+			],
+			[
+				"approval.granted with a target instead of a request",
+				{ ...without(approvalGranted(), "request"), target: "evt-3" },
+				"approval.granted: request is required",
+			],
+			[
+				"via of an unknown value",
+				recorded(2, "lender", { via: "sms" }),
+				'payment.recorded: via must be "email-link" or "account", got "sms"',
+			],
+			[
+				"via that is not a string",
+				recorded(2, "lender", { via: 1 }),
+				'payment.recorded: via must be "email-link" or "account", got 1',
+			],
+			[
+				"an empty agent_ref",
+				recorded(2, "lender", { agent_ref: "" }),
+				"payment.recorded: agent_ref must be a non-empty string",
+			],
+			[
+				"an agent_ref that is not a string",
+				recorded(2, "lender", { agent_ref: 7 }),
+				"payment.recorded: agent_ref must be a non-empty string",
+			],
+			[
+				"an agent_ref of 129 characters",
+				recorded(2, "lender", { agent_ref: "a".repeat(129) }),
+				"payment.recorded: agent_ref must be at most 128 characters, got 129",
+			],
+			[
+				"an agent_ref of 129 code points beyond the BMP",
+				recorded(2, "lender", { agent_ref: "\u{1F600}".repeat(129) }),
+				"payment.recorded: agent_ref must be at most 128 characters, got 129",
+			],
+			[
+				"via on an unknown event type",
+				make(2, "loan.forgiven", "lender", { via: "account" }),
+				"event: type must be one of",
+			],
+			[
+				"an email field on any event",
+				{ ...termsAccepted(), email: "a@b.co" },
+				"terms.accepted: email is not allowed",
+			],
+			[
+				"a name field on any event",
+				recorded(2, "lender", { name: "Ann" }),
+				"payment.recorded: name is not allowed",
+			],
+		];
+		for (const [name, event, message] of invalid) {
+			it(name, () => {
+				expect(() => parseNoteEvent(event)).toThrow(message);
+			});
+		}
+	});
+
+	describe("validateStream accepts", () => {
+		const draftThenRelease = (): Fields[] => [
+			created(),
+			drafted(2),
+			releaseConfirmed(3, "evt-2"),
+		];
+		const accepted: [string, () => Fields[]][] = [
+			[
+				"a payment before the borrower accepts the terms",
+				() => [created(), recorded(2, "lender"), termsAccepted(3)],
+			],
+			[
+				"terms accepted, then declined",
+				() => [created(), termsAccepted(2), termsDeclined(3)],
+			],
+			["a draft and its confirmation", draftThenRelease],
+			[
+				"a confirmation at the same instant as its draft",
+				() => [
+					created(),
+					{ ...drafted(2), entered_at: "2026-02-01T12:00:00Z" },
+					{
+						...releaseConfirmed(3, "evt-2"),
+						entered_at: "2026-02-01T12:00:00Z",
+					},
+				],
+			],
+			[
+				"a confirmation a fraction of a second after its draft",
+				() => [
+					created(),
+					{ ...drafted(2), entered_at: "2026-02-01T12:00:00Z" },
+					{
+						...releaseConfirmed(3, "evt-2"),
+						entered_at: "2026-02-01T12:00:00.5Z",
+					},
+				],
+			],
+			[
+				"a confirmation between two fractions of a second",
+				() => [
+					created(),
+					{ ...drafted(2), entered_at: "2026-02-01T12:00:00.123Z" },
+					{
+						...releaseConfirmed(3, "evt-2"),
+						entered_at: "2026-02-01T12:00:00.1234Z",
+					},
+				],
+			],
+			[
+				"two confirmations of one draft",
+				() => [...draftThenRelease(), releaseConfirmed(4, "evt-2")],
+			],
+			[
+				"a payoff, a reminder and a default notice",
+				() => [
+					created(),
+					payoff(2),
+					notice(3),
+					notice(4, { kind: "default", cure_days: 30 }),
+				],
+			],
+			["a rebind of the borrower", () => [created(), rebound(2)]],
+			[
+				"a proposal, a consent and a revoke",
+				() => [
+					created(),
+					proposal(2),
+					grantAnswer(3, "grant.consented"),
+					grantAnswer(4, "grant.revoked", "borrower"),
+				],
+			],
+			[
+				"two grants with different ids",
+				() => [created(), proposal(2), proposal(3, { grant_id: "grant-2" })],
+			],
+			[
+				"a revoke of a grant that was never consented",
+				() => [created(), proposal(2), grantAnswer(3, "grant.revoked")],
+			],
+			[
+				"an approval requested against any earlier event, then granted",
+				() => [
+					created(),
+					recorded(2, "borrower"),
+					approvalRequested(3, { action: "waiver", target: "evt-2" }),
+					approvalGranted(4, "evt-3"),
+				],
+			],
+		];
+		for (const [name, build] of accepted) {
+			it(name, () => {
+				expect(validateStream(build()).length).toBeGreaterThan(0);
+			});
+		}
+	});
+
+	describe("validateStream rejects", () => {
+		const invalidStreams: [string, () => unknown[], string][] = [
+			[
+				"a release.confirmed with no draft",
+				() => [created(), releaseConfirmed(2, "evt-9")],
+				'release.confirmed: seq 2: target "evt-9" does not match an earlier release.drafted event',
+			],
+			[
+				"a release.confirmed naming a payment",
+				() => [
+					created(),
+					recorded(2, "borrower"),
+					releaseConfirmed(3, "evt-2"),
+				],
+				'release.confirmed: seq 3: target "evt-2" has type payment.recorded, not release.drafted',
+			],
+			[
+				"a release.confirmed naming itself",
+				() => [created(), drafted(2), releaseConfirmed(3, "evt-3")],
+				'release.confirmed: seq 3: target "evt-3" does not match an earlier release.drafted event',
+			],
+			[
+				"a release.confirmed entered before its draft",
+				() => [
+					created(),
+					{ ...drafted(2), entered_at: "2026-02-01T12:00:00Z" },
+					{
+						...releaseConfirmed(3, "evt-2"),
+						entered_at: "2026-02-01T11:59:59Z",
+					},
+				],
+				'release.confirmed: seq 3: entered_at 2026-02-01T11:59:59Z is before the 2026-02-01T12:00:00Z of the draft "evt-2"',
+			],
+			[
+				"a release.confirmed a fraction of a second before its draft",
+				() => [
+					created(),
+					{ ...drafted(2), entered_at: "2026-02-01T12:00:00.5Z" },
+					{
+						...releaseConfirmed(3, "evt-2"),
+						entered_at: "2026-02-01T12:00:00.49Z",
+					},
+				],
+				"release.confirmed: seq 3: entered_at 2026-02-01T12:00:00.49Z is before",
+			],
+			[
+				"a release.confirmed before its draft when only the whole second matches",
+				() => [
+					created(),
+					{ ...drafted(2), entered_at: "2026-02-01T12:00:00.5Z" },
+					{
+						...releaseConfirmed(3, "evt-2"),
+						entered_at: "2026-02-01T12:00:00Z",
+					},
+				],
+				"release.confirmed: seq 3: entered_at 2026-02-01T12:00:00Z is before",
+			],
+			[
+				"a consent with no proposal",
+				() => [created(), grantAnswer(2, "grant.consented")],
+				'visibility.changed: seq 2: grant_id "grant-1" does not match an earlier grant.proposed event',
+			],
+			[
+				"a revoke of an unknown grant",
+				() => [
+					created(),
+					proposal(2),
+					grantAnswer(3, "grant.revoked", "lender", "grant-9"),
+				],
+				'visibility.changed: seq 3: grant_id "grant-9" does not match an earlier grant.proposed event',
+			],
+			[
+				"a consent that comes before its proposal",
+				() => [created(), grantAnswer(2, "grant.consented"), proposal(3)],
+				'visibility.changed: seq 2: grant_id "grant-1" does not match an earlier grant.proposed event',
+			],
+			[
+				"a second proposal with the same grant_id",
+				() => [created(), proposal(2), proposal(3)],
+				'visibility.changed: seq 3: grant_id "grant-1" is already proposed by seq 2',
+			],
+			[
+				"an approval request about an unknown event",
+				() => [created(), approvalRequested(2, { target: "evt-9" })],
+				'approval.requested: seq 2: target "evt-9" does not match an earlier event',
+			],
+			[
+				"an approval request about itself",
+				() => [created(), approvalRequested(2, { target: "evt-2" })],
+				'approval.requested: seq 2: target "evt-2" does not match an earlier event',
+			],
+			[
+				"an approval granted for an unknown request",
+				() => [created(), approvalGranted(2, "evt-9")],
+				'approval.granted: seq 2: request "evt-9" does not match an earlier approval.requested event',
+			],
+			[
+				"an approval granted for an event that is not a request",
+				() => [created(), recorded(2, "borrower"), approvalGranted(3, "evt-2")],
+				'approval.granted: seq 3: request "evt-2" has type payment.recorded, not approval.requested',
+			],
+			[
+				"an approval granted before its request",
+				() => [
+					created(),
+					approvalGranted(2, "evt-3"),
+					approvalRequested(3, { target: "evt-1" }),
+				],
+				'approval.granted: seq 2: request "evt-3" does not match an earlier approval.requested event',
+			],
+			[
+				"a second note.created disguised among the new events",
+				() => [
+					created(),
+					termsAccepted(2),
+					{ ...created(), id: "evt-3", seq: 3 },
+				],
+				"note.created: seq 3: note.created is only allowed as the first event",
+			],
+			[
+				"a new event with a repeated id",
+				() => [
+					created(),
+					termsAccepted(2),
+					{ ...termsDeclined(3), id: "evt-2" },
+				],
+				'terms.declined: seq 3: id "evt-2" is already used by seq 2',
+			],
+			[
+				"a new event with a gap in seq",
+				() => [created(), termsAccepted(3)],
+				"stream: seq has a gap",
+			],
+			[
+				"a new event with another note_id",
+				() => [created(), { ...termsAccepted(2), note_id: "note-2" }],
+				'terms.accepted: seq 2: note_id "note-2" differs from "note-1"',
+			],
+			[
+				"an invalid new event named by its index",
+				() => [created(), termsAccepted(2, "lender")],
+				'events[1]: terms.accepted: entered_by must be "borrower"',
+			],
+		];
+		for (const [name, build, message] of invalidStreams) {
+			it(name, () => {
+				expect(() => validateStream(build())).toThrow(message);
+			});
+		}
+	});
+});
+
 describe("schema/note-event.v1.json", () => {
 	const EVENT_TYPE_NAMES: NoteEvent["type"][] = [
 		"note.created",
@@ -1085,18 +1849,29 @@ describe("schema/note-event.v1.json", () => {
 		"payment.disputed",
 		"payment.resolved",
 		"annotation.added",
+		"terms.accepted",
+		"terms.declined",
+		"payoff.issued",
+		"release.drafted",
+		"release.confirmed",
+		"notice.sent",
+		"party.rebound",
+		"visibility.changed",
+		"approval.requested",
+		"approval.granted",
 	];
 
-	it("is JSON Schema 2020-12 with a oneOf over the six event types", () => {
+	it("is JSON Schema 2020-12 with a oneOf over the sixteen event types", () => {
 		expect(schema.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
-		expect(schema.oneOf.length).toBe(6);
-		expect(EVENT_TYPE_NAMES.length).toBe(6);
+		// visibility.changed has two branches: a proposal, and a consent or revocation.
+		expect(schema.oneOf.length).toBe(17);
+		expect(EVENT_TYPE_NAMES.length).toBe(16);
 	});
 
-	it("has one branch per NoteEvent type, each closed", () => {
-		const branchTypes = schema.oneOf.map(
-			(branch) => branch.properties.type.const,
-		);
+	it("has one branch per NoteEvent type (two for visibility.changed), each closed", () => {
+		const branchTypes = [
+			...new Set(schema.oneOf.map((branch) => branch.properties.type.const)),
+		];
 		expect(branchTypes).toEqual(EVENT_TYPE_NAMES);
 		for (const branch of schema.oneOf) {
 			expect(branch.additionalProperties).toBe(false);
@@ -1125,6 +1900,76 @@ describe("schema/note-event.v1.json", () => {
 		expect(schema.description).toContain("checked in code");
 	});
 
+	it("declares no personal-data property anywhere: no email, no name", () => {
+		const found: string[] = [];
+		const visit = (node: unknown): void => {
+			if (Array.isArray(node)) {
+				for (const item of node) visit(item);
+				return;
+			}
+			if (typeof node !== "object" || node === null) return;
+			for (const [key, value] of Object.entries(node)) {
+				if (
+					key === "properties" &&
+					typeof value === "object" &&
+					value !== null
+				) {
+					for (const propertyName of Object.keys(value)) {
+						if (propertyName === "email" || propertyName === "name") {
+							found.push(propertyName);
+						}
+					}
+				}
+				visit(value);
+			}
+		};
+		visit(schema);
+		expect(found).toEqual([]);
+	});
+
+	it("gives every branch the optional via and agent_ref", () => {
+		for (const branch of schema.oneOf) {
+			expect(branch.required).not.toContain("via");
+			expect(branch.required).not.toContain("agent_ref");
+			expect(branch.properties).toHaveProperty("via");
+			expect(branch.properties).toHaveProperty("agent_ref");
+		}
+		expect(schema.$defs.via.enum).toEqual(["email-link", "account"]);
+		expect(schema.$defs.agent_ref).toMatchObject({
+			type: "string",
+			minLength: 1,
+			maxLength: 128,
+		});
+	});
+
+	it("fixes entered_by on the events only one role may enter", () => {
+		const roles: Record<string, string> = {
+			"terms.accepted": "borrower",
+			"terms.declined": "borrower",
+			"payoff.issued": "lender",
+			"release.drafted": "lender",
+			"release.confirmed": "lender",
+			"notice.sent": "lender",
+		};
+		for (const [type, role] of Object.entries(roles)) {
+			const branch = schema.oneOf.find(
+				(candidate) => candidate.properties.type.const === type,
+			);
+			expect(branch?.properties.entered_by).toEqual({ const: role });
+		}
+	});
+
+	it("keeps money out of payoff.issued", () => {
+		const branch = schema.oneOf.find(
+			(candidate) => candidate.properties.type.const === "payoff.issued",
+		);
+		expect(
+			Object.keys(branch?.properties ?? {}).filter((key) =>
+				key.endsWith("_minor"),
+			),
+		).toEqual([]);
+	});
+
 	it("requires counter_amount_minor and reason on payment.disputed", () => {
 		const branch = schema.oneOf.find(
 			(candidate) => candidate.properties.type.const === "payment.disputed",
@@ -1147,5 +1992,495 @@ describe("schema/note-event.v1.json", () => {
 		>;
 		expect(conditions[THEN_KEY]).toEqual({ required: ["reverses"] });
 		expect(conditions.else).toEqual({ not: { required: ["reverses"] } });
+	});
+});
+
+describe("grant.proposed expiry, link and carve-out rules", () => {
+	const ENTERED_AT = "2026-02-01T12:00:00Z";
+	const proposed = (fields: Fields = {}): Fields =>
+		make(2, "visibility.changed", "lender", {
+			change: "grant.proposed",
+			grant_id: "grant-1",
+			audience: { kind: "person", ref: "person-ref-1" },
+			level: "summary",
+			expires_at: "2026-03-01T12:00:00Z",
+			...fields,
+		});
+	const carveOut = (fields: Fields = {}): Fields =>
+		proposed({
+			carve_out: true,
+			purpose: "accountant",
+			level: "statement",
+			...fields,
+		});
+	const withoutKey = (event: Fields, key: string): Fields => {
+		const { [key]: _removed, ...rest } = event;
+		return rest;
+	};
+
+	const accepted: [string, Fields][] = [
+		["a plain person grant", proposed()],
+		[
+			"an expiry one second after entered_at",
+			proposed({ expires_at: "2026-02-01T12:00:01Z" }),
+		],
+		[
+			"an expiry exactly 365 days after entered_at",
+			proposed({ expires_at: "2027-02-01T12:00:00Z" }),
+		],
+		[
+			"a link at verify level",
+			proposed({ audience: { kind: "link", ref: "link-1" }, level: "verify" }),
+		],
+		[
+			"an org at statement level",
+			proposed({ audience: { kind: "org", ref: "org-1" }, level: "statement" }),
+		],
+		["a carve-out at statement level with an accountant", carveOut()],
+		[
+			"a carve-out at summary level with a lawyer",
+			carveOut({ level: "summary", purpose: "lawyer" }),
+		],
+		["a carve-out for a court", carveOut({ purpose: "court" })],
+		["a carve-out for an assignee", carveOut({ purpose: "assignee" })],
+		[
+			"a carve-out exactly 90 days after entered_at",
+			carveOut({ expires_at: "2026-05-02T12:00:00Z" }),
+		],
+		["carve_out false with no purpose", proposed({ carve_out: false })],
+		[
+			"carve_out false with a purpose on an org",
+			proposed({
+				carve_out: false,
+				purpose: "lawyer",
+				audience: { kind: "org", ref: "o" },
+			}),
+		],
+	];
+	for (const [name, event] of accepted) {
+		it(`accepts ${name}`, () => {
+			expect(parseNoteEvent(event)).toEqual(event as unknown as NoteEvent);
+		});
+	}
+
+	const rejected: [string, Fields, string][] = [
+		[
+			"a proposal without expires_at",
+			withoutKey(proposed(), "expires_at"),
+			"visibility.changed: expires_at is required",
+		],
+		[
+			"an expiry at entered_at",
+			proposed({ expires_at: ENTERED_AT }),
+			"must be after entered_at",
+		],
+		[
+			"an expiry before entered_at",
+			proposed({ expires_at: "2026-01-01T00:00:00Z" }),
+			"must be after entered_at",
+		],
+		[
+			"an expiry one second past 365 days",
+			proposed({ expires_at: "2027-02-01T12:00:01Z" }),
+			"more than 365 days after entered_at",
+		],
+		[
+			"an expiry two years out",
+			proposed({ expires_at: "2028-02-01T12:00:00Z" }),
+			"more than 365 days after entered_at",
+		],
+		[
+			"a carve-out one second past 90 days",
+			carveOut({ expires_at: "2026-05-02T12:00:01Z" }),
+			"more than 90 days after entered_at",
+		],
+		[
+			"a carve-out for a year",
+			carveOut({ expires_at: "2027-02-01T12:00:00Z" }),
+			"more than 90 days after entered_at",
+		],
+		[
+			"a carve-out for the purpose other",
+			carveOut({ purpose: "other" }),
+			'purpose must be "accountant", "lawyer", "court" or "assignee"',
+		],
+		[
+			"a link at statement level",
+			proposed({ audience: { kind: "link", ref: "l" }, level: "statement" }),
+			'a link audience may only have level "verify"',
+		],
+		[
+			"a link at summary level",
+			proposed({ audience: { kind: "link", ref: "l" }, level: "summary" }),
+			'a link audience may only have level "verify"',
+		],
+		[
+			"a carve-out without a purpose",
+			withoutKey(carveOut(), "purpose"),
+			"purpose is required when carve_out is true",
+		],
+		[
+			"a carve-out to an org",
+			carveOut({ audience: { kind: "org", ref: "o" } }),
+			"a carve_out may only name a person audience",
+		],
+		[
+			"a carve-out to a link",
+			carveOut({ audience: { kind: "link", ref: "l" }, level: "verify" }),
+			"a carve_out may only name a person audience",
+		],
+		[
+			"a carve-out at verify level",
+			carveOut({ level: "verify" }),
+			'a carve_out level must be "summary" or "statement"',
+		],
+		[
+			"a purpose outside the list",
+			carveOut({ purpose: "friend" }),
+			"purpose must be",
+		],
+		[
+			"a carve_out that is not a boolean",
+			proposed({ carve_out: "yes" }),
+			"carve_out must be true or false",
+		],
+		[
+			"a purpose that is not a string",
+			carveOut({ purpose: 3 }),
+			"purpose must be",
+		],
+	];
+	for (const [name, event, message] of rejected) {
+		it(`rejects ${name}`, () => {
+			expect(() => parseNoteEvent(event)).toThrow(message);
+		});
+	}
+
+	it("exports the day caps the validator applies", () => {
+		expect(MAX_GRANT_DAYS).toBe(365);
+		expect(MAX_CARVE_OUT_DAYS).toBe(90);
+	});
+
+	it("keeps the 365-day cap for a grant that is not a carve-out", () => {
+		expect(() =>
+			parseNoteEvent(proposed({ expires_at: "2026-05-02T12:00:01Z" })),
+		).not.toThrow();
+	});
+
+	it("describes the same rules in the schema", () => {
+		const branch = schema.oneOf.find(
+			(candidate) => candidate.title === "visibility.changed (grant.proposed)",
+		);
+		expect(branch?.properties.purpose?.enum).toEqual([
+			"accountant",
+			"lawyer",
+			"court",
+			"assignee",
+		]);
+		expect(branch?.required).toContain("expires_at");
+		expect(branch?.properties).toHaveProperty("purpose");
+		expect(branch?.properties).toHaveProperty("carve_out");
+		expect(JSON.stringify(branch)).toContain('"link"');
+	});
+});
+
+describe("default notice binding in the event shapes", () => {
+	const request = (seq: number, fields: Fields = {}): Fields =>
+		make(seq, "approval.requested", "lender", {
+			action: "notice.default",
+			target: "evt-1",
+			cure_days: 30,
+			...fields,
+		});
+	const defaultNotice = (seq: number, fields: Fields = {}): Fields =>
+		make(seq, "notice.sent", "lender", {
+			kind: "default",
+			cure_days: 30,
+			...fields,
+		});
+
+	it("requires cure_days on an approval.requested for notice.default", () => {
+		expect(() => parseNoteEvent(request(2))).not.toThrow();
+		expect(() => parseNoteEvent(without(request(2), "cure_days"))).toThrow(
+			"approval.requested: cure_days is required when action is notice.default",
+		);
+	});
+
+	it("forbids cure_days on any other approval action", () => {
+		for (const action of ["release.confirm", "waiver"]) {
+			expect(() => parseNoteEvent(request(2, { action }))).toThrow(
+				"approval.requested: cure_days is only allowed when action is notice.default",
+			);
+		}
+	});
+
+	it("takes cure_days from 0 to 365 only", () => {
+		for (const good of [0, 1, 365]) {
+			expect(() =>
+				parseNoteEvent(request(2, { cure_days: good })),
+			).not.toThrow();
+		}
+		for (const bad of [-1, 366, 1.5, "30", null]) {
+			expect(() => parseNoteEvent(request(2, { cure_days: bad }))).toThrow(
+				"approval.requested: cure_days must be an integer from 0 to 365",
+			);
+		}
+	});
+
+	it("takes an approval on a default notice and refuses one on a reminder", () => {
+		expect(
+			parseNoteEvent(defaultNotice(3, { approval: "evt-2" })),
+		).toMatchObject({ approval: "evt-2" });
+		expect(() =>
+			parseNoteEvent(
+				make(3, "notice.sent", "lender", {
+					kind: "reminder",
+					approval: "evt-2",
+				}),
+			),
+		).toThrow("notice.sent: approval is not allowed when kind is reminder");
+		expect(() => parseNoteEvent(defaultNotice(3, { approval: "" }))).toThrow(
+			"notice.sent: approval must be a non-empty string",
+		);
+	});
+
+	const streamOf = (...extra: Fields[]): unknown[] => [created(), ...extra];
+
+	it("accepts a notice whose approval is an earlier request with the same cure_days", () => {
+		const stream = streamOf(
+			request(2),
+			defaultNotice(3, { approval: "evt-2" }),
+		);
+		expect(validateStream(stream)).toHaveLength(3);
+	});
+
+	it("accepts a default notice with no approval (the policy decides whether one is needed)", () => {
+		expect(validateStream(streamOf(defaultNotice(2)))).toHaveLength(2);
+	});
+
+	it("rejects an approval that does not exist, is not a request, or is a request for another action", () => {
+		expect(() =>
+			validateStream(streamOf(defaultNotice(2, { approval: "evt-9" }))),
+		).toThrow(
+			'notice.sent: seq 2: approval "evt-9" does not match an earlier approval.requested event',
+		);
+		expect(() =>
+			validateStream(
+				streamOf(
+					recorded(2, "borrower"),
+					defaultNotice(3, { approval: "evt-2" }),
+				),
+			),
+		).toThrow(
+			'notice.sent: seq 3: approval "evt-2" has type payment.recorded, not approval.requested',
+		);
+		expect(() =>
+			validateStream(
+				streamOf(
+					without(request(2, { action: "waiver" }), "cure_days"),
+					defaultNotice(3, { approval: "evt-2" }),
+				),
+			),
+		).toThrow(
+			'notice.sent: seq 3: approval "evt-2" is a request for waiver, not notice.default',
+		);
+	});
+
+	it("rejects an approval that names a request that comes later", () => {
+		expect(() =>
+			validateStream(
+				streamOf(defaultNotice(2, { approval: "evt-3" }), request(3)),
+			),
+		).toThrow("does not match an earlier approval.requested event");
+	});
+
+	it("rejects a notice whose cure_days differs from its request", () => {
+		expect(() =>
+			validateStream(
+				streamOf(
+					request(2),
+					defaultNotice(3, { approval: "evt-2", cure_days: 31 }),
+				),
+			),
+		).toThrow(
+			'notice.sent: seq 3: cure_days 31 differs from the 30 of the approval request "evt-2"',
+		);
+	});
+});
+
+describe("declined terms in the stream", () => {
+	const declined = (seq: number): Fields =>
+		make(seq, "terms.declined", "borrower", {});
+	const accepted = (seq: number): Fields =>
+		make(seq, "terms.accepted", "borrower", {});
+	const payoff = (seq: number): Fields =>
+		make(seq, "payoff.issued", "lender", {
+			as_of: "2026-03-01",
+			document_sha256: "a".repeat(64),
+		});
+	const reminder = (seq: number): Fields =>
+		make(seq, "notice.sent", "lender", { kind: "reminder" });
+	const defaultNotice = (seq: number): Fields =>
+		make(seq, "notice.sent", "lender", { kind: "default", cure_days: 30 });
+	const defaultRequest = (seq: number): Fields =>
+		make(seq, "approval.requested", "lender", {
+			action: "notice.default",
+			target: "evt-1",
+			cure_days: 30,
+		});
+
+	const refused: [string, (seq: number) => Fields][] = [
+		["a payoff statement", payoff],
+		["a reminder", reminder],
+		["a default notice", defaultNotice],
+		["a request to approve a default notice", defaultRequest],
+	];
+	for (const [name, build] of refused) {
+		it(`rejects ${name} while the terms stand declined`, () => {
+			expect(() => validateStream([created(), declined(2), build(3)])).toThrow(
+				"the borrower has declined the terms (terms.declined)",
+			);
+		});
+		it(`allows ${name} again once the borrower accepts`, () => {
+			expect(
+				validateStream([created(), declined(2), accepted(3), build(4)]),
+			).toHaveLength(4);
+		});
+		it(`allows ${name} before any decision`, () => {
+			expect(validateStream([created(), build(2)])).toHaveLength(2);
+		});
+	}
+
+	it("rejects again after a later decline", () => {
+		expect(() =>
+			validateStream([
+				created(),
+				declined(2),
+				accepted(3),
+				declined(4),
+				reminder(5),
+			]),
+		).toThrow("terms.declined");
+	});
+
+	it("still allows payments, confirmations, disputes, annotations, releases and approvals of other actions", () => {
+		const stream = [
+			created(),
+			declined(2),
+			recorded(3, "borrower"),
+			confirmed(4, "lender", "evt-3"),
+			recorded(5, "lender"),
+			disputed(6, "borrower", "evt-5"),
+			annotation(7),
+			make(8, "release.drafted", "lender", {}),
+			make(9, "release.confirmed", "lender", { target: "evt-8" }),
+			make(10, "approval.requested", "lender", {
+				action: "release.confirm",
+				target: "evt-8",
+			}),
+		];
+		expect(validateStream(stream)).toHaveLength(10);
+	});
+});
+
+describe("free text hygiene", () => {
+	const UNSAFE: [string, string][] = [
+		["a null character", "\u0000"],
+		["a bell", "\u0007"],
+		["a carriage return", "\r"],
+		["an escape", "\u001b"],
+		["a delete character", "\u007f"],
+		["a C1 control", "\u0085"],
+		["the last C1 control", "\u009f"],
+		["a left-to-right mark", "‎"],
+		["a right-to-left mark", "‏"],
+		["an Arabic letter mark", "؜"],
+		["a right-to-left override", "‮"],
+		["a left-to-right embedding", "‪"],
+		["a bidirectional isolate", "⁦"],
+		["a pop directional isolate", "⁩"],
+		["a byte order mark", "﻿"],
+	];
+	const LAYOUT: [string, string][] = [
+		["a newline", "\n"],
+		["a tab", "\t"],
+	];
+	const fields: [string, (value: string) => Fields, boolean][] = [
+		["annotation.added text", (value) => annotation(2, { text: value }), true],
+		[
+			"payment.disputed reason",
+			(value) => disputed(3, "borrower", "evt-2", { reason: value }),
+			true,
+		],
+		[
+			"payment.recorded method",
+			(value) => recorded(2, "borrower", { method: value }),
+			false,
+		],
+		[
+			"payment.recorded reference",
+			(value) => recorded(2, "borrower", { reference: value }),
+			false,
+		],
+		["agent_ref", (value) => annotation(2, { agent_ref: value }), false],
+	];
+	for (const [fieldName, build, multiline] of fields) {
+		const path = fieldName.split(" ").pop() ?? fieldName;
+		for (const [kind, character] of UNSAFE) {
+			it(`${fieldName} rejects ${kind}`, () => {
+				expect(() => parseNoteEvent(build(`pay${character}ment`))).toThrow(
+					`${fieldName === "agent_ref" ? "annotation.added" : fieldName.split(" ")[0]}: ${path} must not contain control or bidirectional characters`,
+				);
+			});
+		}
+		for (const [kind, character] of LAYOUT) {
+			it(`${fieldName} ${multiline ? "keeps" : "rejects"} ${kind}`, () => {
+				const attempt = () => parseNoteEvent(build(`one${character}two`));
+				if (multiline) {
+					expect(attempt).not.toThrow();
+				} else {
+					expect(attempt).toThrow("must not contain control or bidirectional");
+				}
+			});
+		}
+		it(`${fieldName} keeps ordinary text, accents, emoji and other scripts`, () => {
+			expect(() =>
+				parseNoteEvent(build("Pago en efectivo, señor 😀 تم الدفع 支払い")),
+			).not.toThrow();
+		});
+	}
+
+	it("names the character and its position", () => {
+		expect(() => parseNoteEvent(annotation(2, { text: "ab‮cd" }))).toThrow(
+			"found U+202E at character 2",
+		);
+		expect(() => parseNoteEvent(annotation(2, { text: "😀\u0000" }))).toThrow(
+			"found U+0000 at character 1",
+		);
+	});
+
+	it("still takes an empty method and reference, and refuses an empty text", () => {
+		expect(() =>
+			parseNoteEvent(recorded(2, "borrower", { method: "", reference: "" })),
+		).not.toThrow();
+		expect(() => parseNoteEvent(annotation(2, { text: "" }))).toThrow(
+			"annotation.added: text must be a non-empty string",
+		);
+	});
+
+	it("is written into the schema as patterns that agree with the validator", () => {
+		const line = new RegExp(schema.$defs.free_line.pattern);
+		const text = new RegExp(schema.$defs.free_text.pattern);
+		const agent = new RegExp(schema.$defs.agent_ref.pattern);
+		for (const [, character] of UNSAFE) {
+			for (const pattern of [line, text, agent]) {
+				expect(pattern.test(`a${character}b`)).toBe(false);
+			}
+		}
+		for (const [, character] of LAYOUT) {
+			expect(text.test(`a${character}b`)).toBe(true);
+			expect(line.test(`a${character}b`)).toBe(false);
+		}
+		expect(line.test("señor 😀 تم الدفع")).toBe(true);
 	});
 });

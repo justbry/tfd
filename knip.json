@@ -123,6 +123,10 @@
 			"entry": ["tests/**/*.test.ts"],
 			"project": ["src/**/*.ts"]
 		},
+		"packages/verify-notes": {
+			"entry": ["tests/**/*.test.ts"],
+			"project": ["src/**/*.ts"]
+		},
 		"packages/verify": {
 			"entry": ["tests/**/*.test.ts"],
 			"project": ["src/**/*.ts"]

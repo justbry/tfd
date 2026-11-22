@@ -1,0 +1,21 @@
+{
+	"status": {
+		"requested": true,
+		"requester_agent": "alice",
+		"granted_by": ["bob"],
+		"satisfied": true
+	},
+	"pending": [],
+	"checks": [
+		"ok",
+		"ok",
+		"notice.sent: approval \"evt-2\" is more than 30 days older than the notice",
+		"notice.sent: approval \"evt-2\" was entered after the notice",
+		"notice.sent: approval \"evt-4\" covers cure_days 10, not 30",
+		"ok",
+		"notice.sent: approval must be a non-empty string",
+		"notice.sent: approval \"evt-7\" is not an approval request for notice.default",
+		"notice.sent: approval \"evt-9\" is not an approval request for notice.default",
+		"notice.sent: entered_at must be an ISO 8601 UTC instant ending in Z"
+	]
+}

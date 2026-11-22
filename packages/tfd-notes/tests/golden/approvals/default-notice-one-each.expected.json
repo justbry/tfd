@@ -1,0 +1,22 @@
+{
+	"status": {
+		"requested": true,
+		"requester_agent": "alice",
+		"granted_by": ["bob"],
+		"satisfied": true
+	},
+	"pending": [
+		{
+			"action": "notice.default",
+			"target": "evt-1",
+			"requested_by_agent": "alice",
+			"requested_at": "2026-02-05T10:00:00Z"
+		}
+	],
+	"checks": [
+		"notice.sent: approval \"evt-2\" is already used by the notice at seq 4",
+		"ok",
+		"ok",
+		"notice.sent: approval \"evt-5\" has no approval from a second agent"
+	]
+}

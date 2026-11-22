@@ -10,6 +10,10 @@
 		"deploy:staging": "bunx wrangler@4.90.0 deploy --env staging",
 		"migrate:staging": "bunx wrangler@4.90.0 d1 migrations apply trifold-cloud-staging --env staging --remote"
 	},
+	"dependencies": {
+		"tfd-notes": "workspace:*",
+		"tfd-verify-notes": "workspace:*"
+	},
 	"devDependencies": {
 		"@types/bun": "1.4.2",
 		"typescript": "~5.8.3"

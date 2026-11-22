@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "bun:test";
 import { statement, statusLabel } from "../src/statement";
-import type { PaymentStatus } from "../src/types";
+import type { PaymentStatus, TermsState } from "../src/types";
 
 type Fields = Record<string, unknown>;
 
@@ -828,6 +828,176 @@ describe("payments after as_of", () => {
 		);
 		expect(result.borrower.paid_minor).toBe("0");
 		expect(result.difference).toEqual([]);
+	});
+});
+
+describe("statement state (terms and closed)", () => {
+	const termsEvent = (seq: number, type: string): Fields =>
+		make(seq, type, "borrower", "2026-01-02T10:00:00Z", {});
+	const drafted = (seq: number): Fields =>
+		make(seq, "release.drafted", "lender", "2026-01-19T10:00:00Z", {});
+	const released = (seq: number, target: string, enteredAt: string): Fields =>
+		make(seq, "release.confirmed", "lender", enteredAt, { target });
+	const RELEASE_AT = "2026-01-20T10:00:00Z";
+	const stateOf = (events: Fields[]) => statement(events, DAY_20).state;
+
+	it("is proposed and open for a note with no decision events", () => {
+		expect(stateOf([created()])).toEqual({ terms: "proposed", closed: false });
+	});
+
+	const termsCases: [string, string[], TermsState][] = [
+		["accepted", ["terms.accepted"], "accepted"],
+		["declined", ["terms.declined"], "declined"],
+		[
+			"accepted, then declined: the last decides",
+			["terms.accepted", "terms.declined"],
+			"declined",
+		],
+		[
+			"declined, then accepted: the last decides",
+			["terms.declined", "terms.accepted"],
+			"accepted",
+		],
+		[
+			"accepted, declined, accepted",
+			["terms.accepted", "terms.declined", "terms.accepted"],
+			"accepted",
+		],
+	];
+	for (const [name, types, expected] of termsCases) {
+		it(`terms ${name}`, () => {
+			const events = [
+				created(),
+				...types.map((type, index) => termsEvent(index + 2, type)),
+			];
+			expect(stateOf(events).terms).toBe(expected);
+		});
+	}
+
+	it("decides terms by seq, not by input order", () => {
+		const events = [
+			created(),
+			termsEvent(3, "terms.accepted"),
+			termsEvent(2, "terms.declined"),
+		];
+		expect(stateOf(events).terms).toBe("accepted");
+	});
+
+	it("counts a payment recorded before acceptance", () => {
+		const result = statement(
+			[created(), payment(2, "lender", "30000", DAY_10)],
+			DAY_20,
+		);
+		expect(result.state.terms).toBe("proposed");
+		expect(result.lender.paid_minor).toBe("30000");
+	});
+
+	it("is not closed by a draft alone", () => {
+		expect(stateOf([created(), drafted(2)]).closed).toBe(false);
+	});
+
+	it("is closed by release.confirmed, and still computes both balances", () => {
+		const open = [created(), payment(2, "borrower", "30000", DAY_10)];
+		const closed = [...open, drafted(3), released(4, "evt-3", RELEASE_AT)];
+		const before = statement(open, DAY_20);
+		const after = statement(closed, DAY_20);
+		expect(after.state.closed).toBe(true);
+		expect(after.lender).toEqual(before.lender);
+		expect(after.borrower).toEqual(before.borrower);
+		expect(after.difference).toEqual(before.difference);
+		expect(after.expected).toEqual(before.expected);
+	});
+
+	it("reopens when a reversal dated after the release is recorded", () => {
+		const events = [
+			created(),
+			payment(2, "lender", "30000", DAY_10),
+			drafted(3),
+			released(4, "evt-3", RELEASE_AT),
+			reversal(5, "lender", "30000", "2026-01-21", "evt-2"),
+		];
+		expect(stateOf(events).closed).toBe(false);
+	});
+
+	it("stays closed for a reversal dated on or before the release date", () => {
+		const events = [
+			created(),
+			payment(2, "lender", "30000", DAY_10),
+			drafted(3),
+			released(4, "evt-3", RELEASE_AT),
+			reversal(5, "lender", "30000", "2026-01-20", "evt-2"),
+		];
+		expect(stateOf(events).closed).toBe(true);
+	});
+
+	it("is closed when a reversal dated after the release came before the release in seq", () => {
+		const events = [
+			created(),
+			payment(2, "lender", "30000", DAY_10),
+			reversal(3, "lender", "30000", "2026-01-25", "evt-2"),
+			drafted(4),
+			released(5, "evt-4", RELEASE_AT),
+		];
+		expect(stateOf(events).closed).toBe(true);
+	});
+
+	it("closes again on a later release.confirmed after a reopening", () => {
+		const events = [
+			created(),
+			payment(2, "lender", "30000", DAY_10),
+			drafted(3),
+			released(4, "evt-3", RELEASE_AT),
+			reversal(5, "lender", "30000", "2026-01-21", "evt-2"),
+			released(6, "evt-3", "2026-01-22T10:00:00Z"),
+		];
+		expect(stateOf(events).closed).toBe(true);
+	});
+
+	it("takes the release date in UTC from entered_at", () => {
+		const events = [
+			created(),
+			payment(2, "lender", "30000", DAY_10),
+			drafted(3),
+			released(4, "evt-3", "2026-01-20T23:59:59Z"),
+			reversal(5, "lender", "30000", "2026-01-20", "evt-2"),
+		];
+		expect(stateOf(events).closed).toBe(true);
+	});
+
+	it("leaves every figure alone for payoff, notice, rebind, visibility and approval events", () => {
+		const plain = [created(), payment(2, "borrower", "30000", DAY_10)];
+		const sha = "b".repeat(64);
+		const noisy = [
+			...plain,
+			make(3, "payoff.issued", "lender", "2026-01-15T10:00:00Z", {
+				as_of: DAY_20,
+				document_sha256: sha,
+			}),
+			make(4, "notice.sent", "lender", "2026-01-15T10:00:00Z", {
+				kind: "default",
+				cure_days: 30,
+			}),
+			make(5, "party.rebound", "lender", "2026-01-15T10:00:00Z", {
+				role: "borrower",
+				contact_commitment: sha,
+			}),
+			make(6, "visibility.changed", "lender", "2026-01-15T10:00:00Z", {
+				change: "grant.proposed",
+				grant_id: "g1",
+				audience: { kind: "link", ref: "l1" },
+				level: "verify",
+				expires_at: "2026-02-15T10:00:00Z",
+			}),
+			make(7, "approval.requested", "lender", "2026-01-15T10:00:00Z", {
+				action: "notice.default",
+				target: "evt-4",
+				cure_days: 30,
+			}),
+			make(8, "approval.granted", "borrower", "2026-01-15T10:00:00Z", {
+				request: "evt-7",
+			}),
+		];
+		expect(statement(noisy, DAY_20)).toEqual(statement(plain, DAY_20));
 	});
 });
 

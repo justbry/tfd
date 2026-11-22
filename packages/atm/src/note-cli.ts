@@ -232,6 +232,7 @@ const statementText = (report: Statement): string => {
 			: `Payoff gap (lender payoff minus borrower payoff): ${gap}`;
 	return `${[
 		`Note ${report.note_id} (${report.currency}), as of ${report.as_of}`,
+		`Terms: ${report.state.terms}. Closed: ${report.state.closed ? "yes" : "no"}.`,
 		"",
 		viewsTable(report),
 		"",

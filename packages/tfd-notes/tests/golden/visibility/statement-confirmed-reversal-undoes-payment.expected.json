@@ -1,0 +1,56 @@
+{
+	"note_id": "note-vis",
+	"level": "statement",
+	"as_of": "2026-03-01",
+	"currency": "USD",
+	"exponent": 2,
+	"status": "open",
+	"principal_minor": "100000",
+	"interest_minor": "450",
+	"payoff_minor": "100450",
+	"schedule_length": 3,
+	"next_installment_due": "2026-03-15",
+	"schedule": [
+		{
+			"n": 1,
+			"due": "2026-02-15",
+			"payment_minor": "40000",
+			"interest_minor": "310",
+			"principal_minor": "39690",
+			"balance_after_minor": "60310"
+		},
+		{
+			"n": 2,
+			"due": "2026-03-15",
+			"payment_minor": "40000",
+			"interest_minor": "169",
+			"principal_minor": "39831",
+			"balance_after_minor": "20479"
+		},
+		{
+			"n": 3,
+			"due": "2026-04-15",
+			"payment_minor": "20542",
+			"interest_minor": "63",
+			"principal_minor": "20479",
+			"balance_after_minor": "0"
+		}
+	],
+	"payments": {
+		"label": "recorded and counted by both parties",
+		"items": [
+			{
+				"index": 1,
+				"value_date": "2026-02-15",
+				"amount_minor": "40000",
+				"kind": "payment"
+			},
+			{
+				"index": 2,
+				"value_date": "2026-02-20",
+				"amount_minor": "40000",
+				"kind": "reversal"
+			}
+		]
+	}
+}

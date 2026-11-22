@@ -1,6 +1,8 @@
 // The hosted Trifold product (plans/trifold-cloud/PLAN.md). One Worker serves ledger.* and api.*, routed by Host.
 // Only `staging` is bound. The top level is production and stays unbound until the launch gate (PLAN.md section 10):
 // tests/config.test.ts fails if a route, D1 database or bucket appears there.
+// The three NOTES_* vars of staging are public (key ids and published public keys, as in
+// apps/trifold-verify/public/.well-known/trifold-keys.json); the secrets are not here (README, "Promissory notes").
 {
 	"name": "trifold-cloud",
 	"main": "src/index.ts",
@@ -9,9 +11,15 @@
 	"workers_dev": false,
 	"observability": { "enabled": true },
 	"durable_objects": {
-		"bindings": [{ "name": "ORG", "class_name": "OrgDO" }]
+		"bindings": [
+			{ "name": "ORG", "class_name": "OrgDO" },
+			{ "name": "NOTE", "class_name": "NoteDO" }
+		]
 	},
-	"migrations": [{ "tag": "v1", "new_sqlite_classes": ["OrgDO"] }],
+	"migrations": [
+		{ "tag": "v1", "new_sqlite_classes": ["OrgDO"] },
+		{ "tag": "v2", "new_sqlite_classes": ["NoteDO"] }
+	],
 	"env": {
 		"staging": {
 			"name": "trifold-cloud-staging",
@@ -21,7 +29,10 @@
 				{ "pattern": "staging-api.trifold.app", "custom_domain": true }
 			],
 			"durable_objects": {
-				"bindings": [{ "name": "ORG", "class_name": "OrgDO" }]
+				"bindings": [
+					{ "name": "ORG", "class_name": "OrgDO" },
+					{ "name": "NOTE", "class_name": "NoteDO" }
+				]
 			},
 			"d1_databases": [
 				{
@@ -45,7 +56,10 @@
 				"ENVIRONMENT": "staging",
 				"LEDGER_HOST": "staging-ledger.trifold.app",
 				"API_HOST": "staging-api.trifold.app",
-				"BACKUP_SUBREQUEST_BUDGET": "900"
+				"BACKUP_SUBREQUEST_BUDGET": "900",
+				"NOTES_RECEIPT_KEY_ID": "trifold-staging-2026-11-receipt",
+				"NOTES_SEAL_KEY_ID": "trifold-staging-2026-11-seal",
+				"NOTES_PUBLIC_KEYS_JSON": "{\"trifold-staging-2026-11-receipt\":{\"pem\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAwxmZV0ZthKj9GO9wNSOnwwY4r7QBPsQu4Hjxs/9mYIk=\\n-----END PUBLIC KEY-----\\n\",\"purpose\":\"receipt\",\"not_before\":\"2026-11-01T00:00:00Z\",\"not_after\":\"2027-01-31T23:59:59Z\"},\"trifold-staging-2026-11-seal\":{\"pem\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAATJBok2Hs2s7ODYJol2VeKYGkM+t9OlsDTYMpvRi1oY=\\n-----END PUBLIC KEY-----\\n\",\"purpose\":\"seal\",\"not_before\":\"2026-11-01T00:00:00Z\",\"not_after\":\"2027-01-31T23:59:59Z\"}}"
 			}
 		}
 	}

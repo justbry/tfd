@@ -1,0 +1,13 @@
+{
+	"note_id": "note-vis",
+	"level": "summary",
+	"as_of": "2026-03-01",
+	"currency": "USD",
+	"exponent": 2,
+	"status": "open",
+	"principal_minor": "50340",
+	"interest_minor": "45",
+	"payoff_minor": "50385",
+	"schedule_length": 3,
+	"next_installment_due": "2026-03-15"
+}

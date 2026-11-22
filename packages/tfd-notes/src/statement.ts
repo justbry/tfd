@@ -29,6 +29,8 @@ import {
 	type PaymentStatus,
 	type Role,
 	type Statement,
+	type StatementState,
+	type TermsState,
 } from "./types";
 
 const DATE_LENGTH = 10;
@@ -268,6 +270,34 @@ const noteCreated = (events: NoteEvent[]): NoteCreatedEvent => {
 };
 
 /**
+ * What the events say about the note itself, in seq order (`events` must be in seq order). The last of `terms.accepted`
+ * and `terms.declined` decides `terms`; it is `proposed` until one exists. `release.confirmed` closes the note, and a
+ * reversal recorded after it with a value date after the release's UTC date reopens it, so the latest such decision
+ * wins. Neither touches a balance: a closed note still has both views' figures.
+ */
+const stateFor = (events: NoteEvent[]): StatementState => {
+	let terms: TermsState = "proposed";
+	let closed = false;
+	let releaseDate: CivilDate | undefined;
+	for (const event of events) {
+		if (event.type === "terms.accepted") terms = "accepted";
+		else if (event.type === "terms.declined") terms = "declined";
+		else if (event.type === "release.confirmed") {
+			closed = true;
+			releaseDate = event.entered_at.slice(0, DATE_LENGTH);
+		} else if (
+			event.type === "payment.recorded" &&
+			event.kind === "reversal" &&
+			releaseDate !== undefined &&
+			compareDates(event.value_date, releaseDate) > 0
+		) {
+			closed = false;
+		}
+	}
+	return { terms, closed };
+};
+
+/**
  * One view's overdue amount (R-16): what is due to date less what that view counts as paid, when positive, and never
  * more than the view's payoff. A paid-off view owes nothing, so it is never overdue (its payoff is 0).
  */
@@ -349,5 +379,97 @@ export const statement = (events: unknown[], asOf: CivilDate): Statement => {
 			borrower_days_overdue:
 				borrowerOverdue === 0n ? 0 : daysOverdue(schedule, borrowerPaid, asOf),
 		},
+		state: stateFor(ordered),
+	};
+};
+
+/** One payment or reversal that both views count identically, for a shared view (event ids stay private). */
+export interface AgreedPayment {
+	value_date: CivilDate;
+	/** What both views count: the payment's amount, or for a reversal the amount of the payment it undoes. */
+	amount_minor: string;
+	kind: "payment" | "reversal";
+}
+
+/** The note as both parties count it identically: only facts that neither party disputes or has yet to answer. */
+export interface AgreedView {
+	note_id: string;
+	currency: string;
+	exponent: number;
+	schedule: Statement["schedule"];
+	/** The balance replayed over the agreed payments alone. */
+	balance: Balance;
+	/** Agreed payments dated on or before `asOf`, in value-date then seq order. */
+	payments: AgreedPayment[];
+	/** True once a release is confirmed and no agreed reversal reopened the note. */
+	closed: boolean;
+}
+
+/** The events that remain once every payment the two views count differently (and its reversals) is dropped. */
+const withoutDiffering = (
+	ordered: NoteEvent[],
+	differing: Set<string>,
+): NoteEvent[] =>
+	ordered.filter(
+		(event) => !(event.type === "payment.recorded" && differing.has(event.id)),
+	);
+
+/**
+ * The note counting only what both views count identically on `asOf`: every payment that appears in the statement's
+ * itemised difference is dropped, and so is a reversal that does. A pure function of the events and the date; a
+ * dispute, an unanswered claim and a counter-amount leave no trace in the result.
+ */
+export const agreedView = (events: unknown[], asOf: CivilDate): AgreedView => {
+	const ordered = validateStream(events);
+	const created = noteCreated(ordered);
+	const { terms } = created;
+	const recorded = ordered.filter(isRecorded);
+	const decisions = decisionsFor(ordered);
+	const lenderView = countsForView(recorded, decisions, "lender");
+	const borrowerView = countsForView(recorded, decisions, "borrower");
+	const differing = new Set<string>();
+	for (const event of recorded) {
+		if (lenderView.counts.get(event.id) !== borrowerView.counts.get(event.id)) {
+			differing.add(event.id);
+		}
+	}
+	const agreed = recorded.filter((event) => !differing.has(event.id));
+	const agreedReversals = new Map<string, PaymentRecordedEvent>();
+	for (const [targetId, reversal] of lenderView.reversals) {
+		if (!(differing.has(reversal.id) || differing.has(targetId))) {
+			agreedReversals.set(targetId, reversal);
+		}
+	}
+	const agreedCounts: ViewCounts = {
+		counts: lenderView.counts,
+		reversals: agreedReversals,
+	};
+	const payments: AgreedPayment[] = [];
+	for (const event of [...agreed].sort(comparePayments)) {
+		if (compareDates(event.value_date, asOf) > 0) {
+			continue;
+		}
+		const counted = lenderView.counts.get(event.id) ?? 0n;
+		if (counted === 0n) {
+			continue;
+		}
+		payments.push({
+			value_date: event.value_date,
+			amount_minor: formatMinor(counted < 0n ? -counted : counted),
+			kind: event.kind,
+		});
+	}
+	return {
+		note_id: created.note_id,
+		currency: terms.currency,
+		exponent: terms.exponent,
+		schedule: generateSchedule(terms),
+		balance: replayBalance(
+			terms,
+			toCountedPayments(agreed, agreedCounts, asOf),
+			asOf,
+		),
+		payments,
+		closed: stateFor(withoutDiffering(ordered, differing)).closed,
 	};
 };

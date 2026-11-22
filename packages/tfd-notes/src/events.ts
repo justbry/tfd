@@ -9,28 +9,49 @@
  * type and the field.
  */
 
-import { isValidCivilDate } from "./date.js";
-import { dueDateFor, MAX_INSTALLMENTS } from "./schedule.js";
+import { isValidCivilDate } from "./date";
+import { addDaysToInstant, compareInstants, isInstant } from "./instant";
+import { dueDateFor, MAX_INSTALLMENTS } from "./schedule";
+import { findUnsafeCharacter } from "./text";
 import {
 	type AnnotationAddedEvent,
+	type ApprovalAction,
+	type ApprovalGrantedEvent,
+	type ApprovalRequestedEvent,
+	type EventVia,
+	type GrantAnsweredEvent,
+	type GrantAudience,
+	type GrantAudienceKind,
+	type GrantLevel,
+	type GrantProposedEvent,
+	type GrantPurpose,
 	NOTE_EVENT_SCHEMA,
 	type NoteCreatedEvent,
 	type NoteEvent,
 	type NoteTerms,
+	type NoticeKind,
+	type NoticeSentEvent,
+	type PartyReboundEvent,
 	type PaymentConfirmedEvent,
 	type PaymentDisputedEvent,
 	type PaymentRecordedEvent,
 	type PaymentResolvedEvent,
 	type PaymentSource,
+	type PayoffIssuedEvent,
+	type ReleaseConfirmedEvent,
+	type ReleaseDraftedEvent,
 	type Role,
 	type ScheduleTerms,
-} from "./types.js";
+	type TermsAcceptedEvent,
+	type TermsDeclinedEvent,
+	type VisibilityChangedEvent,
+} from "./types";
 
 type JsonRecord = Record<string, unknown>;
 type BaseFields = Pick<
 	NoteCreatedEvent,
 	"schema" | "id" | "note_id" | "seq" | "entered_at" | "entered_by"
->;
+> & { via?: EventVia; agent_ref?: string };
 
 /**
  * At most 20 digits (below 10^20 minor units): far above any real note, and small enough that the level-payment search,
@@ -40,10 +61,10 @@ const MONEY_PATTERN = /^(0|[1-9][0-9]{0,19})$/;
 const RATE_PATTERN = /^(0|0\.[0-9]{1,6})$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
-const INSTANT_PATTERN =
-	/^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,9})?Z$/;
 
 const MAX_EXPONENT = 4;
+const MAX_AGENT_REF_LENGTH = 128;
+const MAX_CURE_DAYS = 365;
 const FIRST_SEQ = 1;
 
 const BASE_KEYS = [
@@ -55,7 +76,28 @@ const BASE_KEYS = [
 	"entered_by",
 	"type",
 ] as const;
+/** Optional on every event: how the party reached the system, and who acted for the party. */
+const BASE_OPTIONAL_KEYS = ["via", "agent_ref"] as const;
+const VIAS = ["email-link", "account"] as const;
 const ROLES = ["lender", "borrower"] as const;
+const NOTICE_KINDS = ["reminder", "default"] as const;
+const GRANT_CHANGES = [
+	"grant.proposed",
+	"grant.consented",
+	"grant.revoked",
+] as const;
+const GRANT_AUDIENCE_KINDS = ["person", "org", "link"] as const;
+const GRANT_LEVELS = ["summary", "statement", "verify"] as const;
+const GRANT_PURPOSES = ["accountant", "lawyer", "court", "assignee"] as const;
+/** The longest a grant may run past the event that proposed it. */
+export const MAX_GRANT_DAYS = 365;
+/** The longest a carve-out disclosure may run past the event that proposed it. */
+export const MAX_CARVE_OUT_DAYS = 90;
+const APPROVAL_ACTIONS = [
+	"release.confirm",
+	"notice.default",
+	"waiver",
+] as const;
 const FREQUENCIES = ["weekly", "biweekly", "monthly"] as const;
 const PAYMENT_KINDS = ["payment", "reversal"] as const;
 // `both-agree` is derived from a confirmation and never typed (R-14), so the validator does not accept it.
@@ -67,6 +109,16 @@ const EVENT_TYPES = [
 	"payment.disputed",
 	"payment.resolved",
 	"annotation.added",
+	"terms.accepted",
+	"terms.declined",
+	"payoff.issued",
+	"release.drafted",
+	"release.confirmed",
+	"notice.sent",
+	"party.rebound",
+	"visibility.changed",
+	"approval.requested",
+	"approval.granted",
 ] as const;
 
 const isRecord = (value: unknown): value is JsonRecord =>
@@ -117,9 +169,28 @@ const readString = (label: string, path: string, value: unknown): string => {
 	return value;
 };
 
-const readText = (label: string, path: string, value: unknown): string => {
-	if (typeof value !== "string") {
-		return fail(label, `${path} must be a string, got ${show(value)}`);
+/**
+ * Free text a person can read: a string with no control or bidirectional character (src/text.ts). `multiline` lets a
+ * field that already holds several lines keep `\n` and `\t`. `allowEmpty` is for the optional method and reference.
+ */
+const readFreeText = (
+	label: string,
+	path: string,
+	value: unknown,
+	{ multiline, allowEmpty }: { multiline: boolean; allowEmpty: boolean },
+): string => {
+	if (typeof value !== "string" || (!allowEmpty && value.length === 0)) {
+		return fail(
+			label,
+			`${path} must be ${allowEmpty ? "a string" : "a non-empty string"}, got ${show(value)}`,
+		);
+	}
+	const unsafe = findUnsafeCharacter(value, multiline);
+	if (unsafe !== null) {
+		return fail(
+			label,
+			`${path} must not contain control or bidirectional characters, found ${unsafe.label} at character ${unsafe.position}`,
+		);
 	}
 	return value;
 };
@@ -168,12 +239,7 @@ const readSha256 = (label: string, path: string, value: unknown): string => {
 };
 
 const readInstant = (label: string, path: string, value: unknown): string => {
-	const match = typeof value === "string" ? INSTANT_PATTERN.exec(value) : null;
-	if (
-		typeof value !== "string" ||
-		match === null ||
-		!isValidCivilDate(match[1] ?? "")
-	) {
+	if (!isInstant(value)) {
 		return fail(
 			label,
 			`${path} must be an ISO 8601 UTC instant ending in Z, got ${show(value)}`,
@@ -214,6 +280,32 @@ const readPositiveInteger = (
 	return value;
 };
 
+const readVia = (label: string, value: unknown): EventVia => {
+	if (!isOneOf(VIAS, value)) {
+		return fail(
+			label,
+			`via must be "email-link" or "account", got ${show(value)}`,
+		);
+	}
+	return value;
+};
+
+/** A non-empty reference of at most 128 characters (code points, as the schema's `maxLength` counts them). */
+const readAgentReference = (label: string, value: unknown): string => {
+	const reference = readFreeText(label, "agent_ref", value, {
+		multiline: false,
+		allowEmpty: false,
+	});
+	const length = Array.from(reference).length;
+	if (length > MAX_AGENT_REF_LENGTH) {
+		return fail(
+			label,
+			`agent_ref must be at most ${MAX_AGENT_REF_LENGTH} characters, got ${length}`,
+		);
+	}
+	return reference;
+};
+
 const readBase = (record: JsonRecord, label: string): BaseFields => {
 	if (record.schema !== NOTE_EVENT_SCHEMA) {
 		fail(
@@ -221,7 +313,7 @@ const readBase = (record: JsonRecord, label: string): BaseFields => {
 			`schema must be "${NOTE_EVENT_SCHEMA}", got ${show(record.schema)}`,
 		);
 	}
-	return {
+	const base: BaseFields = {
 		schema: NOTE_EVENT_SCHEMA,
 		id: readString(label, "id", record.id),
 		note_id: readString(label, "note_id", record.note_id),
@@ -229,6 +321,42 @@ const readBase = (record: JsonRecord, label: string): BaseFields => {
 		entered_at: readInstant(label, "entered_at", record.entered_at),
 		entered_by: readRole(label, "entered_by", record.entered_by),
 	};
+	if ("via" in record) base.via = readVia(label, record.via);
+	if ("agent_ref" in record) {
+		base.agent_ref = readAgentReference(label, record.agent_ref);
+	}
+	return base;
+};
+
+/** Checks the keys common to every event plus the type's own, required and optional. */
+const checkEventKeys = (
+	record: JsonRecord,
+	label: string,
+	required: readonly string[],
+	optional: readonly string[] = [],
+): void => {
+	checkKeys(
+		record,
+		label,
+		"",
+		[...BASE_KEYS, ...required],
+		[...BASE_OPTIONAL_KEYS, ...optional],
+	);
+};
+
+/** The event's `entered_by` must be `role`; returns the base narrowed to that role. */
+const requireRole = <Required extends Role>(
+	label: string,
+	base: BaseFields,
+	role: Required,
+): BaseFields & { entered_by: Required } => {
+	if (base.entered_by !== role) {
+		return fail(
+			label,
+			`entered_by must be "${role}", got ${show(base.entered_by)}`,
+		);
+	}
+	return { ...base, entered_by: role };
 };
 
 const readAmortized = (
@@ -432,7 +560,7 @@ export const parseNoteTerms = (value: unknown): NoteTerms =>
 
 const parseNoteCreated = (record: JsonRecord): NoteCreatedEvent => {
 	const label = "note.created";
-	checkKeys(record, label, "", [...BASE_KEYS, "terms"], []);
+	checkEventKeys(record, label, ["terms"]);
 	const base = readBase(record, label);
 	return {
 		...base,
@@ -443,11 +571,10 @@ const parseNoteCreated = (record: JsonRecord): NoteCreatedEvent => {
 
 const parsePaymentRecorded = (record: JsonRecord): PaymentRecordedEvent => {
 	const label = "payment.recorded";
-	checkKeys(
+	checkEventKeys(
 		record,
 		label,
-		"",
-		[...BASE_KEYS, "kind", "amount_minor", "value_date"],
+		["kind", "amount_minor", "value_date"],
 		["method", "reference", "reverses", "source"],
 	);
 	const base = readBase(record, label);
@@ -475,10 +602,16 @@ const parsePaymentRecorded = (record: JsonRecord): PaymentRecordedEvent => {
 		event.reverses = readString(label, "reverses", record.reverses);
 	}
 	if ("method" in record) {
-		event.method = readText(label, "method", record.method);
+		event.method = readFreeText(label, "method", record.method, {
+			multiline: false,
+			allowEmpty: true,
+		});
 	}
 	if ("reference" in record) {
-		event.reference = readText(label, "reference", record.reference);
+		event.reference = readFreeText(label, "reference", record.reference, {
+			multiline: false,
+			allowEmpty: true,
+		});
 	}
 	if ("source" in record) {
 		event.source = readSource(label, record.source);
@@ -504,7 +637,7 @@ const readSource = (label: string, value: unknown): PaymentSource => {
 
 const parsePaymentConfirmed = (record: JsonRecord): PaymentConfirmedEvent => {
 	const label = "payment.confirmed";
-	checkKeys(record, label, "", [...BASE_KEYS, "target"], []);
+	checkEventKeys(record, label, ["target"]);
 	const base = readBase(record, label);
 	return {
 		...base,
@@ -515,13 +648,7 @@ const parsePaymentConfirmed = (record: JsonRecord): PaymentConfirmedEvent => {
 
 const parsePaymentDisputed = (record: JsonRecord): PaymentDisputedEvent => {
 	const label = "payment.disputed";
-	checkKeys(
-		record,
-		label,
-		"",
-		[...BASE_KEYS, "target", "counter_amount_minor", "reason"],
-		[],
-	);
+	checkEventKeys(record, label, ["target", "counter_amount_minor", "reason"]);
 	const base = readBase(record, label);
 	return {
 		...base,
@@ -532,19 +659,16 @@ const parsePaymentDisputed = (record: JsonRecord): PaymentDisputedEvent => {
 			"counter_amount_minor",
 			record.counter_amount_minor,
 		),
-		reason: readString(label, "reason", record.reason),
+		reason: readFreeText(label, "reason", record.reason, {
+			multiline: true,
+			allowEmpty: false,
+		}),
 	};
 };
 
 const parsePaymentResolved = (record: JsonRecord): PaymentResolvedEvent => {
 	const label = "payment.resolved";
-	checkKeys(
-		record,
-		label,
-		"",
-		[...BASE_KEYS, "target", "agreed_amount_minor"],
-		[],
-	);
+	checkEventKeys(record, label, ["target", "agreed_amount_minor"]);
 	const base = readBase(record, label);
 	return {
 		...base,
@@ -560,18 +684,15 @@ const parsePaymentResolved = (record: JsonRecord): PaymentResolvedEvent => {
 
 const parseAnnotationAdded = (record: JsonRecord): AnnotationAddedEvent => {
 	const label = "annotation.added";
-	checkKeys(
-		record,
-		label,
-		"",
-		[...BASE_KEYS, "text"],
-		["attachment_sha256", "target"],
-	);
+	checkEventKeys(record, label, ["text"], ["attachment_sha256", "target"]);
 	const base = readBase(record, label);
 	const event: AnnotationAddedEvent = {
 		...base,
 		type: "annotation.added",
-		text: readString(label, "text", record.text),
+		text: readFreeText(label, "text", record.text, {
+			multiline: true,
+			allowEmpty: false,
+		}),
 	};
 	if ("attachment_sha256" in record) {
 		event.attachment_sha256 = readSha256(
@@ -584,6 +705,315 @@ const parseAnnotationAdded = (record: JsonRecord): AnnotationAddedEvent => {
 		event.target = readString(label, "target", record.target);
 	}
 	return event;
+};
+
+const parseTermsAccepted = (record: JsonRecord): TermsAcceptedEvent => {
+	const label = "terms.accepted";
+	checkEventKeys(record, label, []);
+	const base = requireRole(label, readBase(record, label), "borrower");
+	return { ...base, type: "terms.accepted" };
+};
+
+const parseTermsDeclined = (record: JsonRecord): TermsDeclinedEvent => {
+	const label = "terms.declined";
+	checkEventKeys(record, label, []);
+	const base = requireRole(label, readBase(record, label), "borrower");
+	return { ...base, type: "terms.declined" };
+};
+
+const parsePayoffIssued = (record: JsonRecord): PayoffIssuedEvent => {
+	const label = "payoff.issued";
+	checkEventKeys(record, label, ["as_of", "document_sha256"]);
+	const base = requireRole(label, readBase(record, label), "lender");
+	return {
+		...base,
+		type: "payoff.issued",
+		as_of: readDate(label, "as_of", record.as_of),
+		document_sha256: readSha256(
+			label,
+			"document_sha256",
+			record.document_sha256,
+		),
+	};
+};
+
+const parseReleaseDrafted = (record: JsonRecord): ReleaseDraftedEvent => {
+	const label = "release.drafted";
+	checkEventKeys(record, label, []);
+	const base = requireRole(label, readBase(record, label), "lender");
+	return { ...base, type: "release.drafted" };
+};
+
+const parseReleaseConfirmed = (record: JsonRecord): ReleaseConfirmedEvent => {
+	const label = "release.confirmed";
+	checkEventKeys(record, label, ["target"]);
+	const base = requireRole(label, readBase(record, label), "lender");
+	return {
+		...base,
+		type: "release.confirmed",
+		target: readString(label, "target", record.target),
+	};
+};
+
+const readCureDays = (label: string, value: unknown): number => {
+	if (
+		typeof value !== "number" ||
+		!Number.isInteger(value) ||
+		value < 0 ||
+		value > MAX_CURE_DAYS
+	) {
+		return fail(
+			label,
+			`cure_days must be an integer from 0 to ${MAX_CURE_DAYS}, got ${show(value)}`,
+		);
+	}
+	return value;
+};
+
+const parseNoticeSent = (record: JsonRecord): NoticeSentEvent => {
+	const label = "notice.sent";
+	checkEventKeys(record, label, ["kind"], ["cure_days", "approval"]);
+	const base = requireRole(label, readBase(record, label), "lender");
+	if (!isOneOf(NOTICE_KINDS, record.kind)) {
+		return fail(
+			label,
+			`kind must be "reminder" or "default", got ${show(record.kind)}`,
+		);
+	}
+	const kind: NoticeKind = record.kind;
+	if (kind === "default" && !("cure_days" in record)) {
+		fail(label, "cure_days is required when kind is default");
+	}
+	if (kind === "reminder" && "cure_days" in record) {
+		fail(label, "cure_days is not allowed when kind is reminder");
+	}
+	if (kind === "reminder" && "approval" in record) {
+		fail(label, "approval is not allowed when kind is reminder");
+	}
+	const event: NoticeSentEvent = { ...base, type: "notice.sent", kind };
+	if ("cure_days" in record) {
+		event.cure_days = readCureDays(label, record.cure_days);
+	}
+	if ("approval" in record) {
+		event.approval = readString(label, "approval", record.approval);
+	}
+	return event;
+};
+
+const otherRole = (role: Role): Role =>
+	role === "lender" ? "borrower" : "lender";
+
+const parsePartyRebound = (record: JsonRecord): PartyReboundEvent => {
+	const label = "party.rebound";
+	checkEventKeys(record, label, ["role", "contact_commitment"]);
+	const base = readBase(record, label);
+	const role = readRole(label, "role", record.role);
+	const confirmer = otherRole(role);
+	if (base.entered_by !== confirmer) {
+		fail(
+			label,
+			`entered_by must be "${confirmer}" (the other party) when role is "${role}", got ${show(base.entered_by)}`,
+		);
+	}
+	return {
+		...base,
+		type: "party.rebound",
+		role,
+		contact_commitment: readSha256(
+			label,
+			"contact_commitment",
+			record.contact_commitment,
+		),
+	};
+};
+
+const readGrantAudience = (label: string, value: unknown): GrantAudience => {
+	if (!isRecord(value)) {
+		return fail(label, `audience must be an object, got ${show(value)}`);
+	}
+	checkKeys(value, label, "audience.", ["kind", "ref"], []);
+	if (!isOneOf(GRANT_AUDIENCE_KINDS, value.kind)) {
+		return fail(
+			label,
+			`audience.kind must be "person", "org" or "link", got ${show(value.kind)}`,
+		);
+	}
+	const kind: GrantAudienceKind = value.kind;
+	return { kind, ref: readString(label, "audience.ref", value.ref) };
+};
+
+const readGrantLevel = (label: string, value: unknown): GrantLevel => {
+	if (!isOneOf(GRANT_LEVELS, value)) {
+		return fail(
+			label,
+			`level must be "summary", "statement" or "verify", got ${show(value)}`,
+		);
+	}
+	return value;
+};
+
+const readGrantPurpose = (label: string, value: unknown): GrantPurpose => {
+	if (!isOneOf(GRANT_PURPOSES, value)) {
+		return fail(
+			label,
+			`purpose must be "accountant", "lawyer", "court" or "assignee", got ${show(value)}`,
+		);
+	}
+	return value;
+};
+
+const readCarveOut = (label: string, value: unknown): boolean => {
+	if (typeof value !== "boolean") {
+		return fail(label, `carve_out must be true or false, got ${show(value)}`);
+	}
+	return value;
+};
+
+/**
+ * A grant ends after the event that proposed it and at most `maximumDays` days after it (the same time of day on that
+ * date): `MAX_GRANT_DAYS`, or `MAX_CARVE_OUT_DAYS` for a carve-out.
+ */
+const checkGrantExpiry = (
+	label: string,
+	enteredAt: string,
+	expiresAt: string,
+	maximumDays: number,
+): void => {
+	const latest = addDaysToInstant(enteredAt, maximumDays);
+	if (compareInstants(expiresAt, enteredAt) <= 0) {
+		fail(
+			label,
+			`expires_at ${expiresAt} must be after entered_at ${enteredAt}`,
+		);
+	}
+	if (compareInstants(expiresAt, latest) > 0) {
+		fail(
+			label,
+			`expires_at ${expiresAt} is more than ${maximumDays} days after entered_at ${enteredAt}`,
+		);
+	}
+};
+
+/** The carve-out disclosure reaches one person, at most at statement level, for a stated purpose. */
+const checkCarveOut = (
+	label: string,
+	record: JsonRecord,
+	audience: GrantAudience,
+	level: GrantLevel,
+): void => {
+	if (audience.kind !== "person") {
+		fail(
+			label,
+			`a carve_out may only name a person audience, got "${audience.kind}"`,
+		);
+	}
+	if (level === "verify") {
+		fail(label, 'a carve_out level must be "summary" or "statement"');
+	}
+	if (!("purpose" in record)) {
+		fail(label, "purpose is required when carve_out is true");
+	}
+};
+
+const parseVisibilityChanged = (record: JsonRecord): VisibilityChangedEvent => {
+	const label = "visibility.changed";
+	if (!isOneOf(GRANT_CHANGES, record.change)) {
+		return fail(
+			label,
+			`change must be "grant.proposed", "grant.consented" or "grant.revoked", got ${show(record.change)}`,
+		);
+	}
+	const change = record.change;
+	if (change !== "grant.proposed") {
+		checkEventKeys(record, label, ["change", "grant_id"]);
+		const answered: GrantAnsweredEvent = {
+			...readBase(record, label),
+			type: "visibility.changed",
+			change,
+			grant_id: readString(label, "grant_id", record.grant_id),
+		};
+		return answered;
+	}
+	checkEventKeys(
+		record,
+		label,
+		["change", "grant_id", "audience", "level", "expires_at"],
+		["purpose", "carve_out"],
+	);
+	const base = readBase(record, label);
+	const audience = readGrantAudience(label, record.audience);
+	const level = readGrantLevel(label, record.level);
+	const expiresAt = readInstant(label, "expires_at", record.expires_at);
+	const carveOut =
+		"carve_out" in record ? readCarveOut(label, record.carve_out) : undefined;
+	checkGrantExpiry(
+		label,
+		base.entered_at,
+		expiresAt,
+		carveOut === true ? MAX_CARVE_OUT_DAYS : MAX_GRANT_DAYS,
+	);
+	if (audience.kind === "link" && level !== "verify") {
+		fail(label, `a link audience may only have level "verify", got "${level}"`);
+	}
+	if (carveOut === true) {
+		checkCarveOut(label, record, audience, level);
+	}
+	const proposed: GrantProposedEvent = {
+		...base,
+		type: "visibility.changed",
+		change,
+		grant_id: readString(label, "grant_id", record.grant_id),
+		audience,
+		level,
+		expires_at: expiresAt,
+	};
+	if ("purpose" in record) {
+		proposed.purpose = readGrantPurpose(label, record.purpose);
+	}
+	if (carveOut !== undefined) {
+		proposed.carve_out = carveOut;
+	}
+	return proposed;
+};
+
+const parseApprovalRequested = (record: JsonRecord): ApprovalRequestedEvent => {
+	const label = "approval.requested";
+	checkEventKeys(record, label, ["action", "target"], ["cure_days"]);
+	const base = readBase(record, label);
+	if (!isOneOf(APPROVAL_ACTIONS, record.action)) {
+		return fail(
+			label,
+			`action must be "release.confirm", "notice.default" or "waiver", got ${show(record.action)}`,
+		);
+	}
+	const action: ApprovalAction = record.action;
+	if (action === "notice.default" && !("cure_days" in record)) {
+		fail(label, "cure_days is required when action is notice.default");
+	}
+	if (action !== "notice.default" && "cure_days" in record) {
+		fail(label, "cure_days is only allowed when action is notice.default");
+	}
+	const event: ApprovalRequestedEvent = {
+		...base,
+		type: "approval.requested",
+		action,
+		target: readString(label, "target", record.target),
+	};
+	if ("cure_days" in record) {
+		event.cure_days = readCureDays(label, record.cure_days);
+	}
+	return event;
+};
+
+const parseApprovalGranted = (record: JsonRecord): ApprovalGrantedEvent => {
+	const label = "approval.granted";
+	checkEventKeys(record, label, ["request"]);
+	const base = readBase(record, label);
+	return {
+		...base,
+		type: "approval.granted",
+		request: readString(label, "request", record.request),
+	};
 };
 
 /** Validates one event's shape and returns it typed. Throws an `Error` naming the event type and the field. */
@@ -604,6 +1034,26 @@ export const parseNoteEvent = (value: unknown): NoteEvent => {
 			return parsePaymentResolved(value);
 		case "annotation.added":
 			return parseAnnotationAdded(value);
+		case "terms.accepted":
+			return parseTermsAccepted(value);
+		case "terms.declined":
+			return parseTermsDeclined(value);
+		case "payoff.issued":
+			return parsePayoffIssued(value);
+		case "release.drafted":
+			return parseReleaseDrafted(value);
+		case "release.confirmed":
+			return parseReleaseConfirmed(value);
+		case "notice.sent":
+			return parseNoticeSent(value);
+		case "party.rebound":
+			return parsePartyRebound(value);
+		case "visibility.changed":
+			return parseVisibilityChanged(value);
+		case "approval.requested":
+			return parseApprovalRequested(value);
+		case "approval.granted":
+			return parseApprovalGranted(value);
 		default:
 			return fail(
 				"event",
@@ -621,6 +1071,12 @@ interface StreamState {
 	disputed: Set<string>;
 	/** Each reversed payment's id, with the reversal that undoes it (R-9a: at most once). */
 	reversedBy: Map<string, PaymentRecordedEvent>;
+	drafts: Map<string, ReleaseDraftedEvent>;
+	/** Each proposed grant by its `grant_id`. */
+	grants: Map<string, GrantProposedEvent>;
+	approvalRequests: Map<string, ApprovalRequestedEvent>;
+	/** True while the latest `terms.accepted` or `terms.declined` is a decline. */
+	termsDeclined: boolean;
 }
 
 function streamFail(event: NoteEvent, message: string): never {
@@ -647,6 +1103,111 @@ const findRecorded = (
 		event,
 		`${field} ${show(target)} does not match an earlier payment.recorded event`,
 	);
+};
+
+/** Resolves `target` to an earlier event of one type, named `typeName`, or throws with what it found instead. */
+const findEarlier = <Found extends NoteEvent>(
+	state: StreamState,
+	event: NoteEvent,
+	field: string,
+	target: string,
+	found: Found | undefined,
+	typeName: string,
+): Found => {
+	if (found !== undefined) return found;
+	const other = state.seen.get(target);
+	if (other !== undefined) {
+		return streamFail(
+			event,
+			`${field} ${show(target)} has type ${other.type}, not ${typeName}`,
+		);
+	}
+	return streamFail(
+		event,
+		`${field} ${show(target)} does not match an earlier ${typeName} event`,
+	);
+};
+
+const checkReleaseConfirmed = (
+	state: StreamState,
+	event: ReleaseConfirmedEvent,
+): void => {
+	const draft = findEarlier(
+		state,
+		event,
+		"target",
+		event.target,
+		state.drafts.get(event.target),
+		"release.drafted",
+	);
+	if (compareInstants(event.entered_at, draft.entered_at) < 0) {
+		streamFail(
+			event,
+			`entered_at ${event.entered_at} is before the ${draft.entered_at} of the draft ${show(draft.id)}`,
+		);
+	}
+};
+
+const checkVisibilityChanged = (
+	state: StreamState,
+	event: VisibilityChangedEvent,
+): void => {
+	if (event.change === "grant.proposed") {
+		const earlier = state.grants.get(event.grant_id);
+		if (earlier !== undefined) {
+			streamFail(
+				event,
+				`grant_id ${show(event.grant_id)} is already proposed by seq ${earlier.seq}`,
+			);
+		}
+		return;
+	}
+	if (!state.grants.has(event.grant_id)) {
+		streamFail(
+			event,
+			`grant_id ${show(event.grant_id)} does not match an earlier grant.proposed event`,
+		);
+	}
+};
+
+const DECLINED_TERMS_RULE =
+	"the borrower has declined the terms (terms.declined), so no payoff statement, notice or default-notice approval is allowed until they accept";
+
+/** While the terms stand declined, no payoff statement is issued and no notice or default approval is started. */
+const checkTermsNotDeclined = (state: StreamState, event: NoteEvent): void => {
+	if (state.termsDeclined) {
+		streamFail(event, DECLINED_TERMS_RULE);
+	}
+};
+
+/** A notice that names an approval names an earlier default-notice request with the same cure period. */
+const checkNoticeApproval = (
+	state: StreamState,
+	event: NoticeSentEvent,
+): void => {
+	if (event.approval === undefined) {
+		return;
+	}
+	const request = findEarlier(
+		state,
+		event,
+		"approval",
+		event.approval,
+		state.approvalRequests.get(event.approval),
+		"approval.requested",
+	);
+	if (request.action !== "notice.default") {
+		streamFail(
+			event,
+			`approval ${show(event.approval)} is a request for ${request.action}, not notice.default`,
+		);
+	}
+	if (request.cure_days !== event.cure_days) {
+		streamFail(
+			event,
+			`cure_days ${show(event.cure_days)} differs from the ${show(request.cure_days)} of the approval request ${show(event.approval)}`,
+		);
+	}
 };
 
 const checkResponder = (
@@ -735,6 +1296,40 @@ const checkEventAgainstStream = (
 				);
 			}
 			return;
+		case "release.confirmed":
+			checkReleaseConfirmed(state, event);
+			return;
+		case "payoff.issued":
+			checkTermsNotDeclined(state, event);
+			return;
+		case "notice.sent":
+			checkTermsNotDeclined(state, event);
+			checkNoticeApproval(state, event);
+			return;
+		case "visibility.changed":
+			checkVisibilityChanged(state, event);
+			return;
+		case "approval.requested":
+			if (event.action === "notice.default") {
+				checkTermsNotDeclined(state, event);
+			}
+			if (!state.seen.has(event.target)) {
+				streamFail(
+					event,
+					`target ${show(event.target)} does not match an earlier event`,
+				);
+			}
+			return;
+		case "approval.granted":
+			findEarlier(
+				state,
+				event,
+				"request",
+				event.request,
+				state.approvalRequests.get(event.request),
+				"approval.requested",
+			);
+			return;
 		default:
 			return;
 	}
@@ -748,6 +1343,18 @@ const recordInState = (state: StreamState, event: NoteEvent): void => {
 			state.reversedBy.set(event.reverses, event);
 	}
 	if (event.type === "payment.disputed") state.disputed.add(event.target);
+	if (event.type === "release.drafted") state.drafts.set(event.id, event);
+	if (
+		event.type === "visibility.changed" &&
+		event.change === "grant.proposed"
+	) {
+		state.grants.set(event.grant_id, event);
+	}
+	if (event.type === "approval.requested") {
+		state.approvalRequests.set(event.id, event);
+	}
+	if (event.type === "terms.accepted") state.termsDeclined = false;
+	if (event.type === "terms.declined") state.termsDeclined = true;
 };
 
 const orderBySeq = (events: NoteEvent[]): NoteEvent[] => {
@@ -794,6 +1401,10 @@ export const validateStream = (events: unknown[]): NoteEvent[] => {
 		recorded: new Map(),
 		disputed: new Set(),
 		reversedBy: new Map(),
+		drafts: new Map(),
+		grants: new Map(),
+		approvalRequests: new Map(),
+		termsDeclined: false,
 	};
 	for (const event of ordered) {
 		if (event.note_id !== state.noteId) {

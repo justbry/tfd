@@ -1,0 +1,16 @@
+{
+	"status": {
+		"requested": true,
+		"requester_agent": "alice",
+		"granted_by": ["bob"],
+		"satisfied": true
+	},
+	"pending": [],
+	"checks": [
+		"ok",
+		"approval.granted: agent \"bob\" already approved request \"evt-3\"",
+		"ok",
+		"approval.granted: an agent cannot approve their own request",
+		"notice.sent: approval must be a non-empty string"
+	]
+}

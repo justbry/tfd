@@ -295,6 +295,10 @@
     "apps/trifold-cloud": {
       "name": "trifold-cloud",
       "version": "0.1.0",
+      "dependencies": {
+        "tfd-notes": "workspace:*",
+        "tfd-verify-notes": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "1.4.2",
         "typescript": "~5.8.3",
@@ -401,7 +405,7 @@
     },
     "packages/atm": {
       "name": "tfd",
-      "version": "0.10.0",
+      "version": "0.11.1",
       "bin": {
         "atm": "./src/atm.ts",
         "tfd": "./src/bin.ts",
@@ -1115,6 +1119,19 @@
         "typescript": "5.8.3",
       },
     },
+    "packages/verify-notes": {
+      "name": "tfd-verify-notes",
+      "version": "0.1.0",
+      "dependencies": {
+        "@noble/ed25519": "^3.2.0",
+        "tfd-notes": "workspace:*",
+        "tfd-verify": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "1.4.2",
+        "typescript": "5.8.3",
+      },
+    },
     "scripts": {
       "name": "@autumn/scripts",
       "version": "1.0.0",
@@ -1430,7 +1447,7 @@
         "@types/react": "^19.0.0",
         "@types/react-dom": "^19.0.0",
         "@vitejs/plugin-react": "catalog:",
-        "esbuild": "^0.25.0",
+        "esbuild": "0.25.0",
         "eslint": "^9.21.0",
         "eslint-plugin-react-hooks": "^5.1.0",
         "eslint-plugin-react-refresh": "^0.4.19",
@@ -6973,6 +6990,8 @@
     "tfd-notes": ["tfd-notes@workspace:packages/tfd-notes"],
 
     "tfd-verify": ["tfd-verify@workspace:packages/verify"],
+
+    "tfd-verify-notes": ["tfd-verify-notes@workspace:packages/verify-notes"],
 
     "thenify": ["thenify@3.3.1", "", { "dependencies": { "any-promise": "^1.0.0" } }, "sha512-RVZSIV5IG10Hk3enotrhvz0T9em6cyHBLkH/YAZuKqd8hRkKhSfCGIcP2KUY0EPxndzANBmNllzWPwak+bheSw=="],
 

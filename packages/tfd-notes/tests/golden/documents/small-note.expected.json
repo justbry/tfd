@@ -1,0 +1,126 @@
+{
+	"document_sha256": {
+		"chain_seal": "4b48737318244915d614cf7de7572810bc6516342e3eb6054fb7e4aab7e9cc0b",
+		"payment_receipt": "022d3c0be743dc3447eedded6c40f70948bdef750957ce5fd2ff00bd50cff483",
+		"payoff_statement": "4cd84a82d35d6a860ffb289da6f043427a518327c542051af420610c634c927c",
+		"release": "0b127035ae2a0dc5a412d7029504488e52575fe5ae37c7fe89be21153ea3c53c"
+	},
+	"documents": {
+		"chain_seal": {
+			"head_hash": "371c1d0b16de17cac701ef83aaa5f0e76b6460e1ab8ea134ad7cb46228d8f7d6",
+			"head_seq": 9,
+			"note_id": "note-demo-1",
+			"schema": "tfd.note-document.v1",
+			"sealed_at": "2026-03-05T12:00:01Z",
+			"signature": {
+				"alg": "Ed25519",
+				"key_id": "note-test-seal-1",
+				"purpose": "seal",
+				"sig": "3Jh0cPgWUyT_ZwxYWZyQCnEhCwMBtdDyNA60Af1KpSeaEpUIVspqk9liGeR_kN1QJOqwbXdKRyV-SnsAh-0BCA"
+			},
+			"type": "note.chain-seal"
+		},
+		"payment_receipt": {
+			"amount_minor": "20000",
+			"borrower_payoff_minor": "88",
+			"chain_head": {
+				"head_hash": "371c1d0b16de17cac701ef83aaa5f0e76b6460e1ab8ea134ad7cb46228d8f7d6",
+				"seq": 9
+			},
+			"currency": "USD",
+			"engine_version": "tfd-notes/1",
+			"event_hash": "3cc9af2c42214589de783958d4b04b7c9ada7af5723ac2d6d4ab68b71e21ce21",
+			"exponent": 2,
+			"issued_at": "2026-03-05T12:00:00Z",
+			"kind": "payment",
+			"lender_payoff_minor": "20088",
+			"note_id": "note-demo-1",
+			"parties": {
+				"borrower_ref": "party-borrower-1",
+				"lender_ref": "party-lender-1"
+			},
+			"payment_event_id": "evt-6",
+			"recorded_by": "borrower",
+			"schema": "tfd.note-document.v1",
+			"signature": {
+				"alg": "Ed25519",
+				"key_id": "note-test-1",
+				"purpose": "receipt",
+				"sig": "EjQpL64Xf_kKFNxehEO1-NokH92PihPOuhdt_8AAdlRDGwCCuSO_Gi9YTq6gTJD_LhIlMAxnUYQMeSmePs8GAQ"
+			},
+			"status": "claimed by borrower",
+			"type": "note.payment-receipt",
+			"value_date": "2026-01-20",
+			"via": "email-link"
+		},
+		"payoff_statement": {
+			"as_of": "2026-03-31",
+			"borrower": {
+				"interest_minor": "1",
+				"payoff_minor": "89",
+				"principal_minor": "88"
+			},
+			"chain_head": {
+				"head_hash": "371c1d0b16de17cac701ef83aaa5f0e76b6460e1ab8ea134ad7cb46228d8f7d6",
+				"seq": 9
+			},
+			"currency": "USD",
+			"engine_version": "tfd-notes/1",
+			"exponent": 2,
+			"issued_at": "2026-03-05T12:00:00Z",
+			"lender": {
+				"interest_minor": "159",
+				"payoff_minor": "20229",
+				"principal_minor": "20070"
+			},
+			"note_id": "note-demo-1",
+			"parties": {
+				"borrower_ref": "party-borrower-1",
+				"lender_ref": "party-lender-1"
+			},
+			"payoff_gap_minor": "20140",
+			"schema": "tfd.note-document.v1",
+			"signature": {
+				"alg": "Ed25519",
+				"key_id": "note-test-1",
+				"purpose": "receipt",
+				"sig": "8w_VBuyWKKf2Zt42wgxmXfUJwYZccLJOwq9cVACc9mekIXzey9rzZx1TC4qz4gymJr5FZqDbSzjAERCEn0KiBA"
+			},
+			"type": "note.payoff-statement",
+			"wording": "Computed by tfd-notes from the recorded events. A record, not legal or tax advice."
+		},
+		"release": {
+			"as_of": "2026-03-02",
+			"balance_at_release_minor": "20170",
+			"chain_head": {
+				"head_hash": "371c1d0b16de17cac701ef83aaa5f0e76b6460e1ab8ea134ad7cb46228d8f7d6",
+				"seq": 9
+			},
+			"currency": "USD",
+			"engine_version": "tfd-notes/1",
+			"exponent": 2,
+			"issued_at": "2026-03-05T12:00:00Z",
+			"note_id": "note-demo-1",
+			"parties": {
+				"borrower_ref": "party-borrower-1",
+				"lender_ref": "party-lender-1"
+			},
+			"release_event_hash": "2a65b9dd14351ff3e37a9c2edc12b3a0eaf8e7382c25c39af7beaa131ef0e2fd",
+			"release_event_id": "evt-9",
+			"released_with_balance": true,
+			"schema": "tfd.note-document.v1",
+			"signature": {
+				"alg": "Ed25519",
+				"key_id": "note-test-1",
+				"purpose": "receipt",
+				"sig": "hxoP0l8mb1T0MtcLHjht2_33ScUQInyObYsjuv-3zYZm3GjFVZwr9znvXuQsMYyGk8xCuYBdKezBts3n3DFCBA"
+			},
+			"type": "note.release",
+			"wording": "The lender states this note is released."
+		}
+	},
+	"public_keys": {
+		"note-test-1": "28f59a9ca8a4d97e5bb7c12ec1f713d8b4cab9cf5b317ebef7817aa3d744437a",
+		"note-test-seal-1": "cc565d3987395ff576b58dcb5f7408c9213d34259188bdb9549e4d92dc8e7a5f"
+	}
+}

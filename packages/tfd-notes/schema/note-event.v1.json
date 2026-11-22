@@ -2,7 +2,7 @@
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://b4uni.com/_schema/note-event.v1.json",
 	"title": "Promissory note event v1",
-	"description": "One event in a note's append-only stream (docs/specs/promissory-notes.md). Money is an integer count of minor units as a digit string, rates are decimal strings, dates are civil YYYY-MM-DD. This schema checks the shape of one event only. These are checked in code (src/events.ts, parseNoteEvent and validateStream), not by this schema: calendar validity of every date (a real day of a real month, leap years included), strictly increasing custom installment dates after issue_date, first_due after issue_date, an amortized count of at most 5200 whose last due date stays within year 9999, and every stream rule (seq with no gap or repeat, unique ids, targets that exist earlier, who may confirm or dispute, a reversal that equals its payment, is dated on or after it and is the only reversal of it).",
+	"description": "One event in a note's append-only stream (docs/specs/promissory-notes.md). Money is an integer count of minor units as a digit string, rates are decimal strings, dates are civil YYYY-MM-DD. This schema checks the shape of one event only. These are checked in code (src/events.ts, parseNoteEvent and validateStream), not by this schema: calendar validity of every date (a real day of a real month, leap years included), strictly increasing custom installment dates after issue_date, first_due after issue_date, an amortized count of at most 5200 whose last due date stays within year 9999, and every stream rule (seq with no gap or repeat, unique ids, targets that exist earlier, who may confirm or dispute, a target that is the right event type (release.confirmed names a release.drafted, approval.granted an approval.requested), a release.confirmed entered no earlier than its draft, a grant.proposed expires_at that is after entered_at and at most 365 days after it (90 days for a carve_out), a notice.sent approval that names an earlier approval.requested of action notice.default with the same cure_days, no payoff.issued, notice.sent or notice.default approval.requested while the latest terms decision is terms.declined, a grant.consented or grant.revoked that names an earlier grant.proposed and a grant_id proposed only once, a reversal that equals its payment, is dated on or after it and is the only reversal of it).",
 	"oneOf": [
 		{
 			"title": "note.created",
@@ -25,6 +25,8 @@
 				"seq": { "$ref": "#/$defs/seq" },
 				"entered_at": { "$ref": "#/$defs/instant" },
 				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
 				"type": { "const": "note.created" },
 				"terms": { "$ref": "#/$defs/terms" }
 			}
@@ -52,12 +54,14 @@
 				"seq": { "$ref": "#/$defs/seq" },
 				"entered_at": { "$ref": "#/$defs/instant" },
 				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
 				"type": { "const": "payment.recorded" },
 				"kind": { "enum": ["payment", "reversal"] },
 				"amount_minor": { "$ref": "#/$defs/minor_unsigned" },
 				"value_date": { "$ref": "#/$defs/civil_date" },
-				"method": { "type": "string" },
-				"reference": { "type": "string" },
+				"method": { "$ref": "#/$defs/free_line" },
+				"reference": { "$ref": "#/$defs/free_line" },
 				"reverses": { "$ref": "#/$defs/text" },
 				"source": {
 					"description": "A backfilled past payment's label. both-agree is derived from a confirmation and is never recorded.",
@@ -92,6 +96,8 @@
 				"seq": { "$ref": "#/$defs/seq" },
 				"entered_at": { "$ref": "#/$defs/instant" },
 				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
 				"type": { "const": "payment.confirmed" },
 				"target": { "$ref": "#/$defs/text" }
 			}
@@ -119,10 +125,12 @@
 				"seq": { "$ref": "#/$defs/seq" },
 				"entered_at": { "$ref": "#/$defs/instant" },
 				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
 				"type": { "const": "payment.disputed" },
 				"target": { "$ref": "#/$defs/text" },
 				"counter_amount_minor": { "$ref": "#/$defs/minor_unsigned" },
-				"reason": { "$ref": "#/$defs/text" }
+				"reason": { "$ref": "#/$defs/free_text" }
 			}
 		},
 		{
@@ -147,6 +155,8 @@
 				"seq": { "$ref": "#/$defs/seq" },
 				"entered_at": { "$ref": "#/$defs/instant" },
 				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
 				"type": { "const": "payment.resolved" },
 				"target": { "$ref": "#/$defs/text" },
 				"agreed_amount_minor": { "$ref": "#/$defs/minor_unsigned" }
@@ -173,16 +183,418 @@
 				"seq": { "$ref": "#/$defs/seq" },
 				"entered_at": { "$ref": "#/$defs/instant" },
 				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
 				"type": { "const": "annotation.added" },
-				"text": { "$ref": "#/$defs/text" },
+				"text": { "$ref": "#/$defs/free_text" },
 				"attachment_sha256": { "$ref": "#/$defs/sha256" },
 				"target": { "$ref": "#/$defs/text" }
+			}
+		},
+		{
+			"title": "terms.accepted",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "const": "borrower" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "terms.accepted" }
+			}
+		},
+		{
+			"title": "terms.declined",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "const": "borrower" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "terms.declined" }
+			}
+		},
+		{
+			"title": "payoff.issued",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"as_of",
+				"document_sha256"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "const": "lender" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "payoff.issued" },
+				"as_of": { "$ref": "#/$defs/civil_date" },
+				"document_sha256": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		{
+			"title": "release.drafted",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "const": "lender" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "release.drafted" }
+			}
+		},
+		{
+			"title": "release.confirmed",
+			"description": "target is the id of an earlier release.drafted, and entered_at is not before the draft's; both are stream rules checked in code.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"target"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "const": "lender" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "release.confirmed" },
+				"target": { "$ref": "#/$defs/text" }
+			}
+		},
+		{
+			"title": "notice.sent",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"kind"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "const": "lender" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "notice.sent" },
+				"kind": { "enum": ["reminder", "default"] },
+				"cure_days": { "type": "integer", "minimum": 0, "maximum": 365 },
+				"approval": {
+					"description": "The id of the approval.requested (action notice.default, same cure_days) this notice uses. Only on a default notice; checked against the stream in code.",
+					"$ref": "#/$defs/text"
+				}
+			},
+			"if": {
+				"properties": { "kind": { "const": "default" } },
+				"required": ["kind"]
+			},
+			"then": { "required": ["cure_days"] },
+			"else": {
+				"not": {
+					"anyOf": [{ "required": ["cure_days"] }, { "required": ["approval"] }]
+				}
+			}
+		},
+		{
+			"title": "party.rebound",
+			"description": "entered_by is the other role than role: the party being rebound does not confirm its own new contact. The event carries a salted hash, never an email.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"role",
+				"contact_commitment"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "party.rebound" },
+				"role": { "$ref": "#/$defs/role" },
+				"contact_commitment": { "$ref": "#/$defs/sha256" }
+			},
+			"allOf": [
+				{
+					"if": {
+						"properties": { "role": { "const": "lender" } },
+						"required": ["role"]
+					},
+					"then": {
+						"properties": { "entered_by": { "const": "borrower" } }
+					}
+				},
+				{
+					"if": {
+						"properties": { "role": { "const": "borrower" } },
+						"required": ["role"]
+					},
+					"then": {
+						"properties": { "entered_by": { "const": "lender" } }
+					}
+				}
+			]
+		},
+		{
+			"title": "visibility.changed (grant.proposed)",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"change",
+				"grant_id",
+				"audience",
+				"level",
+				"expires_at"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "visibility.changed" },
+				"change": { "const": "grant.proposed" },
+				"grant_id": { "$ref": "#/$defs/text" },
+				"audience": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["kind", "ref"],
+					"properties": {
+						"kind": { "enum": ["person", "org", "link"] },
+						"ref": { "$ref": "#/$defs/text" }
+					}
+				},
+				"level": { "enum": ["summary", "statement", "verify"] },
+				"expires_at": { "$ref": "#/$defs/instant" },
+				"purpose": {
+					"enum": ["accountant", "lawyer", "court", "assignee"]
+				},
+				"carve_out": { "type": "boolean" }
+			},
+			"allOf": [
+				{
+					"description": "A link audience may only have level verify.",
+					"if": {
+						"properties": {
+							"audience": { "properties": { "kind": { "const": "link" } } }
+						}
+					},
+					"then": { "properties": { "level": { "const": "verify" } } }
+				},
+				{
+					"description": "A carve_out of true names a person, at summary or statement level, with a purpose, and expires at most 90 days after entered_at (checked in code).",
+					"if": {
+						"properties": { "carve_out": { "const": true } },
+						"required": ["carve_out"]
+					},
+					"then": {
+						"required": ["purpose"],
+						"properties": {
+							"audience": { "properties": { "kind": { "const": "person" } } },
+							"level": { "enum": ["summary", "statement"] }
+						}
+					}
+				}
+			]
+		},
+		{
+			"title": "visibility.changed (grant.consented, grant.revoked)",
+			"description": "grant_id must match an earlier grant.proposed in the same stream; checked in code.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"change",
+				"grant_id"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "visibility.changed" },
+				"change": { "enum": ["grant.consented", "grant.revoked"] },
+				"grant_id": { "$ref": "#/$defs/text" }
+			}
+		},
+		{
+			"title": "approval.requested",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"action",
+				"target"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "approval.requested" },
+				"action": { "enum": ["release.confirm", "notice.default", "waiver"] },
+				"target": { "$ref": "#/$defs/text" },
+				"cure_days": { "type": "integer", "minimum": 0, "maximum": 365 }
+			},
+			"if": {
+				"properties": { "action": { "const": "notice.default" } },
+				"required": ["action"]
+			},
+			"then": { "required": ["cure_days"] },
+			"else": { "not": { "required": ["cure_days"] } }
+		},
+		{
+			"title": "approval.granted",
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"schema",
+				"id",
+				"note_id",
+				"seq",
+				"entered_at",
+				"entered_by",
+				"type",
+				"request"
+			],
+			"properties": {
+				"schema": { "$ref": "#/$defs/schema" },
+				"id": { "$ref": "#/$defs/text" },
+				"note_id": { "$ref": "#/$defs/text" },
+				"seq": { "$ref": "#/$defs/seq" },
+				"entered_at": { "$ref": "#/$defs/instant" },
+				"entered_by": { "$ref": "#/$defs/role" },
+				"via": { "$ref": "#/$defs/via" },
+				"agent_ref": { "$ref": "#/$defs/agent_ref" },
+				"type": { "const": "approval.granted" },
+				"request": { "$ref": "#/$defs/text" }
 			}
 		}
 	],
 	"$defs": {
 		"schema": { "const": "tfd.note-event.v1" },
 		"text": { "type": "string", "minLength": 1 },
+		"free_line": {
+			"description": "Free text on one line: no control character (U+0000 to U+001F, U+007F to U+009F), no bidirectional control (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) and no U+FEFF.",
+			"type": "string",
+			"pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]*$"
+		},
+		"free_text": {
+			"description": "Non-empty free text that may hold several lines: as free_line, but newline (U+000A) and tab (U+0009) are allowed.",
+			"type": "string",
+			"minLength": 1,
+			"pattern": "^[^\\u0000-\\u0008\\u000B-\\u001F\\u007F-\\u009F\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]*$"
+		},
 		"seq": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
 		"role": { "enum": ["lender", "borrower"] },
 		"minor_unsigned": {
@@ -205,10 +617,7 @@
 			"type": "string",
 			"pattern": "^\\d{4}-\\d{2}-\\d{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z$"
 		},
-		"sha256": {
-			"type": "string",
-			"pattern": "^[0-9a-f]{64}$"
-		},
+		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
 		"annual_rate": {
 			"description": "A decimal string below 1 with at most 6 places: \"0.0525\", \"0\".",
 			"type": "string",
@@ -284,11 +693,20 @@
 					"type": "object",
 					"additionalProperties": false,
 					"required": ["type"],
-					"properties": {
-						"type": { "const": "none" }
-					}
+					"properties": { "type": { "const": "none" } }
 				}
 			]
+		},
+		"via": {
+			"description": "How the party reached the system.",
+			"enum": ["email-link", "account"]
+		},
+		"agent_ref": {
+			"description": "Opaque id of whoever acted for the party. Never a name or an email.",
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F\\u061C\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]*$"
 		}
 	}
 }
