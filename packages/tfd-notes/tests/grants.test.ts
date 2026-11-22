@@ -533,3 +533,44 @@ describe("REVOKE_NOTICE", () => {
 		);
 	});
 });
+
+describe("carve-out limits reach the fold", () => {
+	it("refuses a carve-out for the purpose other, to an org, above statement level or beyond 90 days", () => {
+		const bad: Fields[] = [
+			carveOut({ purpose: "other" }),
+			carveOut({ audience: { kind: "org", ref: "org-1" } }),
+			carveOut({ level: "verify" }),
+			// 2026-02-01T00:01:00Z plus 91 days.
+			carveOut({ expires_at: "2026-05-03T00:01:00Z" }),
+		];
+		for (const fields of bad) {
+			expect(() =>
+				grantsOf([created(), propose(2, "lender", "g", fields)], DURING),
+			).toThrow();
+		}
+	});
+
+	it("takes a carve-out at exactly 90 days and a plain grant for a year", () => {
+		const ninety = grantsOf(
+			[
+				created(),
+				propose(
+					2,
+					"lender",
+					"g",
+					carveOut({ expires_at: "2026-05-02T00:02:00Z" }),
+				),
+			],
+			DURING,
+		);
+		expect(ninety[0]?.status).toBe("active");
+		const year = grantsOf(
+			[
+				created(),
+				propose(2, "lender", "g", { expires_at: "2027-02-01T00:02:00Z" }),
+			],
+			DURING,
+		);
+		expect(year[0]?.status).toBe("pending");
+	});
+});

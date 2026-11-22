@@ -12,9 +12,13 @@ export type AgentRole = (typeof AGENT_ROLES)[number];
 export const isAgentRole = (value: unknown): value is AgentRole =>
 	AGENT_ROLES.some((role) => role === value);
 
-/** Who is acting for an organization on one note. `agentRef` is the opaque id stamped on every event they enter. */
+/**
+ * Who is acting for an organization on one note. `agentRef` is the opaque id stamped on every event they enter: random,
+ * and different for the same person on every note. `agentId` is their organization-wide identity and stays server-side.
+ */
 export interface AgentIdentity {
 	orgId: string;
+	agentId: string;
 	agentRef: string;
 	role: AgentRole;
 }
@@ -31,6 +35,11 @@ export const MAX_AGENTS_PER_REQUEST = 20;
 export const ORG_POLICY: ApprovalPolicy = {
 	twoPerson: new Set(["release.confirm", "notice.default", "waiver"]),
 };
+
+/** `ORG_POLICY` for the agents who may act now: a request or a grant by anyone else (a person who left) counts for nothing. */
+export const orgPolicyFor = (
+	activeAgents: ReadonlySet<string>,
+): ApprovalPolicy => ({ twoPerson: ORG_POLICY.twoPerson, activeAgents });
 
 export const NO_APPROVALS: ApprovalPolicy = { twoPerson: new Set() };
 

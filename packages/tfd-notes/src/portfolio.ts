@@ -3,7 +3,9 @@
  * The portfolio of an organization party (promissory-notes plan, step 4): one row per note read from the chosen role's
  * view, totals grouped by currency, and a board report that carries only fields safe to share. Pure: the notes and the
  * date are the only inputs. No amount ever crosses a currency, and the report never carries free text, dispute reasons,
- * notice contents, agent refs or event ids.
+ * notice contents, agent refs or event ids. A note whose borrower declined the terms ("Not my loan") is not an
+ * outstanding loan: it is left out of the outstanding payoff, the overdue figures and the aging buckets, and counted
+ * on its own as `declined`.
  */
 
 import { compareDates } from "./date";
@@ -17,15 +19,8 @@ import type {
 	TermsState,
 } from "./types";
 
-/** Days overdue, in four steps. A closed note or a payoff of 0 is always `current`. */
+/** Days overdue, in four steps. A closed note, a declined note or a payoff of 0 is always `current`. */
 export type AgingBucket = "current" | "1-30" | "31-60" | "61+";
-
-export const AGING_BUCKETS: readonly AgingBucket[] = [
-	"current",
-	"1-30",
-	"31-60",
-	"61+",
-];
 
 const LAST_DAY_OF_FIRST_BUCKET = 30;
 const LAST_DAY_OF_SECOND_BUCKET = 60;
@@ -45,9 +40,9 @@ export interface PortfolioRow {
 	role: Role;
 	/** The chosen view's payoff on the date. */
 	payoff_minor: MinorString;
-	/** The chosen view's overdue amount; `"0"` on a closed note. */
+	/** The chosen view's overdue amount; `"0"` on a closed or declined note. */
 	overdue_minor: MinorString;
-	/** Days from the earliest unmet due date; 0 on a closed note. */
+	/** Days from the earliest unmet due date; 0 on a closed or declined note. */
 	days_overdue: number;
 	aging: AgingBucket;
 	/** Difference items still claimed by one party and unanswered by the other. */
@@ -55,6 +50,8 @@ export interface PortfolioRow {
 	/** Difference items in dispute. */
 	disputed: number;
 	terms: TermsState;
+	/** True when the borrower declined the terms; the note then counts in no total except `declined`. */
+	declined: boolean;
 	closed: boolean;
 	/** The earliest later installment date that the view's payments do not yet cover, else null. */
 	next_due: CivilDate | null;
@@ -72,14 +69,17 @@ export interface CurrencyTotals {
 	currency: string;
 	exponent: number;
 	notes: number;
-	/** Payoff of notes that are not closed. */
+	/** Payoff of notes that are neither closed nor declined. */
 	outstanding_payoff_minor: MinorString;
 	overdue_minor: MinorString;
+	/** Counts the notes that are not declined; a declined note is in no bucket. */
 	buckets: BucketCounts;
 	awaiting_confirmation: number;
 	disputed: number;
 	/** Notes whose terms the borrower has not yet accepted or declined. */
 	terms_pending: number;
+	/** Notes whose terms the borrower declined. */
+	declined: number;
 }
 
 export interface Portfolio {
@@ -141,7 +141,8 @@ const rowFor = (note: PortfolioNote, asOf: CivilDate): PortfolioRow => {
 	const { expected } = computed;
 	const { closed, terms } = computed.state;
 	const payoff = parseMinor(balance.payoff_minor);
-	const settled = closed || payoff === 0n;
+	const declined = terms === "declined";
+	const settled = closed || declined || payoff === 0n;
 	const overdue = isLender
 		? expected.lender_overdue_minor
 		: expected.borrower_overdue_minor;
@@ -165,6 +166,7 @@ const rowFor = (note: PortfolioNote, asOf: CivilDate): PortfolioRow => {
 		awaiting_confirmation: awaiting,
 		disputed,
 		terms,
+		declined,
 		closed,
 		next_due: settled ? null : nextDue(computed, paid, asOf),
 	};
@@ -191,6 +193,7 @@ interface TotalsAccumulator {
 	awaiting: number;
 	disputed: number;
 	termsPending: number;
+	declined: number;
 }
 
 const totalsFor = (rows: PortfolioRow[]): CurrencyTotals[] => {
@@ -209,20 +212,25 @@ const totalsFor = (rows: PortfolioRow[]): CurrencyTotals[] => {
 				awaiting: 0,
 				disputed: 0,
 				termsPending: 0,
+				declined: 0,
 			};
 			groups.set(key, group);
 		}
 		group.notes += 1;
-		if (!row.closed) {
-			group.payoff += parseMinor(row.payoff_minor);
-		}
-		group.overdue += parseMinor(row.overdue_minor);
-		group.buckets[row.aging] += 1;
 		group.awaiting += row.awaiting_confirmation;
 		group.disputed += row.disputed;
 		if (row.terms === "proposed") {
 			group.termsPending += 1;
 		}
+		if (row.declined) {
+			group.declined += 1;
+			continue;
+		}
+		if (!row.closed) {
+			group.payoff += parseMinor(row.payoff_minor);
+		}
+		group.overdue += parseMinor(row.overdue_minor);
+		group.buckets[row.aging] += 1;
 	}
 	return [...groups.values()]
 		.sort(
@@ -240,6 +248,7 @@ const totalsFor = (rows: PortfolioRow[]): CurrencyTotals[] => {
 			awaiting_confirmation: group.awaiting,
 			disputed: group.disputed,
 			terms_pending: group.termsPending,
+			declined: group.declined,
 		}));
 };
 
@@ -280,6 +289,7 @@ export interface BoardRow {
 	awaiting_confirmation: number;
 	disputed: number;
 	terms: TermsState;
+	declined: boolean;
 	closed: boolean;
 	next_due: CivilDate | null;
 }
@@ -313,6 +323,7 @@ export const boardReport = (
 		awaiting_confirmation: total.awaiting_confirmation,
 		disputed: total.disputed,
 		terms_pending: total.terms_pending,
+		declined: total.declined,
 	})),
 	rows: source.rows.map((row) => ({
 		note_id: row.note_id,
@@ -326,6 +337,7 @@ export const boardReport = (
 		awaiting_confirmation: row.awaiting_confirmation,
 		disputed: row.disputed,
 		terms: row.terms,
+		declined: row.declined,
 		closed: row.closed,
 		next_due: row.next_due,
 	})),
@@ -344,6 +356,7 @@ export const BOARD_CSV_HEADER: readonly string[] = [
 	"awaiting_confirmation",
 	"disputed",
 	"terms",
+	"declined",
 	"closed",
 	"next_due",
 ];
@@ -386,6 +399,7 @@ const boardCsvLine = (row: BoardRow): string =>
 		integerCell(row.awaiting_confirmation),
 		integerCell(row.disputed),
 		textCell(row.terms),
+		row.declined ? "true" : "false",
 		row.closed ? "true" : "false",
 		row.next_due === null ? "" : textCell(row.next_due),
 	].join(",");

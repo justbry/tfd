@@ -88,4 +88,74 @@ describe("production stays unbound until the launch gate", () => {
 			["SIGNING_DIRECTORY", "TRIFOLD_STAGING_SIGNING_DIRECTORY"],
 		]);
 	});
+
+	test("staging carries the note key ids and the published public keys as plain vars, and no secret", async () => {
+		const staging = (await readConfig("..")).env.staging;
+		const { vars } = staging;
+		const published = JSON.parse(
+			await Bun.file(
+				join(
+					import.meta.dir,
+					"../../trifold-verify/public/.well-known/trifold-keys.json",
+				),
+			).text(),
+		) as Record<string, { pem: string; purpose: string }>;
+		const idOf = (purpose: string): string | undefined =>
+			Object.entries(published).find(([, key]) => key.purpose === purpose)?.[0];
+		expect(vars.NOTES_RECEIPT_KEY_ID).toBe(idOf("receipt"));
+		expect(vars.NOTES_SEAL_KEY_ID).toBe(idOf("seal"));
+		expect(vars.NOTES_RECEIPT_KEY_ID).toBe("trifold-staging-2026-11-receipt");
+		expect(vars.NOTES_SEAL_KEY_ID).toBe("trifold-staging-2026-11-seal");
+		// The public keys are exactly the published ones for those two ids: same PEM, same purpose.
+		const keys = JSON.parse(vars.NOTES_PUBLIC_KEYS_JSON) as Record<
+			string,
+			{ pem: string; purpose: string }
+		>;
+		expect(Object.keys(keys).sort()).toEqual(
+			[vars.NOTES_RECEIPT_KEY_ID, vars.NOTES_SEAL_KEY_ID].sort(),
+		);
+		for (const [id, key] of Object.entries(keys)) {
+			expect(key.pem).toBe(published[id]?.pem as string);
+			expect(key.pem).toStartWith("-----BEGIN PUBLIC KEY-----");
+			expect(key.purpose).toBe(published[id]?.purpose as string);
+		}
+		// Secrets stay out of the file: the session secret and the API key are Worker secrets, put by hand.
+		for (const secret of [
+			"NOTES_SESSION_SECRET",
+			"NOTES_API_KEY",
+			"STRIPE_SECRET_KEY",
+			"STRIPE_BILLING_WEBHOOK_SECRET",
+		])
+			expect(Object.keys(vars)).not.toContain(secret);
+		expect(JSON.stringify(vars)).not.toMatch(/PRIVATE KEY/);
+		// The top level (production) has no vars at all.
+		expect((await readConfig("..")).vars).toBeUndefined();
+	});
+});
+
+describe("CI covers what the hosted notes build on", () => {
+	test("the workflow runs on a change to the note libraries and the lockfile, and tests them", async () => {
+		const workflow = await Bun.file(
+			join(import.meta.dir, "../../../.github/workflows/trifold-cloud.yml"),
+		).text();
+		// Once under pull_request and once under push.
+		for (const path of [
+			"packages/tfd-notes/**",
+			"packages/verify-notes/**",
+			"packages/verify/**",
+			"packages/atm/**",
+			"bun.lock",
+		])
+			expect({ path, count: workflow.split(`- ${path}\n`).length - 1 }).toEqual(
+				{
+					path,
+					count: 2,
+				},
+			);
+		expect(workflow).toContain(
+			"(cd packages/verify-notes && bun test tests && bunx tsc --noEmit)",
+		);
+		expect(workflow).toContain("(cd packages/verify && bun test tests)");
+		expect(workflow).toContain("(cd packages/tfd-notes && bun test tests)");
+	});
 });

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "bun:test";
 import {
+	APPROVAL_MAX_AGE_DAYS,
 	type ApprovalPolicy,
 	approvalStatus,
 	checkAppend,
@@ -50,14 +51,38 @@ const requested = (
 	action: ApprovalAction,
 	target: string,
 	agent: string | undefined,
-): Fields => make(seq, "approval.requested", agent, { action, target });
+	cureDays = 30,
+): Fields =>
+	make(seq, "approval.requested", agent, {
+		action,
+		target,
+		...(action === "notice.default" ? { cure_days: cureDays } : {}),
+	});
 const granted = (
 	seq: number,
 	request: string,
 	agent: string | undefined,
 ): Fields => make(seq, "approval.granted", agent, { request });
-const defaultNotice = (seq: number, agent = "alice"): Fields =>
-	make(seq, "notice.sent", agent, { kind: "default", cure_days: 30 });
+const defaultNotice = (
+	seq: number,
+	approval: string,
+	agent = "alice",
+): Fields =>
+	make(seq, "notice.sent", agent, {
+		kind: "default",
+		cure_days: 30,
+		approval,
+	});
+
+const NOTICE_TIME = "2026-02-20T10:00:00Z";
+/** A default notice about to be appended at `NOTICE_TIME`. */
+const candidateNotice = (fields: Fields = {}): Fields => ({
+	type: "notice.sent",
+	kind: "default",
+	cure_days: 30,
+	entered_at: NOTICE_TIME,
+	...fields,
+});
 
 const stream = (...events: Fields[]): NoteEvent[] =>
 	validateStream([created(), ...events]);
@@ -224,12 +249,36 @@ describe("checkAppend", () => {
 			policy: { twoPerson: new Set<ApprovalAction>(["notice.default"]) },
 		},
 		{
-			name: "a default notice with one satisfied request",
+			name: "a default notice with its own satisfied request",
 			events: [
 				requested(2, "notice.default", "evt-1", "alice"),
 				granted(3, "evt-2", "bob"),
 			],
-			candidate: { type: "notice.sent", kind: "default", cure_days: 30 },
+			candidate: candidateNotice({ approval: "evt-2" }),
+			policy: BOTH,
+		},
+		{
+			name: "a default notice exactly 30 days after its request",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({
+				approval: "evt-2",
+				entered_at: "2026-03-04T10:00:00Z",
+			}),
+			policy: BOTH,
+		},
+		{
+			name: "a default notice entered at the instant of its request",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({
+				approval: "evt-2",
+				entered_at: "2026-02-02T10:00:00Z",
+			}),
 			policy: BOTH,
 		},
 		{
@@ -363,29 +412,113 @@ describe("checkAppend", () => {
 			message: "release.confirmed: target must be a non-empty string",
 		},
 		{
-			name: "default notice with no request",
+			name: "default notice naming no approval",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice(),
+			message: "notice.sent: approval must be a non-empty string",
+		},
+		{
+			name: "default notice naming a request that does not exist",
 			events: [],
-			candidate: { type: "notice.sent", kind: "default", cure_days: 30 },
+			candidate: candidateNotice({ approval: "evt-9" }),
 			message:
-				"notice.sent: a default notice needs its own approved request (action notice.default); 0 approved, 0 already sent",
+				'notice.sent: approval "evt-9" is not an approval request for notice.default',
+		},
+		{
+			name: "default notice naming a request for another action",
+			events: [
+				drafted(2),
+				requested(3, "release.confirm", "evt-2", "alice"),
+				granted(4, "evt-3", "bob"),
+			],
+			candidate: candidateNotice({ approval: "evt-3" }),
+			message:
+				'notice.sent: approval "evt-3" is not an approval request for notice.default',
 		},
 		{
 			name: "default notice with an unanswered request",
 			events: [requested(2, "notice.default", "evt-1", "alice")],
-			candidate: { type: "notice.sent", kind: "default", cure_days: 30 },
+			candidate: candidateNotice({ approval: "evt-2" }),
 			message:
-				"notice.sent: a default notice needs its own approved request (action notice.default); 0 approved, 0 already sent",
+				'notice.sent: approval "evt-2" has no approval from a second agent',
 		},
 		{
 			name: "a second default notice on one approved request",
 			events: [
 				requested(2, "notice.default", "evt-1", "alice"),
 				granted(3, "evt-2", "bob"),
-				defaultNotice(4),
+				defaultNotice(4, "evt-2"),
 			],
-			candidate: { type: "notice.sent", kind: "default", cure_days: 30 },
+			candidate: candidateNotice({ approval: "evt-2" }),
 			message:
-				"notice.sent: a default notice needs its own approved request (action notice.default); 1 approved, 1 already sent",
+				'notice.sent: approval "evt-2" is already used by the notice at seq 4',
+		},
+		{
+			name: "default notice with a different cure_days than its request",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice", 10),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({ approval: "evt-2" }),
+			message: 'notice.sent: approval "evt-2" covers cure_days 10, not 30',
+		},
+		{
+			name: "default notice with no cure_days",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({ approval: "evt-2", cure_days: undefined }),
+			message:
+				'notice.sent: approval "evt-2" covers cure_days 30, not undefined',
+		},
+		{
+			name: "default notice one second more than 30 days after its request",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({
+				approval: "evt-2",
+				entered_at: "2026-03-04T10:00:01Z",
+			}),
+			message: "is more than 30 days older than the notice",
+		},
+		{
+			name: "default notice entered before its request",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({
+				approval: "evt-2",
+				entered_at: "2026-02-02T09:59:59Z",
+			}),
+			message: "was entered after the notice",
+		},
+		{
+			name: "default notice with no entered_at",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({ approval: "evt-2", entered_at: undefined }),
+			message: "notice.sent: entered_at must be an ISO 8601 UTC instant",
+		},
+		{
+			name: "default notice with an entered_at that is not an instant",
+			events: [
+				requested(2, "notice.default", "evt-1", "alice"),
+				granted(3, "evt-2", "bob"),
+			],
+			candidate: candidateNotice({
+				approval: "evt-2",
+				entered_at: "2026-02-30T10:00:00Z",
+			}),
+			message: "notice.sent: entered_at must be an ISO 8601 UTC instant",
 		},
 		{
 			name: "a grant that names no existing request",
@@ -460,21 +593,58 @@ describe("checkAppend", () => {
 		});
 	}
 
-	it("lets a second default notice through once a second request is satisfied", () => {
+	it("lets a second default notice through on its own satisfied request", () => {
 		const events = stream(
 			requested(2, "notice.default", "evt-1", "alice"),
 			granted(3, "evt-2", "bob"),
-			defaultNotice(4),
+			defaultNotice(4, "evt-2"),
 			requested(5, "notice.default", "evt-1", "alice"),
 			granted(6, "evt-5", "carol"),
 		);
 		expect(() =>
+			checkAppend(events, candidateNotice({ approval: "evt-5" }), BOTH),
+		).not.toThrow();
+	});
+
+	it("does not let an approval be borrowed: each request backs one notice, whichever one", () => {
+		const events = stream(
+			requested(2, "notice.default", "evt-1", "alice"),
+			granted(3, "evt-2", "bob"),
+			requested(4, "notice.default", "evt-1", "alice"),
+			granted(5, "evt-4", "carol"),
+			defaultNotice(6, "evt-4"),
+		);
+		expect(() =>
+			checkAppend(events, candidateNotice({ approval: "evt-4" }), BOTH),
+		).toThrow("already used");
+		expect(() =>
+			checkAppend(events, candidateNotice({ approval: "evt-2" }), BOTH),
+		).not.toThrow();
+	});
+
+	it("lets a reminder leave an approval unused, and ages an old request out", () => {
+		const events = stream(
+			requested(2, "notice.default", "evt-1", "alice"),
+			granted(3, "evt-2", "bob"),
+			make(4, "notice.sent", "alice", { kind: "reminder" }),
+		);
+		expect(() =>
+			checkAppend(events, candidateNotice({ approval: "evt-2" }), BOTH),
+		).not.toThrow();
+		expect(() =>
 			checkAppend(
 				events,
-				{ type: "notice.sent", kind: "default", cure_days: 30 },
+				candidateNotice({
+					approval: "evt-2",
+					entered_at: "2026-04-01T00:00:00Z",
+				}),
 				BOTH,
 			),
-		).not.toThrow();
+		).toThrow("days older");
+	});
+
+	it("exports the age limit as 30 days", () => {
+		expect(APPROVAL_MAX_AGE_DAYS).toBe(30);
 	});
 
 	it("never mutates the events, the candidate or the policy", () => {
@@ -530,5 +700,119 @@ describe("pendingApprovals", () => {
 		expect(
 			pendingApprovals(events, policy).map((entry) => entry.action),
 		).toEqual(["waiver"]);
+	});
+});
+
+describe("active agents", () => {
+	const ACTIVE = new Set(["alice", "bob", "carol"]);
+	const withActive = (
+		activeAgents: ReadonlySet<string>,
+		policy: ApprovalPolicy = BOTH,
+	): ApprovalPolicy => ({ ...policy, activeAgents });
+	const release = { action: "release.confirm", target: "evt-2" } as const;
+	const approved = (approver: string, requester = "alice"): NoteEvent[] =>
+		stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", requester),
+			granted(4, "evt-3", approver),
+		);
+
+	it("counts every agent when the set is absent", () => {
+		expect(approvalStatus(approved("bob"), release).satisfied).toBe(true);
+		expect(approvalStatus(approved("bob"), release, {}).satisfied).toBe(true);
+	});
+
+	it("counts an approval by an agent in the set", () => {
+		const status = approvalStatus(approved("bob"), release, {
+			activeAgents: ACTIVE,
+		});
+		expect(status.satisfied).toBe(true);
+		expect(status.granted_by).toEqual(["bob"]);
+	});
+
+	it("no longer counts the approval of a deactivated approver", () => {
+		const status = approvalStatus(approved("bob"), release, {
+			activeAgents: new Set(["alice", "carol"]),
+		});
+		expect(status.satisfied).toBe(false);
+		expect(status.granted_by).toEqual([]);
+		expect(status.requested).toBe(true);
+	});
+
+	it("keeps the approvals of agents who are still active", () => {
+		const events = stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", "alice"),
+			granted(4, "evt-3", "bob"),
+			granted(5, "evt-3", "carol"),
+		);
+		const status = approvalStatus(events, release, {
+			activeAgents: new Set(["alice", "carol"]),
+		});
+		expect(status.granted_by).toEqual(["carol"]);
+		expect(status.satisfied).toBe(true);
+	});
+
+	it("does not satisfy a request whose requester has been deactivated", () => {
+		const status = approvalStatus(approved("bob"), release, {
+			activeAgents: new Set(["bob", "carol"]),
+		});
+		expect(status.satisfied).toBe(false);
+		expect(status.requester_agent).toBe("alice");
+	});
+
+	it("makes checkAppend refuse a release approved only by a deactivated agent", () => {
+		const candidate = { type: "release.confirmed", target: "evt-2" };
+		expect(() =>
+			checkAppend(approved("bob"), candidate, withActive(ACTIVE)),
+		).not.toThrow();
+		expect(() =>
+			checkAppend(
+				approved("bob"),
+				candidate,
+				withActive(new Set(["alice", "carol"])),
+			),
+		).toThrow("has no approval from a second agent");
+	});
+
+	it("makes checkAppend refuse a default notice backed only by a deactivated agent", () => {
+		const events = stream(
+			requested(2, "notice.default", "evt-1", "alice"),
+			granted(3, "evt-2", "bob"),
+		);
+		const candidate = candidateNotice({ approval: "evt-2" });
+		expect(() =>
+			checkAppend(events, candidate, withActive(ACTIVE)),
+		).not.toThrow();
+		expect(() =>
+			checkAppend(events, candidate, withActive(new Set(["alice"]))),
+		).toThrow("has no approval from a second agent");
+	});
+
+	it("refuses a new grant from an agent outside the set, and allows it without a set", () => {
+		const events = stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", "alice"),
+		);
+		const candidate = {
+			type: "approval.granted",
+			request: "evt-3",
+			agent_ref: "bob",
+		};
+		expect(() => checkAppend(events, candidate, BOTH)).not.toThrow();
+		expect(() =>
+			checkAppend(events, candidate, withActive(new Set(["alice", "carol"]))),
+		).toThrow('approval.granted: agent "bob" is not an active agent');
+	});
+
+	it("keeps a request pending when its only approver was deactivated", () => {
+		const events = approved("bob");
+		expect(pendingApprovals(events, BOTH)).toEqual([]);
+		expect(
+			pendingApprovals(events, withActive(new Set(["alice"]))).map(
+				(entry) => entry.target,
+			),
+		).toEqual(["evt-2"]);
+		expect(pendingApprovals(events, withActive(ACTIVE))).toEqual([]);
 	});
 });

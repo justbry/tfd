@@ -14,10 +14,11 @@ import {
 	DAY,
 	OTHER_RECIPIENT,
 	RECIPIENT,
-	SHARE_COOKIE,
+	shareCookieName,
 	shareWorld,
 	textOf,
 	type World,
+	withoutSignOut,
 } from "./notes-share-fakes";
 import { type TestSigning, testSigning } from "./notes-signers";
 
@@ -126,10 +127,10 @@ describe("a person share over HTTP", () => {
 			);
 			expect(opened.headers.get("Location")).not.toContain(token);
 			const cookie = opened.headers.get("Set-Cookie") ?? "";
-			expect(cookie).toContain(`${SHARE_COOKIE}=`);
-			for (const attribute of ["HttpOnly", "Secure", "SameSite=Lax"])
+			expect(cookie).toStartWith(`${shareCookieName(note.noteId, grantId)}=`);
+			for (const attribute of ["HttpOnly", "Secure", "SameSite=Lax", "Path=/"])
 				expect(cookie).toContain(attribute);
-			expect(cookie).toContain(`Path=/s/${note.noteId}/${grantId}`);
+			expect(cookie).not.toContain("Domain");
 			expect(cookie).toContain("Max-Age=43200");
 			// The link works once.
 			const again = await w.post(`/s/${note.noteId}/${grantId}/enter`, {
@@ -246,7 +247,7 @@ describe("a disclosure (carve-out)", () => {
 		expect(guess.status).toBe(400);
 		const forged = await w.get(
 			`/s/${note.noteId}/${grantId}`,
-			`${SHARE_COOKIE}=forged`,
+			`${shareCookieName(note.noteId, grantId)}=forged`,
 		);
 		expect(forged.status).toBe(401);
 		const lenderPage = await (
@@ -449,7 +450,7 @@ describe("links and sessions", () => {
 			await w.h.service.proposeShare(second.lender.session, {
 				recipient_email: "third@other.example",
 				level: "summary",
-				carve_out: { purpose: "other" },
+				carve_out: { purpose: "assignee" },
 			}),
 		);
 		const grantC = await w.lastGrantId(second.noteId);
@@ -582,7 +583,8 @@ describe("a share session is read-only", () => {
 				...init,
 				headers: sessionCookie,
 			});
-			expect({ path, status: response.status }).toEqual({ path, status: 403 });
+			// The share cookie has a name of its own, so a party route never reads it: the visitor is not signed in.
+			expect({ path, status: response.status }).toEqual({ path, status: 401 });
 			expect(await response.text()).not.toContain("1,000.00");
 		}
 		expect(await w.events(note.noteId)).toHaveLength(before);
@@ -683,7 +685,7 @@ const sharePages = async (w: World, idem: string, mutate?: Mutation) => {
 			opened.header,
 		);
 		expect(response.status).toBe(200);
-		pages[level] = await response.text();
+		pages[level] = withoutSignOut(await response.text());
 	}
 	return pages;
 };
@@ -788,9 +790,11 @@ describe("the ceiling: what a share viewer can never see", () => {
 			email: string,
 		) => {
 			const opened = await openCarveOut(w, note, level, email);
-			return (
-				await w.get(`/s/${opened.noteId}/${opened.grantId}`, opened.header)
-			).text();
+			return withoutSignOut(
+				await (
+					await w.get(`/s/${opened.noteId}/${opened.grantId}`, opened.header)
+				).text(),
+			);
 		};
 		for (const [level, email] of [
 			["summary", RECIPIENT],
@@ -849,9 +853,12 @@ describe("the ceiling: what a share viewer can never see", () => {
 		const w = shareWorld(signing);
 		const note = await paidNote(w);
 		const opened = await openCarveOut(w, note, "statement");
-		const html = await (
-			await w.get(`/s/${opened.noteId}/${opened.grantId}`, opened.header)
-		).text();
+		// The sign-out button names its own grant (the viewer has that address already); the page says nothing else.
+		const html = withoutSignOut(
+			await (
+				await w.get(`/s/${opened.noteId}/${opened.grantId}`, opened.header)
+			).text(),
+		);
 		const events = await w.events(note.noteId);
 		for (const event of events) expect(html).not.toContain(event.id);
 		expect(html).not.toContain(note.noteId);
@@ -981,7 +988,7 @@ describe("the verify link", () => {
 		).not.toContain(url.split("/v/")[1] as string);
 	});
 
-	test("GET /v/:token shows the record id and the issued documents and no money, party or balance", async () => {
+	test("GET /v/:token shows the paste form and one line of explanation: no document list, no record id, no money, party or balance", async () => {
 		const { w, note, payoff, grantId } = await linkWorld();
 		await w.consent(note.borrower, grantId);
 		const text = await (
@@ -995,10 +1002,15 @@ describe("the verify link", () => {
 		expect(response.headers.get("Set-Cookie")).toBeNull();
 		expect(response.headers.get("Cache-Control")).toBe("no-store");
 		const page = await response.text();
-		expect(page).toContain(note.noteId);
-		expect(page).toContain(payoff.document.sha256);
-		expect(page).toContain("note-test-1");
-		expect(page).toContain("Payoff statement");
+		// A listing would leak how many payments, payoffs and releases the record has: there is none, and no record id.
+		// (The form posts to the token's own address, which holds the id; the page never prints it.)
+		expect(textOf(page)).not.toContain(note.noteId);
+		expect(page).not.toContain(payoff.document.sha256);
+		expect(page).not.toContain("note-test-1");
+		expect(page).not.toContain("Payoff statement");
+		expect(page).not.toContain("Documents issued");
+		expect(page).toContain("Paste the JSON of one signed document");
+		expect(page).toContain('<textarea name="document"');
 		expect(page).toContain("The check runs on our server");
 		expect(page).toContain("tfd-verify-notes");
 		const visible = textOf(page);
@@ -1255,7 +1267,10 @@ describe("the verify link", () => {
 			`/s/${note.noteId}/${grantId}`,
 			`/s/${note.noteId}/${grantId}/enter?t=${token}`,
 		]) {
-			const response = await w.get(path, `${SHARE_COOKIE}=${token}`);
+			const response = await w.get(
+				path,
+				`${shareCookieName(note.noteId, grantId)}=${token}`,
+			);
 			expect({
 				path,
 				ok:

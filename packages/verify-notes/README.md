@@ -12,15 +12,27 @@ Documents: `note.payment-receipt`, `note.payoff-statement`, `note.release` and `
 | Function | What it checks |
 |---|---|
 | `verifyNoteDocument(document, keys, { now? })` | The exact shape, the schema string, that a chain seal is signed with purpose `seal` and the other three with `receipt`, the key (published, that purpose, inside its window at `issued_at` or `sealed_at`, not revoked: the same `keyUse` rules as `tfd-verify`), the one base64url spelling of the signature, and the Ed25519 signature over the UTF-8 bytes of the body's canonical JSON (`canonicalJson` from `tfd-notes`). With `now`, a document signed after it fails `signed_in_future`. |
-| `verifyNoteChain(events, links, expectedNoteId?)` | Each event and link has the right shape; then `tfd-notes` recomputes the hash chain from the events and compares it with the links. |
-| `verifyNoteBundle({ events, links, documents, keys })` | The chain, every document, and that each document fits the chain: same note, the `chain_head` it names is the chain's head at that seq, a seal's head is a link head, and a receipt's or release's event hash is the hash of the event it names. |
+| `verifyNoteChain(events, links, expectedNoteId?)` | Each event and link has the right shape; then `tfd-notes` recomputes the hash chain from the events and compares it with the links. It shows hash-chain consistency only, **not authenticity**: anyone can edit an event, rebuild every link and pass. Authenticity needs a verified seal at the head, which only `verifyNoteBundle` checks. |
+| `verifyNoteBundle({ events, links, documents, keys })` | The chain, every document, that each document fits the chain (same note, the `chain_head` it names is the chain's head at that seq, a seal's head is a link head, a receipt's or release's event hash is the hash of the event it names), and the **seal at the head**: `ok` is true only when a `note.chain-seal` document verifies and its `head_seq` is the number of links and its `head_hash` is the recomputed head. |
+
+### The seal at the head
+
+A chain with no seal, or with events after the last seal, never passes the bundle check. The verdict carries `seal` (null
+when the chain itself did not verify) and, when the seal is the reason `ok` is false, a top-level `code`:
+
+- `chain_unsealed`: no verified `note.chain-seal` of this note came with the chain.
+- `chain_seal_stale`: the latest seal names an earlier seq of this chain; `seal.unsealed_events` is how many events come after it.
+- `chain_seal_mismatch`: a seal names a head that is not the chain's (a different hash, or a seq beyond the chain).
+
+The seal alone is enough: a bundle may hold only the chain and its seal. Receipts, payoff statements and releases are
+checked when they come, but none is required.
 
 Each verdict is `{ ok: true, ... }` or `{ ok: false, code, message }`; none throws. Codes: `not_an_object`,
 `unknown_type`, `wrong_schema`, `bad_shape`, `wrong_purpose`, `unknown_key`, `bad_signature_encoding`, `bad_signature`,
 `not_canonical`, `key_revoked`, `key_wrong_purpose`, `outside_key_window`, `signed_in_future`, `bad_options`; for a chain
 `bad_input`, `bad_event`, `bad_link` and `chain_*` (one per `tfd-notes` reason); for a bundle `chain_not_verified`,
 `note_id_mismatch`, `chain_head_unknown`, `chain_head_mismatch`, `event_not_in_chain`, `event_after_head`,
-`event_hash_mismatch`, `wrong_event_type`.
+`event_hash_mismatch`, `wrong_event_type`, and for the seal `chain_unsealed`, `chain_seal_stale`, `chain_seal_mismatch`.
 
 A pass says the signature verifies for this key and the document is unchanged since it was signed. It does not say the
 facts in the document are true: a payment receipt records what was recorded and how far the two parties agreed.
@@ -29,7 +41,9 @@ facts in the document are true: a payment receipt records what was recorded and 
 import { verifyNoteBundle } from "tfd-verify-notes";
 
 const verdict = await verifyNoteBundle({ events, links, documents, keys });
-if (!verdict.ok) console.warn(verdict.chain, verdict.documents);
+if (!verdict.ok) console.warn(verdict.code, verdict.seal, verdict.chain, verdict.documents);
 ```
 
-Tests run the CC0 vectors in `packages/tfd-notes/tests/golden/{chain,documents}/` and a table of failures.
+Tests run the CC0 vectors in `packages/tfd-notes/tests/golden/{chain,documents}/` (the documents vector includes a seal at
+the head of its chain) and a table of failures, including a chain with an edited amount and rebuilt links, and a forged
+event appended after a real seal.

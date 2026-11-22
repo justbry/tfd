@@ -97,13 +97,14 @@ const totalsRow = (total: CurrencyTotals): Safe =>
 <td class="num">${total.awaiting_confirmation}</td>
 <td class="num">${total.disputed}</td>
 <td class="num">${total.terms_pending}</td>
+<td class="num">${total.declined}</td>
 </tr>`;
 
 const totalsBlock = (totals: readonly CurrencyTotals[]): Safe => {
 	if (totals.length === 0) return html`<p>No note could be read yet.</p>`;
-	return html`<p class="muted">Each currency is counted alone: amounts are never added across currencies.</p>
+	return html`<p class="muted">Each currency is counted alone: amounts are never added across currencies. A note whose borrower said it is not their loan is counted under Declined and in no other total.</p>
 <table>
-<thead><tr><th>Currency</th><th>Notes</th><th>Owed (open notes)</th><th>Overdue</th><th>Current</th><th>1-30 days</th><th>31-60 days</th><th>61+ days</th><th>Awaiting confirmation</th><th>Disputed</th><th>Terms pending</th></tr></thead>
+<thead><tr><th>Currency</th><th>Notes</th><th>Owed (open notes)</th><th>Overdue</th><th>Current</th><th>1-30 days</th><th>31-60 days</th><th>61+ days</th><th>Awaiting confirmation</th><th>Disputed</th><th>Terms pending</th><th>Declined</th></tr></thead>
 <tbody>${totals.map(totalsRow)}</tbody>
 </table>`;
 };
@@ -134,16 +135,15 @@ const notesBlock = (orgId: string, rows: readonly PortfolioRow[]): Safe => {
 const queueBlock = (input: {
 	orgId: string;
 	role: AgentRole;
-	agentRef: string;
 	csrf: string;
 	data: OrgPortfolio;
 }): Safe => {
-	const { orgId, role, agentRef, csrf, data } = input;
+	const { orgId, role, csrf, data } = input;
 	if (data.queue.length === 0) return html`<p>No approval is waiting.</p>`;
 	return html`<table>
 <thead><tr><th>Note</th><th>For</th><th>Asked</th><th></th></tr></thead>
 <tbody>${data.queue.map((item) => {
-		const mine = item.requestedByRef === agentRef;
+		const { mine } = item;
 		let control: Safe = html`<span class="muted">Waiting for a board member.</span>`;
 		if (mine)
 			control = html`<span class="muted">You asked for this; another board member must approve.</span>`;
@@ -180,7 +180,6 @@ const reportBlock = (orgId: string, role: AgentRole, asOf: string): Safe => {
 export const portfolioPage = (input: {
 	orgId: string;
 	role: AgentRole;
-	agentRef: string;
 	csrf: string;
 	asOf: string;
 	data: OrgPortfolio;
@@ -193,6 +192,10 @@ export const portfolioPage = (input: {
 		html`<h1>Loan portfolio</h1>
 ${noticeBlock(input.notice)}
 <p class="muted">You are on the team as ${ROLE_WORDS[role]}. As of ${asOf}.</p>
+<form class="inline" method="post" action="/o/${orgId}/logout">
+<input type="hidden" name="csrf" value="${input.csrf}">
+<button type="submit" class="link">Sign out</button>
+</form>
 <section>
 <h2>Totals</h2>
 ${totalsBlock(portfolio.totals)}
@@ -210,7 +213,7 @@ ${
 </section>
 <section>
 <h2>Approvals waiting</h2>
-${queueBlock({ orgId, role, agentRef: input.agentRef, csrf: input.csrf, data })}
+${queueBlock({ orgId, role, csrf: input.csrf, data })}
 </section>
 <section>
 <h2>Board report</h2>

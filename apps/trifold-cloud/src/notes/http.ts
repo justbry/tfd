@@ -76,6 +76,7 @@ export const STATUS_OF: Record<ErrorCode, number> = {
 	cooling_off: 409,
 	approval_required: 409,
 	chain_invalid: 409,
+	terms_declined: 409,
 	not_configured: 503,
 };
 
@@ -93,13 +94,66 @@ export const sameOrigin = (request: Request, url: URL): boolean => {
 	return origin === null || origin === url.origin;
 };
 
+/** A request body went past its limit. `notesRoute` answers it with a 413 whichever route was reading. */
+export class BodyTooLargeError extends Error {
+	constructor() {
+		super("the request body is too large");
+		this.name = "BodyTooLargeError";
+	}
+}
+
+/**
+ * The body's bytes. The limit is enforced while streaming, so a body with no `Content-Length` (chunked) or a false one
+ * is cut off at `limit` bytes plus one chunk: the stream is cancelled and `BodyTooLargeError` thrown. A declared length
+ * over the limit is refused without reading anything.
+ */
+export const readBodyBytes = async (
+	request: Request,
+	limit = MAX_BODY_BYTES,
+): Promise<Uint8Array> => {
+	const declared = Number(request.headers.get("Content-Length") ?? 0);
+	if (declared > limit) throw new BodyTooLargeError();
+	if (request.body === null) return new Uint8Array(0);
+	const reader = request.body.getReader();
+	const chunks: Uint8Array[] = [];
+	let total = 0;
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		total += value.length;
+		if (total > limit) {
+			await reader.cancel();
+			throw new BodyTooLargeError();
+		}
+		chunks.push(value);
+	}
+	const bytes = new Uint8Array(total);
+	let offset = 0;
+	for (const chunk of chunks) {
+		bytes.set(chunk, offset);
+		offset += chunk.length;
+	}
+	return bytes;
+};
+
+/** The body as text, within the limit (see `readBodyBytes`). */
+export const readBodyText = async (
+	request: Request,
+	limit = MAX_BODY_BYTES,
+): Promise<string> =>
+	new TextDecoder().decode(await readBodyBytes(request, limit));
+
+/** The form fields of a body within the limit, or null when it is not a readable form. A body over the limit throws. */
 export const readForm = async (
 	request: Request,
 ): Promise<Record<string, string> | null> => {
-	const length = Number(request.headers.get("Content-Length") ?? 0);
-	if (length > MAX_BODY_BYTES) return null;
+	const bytes = await readBodyBytes(request);
 	try {
-		const form = await request.formData();
+		const form = await new Response(bytes, {
+			headers: {
+				"Content-Type": request.headers.get("Content-Type") ?? "",
+			},
+		}).formData();
 		const fields: Record<string, string> = {};
 		for (const [name, value] of form) {
 			if (typeof value === "string") fields[name] = value;
@@ -110,9 +164,9 @@ export const readForm = async (
 	}
 };
 
+/** The parsed JSON of a body within the limit, or undefined when it is not JSON. A body over the limit throws. */
 export const readJson = async (request: Request): Promise<unknown> => {
-	const text = await request.text();
-	if (text.length > MAX_BODY_BYTES) return undefined;
+	const text = await readBodyText(request);
 	try {
 		return JSON.parse(text);
 	} catch {

@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from "bun:test";
 import schema from "../schema/note-event.v1.json";
-import { parseNoteEvent, validateStream } from "../src/events.js";
-import type { NoteEvent } from "../src/types.js";
+import {
+	MAX_CARVE_OUT_DAYS,
+	MAX_GRANT_DAYS,
+	parseNoteEvent,
+	validateStream,
+} from "../src/events";
+import type { NoteEvent } from "../src/types";
 
 type Fields = Record<string, unknown>;
 
@@ -1195,7 +1200,7 @@ describe("the event vocabulary for terms, payoff, release, notice, rebind, visib
 			["approval.requested for release.confirm", approvalRequested()],
 			[
 				"approval.requested for notice.default",
-				approvalRequested(3, { action: "notice.default" }),
+				approvalRequested(3, { action: "notice.default", cure_days: 30 }),
 			],
 			[
 				"approval.requested for waiver",
@@ -2038,13 +2043,16 @@ describe("grant.proposed expiry, link and carve-out rules", () => {
 		],
 		["a carve-out for a court", carveOut({ purpose: "court" })],
 		["a carve-out for an assignee", carveOut({ purpose: "assignee" })],
-		["a carve-out for another purpose", carveOut({ purpose: "other" })],
+		[
+			"a carve-out exactly 90 days after entered_at",
+			carveOut({ expires_at: "2026-05-02T12:00:00Z" }),
+		],
 		["carve_out false with no purpose", proposed({ carve_out: false })],
 		[
 			"carve_out false with a purpose on an org",
 			proposed({
 				carve_out: false,
-				purpose: "other",
+				purpose: "lawyer",
 				audience: { kind: "org", ref: "o" },
 			}),
 		],
@@ -2080,6 +2088,21 @@ describe("grant.proposed expiry, link and carve-out rules", () => {
 			"an expiry two years out",
 			proposed({ expires_at: "2028-02-01T12:00:00Z" }),
 			"more than 365 days after entered_at",
+		],
+		[
+			"a carve-out one second past 90 days",
+			carveOut({ expires_at: "2026-05-02T12:00:01Z" }),
+			"more than 90 days after entered_at",
+		],
+		[
+			"a carve-out for a year",
+			carveOut({ expires_at: "2027-02-01T12:00:00Z" }),
+			"more than 90 days after entered_at",
+		],
+		[
+			"a carve-out for the purpose other",
+			carveOut({ purpose: "other" }),
+			'purpose must be "accountant", "lawyer", "court" or "assignee"',
 		],
 		[
 			"a link at statement level",
@@ -2133,13 +2156,331 @@ describe("grant.proposed expiry, link and carve-out rules", () => {
 		});
 	}
 
+	it("exports the day caps the validator applies", () => {
+		expect(MAX_GRANT_DAYS).toBe(365);
+		expect(MAX_CARVE_OUT_DAYS).toBe(90);
+	});
+
+	it("keeps the 365-day cap for a grant that is not a carve-out", () => {
+		expect(() =>
+			parseNoteEvent(proposed({ expires_at: "2026-05-02T12:00:01Z" })),
+		).not.toThrow();
+	});
+
 	it("describes the same rules in the schema", () => {
 		const branch = schema.oneOf.find(
 			(candidate) => candidate.title === "visibility.changed (grant.proposed)",
 		);
+		expect(branch?.properties.purpose?.enum).toEqual([
+			"accountant",
+			"lawyer",
+			"court",
+			"assignee",
+		]);
 		expect(branch?.required).toContain("expires_at");
 		expect(branch?.properties).toHaveProperty("purpose");
 		expect(branch?.properties).toHaveProperty("carve_out");
 		expect(JSON.stringify(branch)).toContain('"link"');
+	});
+});
+
+describe("default notice binding in the event shapes", () => {
+	const request = (seq: number, fields: Fields = {}): Fields =>
+		make(seq, "approval.requested", "lender", {
+			action: "notice.default",
+			target: "evt-1",
+			cure_days: 30,
+			...fields,
+		});
+	const defaultNotice = (seq: number, fields: Fields = {}): Fields =>
+		make(seq, "notice.sent", "lender", {
+			kind: "default",
+			cure_days: 30,
+			...fields,
+		});
+
+	it("requires cure_days on an approval.requested for notice.default", () => {
+		expect(() => parseNoteEvent(request(2))).not.toThrow();
+		expect(() => parseNoteEvent(without(request(2), "cure_days"))).toThrow(
+			"approval.requested: cure_days is required when action is notice.default",
+		);
+	});
+
+	it("forbids cure_days on any other approval action", () => {
+		for (const action of ["release.confirm", "waiver"]) {
+			expect(() => parseNoteEvent(request(2, { action }))).toThrow(
+				"approval.requested: cure_days is only allowed when action is notice.default",
+			);
+		}
+	});
+
+	it("takes cure_days from 0 to 365 only", () => {
+		for (const good of [0, 1, 365]) {
+			expect(() =>
+				parseNoteEvent(request(2, { cure_days: good })),
+			).not.toThrow();
+		}
+		for (const bad of [-1, 366, 1.5, "30", null]) {
+			expect(() => parseNoteEvent(request(2, { cure_days: bad }))).toThrow(
+				"approval.requested: cure_days must be an integer from 0 to 365",
+			);
+		}
+	});
+
+	it("takes an approval on a default notice and refuses one on a reminder", () => {
+		expect(
+			parseNoteEvent(defaultNotice(3, { approval: "evt-2" })),
+		).toMatchObject({ approval: "evt-2" });
+		expect(() =>
+			parseNoteEvent(
+				make(3, "notice.sent", "lender", {
+					kind: "reminder",
+					approval: "evt-2",
+				}),
+			),
+		).toThrow("notice.sent: approval is not allowed when kind is reminder");
+		expect(() => parseNoteEvent(defaultNotice(3, { approval: "" }))).toThrow(
+			"notice.sent: approval must be a non-empty string",
+		);
+	});
+
+	const streamOf = (...extra: Fields[]): unknown[] => [created(), ...extra];
+
+	it("accepts a notice whose approval is an earlier request with the same cure_days", () => {
+		const stream = streamOf(
+			request(2),
+			defaultNotice(3, { approval: "evt-2" }),
+		);
+		expect(validateStream(stream)).toHaveLength(3);
+	});
+
+	it("accepts a default notice with no approval (the policy decides whether one is needed)", () => {
+		expect(validateStream(streamOf(defaultNotice(2)))).toHaveLength(2);
+	});
+
+	it("rejects an approval that does not exist, is not a request, or is a request for another action", () => {
+		expect(() =>
+			validateStream(streamOf(defaultNotice(2, { approval: "evt-9" }))),
+		).toThrow(
+			'notice.sent: seq 2: approval "evt-9" does not match an earlier approval.requested event',
+		);
+		expect(() =>
+			validateStream(
+				streamOf(
+					recorded(2, "borrower"),
+					defaultNotice(3, { approval: "evt-2" }),
+				),
+			),
+		).toThrow(
+			'notice.sent: seq 3: approval "evt-2" has type payment.recorded, not approval.requested',
+		);
+		expect(() =>
+			validateStream(
+				streamOf(
+					without(request(2, { action: "waiver" }), "cure_days"),
+					defaultNotice(3, { approval: "evt-2" }),
+				),
+			),
+		).toThrow(
+			'notice.sent: seq 3: approval "evt-2" is a request for waiver, not notice.default',
+		);
+	});
+
+	it("rejects an approval that names a request that comes later", () => {
+		expect(() =>
+			validateStream(
+				streamOf(defaultNotice(2, { approval: "evt-3" }), request(3)),
+			),
+		).toThrow("does not match an earlier approval.requested event");
+	});
+
+	it("rejects a notice whose cure_days differs from its request", () => {
+		expect(() =>
+			validateStream(
+				streamOf(
+					request(2),
+					defaultNotice(3, { approval: "evt-2", cure_days: 31 }),
+				),
+			),
+		).toThrow(
+			'notice.sent: seq 3: cure_days 31 differs from the 30 of the approval request "evt-2"',
+		);
+	});
+});
+
+describe("declined terms in the stream", () => {
+	const declined = (seq: number): Fields =>
+		make(seq, "terms.declined", "borrower", {});
+	const accepted = (seq: number): Fields =>
+		make(seq, "terms.accepted", "borrower", {});
+	const payoff = (seq: number): Fields =>
+		make(seq, "payoff.issued", "lender", {
+			as_of: "2026-03-01",
+			document_sha256: "a".repeat(64),
+		});
+	const reminder = (seq: number): Fields =>
+		make(seq, "notice.sent", "lender", { kind: "reminder" });
+	const defaultNotice = (seq: number): Fields =>
+		make(seq, "notice.sent", "lender", { kind: "default", cure_days: 30 });
+	const defaultRequest = (seq: number): Fields =>
+		make(seq, "approval.requested", "lender", {
+			action: "notice.default",
+			target: "evt-1",
+			cure_days: 30,
+		});
+
+	const refused: [string, (seq: number) => Fields][] = [
+		["a payoff statement", payoff],
+		["a reminder", reminder],
+		["a default notice", defaultNotice],
+		["a request to approve a default notice", defaultRequest],
+	];
+	for (const [name, build] of refused) {
+		it(`rejects ${name} while the terms stand declined`, () => {
+			expect(() => validateStream([created(), declined(2), build(3)])).toThrow(
+				"the borrower has declined the terms (terms.declined)",
+			);
+		});
+		it(`allows ${name} again once the borrower accepts`, () => {
+			expect(
+				validateStream([created(), declined(2), accepted(3), build(4)]),
+			).toHaveLength(4);
+		});
+		it(`allows ${name} before any decision`, () => {
+			expect(validateStream([created(), build(2)])).toHaveLength(2);
+		});
+	}
+
+	it("rejects again after a later decline", () => {
+		expect(() =>
+			validateStream([
+				created(),
+				declined(2),
+				accepted(3),
+				declined(4),
+				reminder(5),
+			]),
+		).toThrow("terms.declined");
+	});
+
+	it("still allows payments, confirmations, disputes, annotations, releases and approvals of other actions", () => {
+		const stream = [
+			created(),
+			declined(2),
+			recorded(3, "borrower"),
+			confirmed(4, "lender", "evt-3"),
+			recorded(5, "lender"),
+			disputed(6, "borrower", "evt-5"),
+			annotation(7),
+			make(8, "release.drafted", "lender", {}),
+			make(9, "release.confirmed", "lender", { target: "evt-8" }),
+			make(10, "approval.requested", "lender", {
+				action: "release.confirm",
+				target: "evt-8",
+			}),
+		];
+		expect(validateStream(stream)).toHaveLength(10);
+	});
+});
+
+describe("free text hygiene", () => {
+	const UNSAFE: [string, string][] = [
+		["a null character", "\u0000"],
+		["a bell", "\u0007"],
+		["a carriage return", "\r"],
+		["an escape", "\u001b"],
+		["a delete character", "\u007f"],
+		["a C1 control", "\u0085"],
+		["the last C1 control", "\u009f"],
+		["a left-to-right mark", "‎"],
+		["a right-to-left mark", "‏"],
+		["an Arabic letter mark", "؜"],
+		["a right-to-left override", "‮"],
+		["a left-to-right embedding", "‪"],
+		["a bidirectional isolate", "⁦"],
+		["a pop directional isolate", "⁩"],
+		["a byte order mark", "﻿"],
+	];
+	const LAYOUT: [string, string][] = [
+		["a newline", "\n"],
+		["a tab", "\t"],
+	];
+	const fields: [string, (value: string) => Fields, boolean][] = [
+		["annotation.added text", (value) => annotation(2, { text: value }), true],
+		[
+			"payment.disputed reason",
+			(value) => disputed(3, "borrower", "evt-2", { reason: value }),
+			true,
+		],
+		[
+			"payment.recorded method",
+			(value) => recorded(2, "borrower", { method: value }),
+			false,
+		],
+		[
+			"payment.recorded reference",
+			(value) => recorded(2, "borrower", { reference: value }),
+			false,
+		],
+		["agent_ref", (value) => annotation(2, { agent_ref: value }), false],
+	];
+	for (const [fieldName, build, multiline] of fields) {
+		const path = fieldName.split(" ").pop() ?? fieldName;
+		for (const [kind, character] of UNSAFE) {
+			it(`${fieldName} rejects ${kind}`, () => {
+				expect(() => parseNoteEvent(build(`pay${character}ment`))).toThrow(
+					`${fieldName === "agent_ref" ? "annotation.added" : fieldName.split(" ")[0]}: ${path} must not contain control or bidirectional characters`,
+				);
+			});
+		}
+		for (const [kind, character] of LAYOUT) {
+			it(`${fieldName} ${multiline ? "keeps" : "rejects"} ${kind}`, () => {
+				const attempt = () => parseNoteEvent(build(`one${character}two`));
+				if (multiline) {
+					expect(attempt).not.toThrow();
+				} else {
+					expect(attempt).toThrow("must not contain control or bidirectional");
+				}
+			});
+		}
+		it(`${fieldName} keeps ordinary text, accents, emoji and other scripts`, () => {
+			expect(() =>
+				parseNoteEvent(build("Pago en efectivo, señor 😀 تم الدفع 支払い")),
+			).not.toThrow();
+		});
+	}
+
+	it("names the character and its position", () => {
+		expect(() => parseNoteEvent(annotation(2, { text: "ab‮cd" }))).toThrow(
+			"found U+202E at character 2",
+		);
+		expect(() => parseNoteEvent(annotation(2, { text: "😀\u0000" }))).toThrow(
+			"found U+0000 at character 1",
+		);
+	});
+
+	it("still takes an empty method and reference, and refuses an empty text", () => {
+		expect(() =>
+			parseNoteEvent(recorded(2, "borrower", { method: "", reference: "" })),
+		).not.toThrow();
+		expect(() => parseNoteEvent(annotation(2, { text: "" }))).toThrow(
+			"annotation.added: text must be a non-empty string",
+		);
+	});
+
+	it("is written into the schema as patterns that agree with the validator", () => {
+		const line = new RegExp(schema.$defs.free_line.pattern);
+		const text = new RegExp(schema.$defs.free_text.pattern);
+		const agent = new RegExp(schema.$defs.agent_ref.pattern);
+		for (const [, character] of UNSAFE) {
+			for (const pattern of [line, text, agent]) {
+				expect(pattern.test(`a${character}b`)).toBe(false);
+			}
+		}
+		for (const [, character] of LAYOUT) {
+			expect(text.test(`a${character}b`)).toBe(true);
+			expect(line.test(`a${character}b`)).toBe(false);
+		}
+		expect(line.test("señor 😀 تم الدفع")).toBe(true);
 	});
 });

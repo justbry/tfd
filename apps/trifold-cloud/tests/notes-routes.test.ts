@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { resetHealthCache } from "../src/health";
 import worker from "../src/index";
+import { noteIdFor } from "../src/notes/note-ids";
 import { type NotesDeps, notesRoute } from "../src/notes/routes";
 import { fakeEnv, signingPem } from "./fakes";
 import {
@@ -20,7 +21,15 @@ const CLAIM_WORDS =
 	/\b(proof|enforceable|binding|tamper-proof|legally|credit)\b/i;
 const SIGNATURE_WORDS = /\b(signature|signed)\b/i;
 const CSRF_FIELD = /name="csrf" value="([^"]+)"/;
-const COOKIE_NAME = "__Secure-tf_note";
+const COOKIE_PREFIX = "__Host-tf_note_";
+const NOTE_IN_PATH = /^\/n\/([^/?]+)/;
+
+/** The one cookie name of the note a path belongs to. */
+const cookieNameFor = (path: string): string => {
+	const noteId = NOTE_IN_PATH.exec(path)?.[1];
+	if (noteId === undefined) throw new Error(`no note in ${path}`);
+	return `${COOKIE_PREFIX}${noteId}`;
+};
 
 let pem = "";
 beforeAll(async () => {
@@ -70,13 +79,13 @@ const setup = (envOverrides: Parameters<typeof notesEnv>[0] = {}) => {
 			method: "POST",
 			body: new URLSearchParams(fields),
 			headers: {
-				...(cookie ? { Cookie: `${COOKIE_NAME}=${cookie}` } : {}),
+				...(cookie ? { Cookie: `${cookieNameFor(path)}=${cookie}` } : {}),
 				...headers,
 			},
 		});
 	const get = (path: string, cookie?: string) =>
 		ledger(path, {
-			headers: cookie ? { Cookie: `${COOKIE_NAME}=${cookie}` } : {},
+			headers: cookie ? { Cookie: `${cookieNameFor(path)}=${cookie}` } : {},
 		});
 	/** Opens the newest emailed link the way a browser does: GET the page, press the button. */
 	const enter = async (noteId: string, email: string) => {
@@ -84,7 +93,7 @@ const setup = (envOverrides: Parameters<typeof notesEnv>[0] = {}) => {
 		expect((await get(`/n/${noteId}/enter?t=${token}`)).status).toBe(200);
 		const response = await post(`/n/${noteId}/enter`, { t: token });
 		expect(response.status).toBe(303);
-		const cookie = new RegExp(`${COOKIE_NAME}=([^;]+)`).exec(
+		const cookie = new RegExp(`${cookieNameFor(`/n/${noteId}`)}=([^;]+)`).exec(
 			response.headers.get("Set-Cookie") ?? "",
 		)?.[1];
 		if (!cookie) throw new Error("no cookie");
@@ -311,15 +320,17 @@ describe("the link page and signing in", () => {
 		const noteId = await createViaApi();
 		const { cookie, token, response } = await enter(noteId, BORROWER_EMAIL);
 		const setCookie = response.headers.get("Set-Cookie") ?? "";
-		expect(setCookie).toStartWith(`${COOKIE_NAME}=`);
+		expect(setCookie).toStartWith(`${cookieNameFor(`/n/${noteId}`)}=`);
 		for (const attribute of [
 			"HttpOnly",
 			"Secure",
 			"SameSite=Lax",
-			`Path=/n/${noteId}`,
+			"Path=/",
 			"Max-Age=43200",
 		])
 			expect(setCookie).toContain(attribute);
+		// `__Host-` needs Secure and Path=/ and forbids Domain: nothing else can set or shadow it.
+		expect(setCookie).not.toContain("Domain");
 		expect(response.headers.get("Location")).toBe(`/n/${noteId}?m=entered`);
 		expect(cookie).not.toBe(token);
 		expect(response.headers.get("Location")).not.toContain(token);
@@ -493,7 +504,7 @@ describe("posts need the CSRF token", () => {
 		const rotated = await notesRoute(
 			new Request(`https://${LEDGER}/n/${noteId}/act`, {
 				method: "POST",
-				headers: { Cookie: `${COOKIE_NAME}=${cookie}` },
+				headers: { Cookie: `${cookieNameFor(`/n/${noteId}`)}=${cookie}` },
 				body: new URLSearchParams({
 					csrf: token,
 					type: "annotation.added",
@@ -503,7 +514,8 @@ describe("posts need the CSRF token", () => {
 			notesEnv({ NOTES_SESSION_SECRET: `${SECRET}-rotated` }),
 			first.deps,
 		);
-		expect(rotated?.status).toBe(403);
+		// The note id is keyed to the secret too, so a rotated secret does not even know the note.
+		expect(rotated?.status).toBe(404);
 	});
 });
 
@@ -896,14 +908,16 @@ describe("staging only", () => {
 			notesRoute(new Request(url, init), env);
 		expect(await own(`https://${LEDGER}/healthz`)).toBeNull();
 		expect(await own(`https://${LEDGER}/billing/plans`)).toBeNull();
-		expect(await own(`https://${LEDGER}/n/short`)).toBeNull();
+		// An id-shaped path is the notes' own: a malformed or forged id is a 404, not a fall-through.
+		expect((await own(`https://${LEDGER}/n/short`))?.status).toBe(404);
 		expect(await own(`https://${API}/n/nt_abcdefgh0000`)).toBeNull();
 		expect(
 			await own(`https://${LEDGER}/v1/notes`, { method: "POST" }),
 		).toBeNull();
 		expect(await own(`https://${API}/v1/notes`)).toBeNull();
 		expect(await own("https://evil.example/n/nt_abcdefgh0000")).toBeNull();
-		expect(await own(`https://${LEDGER}/n/nt_abcdefgh0000/link`)).toBeNull();
+		const real = await noteIdFor(SECRET, "api", "paths");
+		expect(await own(`https://${LEDGER}/n/${real}/link`)).toBeNull();
 		expect(
 			await own(`https://${LEDGER}/n/assets/notes.css`, { method: "POST" }),
 		).toBeNull();
@@ -924,7 +938,9 @@ describe("staging only", () => {
 		);
 		expect(css.status).toBe(200);
 		const page = await worker.fetch(
-			new Request(`https://${LEDGER}/n/nt_abcdefgh0000/enter?t=x`),
+			new Request(
+				`https://${LEDGER}/n/${await noteIdFor(SECRET, "api", "worker")}/enter?t=x`,
+			),
 			withNotes,
 		);
 		expect(page.status).toBe(200);
@@ -972,10 +988,10 @@ describe("through the Durable Object store", () => {
 		});
 		expect(entered.status).toBe(303);
 		const cookie =
-			/__Secure-tf_note=([^;]+)/.exec(
+			new RegExp(`${cookieNameFor(`/n/${noteId}`)}=([^;]+)`).exec(
 				entered.headers.get("Set-Cookie") ?? "",
 			)?.[1] ?? "";
-		const headers = { Cookie: `${COOKIE_NAME}=${cookie}` };
+		const headers = { Cookie: `${cookieNameFor(`/n/${noteId}`)}=${cookie}` };
 		const page = await (
 			await call(`https://${LEDGER}/n/${noteId}`, { headers })
 		).text();

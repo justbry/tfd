@@ -4,11 +4,11 @@ import { validateStream, verifyChain } from "tfd-notes";
 import { migrateNote, SqliteNoteStore } from "../src/notes/do-store";
 import { MemoryNoteStore } from "../src/notes/memory-store";
 import {
-	CODE_REQUESTS_PER_WINDOW,
+	LINK_REQUESTS_PER_CLIENT,
 	type NoteView,
 	type Outcome,
 } from "../src/notes/service";
-import type { ActiveSession } from "../src/notes/sessions";
+import { type ActiveSession, CODES_PER_WINDOW } from "../src/notes/sessions";
 import type { AppendResult } from "../src/notes/store";
 import { durableState } from "./fakes";
 import {
@@ -464,7 +464,7 @@ describe("links", () => {
 		expect(h.mailer.sent).toHaveLength(before + 1);
 	});
 
-	test("new links are limited per address (3 an hour) and per note (10 an hour), silently", async () => {
+	test("new links are limited per address (3 an hour), silently, and a flood of other addresses does not use up the real party's allowance", async () => {
 		const h = harness();
 		const noteId = await h.create();
 		const before = h.mailer.sent.length;
@@ -478,10 +478,49 @@ describe("links", () => {
 		const other = harness();
 		const otherId = await other.create();
 		const start = other.mailer.sent.length;
-		for (let index = 0; index < 10; index += 1)
+		for (let index = 0; index < 50; index += 1)
 			await other.service.requestLink(otherId, `guess${index}@example.com`);
-		await other.service.requestLink(otherId, LENDER_EMAIL);
 		expect(other.mailer.sent.length - start).toBe(0);
+		await other.service.requestLink(otherId, LENDER_EMAIL);
+		await other.service.requestLink(otherId, BORROWER_EMAIL);
+		expect(other.mailer.to(LENDER_EMAIL)).toHaveLength(2);
+		expect(other.mailer.to(BORROWER_EMAIL)).toHaveLength(2);
+	});
+
+	test("one client address (a hashed CF-Connecting-IP) may ask only so often, and another client is not affected", async () => {
+		const h = harness();
+		const noteId = await h.create();
+		const before = h.mailer.sent.length;
+		for (let index = 0; index < LINK_REQUESTS_PER_CLIENT; index += 1)
+			await h.service.requestLink(
+				noteId,
+				`guess${index}@example.com`,
+				"203.0.113.9",
+			);
+		// The same client is at its limit: even the real address gets nothing from it.
+		await h.service.requestLink(noteId, BORROWER_EMAIL, "203.0.113.9");
+		expect(h.mailer.sent.length - before).toBe(0);
+		await h.service.requestLink(noteId, BORROWER_EMAIL, "203.0.113.10");
+		expect(h.mailer.sent.length - before).toBe(1);
+		// The counter holds a keyed hash, never the address.
+		expect(
+			JSON.stringify([...(h.store as MemoryNoteStore).countersForTest(noteId)]),
+		).not.toContain("203.0.113.9");
+	});
+
+	test("a new link request revokes the party's older links that nobody opened", async () => {
+		const h = harness();
+		const noteId = await h.create();
+		const first = h.mailer.linkTokenFor(BORROWER_EMAIL);
+		await h.service.requestLink(noteId, BORROWER_EMAIL);
+		const second = h.mailer.linkTokenFor(BORROWER_EMAIL);
+		expect(second).not.toBe(first);
+		expect(await h.service.sessions.redeem(noteId, first)).toBeNull();
+		expect(await h.service.sessions.redeem(noteId, second)).not.toBeNull();
+		// The other party's link is not touched.
+		const lenderLink = h.mailer.linkTokenFor(LENDER_EMAIL);
+		await h.service.requestLink(noteId, BORROWER_EMAIL);
+		expect(await h.service.sessions.redeem(noteId, lenderLink)).not.toBeNull();
 	});
 });
 
@@ -600,14 +639,58 @@ describe("step-up codes", () => {
 			error: "step_up_invalid",
 			message: expect.stringContaining("Too many"),
 		});
+		// A new code does not buy new tries: the count is per session and action, over the hour.
 		const fresh = await codeFor(h, borrower, "terms.accepted");
-		expectOk(
+		expect(
 			await h.service.append(
 				borrower,
 				{ type: "terms.accepted" },
 				{ code: fresh },
 			),
+		).toMatchObject({
+			error: "step_up_invalid",
+			message: expect.stringContaining("Too many"),
+		});
+		h.clock.advance(HOUR + MINUTE);
+		const later = await codeFor(h, borrower, "terms.accepted");
+		expectOk(
+			await h.service.append(
+				borrower,
+				{ type: "terms.accepted" },
+				{ code: later },
+			),
 		);
+	});
+
+	test("issuing codes again and again cannot yield more than five guesses an hour", async () => {
+		const { h, borrower } = await setup();
+		let guesses = 0;
+		for (let round = 0; round < 12; round += 1) {
+			const sent = await h.service.requestStepUp(borrower, "terms.accepted");
+			if (!sent.ok) continue;
+			const wrong =
+				h.mailer.codeFor(BORROWER_EMAIL) === "000000" ? "111111" : "000000";
+			for (let attempt = 0; attempt < 3; attempt += 1) {
+				const tried = await h.service.append(
+					borrower,
+					{ type: "terms.accepted" },
+					{ code: wrong },
+				);
+				if (
+					!tried.ok &&
+					tried.error === "step_up_invalid" &&
+					tried.message.startsWith("That code is not right")
+				)
+					guesses += 1;
+			}
+		}
+		expect(guesses).toBe(5);
+		// Only five codes were sent in the hour, too.
+		expect(
+			h.mailer
+				.to(BORROWER_EMAIL)
+				.filter((mail) => mail.subject === "Your confirmation code"),
+		).toHaveLength(5);
 	});
 
 	test("a code for one kind of action does not open another, and a new code replaces the old", async () => {
@@ -667,7 +750,7 @@ describe("step-up codes", () => {
 
 	test("asking for codes is limited, and only a step-up action can ask", async () => {
 		const { h, borrower } = await setup();
-		for (let index = 0; index < CODE_REQUESTS_PER_WINDOW; index += 1)
+		for (let index = 0; index < CODES_PER_WINDOW; index += 1)
 			expectOk(await h.service.requestStepUp(borrower, "terms.accepted"));
 		expect(
 			await h.service.requestStepUp(borrower, "terms.accepted"),
@@ -675,7 +758,12 @@ describe("step-up codes", () => {
 		expect(
 			await h.service.requestStepUp(borrower, "payment.recorded"),
 		).toMatchObject({ error: "bad_request" });
+		// A window is an hour, not ten minutes: the limit is what bounds the guesses.
 		h.clock.advance(10 * MINUTE);
+		expect(
+			await h.service.requestStepUp(borrower, "terms.accepted"),
+		).toMatchObject({ error: "rate_limited" });
+		h.clock.advance(HOUR);
 		expectOk(await h.service.requestStepUp(borrower, "terms.accepted"));
 	});
 
@@ -800,7 +888,9 @@ describe("creating a note", () => {
 		});
 		expect(result).toMatchObject({ ok: false, error: "mail_failed" });
 		const noteId =
-			(result as { message: string }).message.match(/nt_[0-9a-f]+/)?.[0] ?? "";
+			(result as { message: string }).message.match(
+				/nt_[0-9a-f]+\.[0-9a-f]+/,
+			)?.[0] ?? "";
 		expect((await h.store.readLog(noteId)).events).toHaveLength(1);
 		await h.service.requestLink(noteId, BORROWER_EMAIL);
 		expect(

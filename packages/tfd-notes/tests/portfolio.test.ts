@@ -299,6 +299,88 @@ describe("rows", () => {
 	});
 });
 
+describe("a note whose terms were declined", () => {
+	// One installment of 10,000 due 2026-03-01; on 2026-05-01 the accepted note is 61 days overdue (bucket 61+).
+	const AS_OF = "2026-05-01";
+	const accepted = oneInstallment("accepted", "2026-03-01", "lender", [
+		make(2, "terms.accepted", "borrower"),
+	]);
+	const declined = oneInstallment("declined", "2026-03-01", "lender", [
+		make(2, "terms.declined", "borrower"),
+	]);
+
+	it("is shown as current, nothing overdue and no next due, flagged declined", () => {
+		const { rows } = portfolio([declined], AS_OF);
+		expect(rows[0]).toMatchObject({
+			note_id: "declined",
+			terms: "declined",
+			declined: true,
+			overdue_minor: "0",
+			days_overdue: 0,
+			aging: "current",
+			next_due: null,
+		});
+		expect(rows[0]?.payoff_minor).toBe("10000");
+	});
+
+	it("is flagged only when the latest decision is a decline", () => {
+		const reaccepted = oneInstallment("again", "2026-03-01", "lender", [
+			make(2, "terms.declined", "borrower"),
+			make(3, "terms.accepted", "borrower"),
+		]);
+		const { rows } = portfolio([reaccepted, accepted, declined], AS_OF);
+		expect(
+			Object.fromEntries(rows.map((row) => [row.note_id, row.declined])),
+		).toEqual({ again: false, accepted: false, declined: true });
+		expect(rows.find((row) => row.note_id === "again")?.days_overdue).toBe(61);
+	});
+
+	it("is left out of the outstanding payoff, overdue and the buckets, and counted as declined", () => {
+		const { totals } = portfolio([accepted, declined], AS_OF);
+		expect(totals).toEqual([
+			{
+				currency: "USD",
+				exponent: 2,
+				notes: 2,
+				outstanding_payoff_minor: "10000",
+				overdue_minor: "10000",
+				buckets: { current: 0, "1-30": 0, "31-60": 0, "61+": 1 },
+				awaiting_confirmation: 0,
+				disputed: 0,
+				terms_pending: 0,
+				declined: 1,
+			},
+		]);
+	});
+
+	it("counts declined per currency and carries the count into the board report and CSV", () => {
+		const euro: PortfolioNote = {
+			note_id: "euro",
+			role: "lender",
+			events: [
+				created(terms("5000", "2026-03-01", "EUR")),
+				make(2, "terms.accepted", "borrower"),
+			],
+		};
+		const result = portfolio([accepted, declined, euro], AS_OF);
+		expect(
+			Object.fromEntries(
+				result.totals.map((total) => [total.currency, total.declined]),
+			),
+		).toEqual({ EUR: 0, USD: 1 });
+		const report = boardReport(result, AS_OF);
+		expect(report.totals.map((total) => total.declined)).toEqual([0, 1]);
+		expect(
+			Object.fromEntries(report.rows.map((row) => [row.note_id, row.declined])),
+		).toEqual({ accepted: false, declined: true, euro: false });
+		const lines = boardReportCsv(report).split("\n");
+		expect(lines[0]).toContain(",terms,declined,closed,next_due");
+		expect(lines.find((line) => line.startsWith("declined,"))).toBe(
+			"declined,USD,2,lender,10000,0,0,current,0,0,declined,true,false,",
+		);
+	});
+});
+
 describe("totals", () => {
 	it("never add across currencies", () => {
 		const usdOne = oneInstallment("u1", "2026-03-01");
@@ -513,6 +595,7 @@ describe("board report CSV", () => {
 		awaiting_confirmation: 0,
 		disputed: 0,
 		terms: "accepted",
+		declined: false,
 		closed: false,
 		next_due: null,
 		...overrides,
@@ -524,7 +607,7 @@ describe("board report CSV", () => {
 		not_computed: 0,
 	});
 	const HEADER =
-		"note_id,currency,exponent,role,payoff_minor,overdue_minor,days_overdue,aging,awaiting_confirmation,disputed,terms,closed,next_due";
+		"note_id,currency,exponent,role,payoff_minor,overdue_minor,days_overdue,aging,awaiting_confirmation,disputed,terms,declined,closed,next_due";
 
 	it("writes the fixed header and \\n line ends", () => {
 		expect(boardReportCsv(report())).toBe(`${HEADER}\n`);
@@ -533,7 +616,7 @@ describe("board report CSV", () => {
 				report(row(), row({ note_id: "loan-2", next_due: "2026-07-15" })),
 			),
 		).toBe(
-			`${HEADER}\nloan-1,USD,2,lender,12345,0,0,current,0,0,accepted,false,\nloan-2,USD,2,lender,12345,0,0,current,0,0,accepted,false,2026-07-15\n`,
+			`${HEADER}\nloan-1,USD,2,lender,12345,0,0,current,0,0,accepted,false,false,\nloan-2,USD,2,lender,12345,0,0,current,0,0,accepted,false,false,2026-07-15\n`,
 		);
 		expect(boardReportCsv(report(row()))).not.toContain("\r");
 	});
@@ -611,7 +694,7 @@ describe("board report CSV", () => {
 			report(row({ currency: "-X", next_due: "@2026" })),
 		).slice(HEADER.length + 1);
 		expect(line).toBe(
-			"loan-1,'-X,2,lender,12345,0,0,current,0,0,accepted,false,'@2026\n",
+			"loan-1,'-X,2,lender,12345,0,0,current,0,0,accepted,false,false,'@2026\n",
 		);
 	});
 });

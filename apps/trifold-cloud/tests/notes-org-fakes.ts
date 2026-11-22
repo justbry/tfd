@@ -10,6 +10,7 @@ import type { ActiveSession } from "../src/notes/sessions";
 import {
 	BASE_URL,
 	BORROWER_EMAIL,
+	DeferQueue,
 	DeterministicIds,
 	RecordingMailer,
 	SECRET,
@@ -50,6 +51,7 @@ export const orgHarness = (
 	const mailer = new RecordingMailer();
 	const clock = new SettableClock(START);
 	const ids = new DeterministicIds();
+	const queue = new DeferQueue();
 	const org = new OrgService({
 		orgs,
 		store,
@@ -58,6 +60,7 @@ export const orgHarness = (
 		ids,
 		secret: SECRET,
 		baseUrl: BASE_URL,
+		defer: queue.defer,
 	});
 	const service = new NoteService({
 		store,
@@ -67,8 +70,20 @@ export const orgHarness = (
 		secret: SECRET,
 		baseUrl: BASE_URL,
 		org,
+		defer: queue.defer,
 		...(options.signers === undefined ? {} : { signers: options.signers }),
 	});
+	// Link requests answer before their mail is sent; a test that reads the mailbox next waits for it here.
+	const requestNoteLink = service.requestLink.bind(service);
+	service.requestLink = async (...args) => {
+		await requestNoteLink(...args);
+		await queue.flush();
+	};
+	const requestOrgLink = org.requestLink.bind(org);
+	org.requestLink = async (...args) => {
+		await requestOrgLink(...args);
+		await queue.flush();
+	};
 	const createOrgNote = async (
 		input: {
 			idem?: string;
@@ -127,6 +142,8 @@ export const orgHarness = (
 		mailer,
 		clock,
 		ids,
+		queue,
+		flush: () => queue.flush(),
 		org,
 		service,
 		createOrgNote,

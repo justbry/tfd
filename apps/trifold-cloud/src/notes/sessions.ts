@@ -19,6 +19,10 @@ export const SESSION_IDLE_MS = 2 * HOUR_MS;
 export const SESSION_ABSOLUTE_MS = 12 * HOUR_MS;
 export const CODE_TTL_MS = 10 * MINUTE_MS;
 export const CODE_MAX_ATTEMPTS = 5;
+/** Tries at a code are counted per session and action over this window, and a new code does not reset the count. */
+export const CODE_ATTEMPT_WINDOW_MS = HOUR_MS;
+/** Codes one session may be sent per window, so issuing codes cannot buy more guesses. */
+export const CODES_PER_WINDOW = 5;
 /** 256 bits, for a link and for a session id. */
 const TOKEN_BYTES = 32;
 const CODE_DIGITS = 6;
@@ -27,8 +31,31 @@ const CODE_ENTROPY_BYTES = 16;
 const HASH_PREFIX_BYTES = 8;
 const HEX_BYTE_WIDTH = 2;
 
-/** Session cookie name. `__Secure-` needs `Secure`; `__Host-` is not possible because the cookie's Path is the note. */
-export const SESSION_COOKIE = "__Secure-tf_note";
+/**
+ * One cookie name per scope, so a cookie of one family is never read as another: `__Host-tf_note_<noteId>`,
+ * `__Host-tf_org_<orgId>` (`org-sessions.ts`) and `__Host-tf_share_<noteId>_<grantId>` (`share-routes.ts`). `__Host-`
+ * makes the browser insist on `Secure`, `Path=/` and no `Domain`, so a sibling host cannot set or shadow it.
+ */
+export const SESSION_COOKIE_PREFIX = "__Host-tf_note_";
+
+export const sessionCookieName = (noteId: string): string =>
+	`${SESSION_COOKIE_PREFIX}${noteId}`;
+
+/** The attributes every session cookie carries (`__Host-` needs `Path=/`). */
+export const COOKIE_ATTRIBUTES = "HttpOnly; Secure; SameSite=Lax; Path=/";
+
+/** The value of the cookie `name` in a `Cookie` header, or null. */
+export const readCookie = (
+	header: string | null,
+	name: string,
+): string | null => {
+	if (!header) return null;
+	for (const part of header.split(";")) {
+		const [cookieName, ...rest] = part.trim().split("=");
+		if (cookieName === name) return rest.join("=") || null;
+	}
+	return null;
+};
 
 const ENCODER = new TextEncoder();
 
@@ -84,21 +111,17 @@ export const sessionCookie = (
 	value: string,
 	maxAgeSeconds: number,
 ): string =>
-	`${SESSION_COOKIE}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/n/${noteId}; Max-Age=${maxAgeSeconds}`;
+	`${sessionCookieName(noteId)}=${value}; ${COOKIE_ATTRIBUTES}; Max-Age=${maxAgeSeconds}`;
 
 /** Expires the cookie in the browser. */
 export const clearedSessionCookie = (noteId: string): string =>
-	`${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/n/${noteId}; Max-Age=0`;
+	`${sessionCookieName(noteId)}=; ${COOKIE_ATTRIBUTES}; Max-Age=0`;
 
-/** The value of the session cookie in a `Cookie` header, or null. */
-export const readSessionCookie = (header: string | null): string | null => {
-	if (!header) return null;
-	for (const part of header.split(";")) {
-		const [name, ...rest] = part.trim().split("=");
-		if (name === SESSION_COOKIE) return rest.join("=") || null;
-	}
-	return null;
-};
+/** The value of this note's session cookie in a `Cookie` header, or null. */
+export const readSessionCookie = (
+	header: string | null,
+	noteId: string,
+): string | null => readCookie(header, sessionCookieName(noteId));
 
 export interface ActiveSession {
 	noteId: string;
@@ -163,8 +186,16 @@ export class SessionManager {
 		return new Date(Date.parse(this.deps.clock.now()) + ms).toISOString();
 	}
 
-	/** A fresh single-use link token for `role`. Returns the token; the store keeps its hash. */
-	async issueInvite(noteId: string, role: Role): Promise<string> {
+	/**
+	 * A fresh single-use link token for `role`. Returns the token; the store keeps its hash. With `replace`, the party's
+	 * older links that nobody opened stop working first (what a request for a new link does).
+	 */
+	async issueInvite(
+		noteId: string,
+		role: Role,
+		options: { replace?: boolean } = {},
+	): Promise<string> {
+		if (options.replace) await this.deps.store.deleteInvites(noteId, role);
 		const token = this.deps.ids.token(TOKEN_BYTES);
 		await this.deps.store.putInvite(noteId, {
 			hash: await sha256Hex(token),
@@ -221,6 +252,11 @@ export class SessionManager {
 		return record ? { noteId, role: record.role, hash } : null;
 	}
 
+	/** Ends the session on the server: its cookie opens nothing from now on. */
+	endSession(session: ActiveSession): Promise<void> {
+		return this.deps.store.deleteSession(session.noteId, session.hash);
+	}
+
 	/** The form token for this session: HMAC of the session row's key under `NOTES_SESSION_SECRET`. */
 	csrfToken(session: ActiveSession): Promise<string> {
 		return hmac(
@@ -247,6 +283,20 @@ export class SessionManager {
 		return hmac(
 			this.deps.secret,
 			`code:${session.noteId}:${session.hash}:${action}:${code}`,
+		);
+	}
+
+	/**
+	 * True while this session may be sent another code (`CODES_PER_WINDOW` an hour). Checked by the caller before it
+	 * issues one, so a refused request sends no email.
+	 */
+	canIssueCode(session: ActiveSession): Promise<boolean> {
+		return this.deps.store.hit(
+			session.noteId,
+			`code:${session.hash.slice(0, HASH_PREFIX_BYTES * HEX_BYTE_WIDTH)}`,
+			this.deps.clock.now(),
+			CODE_ATTEMPT_WINDOW_MS,
+			CODES_PER_WINDOW,
 		);
 	}
 
@@ -280,6 +330,15 @@ export class SessionManager {
 			this.codeMaxAttempts,
 		);
 		if (attempt.status !== "ok") return attempt.status;
+		// The count that matters: tries per session and action over the hour. A new code does not reset it.
+		const allowed = await this.deps.store.hit(
+			session.noteId,
+			`try:${await hashPrefix(`${session.hash}:${action}`)}`,
+			this.deps.clock.now(),
+			CODE_ATTEMPT_WINDOW_MS,
+			this.codeMaxAttempts,
+		);
+		if (!allowed) return "locked";
 		const expected = await this.codeHash(session, action, supplied.trim());
 		const matches =
 			attempt.action === action &&

@@ -3,7 +3,7 @@ import type { NoteTerms, Role } from "tfd-notes";
 import type { CloudEnv } from "../src/env";
 import { MemoryNoteStore } from "../src/notes/memory-store";
 import { NoteDO } from "../src/notes/note-do";
-import type { Clock, IdSource, MailSender } from "../src/notes/ports";
+import type { Clock, Defer, IdSource, MailSender } from "../src/notes/ports";
 import { NoteService, type NoteServiceDeps } from "../src/notes/service";
 import type { ActiveSession } from "../src/notes/sessions";
 import type { NoteStore } from "../src/notes/store";
@@ -53,6 +53,22 @@ export class RecordingMailer implements MailSender {
 	}
 }
 
+/**
+ * Stands in for `ctx.waitUntil`: it keeps the work a request deferred, and `flush` waits for all of it. A test that
+ * wants the same timing as production reads the response first and flushes after.
+ */
+export class DeferQueue {
+	private readonly pending: Promise<unknown>[] = [];
+
+	readonly defer: Defer = (work) => {
+		this.pending.push(work);
+	};
+
+	async flush(): Promise<void> {
+		while (this.pending.length > 0) await Promise.all(this.pending.splice(0));
+	}
+}
+
 export class SettableClock implements Clock {
 	constructor(private instant = "2026-11-22T09:00:00.000Z") {}
 	now(): string {
@@ -81,7 +97,7 @@ export class DeterministicIds implements IdSource {
 
 export const LENDER_EMAIL = "maria@example.com";
 export const BORROWER_EMAIL = "ana@example.com";
-export const SECRET = "test-session-secret";
+export const SECRET = "test-session-secret-0123456789abcdef-long";
 export const BASE_URL = "https://staging-ledger.trifold.app";
 export const START = "2026-11-22T09:00:00.000Z";
 
@@ -110,6 +126,9 @@ export type Harness = {
 	mailer: RecordingMailer;
 	clock: SettableClock;
 	ids: DeterministicIds;
+	queue: DeferQueue;
+	/** Waits for the mail a link request deferred. */
+	flush: () => Promise<void>;
 	service: NoteService;
 	create: (idem?: string) => Promise<string>;
 	enter: (
@@ -123,6 +142,7 @@ export const harness = (overrides: Partial<NoteServiceDeps> = {}): Harness => {
 	const mailer = new RecordingMailer();
 	const clock = new SettableClock(START);
 	const ids = new DeterministicIds();
+	const queue = new DeferQueue();
 	const service = new NoteService({
 		store,
 		mailer,
@@ -130,8 +150,15 @@ export const harness = (overrides: Partial<NoteServiceDeps> = {}): Harness => {
 		ids,
 		secret: SECRET,
 		baseUrl: BASE_URL,
+		defer: queue.defer,
 		...overrides,
 	});
+	// A link request answers before its mail is sent; a test that reads the mailbox next waits for it here.
+	const requestLink = service.requestLink.bind(service);
+	service.requestLink = async (...args) => {
+		await requestLink(...args);
+		await queue.flush();
+	};
 	const create = async (idem = "idem-1"): Promise<string> => {
 		const result = await service.createNote({
 			terms: TERMS,
@@ -153,7 +180,17 @@ export const harness = (overrides: Partial<NoteServiceDeps> = {}): Harness => {
 		if (!session) throw new Error("session did not resolve");
 		return { session, cookie: opened.cookieValue };
 	};
-	return { store, mailer, clock, ids, service, create, enter };
+	return {
+		store,
+		mailer,
+		clock,
+		ids,
+		queue,
+		flush: () => queue.flush(),
+		service,
+		create,
+		enter,
+	};
 };
 
 /** A namespace over real `NoteDO` objects, one SQLite database each, like the Worker's `NOTE` binding. */

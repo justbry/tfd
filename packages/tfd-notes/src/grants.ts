@@ -2,12 +2,13 @@
 /**
  * Who may see a note beyond its two parties (docs/specs/promissory-notes.md, plan decision D1). A grant is proposed by
  * one party; a normal grant is live only when both parties consented, a carve-out grant (the typed disclosure to a
- * person who needs it for their own books, legal advice, enforcement or assignment) is live on its proposer's consent
- * alone but is always listed for both parties. Either party may revoke any grant at any time. A pure fold over the
- * event stream and an instant: no clock, no store.
+ * person who needs it for their own books, legal advice, enforcement or assignment; at most 90 days, at statement level
+ * or below) is live on its proposer's consent alone but is always listed for both parties. Either party may revoke any
+ * grant at any time. A pure fold over the event stream and an instant: no clock, no store.
  */
 
 import { validateStream } from "./events";
+import { compareInstants } from "./instant";
 import type {
 	GrantAudience,
 	GrantLevel,
@@ -52,22 +53,6 @@ export interface DisclosureEntry {
 }
 
 const BOTH_ROLES: readonly Role[] = ["lender", "borrower"];
-
-/** Orders two UTC instants ending in Z, comparing fractional seconds as numbers (`.5Z` is after `Z`, before `.51Z`). */
-const compareInstants = (left: string, right: string): number => {
-	const [leftSeconds = "", leftFraction = ""] = left.slice(0, -1).split(".");
-	const [rightSeconds = "", rightFraction = ""] = right.slice(0, -1).split(".");
-	if (leftSeconds !== rightSeconds) {
-		return leftSeconds < rightSeconds ? -1 : 1;
-	}
-	const width = Math.max(leftFraction.length, rightFraction.length);
-	const paddedLeft = leftFraction.padEnd(width, "0");
-	const paddedRight = rightFraction.padEnd(width, "0");
-	if (paddedLeft === paddedRight) {
-		return 0;
-	}
-	return paddedLeft < paddedRight ? -1 : 1;
-};
 
 const isVisibilityChange = (
 	event: NoteEvent,

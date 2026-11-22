@@ -1,10 +1,12 @@
-import type {
-	Grant,
-	GrantLevel,
-	GrantPurpose,
-	GrantStatus,
-	NoteEvent,
-	Role,
+import {
+	type Grant,
+	type GrantLevel,
+	type GrantPurpose,
+	type GrantStatus,
+	MAX_CARVE_OUT_DAYS,
+	MAX_GRANT_DAYS,
+	type NoteEvent,
+	type Role,
 } from "tfd-notes";
 import { isPlausibleEmail, maskEmail, normalizeEmail } from "./masking";
 import { type Failure, failure } from "./outcome";
@@ -19,7 +21,9 @@ import type { ShareRecord } from "./store";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const SHARE_DEFAULT_DAYS = 30;
-export const SHARE_MAX_DAYS = 365;
+export const SHARE_MAX_DAYS = MAX_GRANT_DAYS;
+/** A disclosure (a carve-out the proposer makes alone) lasts at most this many days. */
+export const DISCLOSURE_MAX_DAYS = MAX_CARVE_OUT_DAYS;
 /** Most grants one note may propose in a day, carve-outs and verify links included. */
 export const SHARES_PER_DAY = 10;
 export const SHARE_WINDOW_MS = DAY_MS;
@@ -34,7 +38,6 @@ export const SHARE_PURPOSES: readonly GrantPurpose[] = [
 	"lawyer",
 	"court",
 	"assignee",
-	"other",
 ];
 
 export const PURPOSE_LABELS: Record<GrantPurpose, string> = {
@@ -42,7 +45,6 @@ export const PURPOSE_LABELS: Record<GrantPurpose, string> = {
 	lawyer: "legal advice",
 	court: "enforcement or a court",
 	assignee: "an assignment of the loan",
-	other: "another need of my own",
 };
 
 const isLevel = (value: unknown): value is "summary" | "statement" =>
@@ -93,7 +95,12 @@ export const parseProposal = (input: unknown): ShareProposal | Failure => {
 		if (!(isRecord(carve) && isPurpose(carve.purpose)))
 			return failure(
 				"bad_request",
-				"Choose what the disclosure is for: books, legal advice, enforcement, assignment or other.",
+				"Choose what the disclosure is for: books, legal advice, enforcement or assignment.",
+			);
+		if (checkedDays > DISCLOSURE_MAX_DAYS)
+			return failure(
+				"bad_request",
+				`A disclosure lasts at most ${DISCLOSURE_MAX_DAYS} days. Choose ${DISCLOSURE_MAX_DAYS} or fewer, or share it the ordinary way, which the other party agrees to.`,
 			);
 		carveOut = { purpose: carve.purpose };
 	}
@@ -243,6 +250,31 @@ export const sharingViewOf = (input: {
 };
 
 /**
+ * What the other party is emailed when a disclosure is recorded (the proposer needs no consent from them, so this is
+ * how they hear of it). It says only that a disclosure exists, to whom (masked), for what and until when, and that the
+ * note page lists it: no amount, no name.
+ */
+export const disclosureEmail = (input: {
+	recipientEmail: string;
+	purpose: GrantPurpose;
+	expiresAt: string;
+	notePageUrl: string;
+}): { subject: string; text: string } => ({
+	subject: "A disclosure was recorded on your loan record",
+	text: [
+		"One of the parties to your loan record disclosed it to someone who needs it for their own purposes.",
+		"",
+		`Recipient: ${maskEmail(input.recipientEmail)}`,
+		`Purpose: ${PURPOSE_LABELS[input.purpose]}`,
+		`Ends: ${input.expiresAt.slice(0, 10)}`,
+		"",
+		`Your note page lists it, with every disclosure on the record: ${input.notePageUrl}`,
+		"If the link asks you to sign in, ask for a new link there.",
+		"A record, not legal or tax advice.",
+	].join("\n"),
+});
+
+/**
  * The email a recipient gets when a share becomes active. It carries no name, no amount and no claim, and says who it
  * came from only as "one of the parties". The link works once.
  */
@@ -262,9 +294,12 @@ export const shareEmail = (
 	].join("\n"),
 });
 
-const TOKEN_PATTERN = /^([A-Za-z0-9_-]{8,80})\.([A-Za-z0-9_-]{16,128})$/;
+const TOKEN_PATTERN = /^([A-Za-z0-9_.-]{8,80})\.([A-Za-z0-9_-]{16,128})$/;
 
-/** The text of a verify link's token: the note id (so the right note is asked) and a secret; only the secret is hashed. */
+/**
+ * The text of a verify link's token: the note id (so the right note is asked) and a secret; only the secret is hashed.
+ * A note id holds one dot of its own, so the secret is what follows the last dot.
+ */
 export const verifyTokenOf = (noteId: string, secret: string): string =>
 	`${noteId}.${secret}`;
 

@@ -14,12 +14,22 @@ on:
     paths:
       - apps/trifold-cloud/**
       - apps/trifold-verify/**
+      - packages/tfd-notes/**
+      - packages/verify-notes/**
+      - packages/verify/**
+      - packages/atm/**
+      - bun.lock
       - .github/workflows/trifold-cloud.yml
   push:
     branches: [dev]
     paths:
       - apps/trifold-cloud/**
       - apps/trifold-verify/**
+      - packages/tfd-notes/**
+      - packages/verify-notes/**
+      - packages/verify/**
+      - packages/atm/**
+      - bun.lock
       - .github/workflows/trifold-cloud.yml
   workflow_dispatch:
 
@@ -47,6 +57,12 @@ jobs:
       - name: Test
         working-directory: apps/trifold-cloud
         run: bun run test
+      - name: Libraries the notes build on
+        run: |
+          set -euo pipefail
+          (cd packages/tfd-notes && bun test tests)
+          (cd packages/verify-notes && bun test tests && bunx tsc --noEmit)
+          (cd packages/verify && bun test tests)
 
   staging:
     name: trifold-cloud (staging deploy)

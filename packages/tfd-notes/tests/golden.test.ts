@@ -59,6 +59,8 @@ interface AccrualInput {
 interface ApprovalsInput {
 	events: unknown[];
 	two_person: ApprovalAction[];
+	/** When present, only these agents count (the policy's `activeAgents`). */
+	active_agents?: string[];
 	request: { action: ApprovalAction; target: string };
 	candidates: unknown[];
 }
@@ -95,13 +97,19 @@ const runners: Record<string, (input: unknown) => unknown | Promise<unknown>> =
 			const {
 				events,
 				two_person: twoPerson,
+				active_agents: activeAgents,
 				request,
 				candidates,
 			} = input as ApprovalsInput;
 			const stream = validateStream(events);
-			const policy: ApprovalPolicy = { twoPerson: new Set(twoPerson) };
+			const policy: ApprovalPolicy = {
+				twoPerson: new Set(twoPerson),
+				...(activeAgents === undefined
+					? {}
+					: { activeAgents: new Set(activeAgents) }),
+			};
 			return {
-				status: approvalStatus(stream, request),
+				status: approvalStatus(stream, request, policy),
 				pending: pendingApprovals(stream, policy),
 				checks: candidates.map((candidate) => {
 					try {

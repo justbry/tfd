@@ -1,0 +1,123 @@
+{
+	"events": [
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-1",
+			"note_id": "note-1",
+			"seq": 1,
+			"entered_at": "2026-02-01T10:00:00Z",
+			"entered_by": "lender",
+			"type": "note.created",
+			"terms": {
+				"currency": "USD",
+				"exponent": 2,
+				"principal_minor": "100000",
+				"issue_date": "2026-01-01",
+				"annual_rate": "0",
+				"day_count": "actual/365",
+				"rounding": "half-up",
+				"timezone": "America/Denver",
+				"schedule": {
+					"type": "none"
+				}
+			}
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-2",
+			"note_id": "note-1",
+			"seq": 2,
+			"entered_at": "2026-02-02T10:00:00Z",
+			"entered_by": "lender",
+			"type": "release.drafted",
+			"agent_ref": "alice"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-3",
+			"note_id": "note-1",
+			"seq": 3,
+			"entered_at": "2026-02-03T10:00:00Z",
+			"entered_by": "lender",
+			"type": "approval.requested",
+			"agent_ref": "alice",
+			"action": "release.confirm",
+			"target": "evt-2"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-4",
+			"note_id": "note-1",
+			"seq": 4,
+			"entered_at": "2026-02-04T10:00:00Z",
+			"entered_by": "lender",
+			"type": "approval.granted",
+			"agent_ref": "bob",
+			"request": "evt-3"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-5",
+			"note_id": "note-1",
+			"seq": 5,
+			"entered_at": "2026-02-05T10:00:00Z",
+			"entered_by": "lender",
+			"type": "approval.requested",
+			"agent_ref": "alice",
+			"action": "notice.default",
+			"target": "evt-1",
+			"cure_days": 30
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-6",
+			"note_id": "note-1",
+			"seq": 6,
+			"entered_at": "2026-02-06T10:00:00Z",
+			"entered_by": "lender",
+			"type": "approval.granted",
+			"agent_ref": "bob",
+			"request": "evt-5"
+		},
+		{
+			"schema": "tfd.note-event.v1",
+			"id": "evt-7",
+			"note_id": "note-1",
+			"seq": 7,
+			"entered_at": "2026-02-07T10:00:00Z",
+			"entered_by": "lender",
+			"type": "approval.granted",
+			"agent_ref": "carol",
+			"request": "evt-5"
+		}
+	],
+	"two_person": ["release.confirm", "notice.default"],
+	"active_agents": ["alice", "carol"],
+	"request": {
+		"action": "release.confirm",
+		"target": "evt-2"
+	},
+	"candidates": [
+		{
+			"type": "release.confirmed",
+			"target": "evt-2"
+		},
+		{
+			"type": "approval.granted",
+			"request": "evt-3",
+			"agent_ref": "bob"
+		},
+		{
+			"type": "approval.granted",
+			"request": "evt-3",
+			"agent_ref": "carol"
+		},
+		{
+			"type": "notice.sent",
+			"kind": "default",
+			"cure_days": 30,
+			"approval": "evt-5",
+			"entered_at": "2026-02-10T10:00:00Z"
+		}
+	]
+}

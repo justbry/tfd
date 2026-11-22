@@ -5,19 +5,47 @@ The promissory-note engine behind tfd's note records: from an append-only stream
 schedule, the interest, and a balance statement for each party. Pure functions, no clock, no store, no network, zero
 dependencies, no `node:*` imports. The source is TypeScript and runs in Bun, Workers and browsers (through a bundler); Node needs a TypeScript loader. Not on npm yet (`private: true`).
 
-It is a calculator and a record-keeper. It is not legal advice, and a record it produces is not claimed to be
-enforceable. Whether a note holds up depends on the note, the law where the parties are, and a lawyer's review.
+It is a calculator and a record-keeper. It is not legal advice, and nothing it produces should be read as a promise that a
+court would uphold a note. That depends on the note, the law where the parties are, and a lawyer's review.
 
 ## Entry points
 
-| Export | What it does |
+Everything is exported from `src/index.ts`. Money, dates and instants are strings; the engine reads no clock.
+
+| Group | Exports |
 |---|---|
-| `generateSchedule` | Terms to schedule rows (`amortized`, `custom` or `none`). |
-| `replayBalance` | Terms, the payments a view counts and a date to that view's balance. |
-| `statement` | Events and an `as_of` date to the schedule, both views, the itemised difference, expected vs paid and days overdue. `statusLabel` gives the plain wording for each status. |
-| `parseNoteEvent` | Checks one untrusted event against `schema/note-event.v1.json`. |
-| `parseNoteTerms` | Checks a note's terms alone (what `note.created` carries), with the same rules and messages. |
-| `validateStream` | Checks a whole stream: `seq` without gaps or repeats, references that resolve, disputes with a counter-amount and a reason. |
+| Schedule and statement | `generateSchedule` (terms to rows); `replayBalance`, `daysOverdue`, `expectedDueToDate` (one view's balance and overdue); `statement` (both views, the itemised difference, expected vs paid, `state`); `statusLabel` (plain wording); `agreedView`. |
+| Events and validation | `parseNoteEvent` (one untrusted event, against `schema/note-event.v1.json`), `parseNoteTerms`, `validateStream` (seq with no gaps, references that resolve, the stream rules below); `MAX_GRANT_DAYS`, `MAX_CARVE_OUT_DAYS`. |
+| Chain | `buildChain`, `extendChain`, `chainHead`, `eventHash`, `linkHash`, `genesisHash`, `CHAIN_GENESIS_PREFIX`, `verifyChain`: a per-note hash chain over the events. |
+| Documents | `paymentReceiptBody`, `payoffStatementBody`, `releaseBody`, `chainSealBody`, `documentBody`, `signDocument`, `documentSigningBytes`, `documentSha256`, `NOTE_DOCUMENT_SCHEMA`, `PAYOFF_WORDING`, `RELEASE_WORDING`: the bodies a caller signs. |
+| Approvals | `approvalStatus`, `checkAppend`, `pendingApprovals`, `APPROVAL_MAX_AGE_DAYS`: two-person approval for an organization. |
+| Portfolio | `portfolio` (one row per note, totals per currency), `agingBucket`, `boardReport`, `boardReportCsv`, `BOARD_CSV_HEADER`. |
+| Grants | `grantsOf`, `activeGrants`, `disclosureLog`, `REVOKE_NOTICE`: who may see a note beyond its two parties. |
+| Visibility | `sharedView`, `viewFor`, `agreedBalance`, `AGREED_PAYMENTS_LABEL`: what a grant shows, which never includes a negative event. |
+| Canonical helpers | `canonicalJson`, `sha256Hex`, `utf8Bytes`, `toHex`, `toBase64Url`, `fromBase64Url`, plus `formatMinor`, `parseMinor`, `parseRate`, `roundHalfUp`, `addDays`, `compareDates`, `daysBetween`, `isValidCivilDate`. |
+
+## Rules the library checks
+
+1. **Carve-out disclosure.** A `visibility.changed` grant with `carve_out: true` may name only the purposes `accountant`,
+   `lawyer`, `court` or `assignee`, a `person` audience, a level of `summary` or `statement`, and an `expires_at` at most
+   `MAX_CARVE_OUT_DAYS` (90) days after `entered_at`. Any other grant keeps the `MAX_GRANT_DAYS` (365) cap.
+2. **A default notice uses its own approval.** `approval.requested` for `notice.default` carries `cure_days` (0 to 365; it
+   is refused on other actions). A `notice.sent` may carry `approval`, the id of that request, with the same `cure_days`
+   (never on a reminder). When the policy needs two people for `notice.default`, `checkAppend` requires `approval`: a
+   satisfied request that no other notice uses, with equal `cure_days`, entered at most `APPROVAL_MAX_AGE_DAYS` (30) days
+   before the notice's `entered_at`.
+3. **Active approvers.** If the policy carries `activeAgents`, an approval (and the request's own agent) counts only when
+   its `agent_ref` is in that set, in `approvalStatus`, `checkAppend` and `pendingApprovals`. Without it every agent counts.
+4. **Declined terms.** While the latest of `terms.accepted` and `terms.declined` is a decline, `validateStream` refuses a
+   new `payoff.issued`, any `notice.sent`, and an `approval.requested` for `notice.default`. Payments, confirmations,
+   disputes, annotations and releases still go through. In the portfolio a declined note is left out of the outstanding
+   payoff, overdue and the aging buckets, shown as `current` with 0 days, flagged `declined`, and counted in the totals'
+   `declined` (the board report and its CSV carry it too).
+5. **Free text.** `annotation.added.text`, `payment.disputed.reason`, `payment.recorded.method` and `reference`, and
+   `agent_ref` refuse control characters (U+0000 to U+001F, U+007F to U+009F), bidirectional controls (U+061C, U+200E,
+   U+200F, U+202A to U+202E, U+2066 to U+2069) and U+FEFF. Text and reason may keep a newline and a tab.
+6. **A chain alone shows consistency, not authorship.** `verifyChain` says the links follow from the events. Whether a
+   signer stood behind that chain needs a verified `note.chain-seal` at its head, which `tfd-verify-notes` checks.
 
 ## Money, rates and dates
 

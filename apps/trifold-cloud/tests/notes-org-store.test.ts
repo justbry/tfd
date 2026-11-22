@@ -29,7 +29,7 @@ const d1Store = (): OrgStore => {
 
 const orgStores: [string, () => OrgStore][] = [
 	["memory", () => new MemoryOrgStore()],
-	["D1 (migration 0003, real SQL)", d1Store],
+	["D1 (migrations, real SQL)", d1Store],
 ];
 
 const at = (second: number): string =>
@@ -53,44 +53,64 @@ for (const [name, make] of orgStores) {
 		test("an agent is found or made by address hash, keeps its ref, and takes the latest role and comes back active", async () => {
 			const store = make();
 			const first = await store.upsertAgent("o1", {
-				newRef: "ag_1",
+				newId: "ag_1",
 				emailHash: "h1",
 				role: "treasurer",
 				now: at(0),
 			});
 			expect(first).toEqual({
-				agentRef: "ag_1",
+				agentId: "ag_1",
 				role: "treasurer",
 				active: true,
 			});
 			expect(await store.setAgentActive("o1", "ag_1", false)).toBe(true);
 			expect((await store.getAgent("o1", "ag_1"))?.active).toBe(false);
 			const again = await store.upsertAgent("o1", {
-				newRef: "ag_other",
+				newId: "ag_other",
 				emailHash: "h1",
 				role: "board",
 				now: at(1),
 			});
-			expect(again).toEqual({ agentRef: "ag_1", role: "board", active: true });
+			expect(again).toEqual({ agentId: "ag_1", role: "board", active: true });
 			expect(await store.findAgent("o1", "h1")).toEqual(again);
 			expect(await store.findAgent("o1", "nope")).toBeNull();
 			// The same hash in another organization is another agent.
 			const other = await store.upsertAgent("o2", {
-				newRef: "ag_2",
+				newId: "ag_2",
 				emailHash: "h1",
 				role: "viewer",
 				now: at(2),
 			});
-			expect(other.agentRef).toBe("ag_2");
+			expect(other.agentId).toBe("ag_2");
 			expect(await store.getAgent("o2", "ag_1")).toBeNull();
 			expect(await store.setAgentActive("o1", "ag_missing", true)).toBe(false);
 		});
 
+		test("an agent has one ref per note, written once, found both ways, and never the same on two notes", async () => {
+			const store = make();
+			const first = await store.bindNoteRef("o1", "nt_a", "ag_1", "ar_a1");
+			expect(first).toBe("ar_a1");
+			// A retried create finds the same ref; the offered one is dropped.
+			expect(await store.bindNoteRef("o1", "nt_a", "ag_1", "ar_other")).toBe(
+				"ar_a1",
+			);
+			expect(await store.bindNoteRef("o1", "nt_b", "ag_1", "ar_b1")).toBe(
+				"ar_b1",
+			);
+			expect(await store.noteRefOf("o1", "nt_a", "ag_1")).toBe("ar_a1");
+			expect(await store.noteRefOf("o1", "nt_b", "ag_1")).toBe("ar_b1");
+			expect(await store.noteRefOf("o1", "nt_c", "ag_1")).toBeNull();
+			expect(await store.agentIdOfRef("o1", "nt_a", "ar_a1")).toBe("ag_1");
+			// A ref means nothing on another note or in another organization.
+			expect(await store.agentIdOfRef("o1", "nt_b", "ar_a1")).toBeNull();
+			expect(await store.agentIdOfRef("o2", "nt_a", "ar_a1")).toBeNull();
+		});
+
 		test("a link opens once, not after expiry, and only in its own organization; deleting an agent's links removes them", async () => {
 			const store = make();
-			const link = (hash: string, agentRef = "ag_1") => ({
+			const link = (hash: string, agentId = "ag_1") => ({
 				hash,
-				agentRef,
+				agentId,
 				expiresAt: "2026-11-23T00:00:00.000Z",
 			});
 			await store.putLink("o1", link("l1"));
@@ -110,10 +130,10 @@ for (const [name, make] of orgStores) {
 
 		test("a session slides, ends when idle or at its absolute time, belongs to one organization, and can be deleted by agent", async () => {
 			const store = make();
-			const session = (hash: string, agentRef = "ag_1") => ({
+			const session = (hash: string, agentId = "ag_1") => ({
 				hash,
 				orgId: "o1",
-				agentRef,
+				agentId,
 				createdAt: "2026-11-22T00:00:00.000Z",
 				lastSeenAt: "2026-11-22T00:00:00.000Z",
 				absoluteExpiresAt: "2026-11-22T05:00:00.000Z",
@@ -135,7 +155,7 @@ for (const [name, make] of orgStores) {
 						"2026-11-22T01:30:00.000Z",
 						2 * HOUR,
 					)
-				)?.agentRef,
+				)?.agentId,
 			).toBe("ag_1");
 			expect(
 				(
@@ -145,7 +165,7 @@ for (const [name, make] of orgStores) {
 						"2026-11-22T03:00:00.000Z",
 						2 * HOUR,
 					)
-				)?.agentRef,
+				)?.agentId,
 			).toBe("ag_1");
 			expect(
 				await store.touchSession(
@@ -191,7 +211,7 @@ for (const [name, make] of orgStores) {
 						"2026-11-22T00:30:00.000Z",
 						2 * HOUR,
 					)
-				)?.agentRef,
+				)?.agentId,
 			).toBe("ag_2");
 			await store.deleteSession("o1", "s4");
 			expect(

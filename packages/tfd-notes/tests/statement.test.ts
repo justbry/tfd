@@ -991,6 +991,7 @@ describe("statement state (terms and closed)", () => {
 			make(7, "approval.requested", "lender", "2026-01-15T10:00:00Z", {
 				action: "notice.default",
 				target: "evt-4",
+				cure_days: 30,
 			}),
 			make(8, "approval.granted", "borrower", "2026-01-15T10:00:00Z", {
 				request: "evt-7",

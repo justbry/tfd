@@ -1,13 +1,13 @@
 {
- "status": {
-  "requested": true,
-  "requester_agent": null,
-  "granted_by": [],
-  "satisfied": false
- },
- "pending": [],
- "checks": [
-  "ok",
-  "approval.granted: request \"evt-3\" names no agent_ref, so it cannot be approved"
- ]
+	"status": {
+		"requested": true,
+		"requester_agent": null,
+		"granted_by": [],
+		"satisfied": false
+	},
+	"pending": [],
+	"checks": [
+		"ok",
+		"approval.granted: request \"evt-3\" names no agent_ref, so it cannot be approved"
+	]
 }

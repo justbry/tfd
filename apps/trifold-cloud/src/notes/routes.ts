@@ -6,6 +6,7 @@ import {
 } from "./documents-service";
 import {
 	apiError,
+	BodyTooLargeError,
 	download,
 	failureResponse,
 	forbiddenPage,
@@ -19,6 +20,7 @@ import {
 	STATUS_OF,
 	sameOrigin,
 } from "./http";
+import { isValidNoteId, MIN_SECRET_LENGTH } from "./note-ids";
 import { D1OrgStore } from "./org-d1-store";
 import { orgNoteSession, orgRoute, ownsOrgPath } from "./org-routes";
 import { OrgService } from "./org-service";
@@ -36,11 +38,13 @@ import {
 	type Notice,
 	notePage,
 	parseAmount,
+	signedOutPage,
 	signInRequiredPage,
 } from "./pages";
 import {
 	type Clock,
 	cryptoIdSource,
+	type Defer,
 	type IdSource,
 	type MailSender,
 	type PublicKeySource,
@@ -66,12 +70,7 @@ import {
 } from "./sessions";
 import { publicKeysFromEnv, ShareAccess } from "./share-access";
 import { sharingPanel, verifyLinkRevealPage } from "./share-pages";
-import {
-	ownsSharePath,
-	shareCookieRefusal,
-	shareRoute,
-	verifyRoute,
-} from "./share-routes";
+import { ownsSharePath, shareRoute, verifyRoute } from "./share-routes";
 import type { NoteStore } from "./store";
 
 /**
@@ -85,6 +84,7 @@ import type { NoteStore } from "./store";
  * | ledger | `POST /n/:id/enter` | the link token in the form |
  * | ledger | `POST /n/:id/link` | none; same answer for any address |
  * | ledger | `GET /n/:id` | session cookie |
+ * | ledger | `POST /n/:id/logout` | session cookie and CSRF token; ends the session on the server |
  * | ledger | `POST /n/:id/act`, `POST /n/:id/code` | session cookie and CSRF token |
  * | ledger | `POST /n/:id/receipt` | session cookie and CSRF token, either party |
  * | ledger | `POST /n/:id/payoff`, `/release`, `/notice` | session cookie and CSRF token, lender only |
@@ -96,8 +96,12 @@ import type { NoteStore } from "./store";
  * | api | `POST /v1/notes/:id/agents` | bearer `NOTES_API_KEY`: add or deactivate an organization agent |
  * | api | `GET /v1/orgs/:orgId/portfolio?as_of=` | bearer `NOTES_API_KEY` |
  * | ledger | `POST /n/:id/share/propose`, `/consent`, `/revoke`, `/verify-link`, `/reveal`, `/resend` | session cookie and CSRF token; `/consent` also needs the emailed code; same under `/o/:orgId/n/:id` for a treasurer or board member |
- * | ledger | `GET /s/:noteId/:grantId/enter`, `POST` (redeem), `GET /s/:noteId/:grantId`, `GET` and `POST /v/:token` | see `share-routes.ts` |
+ * | ledger | `GET /s/:noteId/:grantId/enter`, `POST` (redeem), `GET /s/:noteId/:grantId`, `POST .../logout`, `GET` and `POST /v/:token` | see `share-routes.ts` |
  * | ledger | `/o/:orgId/n/:id` and its steps, `docs`, `bundle.json`, `seal.json` | organization session (see `org-routes.ts` for `/o/:orgId`) |
+ *
+ * Every id-shaped path segment is checked before anything else is read: a note id carries a MAC (`note-ids.ts`), and a
+ * malformed or forged one is the same 404 with no store touched. `NOTES_SESSION_SECRET` under 32 characters is a 503 on
+ * every route here. A body over its limit is a 413 whichever route was reading it.
  */
 
 export interface NotesDeps {
@@ -112,13 +116,19 @@ export interface NotesDeps {
 	orgs?: OrgStore;
 	/** The published public keys for the verify link's document check. Absent: `NOTES_PUBLIC_KEYS_JSON`. */
 	publicKeys?: PublicKeySource;
+	/** Runs work after the response is sent. Absent: started and not awaited (the Worker passes `ctx.waitUntil`). */
+	defer?: Defer;
 }
 
-const NOTE_ID = "[A-Za-z0-9_-]{8,80}";
+/**
+ * Any id-shaped text: the route owns the path, and `isValidNoteId` decides afterwards, so a malformed id and a forged one
+ * get the same 404 and neither touches a store.
+ */
+const NOTE_ID = "[A-Za-z0-9_.-]{1,200}";
 const SHARE_STEPS =
 	"share/(?:propose|consent|revoke|verify-link|reveal|resend)";
 const GUEST_PATH = new RegExp(
-	`^/n/(${NOTE_ID})(?:/(enter|link|act|code|receipt|payoff|release|notice|${SHARE_STEPS}))?/?$`,
+	`^/n/(${NOTE_ID})(?:/(enter|link|logout|act|code|receipt|payoff|release|notice|${SHARE_STEPS}))?/?$`,
 );
 const DOCUMENT_PATH = new RegExp(
 	`^/n/(${NOTE_ID})/docs/([A-Za-z0-9_-]{1,80})(\\.json)?/?$`,
@@ -154,6 +164,8 @@ interface Services {
 	service: NoteService;
 	org: OrgService;
 	access: ShareAccess;
+	/** `NOTES_SESSION_SECRET`, long enough: it keys the note ids' MAC. */
+	secret: string;
 }
 
 /** The services for this request, or null when `NOTES_SESSION_SECRET` is not set (the feature answers 503). */
@@ -162,12 +174,13 @@ const serviceFor = (
 	url: URL,
 	deps: NotesDeps,
 ): Services | null => {
-	if (!env.NOTES_SESSION_SECRET) return null;
+	const secret = env.NOTES_SESSION_SECRET;
+	if (secret === undefined || secret.length < MIN_SECRET_LENGTH) return null;
 	const store = deps.store ?? new RemoteNoteStore(env.NOTE);
 	const mailer = deps.mailer ?? unconfiguredMailer;
 	const clock = deps.clock ?? systemClock;
 	const ids = deps.ids ?? cryptoIdSource;
-	const secret = env.NOTES_SESSION_SECRET;
+	const { defer } = deps;
 	const baseUrl = `https://${url.host}`;
 	const org = new OrgService({
 		orgs: deps.orgs ?? new D1OrgStore(env.DB),
@@ -177,6 +190,7 @@ const serviceFor = (
 		ids,
 		secret,
 		baseUrl,
+		...(defer ? { defer } : {}),
 	});
 	const service = new NoteService({
 		store,
@@ -186,6 +200,7 @@ const serviceFor = (
 		secret,
 		baseUrl,
 		org,
+		...(defer ? { defer } : {}),
 		signers:
 			deps.signers === undefined ? documentSignersFromEnv(env) : deps.signers,
 		...(deps.options ? { options: deps.options } : {}),
@@ -194,9 +209,10 @@ const serviceFor = (
 		store,
 		clock,
 		ids,
+		secret,
 		keys: deps.publicKeys ?? publicKeysFromEnv(env),
 	});
-	return { service, org, access };
+	return { service, org, access, secret };
 };
 
 const notConfigured = (surface: Surface): Response =>
@@ -214,7 +230,7 @@ const sessionOf = async (
 ): Promise<ActiveSession | null> =>
 	service.sessions.resolve(
 		noteId,
-		readSessionCookie(request.headers.get("Cookie")),
+		readSessionCookie(request.headers.get("Cookie"), noteId),
 	);
 
 const guestSession =
@@ -325,7 +341,11 @@ const handleLink = async (
 	if (!sameOrigin(request, url))
 		return forbiddenPage("That request came from another site.");
 	const form = await readForm(request);
-	await service.requestLink(noteId, form?.email ?? "");
+	await service.requestLink(
+		noteId,
+		form?.email ?? "",
+		request.headers.get("CF-Connecting-IP") ?? undefined,
+	);
 	return page(linkRequestedPage());
 };
 
@@ -629,6 +649,23 @@ const handleReceipt = async (
 	return redirect(`${basePathOf(session)}/docs/${issued.document.id}`);
 };
 
+/** Ends the guest's session on the server and clears the cookie. A form post with the CSRF token, like every step. */
+const handleLogout = async (
+	request: Request,
+	url: URL,
+	service: NoteService,
+	getSession: GetSession,
+): Promise<Response | null> => {
+	if (request.method !== "POST") return null;
+	const guarded = await guardedPost(request, url, service, getSession);
+	if ("refusal" in guarded) return guarded.refusal;
+	const { session } = guarded;
+	await service.sessions.endSession(session);
+	return page(signedOutPage(), 200, {
+		"Set-Cookie": clearedSessionCookie(session.noteId),
+	});
+};
+
 /** Ask for an approval, or approve one. Only an organization lender has either; a guest session is refused by the service. */
 const handleApproval = async (
 	request: Request,
@@ -646,6 +683,9 @@ const handleApproval = async (
 			? await service.requestApproval(session, {
 					action: fields.action,
 					target: fields.target,
+					...(cureDaysOf(fields.cure_days) === undefined
+						? {}
+						: { cure_days: cureDaysOf(fields.cure_days) }),
 				})
 			: await service.grantApproval(session, fields.request_id);
 	if (result.ok)
@@ -849,6 +889,8 @@ const guestRoute = async (
 			return handleEnter(request, url, service, noteId);
 		case "link":
 			return handleLink(request, url, service, noteId);
+		case "logout":
+			return handleLogout(request, url, service, guestSession(service, noteId));
 		default:
 			return noteStepRoute(
 				request,
@@ -1076,9 +1118,11 @@ const apiRoute = async (
 		return null;
 	if (!hasApiKey(request, env)) return unauthorized();
 	if (isCreate) return createRoute(request, service);
-	if (isAgents) return agentsRoute(request, agents[1] as string, org);
 	if (isPortfolio) return portfolioRoute(url, portfolioMatch[1] as string, org);
-	const noteId = matched?.[1] as string;
+	// A note id that was never made here is refused before anything is read: the same 404 as a malformed one.
+	const noteId = (isAgents ? agents[1] : matched?.[1]) as string;
+	if (!(await isValidNoteId(services.secret, noteId))) return notFound();
+	if (isAgents) return agentsRoute(request, noteId, org);
 	if (matched?.[2] === "bundle") {
 		const made = await service.bundleOf(noteId);
 		return made.ok ? json(made.bundle) : failureResponse(made);
@@ -1118,7 +1162,7 @@ const ownsLedgerPath = (url: URL): boolean =>
 
 /**
  * An organization agent's note routes, `/o/:orgId/n/:id...`: the same steps as a guest's, with the agent's organization
- * session. An organization that does not exist answers 404 whether or not anyone is signed in.
+ * session. An organization that does not exist answers the sign-in page, like a known one with nobody signed in.
  */
 const orgNoteRoute = async (
 	request: Request,
@@ -1133,8 +1177,9 @@ const orgNoteRoute = async (
 	if (match === null) return null;
 	const orgId = match[1] as string;
 	const noteId = match[2] as string;
-	if (!(await org.exists(orgId)))
+	if (!(await isValidNoteId(services.secret, noteId)))
 		return page(messagePage("Not found", "Nothing here."), 404);
+	// An unknown organization and a known one with nobody signed in answer alike: the sign-in page (`orgNoteSession`).
 	const getSession = orgNoteSession(org, orgId, noteId);
 	if (document)
 		return handleDocument(
@@ -1175,38 +1220,63 @@ export const notesRoute = async (
 	}
 	const services = serviceFor(env, url, deps);
 	if (services === null) return notConfigured(surface);
-	const { service, org, access } = services;
-	if (surface === "api") return apiRoute(request, url, env, services);
+	try {
+		return surface === "api"
+			? await apiRoute(request, url, env, services)
+			: await ledgerRoute(request, url, services);
+	} catch (error) {
+		// Whichever route was reading the body, going past the limit is a 413 and nothing was kept.
+		if (error instanceof BodyTooLargeError) return tooLarge(surface);
+		throw error;
+	}
+};
+
+const tooLarge = (surface: Surface): Response =>
+	surface === "api"
+		? apiError(413, "too_large", "That request body is too large.")
+		: page(messagePage("Too large", "That request is too large."), 413);
+
+const notFoundPage = (): Response =>
+	page(messagePage("Not found", "Nothing here."), 404);
+
+/** The ledger host's routes after the feature is known to be on and configured. */
+const ledgerRoute = async (
+	request: Request,
+	url: URL,
+	services: Services,
+): Promise<Response | null> => {
+	const { service, org, access, secret } = services;
 	if (url.pathname.startsWith("/s/") || url.pathname.startsWith("/v/"))
 		return (
-			(await shareRoute(request, url, access)) ??
-			(await verifyRoute(request, url, access))
+			(await shareRoute(request, url, access, secret)) ??
+			(await verifyRoute(request, url, access, secret))
 		);
-	// A share session's cookie is scoped to its own page; one that arrives here anyway opens nothing.
-	const refused = shareCookieRefusal(request);
-	if (refused) return refused;
 	if (url.pathname.startsWith("/o/")) {
 		const noteRoute = await orgNoteRoute(request, url, services);
 		if (noteRoute) return noteRoute;
 		return orgRoute(request, url, org);
 	}
 	const document = DOCUMENT_PATH.exec(url.pathname);
+	const file = FILE_PATH.exec(url.pathname);
+	const step = GUEST_PATH.exec(url.pathname);
+	const noteId = (document ?? file ?? step)?.[1];
+	if (noteId === undefined) return null;
+	// Nothing below reads or writes a store for an id this Worker never made.
+	if (!(await isValidNoteId(secret, noteId))) return notFoundPage();
 	if (document)
 		return handleDocument(
 			request,
 			service,
-			guestSession(service, document[1] as string),
+			guestSession(service, noteId),
 			document[2] as string,
 			document[3] !== undefined,
 		);
-	const file = FILE_PATH.exec(url.pathname);
 	if (file)
 		return handleFile(
 			request,
 			service,
-			guestSession(service, file[1] as string),
+			guestSession(service, noteId),
 			file[2] as string,
 		);
-	const [, noteId, action] = GUEST_PATH.exec(url.pathname) as RegExpExecArray;
-	return guestRoute(request, url, service, noteId as string, action);
+	return guestRoute(request, url, service, noteId, step?.[2]);
 };

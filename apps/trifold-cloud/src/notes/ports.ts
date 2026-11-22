@@ -1,5 +1,5 @@
 /**
- * The three things the guest flow takes from outside, so everything under `src/notes/` runs without Cloudflare and
+ * What the guest flow takes from outside (mail, time, ids, keys, deferred work), so everything under `src/notes/` runs without Cloudflare and
  * tests never touch a network, a clock or a random source (plans/promissory-notes/steps-2-5.md, D5).
  */
 
@@ -17,6 +17,17 @@ export interface MailSender {
 export interface PublicKeySource {
 	get(): Promise<KeysInput | null>;
 }
+
+/**
+ * Runs work after the response has gone (`ctx.waitUntil` in the Worker). A link request hands its mail to this, so the
+ * response takes the same time whether or not an address matched.
+ */
+export type Defer = (work: Promise<unknown>) => void;
+
+/** Starts the work and lets it finish on its own: for callers with no execution context (tests, local runs). */
+export const unawaited: Defer = (work) => {
+	void work;
+};
 
 /** The time source. `now()` is a UTC instant in ISO 8601 ending in `Z`, e.g. `2026-11-22T09:30:00.000Z`. */
 export interface Clock {

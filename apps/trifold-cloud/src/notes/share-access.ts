@@ -11,9 +11,9 @@ import {
 import { type KeysInput, verifyNoteDocument } from "tfd-verify-notes";
 import type { CloudEnv } from "../env";
 import type { Clock, IdSource, PublicKeySource } from "./ports";
-import { constantTimeEqual, SESSION_ABSOLUTE_MS } from "./sessions";
+import { constantTimeEqual, hmac, SESSION_ABSOLUTE_MS } from "./sessions";
 import { MAX_VERIFY_BODY_BYTES, parseVerifyToken } from "./share-core";
-import type { VerifyDocumentRow, VerifyResult } from "./share-pages";
+import type { VerifyResult } from "./share-pages";
 import type { NoteStore, ShareRecord } from "./store";
 
 /**
@@ -47,6 +47,8 @@ export interface ShareAccessDeps {
 	store: NoteStore;
 	clock: Clock;
 	ids: IdSource;
+	/** `NOTES_SESSION_SECRET`: keys a share session's CSRF token. */
+	secret: string;
 	keys: PublicKeySource;
 }
 
@@ -56,13 +58,10 @@ interface ActiveGrant {
 	grant: Grant;
 }
 
+/** What a verify link opens: the note it belongs to, which only the check of a pasted document uses. Never shown. */
 export interface VerifyContext {
 	noteId: string;
-	documents: VerifyDocumentRow[];
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 export class ShareAccess {
 	constructor(private readonly deps: ShareAccessDeps) {}
@@ -173,6 +172,47 @@ export class ShareAccess {
 		return session !== null && session.grantId === grantId;
 	}
 
+	/** The form token of a share session: HMAC of the session row's key under `NOTES_SESSION_SECRET`. */
+	async csrfToken(
+		noteId: string,
+		grantId: string,
+		cookieValue: string,
+	): Promise<string> {
+		return hmac(
+			this.deps.secret,
+			`csrf:share:${noteId}:${grantId}:${await sha256Hex(cookieValue)}`,
+		);
+	}
+
+	async checkCsrf(
+		noteId: string,
+		grantId: string,
+		cookieValue: string,
+		supplied: string | null,
+	): Promise<boolean> {
+		if (supplied === null) return false;
+		return constantTimeEqual(
+			await this.csrfToken(noteId, grantId, cookieValue),
+			supplied,
+		);
+	}
+
+	/** Ends the share session on the server: its cookie opens nothing from now on. */
+	async endSession(
+		noteId: string,
+		grantId: string,
+		cookieValue: string,
+	): Promise<void> {
+		const hash = await sha256Hex(cookieValue);
+		const session = await this.deps.store.getShareSession(
+			noteId,
+			hash,
+			this.deps.clock.now(),
+		);
+		if (session?.grantId === grantId)
+			await this.deps.store.deleteShareSession(noteId, hash);
+	}
+
 	/**
 	 * The view a person's grant allows right now, or null. `viewFor` is the only thing that builds it, from the stream,
 	 * `grantsOf` at this instant and the grant's own audience, so a revoked, expired or pending grant yields nothing.
@@ -202,8 +242,9 @@ export class ShareAccess {
 	}
 
 	/**
-	 * The note a verify link opens and the documents its parties issued (type, time, hash, key id), or null when the
-	 * token is unknown, revoked, expired or its grant is not yet agreed. Every stored hash is compared in constant time.
+	 * The note a verify link opens, or null when the token is unknown, revoked, expired or its grant is not yet agreed.
+	 * Every stored hash is compared in constant time. The page lists nothing about the record: not its documents, not
+	 * their number.
 	 */
 	async verifyContext(token: string): Promise<VerifyContext | null> {
 		const parsed = parseVerifyToken(token);
@@ -223,31 +264,7 @@ export class ShareAccess {
 		if (found === null) return null;
 		const view = this.viewFrom(found, found.grant.audience);
 		if (view?.level !== "verify") return null;
-		return { noteId: view.note_id, documents: await this.documentRows(noteId) };
-	}
-
-	private async documentRows(noteId: string): Promise<VerifyDocumentRow[]> {
-		const rows: VerifyDocumentRow[] = [];
-		for (const stored of await this.deps.store.listDocuments(noteId)) {
-			let body: unknown;
-			try {
-				body = JSON.parse(stored.json);
-			} catch {
-				continue;
-			}
-			if (!isRecord(body)) continue;
-			const signature = body.signature;
-			rows.push({
-				type: stored.type,
-				issuedAt: typeof body.issued_at === "string" ? body.issued_at : "",
-				sha256: stored.sha256,
-				keyId:
-					isRecord(signature) && typeof signature.key_id === "string"
-						? signature.key_id
-						: "",
-			});
-		}
-		return rows;
+		return { noteId: view.note_id };
 	}
 
 	/**

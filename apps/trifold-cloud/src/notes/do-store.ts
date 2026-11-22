@@ -116,6 +116,11 @@ export const NOTE_MIGRATIONS: readonly string[] = [
 		created_at TEXT NOT NULL,
 		absolute_expires_at TEXT NOT NULL
 	)`,
+	// Step 6: a payment gets one receipt per status label (`variant`), so a later dispute or reversal issues a new one.
+	`DROP INDEX IF EXISTS note_documents_event;
+	ALTER TABLE note_documents ADD COLUMN variant TEXT NOT NULL DEFAULT '';
+	CREATE UNIQUE INDEX IF NOT EXISTS note_documents_event
+		ON note_documents (doc_type, event_id, variant) WHERE event_id IS NOT NULL`,
 ];
 
 export const migrateNote = (state: DurableObjectState): number => {
@@ -144,17 +149,20 @@ type DocumentRow = {
 	doc_id: string;
 	doc_type: StoredDocument["type"];
 	event_id: string | null;
+	variant: string;
 	sha256: string;
 	body: string;
 	created_at: string;
 };
 
-const DOCUMENT_COLUMNS = "doc_id, doc_type, event_id, sha256, body, created_at";
+const DOCUMENT_COLUMNS =
+	"doc_id, doc_type, event_id, variant, sha256, body, created_at";
 
 const documentOf = (row: DocumentRow): StoredDocument => ({
 	id: row.doc_id,
 	type: row.doc_type,
 	eventId: row.event_id,
+	variant: row.variant,
 	sha256: row.sha256,
 	json: row.body,
 	createdAt: row.created_at,
@@ -268,12 +276,13 @@ export class SqliteNoteStore implements NoteStore {
 
 	private insertDocument(noteId: string, document: StoredDocument): void {
 		this.db.run(
-			"INSERT INTO note_documents (doc_id, note_id, doc_type, event_id, sha256, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			"INSERT INTO note_documents (doc_id, note_id, doc_type, event_id, variant, sha256, body, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 			[
 				document.id,
 				noteId,
 				document.type,
 				document.eventId,
+				document.variant,
 				document.sha256,
 				document.json,
 				document.createdAt,
@@ -288,8 +297,8 @@ export class SqliteNoteStore implements NoteStore {
 		return this.db.transaction((): StoredDocument => {
 			if (document.eventId !== null) {
 				const [existing] = this.db.all<DocumentRow>(
-					`SELECT ${DOCUMENT_COLUMNS} FROM note_documents WHERE note_id = ? AND doc_type = ? AND event_id = ?`,
-					[noteId, document.type, document.eventId],
+					`SELECT ${DOCUMENT_COLUMNS} FROM note_documents WHERE note_id = ? AND doc_type = ? AND event_id = ? AND variant = ?`,
+					[noteId, document.type, document.eventId, document.variant],
 				);
 				if (existing) return documentOf(existing);
 			}
@@ -506,6 +515,16 @@ export class SqliteNoteStore implements NoteStore {
 
 	async deleteSession(_noteId: string, hash: string): Promise<void> {
 		this.db.run("DELETE FROM note_sessions WHERE hash = ?", [hash]);
+	}
+
+	async deleteInvites(_noteId: string, role: Role): Promise<void> {
+		this.db.run("DELETE FROM note_invites WHERE role = ? AND used_at IS NULL", [
+			role,
+		]);
+	}
+
+	async deleteShareSession(_noteId: string, hash: string): Promise<void> {
+		this.db.run("DELETE FROM note_share_sessions WHERE hash = ?", [hash]);
 	}
 
 	async putCode(
@@ -728,6 +747,7 @@ export const STORE_METHODS = [
 	"setAgentActive",
 	"putInvite",
 	"redeemInvite",
+	"deleteInvites",
 	"putSession",
 	"touchSession",
 	"deleteSession",
@@ -748,6 +768,7 @@ export const STORE_METHODS = [
 	"claimShareLink",
 	"putShareSession",
 	"getShareSession",
+	"deleteShareSession",
 ] as const satisfies readonly (keyof NoteStore)[];
 
 export type StoreMethod = (typeof STORE_METHODS)[number];
@@ -835,6 +856,12 @@ export class RemoteNoteStore implements NoteStore {
 	}
 	deleteSession(noteId: string, hash: string) {
 		return this.call<void>("deleteSession", noteId, [hash]);
+	}
+	deleteInvites(noteId: string, role: Role) {
+		return this.call<void>("deleteInvites", noteId, [role]);
+	}
+	deleteShareSession(noteId: string, hash: string) {
+		return this.call<void>("deleteShareSession", noteId, [hash]);
 	}
 	putCode(noteId: string, sessionHash: string, code: CodeRecord) {
 		return this.call<void>("putCode", noteId, [sessionHash, code]);

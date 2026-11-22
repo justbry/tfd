@@ -19,7 +19,15 @@ import { type TestSigning, testSigning } from "./notes-signers";
 const BANNED =
 	/\b(proof|enforceable|binding|tamper-proof|legally|credit|interest-free)\b/i;
 const CSRF_FIELD = /name="csrf" value="([^"]+)"/;
-const COOKIE_NAME = "__Secure-tf_note";
+const COOKIE_PREFIX = "__Host-tf_note_";
+const NOTE_IN_PATH = /^\/n\/([^/?]+)/;
+
+/** The one cookie name of the note a path belongs to. */
+const cookieNameFor = (path: string): string => {
+	const noteId = NOTE_IN_PATH.exec(path)?.[1];
+	if (noteId === undefined) throw new Error(`no note in ${path}`);
+	return `${COOKIE_PREFIX}${noteId}`;
+};
 const DOC_LINK = /href="\/n\/[^/"]+\/docs\/([A-Za-z0-9_-]+)"/;
 const COOLING_MS = 2 * HOUR;
 
@@ -76,16 +84,16 @@ const setup = (
 		ledger(path, {
 			method: "POST",
 			body: new URLSearchParams(fields),
-			headers: cookie ? { Cookie: `${COOKIE_NAME}=${cookie}` } : {},
+			headers: cookie ? { Cookie: `${cookieNameFor(path)}=${cookie}` } : {},
 		});
 	const get = (path: string, cookie?: string) =>
 		ledger(path, {
-			headers: cookie ? { Cookie: `${COOKIE_NAME}=${cookie}` } : {},
+			headers: cookie ? { Cookie: `${cookieNameFor(path)}=${cookie}` } : {},
 		});
 	const enter = async (noteId: string, email: string): Promise<string> => {
 		const token = h.mailer.linkTokenFor(email);
 		const response = await post(`/n/${noteId}/enter`, { t: token });
-		const cookie = new RegExp(`${COOKIE_NAME}=([^;]+)`).exec(
+		const cookie = new RegExp(`${cookieNameFor(`/n/${noteId}`)}=([^;]+)`).exec(
 			response.headers.get("Set-Cookie") ?? "",
 		)?.[1];
 		if (!cookie) throw new Error("no cookie");
@@ -293,6 +301,7 @@ describe("documents over HTTP", () => {
 			id: "foreign1",
 			type: "note.payoff-statement",
 			eventId: null,
+			variant: "",
 			sha256: "a".repeat(64),
 			json: JSON.stringify({
 				note_id: a.noteId,
@@ -313,6 +322,7 @@ describe("documents over HTTP", () => {
 			id: "hostile1",
 			type: "note.payment-receipt",
 			eventId: null,
+			variant: "",
 			sha256: "a".repeat(64),
 			createdAt: "2026-11-22T09:00:00.000Z",
 			json: JSON.stringify({
@@ -610,7 +620,7 @@ describe("notices and lender-only forms over HTTP", () => {
 				method: "POST",
 				body: new URLSearchParams({ csrf: lenderCsrf, as_of: "2026-11-22" }),
 				headers: {
-					Cookie: `${COOKIE_NAME}=${lender}`,
+					Cookie: `${cookieNameFor(`/n/${noteId}`)}=${lender}`,
 					Origin: "https://evil.example",
 				},
 			});

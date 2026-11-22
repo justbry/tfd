@@ -72,7 +72,7 @@ export type CloudEnv = {
 	STRIPE_SECRET_KEY?: string;
 	/** The signing secret of the `/webhooks/billing` endpoint, a Worker secret. */
 	STRIPE_BILLING_WEBHOOK_SECRET?: string;
-	/** Keys the guest flow's form tokens and step-up code hashes (`src/notes/`), a Worker secret. Unset: the notes routes answer 503. */
+	/** Keys the note ids' MAC, the form tokens and the step-up code hashes (`src/notes/`), a Worker secret of at least 32 characters. Shorter or unset: every notes route answers 503. */
 	NOTES_SESSION_SECRET?: string;
 	/** The key id published for the `receipt` signing key, used on note receipts, payoff statements and releases. Unset: the note document routes answer 503. */
 	NOTES_RECEIPT_KEY_ID?: string;

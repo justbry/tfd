@@ -6,7 +6,6 @@ import {
 	type SharedView,
 } from "tfd-notes";
 import {
-	DOCUMENT_LABELS,
 	formatAmount,
 	html,
 	layout,
@@ -15,6 +14,7 @@ import {
 	type Safe,
 } from "./pages";
 import {
+	DISCLOSURE_MAX_DAYS,
 	type DisclosureRow,
 	PURPOSE_LABELS,
 	SHARE_DEFAULT_DAYS,
@@ -26,8 +26,8 @@ import {
 
 /**
  * The pages of sharing (build step 5): the panel the two parties see on their note page, and what a person or a verify
- * link opens. A viewer's pages (`sharedViewPage`, `verifyPage`) are built from `SharedView` and the list of issued
- * documents only. They hold no dispute, age, notice, annotation, agent, address or name, because nothing that carries
+ * link opens. A viewer's pages (`sharedViewPage`, `verifyPage`) are built from `SharedView` alone (the verify page from
+ * a token and a verdict). They hold no dispute, age, notice, annotation, agent, address or name, because nothing that carries
  * one is ever passed in.
  */
 
@@ -154,7 +154,7 @@ const shareTableRow = (
 
 const sharesTable = (sharing: SharingView, context: PanelContext): Safe => {
 	if (sharing.shares.length === 0)
-		return html`<p>Nothing is shared. Only the two of you can read this record.</p>`;
+		return html`<p>No share has been made yet.</p>`;
 	return html`<table>
 <thead><tr><th>Shared with</th><th>What they see</th><th>Status</th><th>Who agreed</th><th>Ends</th><th></th></tr></thead>
 <tbody>${sharing.shares.map((row) => shareTableRow(row, sharing, context))}</tbody>
@@ -180,7 +180,8 @@ const proposeForm = (sharing: SharingView, context: PanelContext): Safe => {
 	if (!sharing.canAct)
 		return html`<p class="muted">A viewer can read this list but not change it.</p>`;
 	return html`<h3>Share with a named person</h3>
-<p class="muted">They get a read-only view that ends on the day you choose, at most ${SHARE_MAX_DAYS} days out. The other party must agree before anything is sent, unless this is a disclosure (the box below). The person is never shown disputes, notices or notes.</p>
+<p class="muted">They get a read-only view that ends on the day you choose, at most ${SHARE_MAX_DAYS} days out. The other party must agree before anything is sent, unless this is a disclosure (the box below). A shared view never includes disputes, notices or free-text notes.</p>
+<p class="muted">A shared view shows the figures both parties agree on. If that changes, for example a payment is disputed, the shared figures change too.</p>
 ${postForm(
 	context,
 	"propose",
@@ -191,7 +192,7 @@ ${postForm(
 <label>Days it lasts <input type="number" name="days" min="1" max="${SHARE_MAX_DAYS}" value="${SHARE_DEFAULT_DAYS}" required></label>
 <label><input type="checkbox" name="carve_out" value="1"> This is a disclosure for my own books, legal advice, enforcement or assignment</label>
 <label>If so, what for <select name="purpose">${purposeOptions}</select></label>
-<p class="muted">A disclosure is active as soon as you send it. It is listed for the other party in the disclosure log below, with no way to hide it.</p>
+<p class="muted">A disclosure is active as soon as you send it and lasts at most ${DISCLOSURE_MAX_DAYS} days. The other party is emailed that it was made, and it is listed for them in the disclosure log below, with no way to hide it.</p>
 <button type="submit">Share</button>`,
 )}
 <h3>Make a verify link</h3>
@@ -231,6 +232,10 @@ ${disclosureTable(mine, "None.")}
 ${disclosureTable(theirs, "None.")}`;
 };
 
+/** Who can read a record, said whole: the parties, the lender's team, anyone disclosed to, anyone both agreed to. */
+export const SHARING_READERS =
+	"These people can read this record: you, the other party, the lender's team when the lender is an organization, anyone either of you disclosed it to (listed below) and anyone you both agreed to share it with. Trifold stores the record to run the service.";
+
 /** The Sharing section of a note page, the same list and log for both parties. */
 export const sharingPanel = (
 	sharing: SharingView,
@@ -238,7 +243,8 @@ export const sharingPanel = (
 ): Safe =>
 	html`<section>
 <h2>Sharing</h2>
-<p class="muted">Only the two of you can read this record unless you both agree to share it. Either of you can end a share at any time.</p>
+<p class="muted">${SHARING_READERS}</p>
+<p class="muted">Either of you can end a share at any time.</p>
 ${waitingBlock(sharing, context)}
 ${sharesTable(sharing, context)}
 ${proposeForm(sharing, context)}
@@ -350,14 +356,39 @@ ${
 }
 </section>`;
 
-/** The shared view at its grant's level. Built from `SharedView` alone, so nothing else can reach the page. */
-export const sharedViewPage = (view: SharedView): string => {
+/** The sign-out button of a shared view: a post to the grant's own logout route with its CSRF token. */
+const logoutForm = (
+	logout: { action: string; csrf: string } | undefined,
+): Safe =>
+	logout
+		? html`<form method="post" action="${logout.action}">
+<input type="hidden" name="csrf" value="${logout.csrf}">
+<button type="submit" class="secondary">Sign out</button>
+</form>`
+		: html``;
+
+/** What a person sees after ending their shared session. */
+export const signedOutSharePage = (): string =>
+	layout(
+		"Signed out",
+		html`<h1>You are signed out.</h1>
+<p>Your link works once, so ask whoever shared this record to send it again if you need to open it later.</p>`,
+	);
+
+/**
+ * The shared view at its grant's level. Built from `SharedView` alone, so nothing else can reach the page.
+ */
+export const sharedViewPage = (
+	view: SharedView,
+	logout?: { action: string; csrf: string },
+): string => {
 	if (view.level === "verify")
 		return layout(
 			"Shared loan record",
 			html`<h1>Shared loan record</h1>
 <p class="muted">${SHARE_NOTE}</p>
-<p>This share checks documents only. It shows no figures.</p>`,
+<p>This share checks documents only. It shows no figures.</p>
+${logoutForm(logout)}`,
 		);
 	return layout(
 		"Shared loan record",
@@ -365,18 +396,12 @@ export const sharedViewPage = (view: SharedView): string => {
 <p class="muted">${SHARE_NOTE} As of ${view.as_of}.</p>
 ${figuresBlock(view)}
 ${view.level === "statement" ? statementBlock(view) : html``}
-<p class="muted">The figures count only what both parties recorded and counted. Nothing else about the record is shown here.</p>`,
+<p class="muted">The figures count only what both parties recorded and counted. Nothing else about the record is shown here.</p>
+${logoutForm(logout)}`,
 	);
 };
 
 // ---- the verify link ----
-
-export interface VerifyDocumentRow {
-	type: keyof typeof DOCUMENT_LABELS;
-	issuedAt: string;
-	sha256: string;
-	keyId: string;
-}
 
 export type VerifyResult =
 	| { kind: "ok"; type: string; keyId: string; signedAt: string }
@@ -408,11 +433,12 @@ const resultBlock = (result: VerifyResult | undefined): Safe => {
 	}
 };
 
-/** The verify link's page: the record id, the documents issued, and a form to paste one. No figures, parties or balances. */
+/**
+ * The verify link's page: a form to paste one signed document and the one-line explanation. It lists nothing about the
+ * record (not its documents, not their number, not its id), so a link holder learns only whether a pasted file verifies.
+ */
 export const verifyPage = (input: {
 	token: string;
-	noteId: string;
-	documents: VerifyDocumentRow[];
 	result?: VerifyResult;
 	notice?: Notice;
 }): string =>
@@ -420,23 +446,7 @@ export const verifyPage = (input: {
 		"Check a signed document",
 		html`<h1>Check a signed document</h1>
 ${noticeBlock(input.notice)}
-<p class="muted">Record <span class="hash">${input.noteId}</span></p>
 <section>
-<h2>Documents issued for this record</h2>
-${
-	input.documents.length === 0
-		? html`<p>No document has been issued yet.</p>`
-		: html`<table>
-<thead><tr><th>Type</th><th>Issued</th><th>sha256</th><th>Key id</th></tr></thead>
-<tbody>${input.documents.map(
-				(row) =>
-					html`<tr><td>${DOCUMENT_LABELS[row.type]}</td><td>${row.issuedAt}</td><td class="hash">${row.sha256}</td><td>${row.keyId}</td></tr>`,
-			)}</tbody>
-</table>`
-}
-</section>
-<section>
-<h2>Check one document</h2>
 <p>Paste the JSON of one signed document. It is checked and not kept.</p>
 <form method="post" action="/v/${input.token}">
 <label>Document <textarea name="document" rows="12" cols="60" required></textarea></label>

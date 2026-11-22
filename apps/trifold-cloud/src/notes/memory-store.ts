@@ -93,7 +93,8 @@ export class MemoryNoteStore implements NoteStore {
 				: documents.find(
 						(candidate) =>
 							candidate.type === document.type &&
-							candidate.eventId === document.eventId,
+							candidate.eventId === document.eventId &&
+							candidate.variant === document.variant,
 					);
 		if (existing) return { ...existing };
 		documents.push({ ...document });
@@ -187,6 +188,13 @@ export class MemoryNoteStore implements NoteStore {
 			return null;
 		invite.used = true;
 		return invite.role;
+	}
+
+	async deleteInvites(noteId: string, role: Role): Promise<void> {
+		const { invites } = this.note(noteId);
+		for (const [hash, invite] of [...invites]) {
+			if (invite.role === role && !invite.used) invites.delete(hash);
+		}
 	}
 
 	async putSession(noteId: string, session: SessionRecord): Promise<void> {
@@ -345,9 +353,18 @@ export class MemoryNoteStore implements NoteStore {
 		return { ...session };
 	}
 
+	async deleteShareSession(noteId: string, hash: string): Promise<void> {
+		this.note(noteId).shareSessions.delete(hash);
+	}
+
 	/** Test hook: replaces the stored JSON of event `seq` without touching its chain link (what tampering looks like). */
 	tamperEventForTest(noteId: string, seq: number, eventJson: string): void {
 		this.note(noteId).events[seq - 1] = eventJson;
+	}
+
+	/** Test hook: the keys of a note's rate counters (a probe that no address or client address is kept in one). */
+	countersForTest(noteId: string): string[] {
+		return [...this.note(noteId).counters.keys()];
 	}
 
 	/** Test hook: how many notes the store holds (a probe that a note was or was not created). */

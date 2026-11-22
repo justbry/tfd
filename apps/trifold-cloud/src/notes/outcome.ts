@@ -19,6 +19,7 @@ export type ErrorCode =
 	| "cooling_off"
 	| "approval_required"
 	| "chain_invalid"
+	| "terms_declined"
 	| "not_configured";
 
 /**

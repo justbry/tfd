@@ -1,0 +1,22 @@
+{
+	"status": {
+		"requested": true,
+		"requester_agent": "alice",
+		"granted_by": [],
+		"satisfied": false
+	},
+	"pending": [
+		{
+			"action": "release.confirm",
+			"target": "evt-2",
+			"requested_by_agent": "alice",
+			"requested_at": "2026-02-03T10:00:00Z"
+		}
+	],
+	"checks": [
+		"release.confirmed: the approval request for draft \"evt-2\" has no approval from a second agent",
+		"approval.granted: agent \"bob\" is not an active agent",
+		"ok",
+		"ok"
+	]
+}

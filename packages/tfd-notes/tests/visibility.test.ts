@@ -661,6 +661,7 @@ describe("viewFor", () => {
 			grantEvent(8, "borrower", "g", ACCOUNTANT, "summary", {
 				carve_out: true,
 				purpose: "accountant",
+				expires_at: "2026-05-01T00:00:00Z",
 			}),
 		];
 		expect(viewOf(events, { kind: "person", ref: "person-1" })).toEqual(
@@ -878,6 +879,7 @@ describe("the ceiling: negative events never leave the two parties (property)", 
 					id,
 					action: "notice.default",
 					target: previousId,
+					cure_days: 30,
 				}),
 				make(0, "approval.granted", "borrower", stamp, {
 					id: `${id}-granted`,

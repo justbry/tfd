@@ -12,7 +12,7 @@ import { MemoryNoteStore } from "../src/notes/memory-store";
 import { ShareAccess } from "../src/notes/share-access";
 import type { NoteStore, ShareRecord } from "../src/notes/store";
 import { durableState } from "./fakes";
-import { BORROWER_EMAIL, noteNamespace, notesEnv } from "./notes-fakes";
+import { BORROWER_EMAIL, noteNamespace, notesEnv, SECRET } from "./notes-fakes";
 import { expectOk, VIEWER } from "./notes-org-fakes";
 import {
 	DAY,
@@ -42,6 +42,7 @@ const setup = async () => {
 		store: w.h.store,
 		clock: w.h.clock,
 		ids: w.h.ids,
+		secret: SECRET,
 		keys: { get: async () => signing.keys },
 	});
 	return { w, ...note, code, access };
@@ -211,7 +212,7 @@ describe("proposing a share", () => {
 		const proposed = expectOk(
 			await w.h.service.proposeShare(
 				lender.session,
-				person({ carve_out: { purpose: "other" } }),
+				person({ carve_out: { purpose: "lawyer" } }),
 			),
 		);
 		expect(proposed).toMatchObject({ status: "active", mailed: false });
@@ -811,8 +812,13 @@ describe("source scan: sharing", () => {
 			(match) => match[1],
 		);
 		expect(imported.sort()).toEqual(["./pages", "./share-core", "tfd-notes"]);
-		// The viewer pages take SharedView; the only other inputs are the list of issued documents and a verdict.
-		expect(text).toContain("sharedViewPage = (view: SharedView)");
+		// The viewer pages take SharedView (and a sign-out token); the verify page takes a token and a verdict, and lists
+		// nothing about the record.
+		expect(text).toContain(
+			"export const sharedViewPage = (\n\tview: SharedView,",
+		);
+		expect(text).not.toContain("VerifyDocumentRow");
+		expect(text).not.toContain("issued documents");
 		for (const forbidden of [
 			"statement(",
 			"difference",

@@ -224,6 +224,14 @@ export const signInRequiredPage = (noteId: string): string =>
 ${linkRequestForm(noteId, "Get a new link")}`,
 	);
 
+/** What a person sees after ending their session. */
+export const signedOutPage = (): string =>
+	layout(
+		"Signed out",
+		html`<h1>You are signed out.</h1>
+<p>Use the link from your email to come back, or ask for a new one on the sign-in page.</p>`,
+	);
+
 const roleName = (role: Role): string =>
 	role === "lender" ? "Lender" : "Borrower";
 
@@ -426,8 +434,18 @@ const receiptControl = (
 </form>`;
 };
 
+/**
+ * What the borrower reads in the history: everything except the lender's internal approvals. Who asked a second person
+ * to approve a step is the lender's own business, so those entries are left out of the borrower's page (they stay in the
+ * chain and in the downloadable file, which a verifier needs whole).
+ */
+const shownEvents = (view: NoteView): NoteEvent[] =>
+	view.role === "borrower"
+		? view.events.filter((event) => !event.type.startsWith("approval."))
+		: view.events;
+
 const historyBlock = (view: NoteView, csrf: string): Safe =>
-	html`<ol class="history">${view.events.map(
+	html`<ol class="history">${shownEvents(view).map(
 		(event) =>
 			html`<li><span class="muted">${event.entered_at.slice(0, 10)}, by email link</span> ${eventLine(event, view)}${receiptControl(view, csrf, event)}</li>`,
 	)}</ol>`;
@@ -639,7 +657,11 @@ const noticeForms = (view: NoteView, csrf: string): Safe => {
 <label>Days to cure (default notice only, 0 to 365) <input type="number" name="cure_days" min="0" max="365" step="1"></label>
 <button type="submit" class="secondary">Record the notice</button>
 </form>`;
-	const approved = view.org.defaultNoticesApproved > 0;
+	const ready = view.org.approvedNotices;
+	const approved = ready.length > 0;
+	const readyText = ready
+		.map((notice) => `${notice.cureDays} days to cure`)
+		.join(", ");
 	return html`<form method="post" action="${view.basePath}/notice">
 <input type="hidden" name="csrf" value="${csrf}">
 <input type="hidden" name="kind" value="reminder">
@@ -649,13 +671,20 @@ const noticeForms = (view: NoteView, csrf: string): Safe => {
 <input type="hidden" name="csrf" value="${csrf}">
 <input type="hidden" name="kind" value="default">
 <label>Days to cure (0 to 365) <input type="number" name="cure_days" min="0" max="365" step="1" required></label>
-<button type="submit" class="secondary" ${approved ? "" : "disabled"}>Record a default notice</button> <span class="muted">${approved ? "One approval is ready. Each approval covers one default notice." : "Disabled until a second person approves it: ask for approval under Approvals below."}</span>
+<button type="submit" class="secondary" ${approved ? "" : "disabled"}>Record a default notice</button> <span class="muted">${approved ? `Approved and ready: ${readyText}. Each approval covers one default notice, with the days to cure it was asked for.` : "Disabled until a second person approves it: ask for approval under Approvals below."}</span>
 </form>`;
 };
+
+/** Shown to the lender's side in place of the payoff and notice forms while the borrower's decline stands. */
+export const DECLINED_NOTICE =
+	"The borrower said this is not their loan. Payments and notes can still be recorded; payoff statements and notices are paused.";
 
 const lenderForms = (view: NoteView, csrf: string): Safe => {
 	if (view.role !== "lender") return html``;
 	if (!canAct(view)) return html``;
+	if (view.state.terms === "declined")
+		return html`<h2>Payoff statement and notices</h2>
+<p class="notice" role="status">${DECLINED_NOTICE}</p>`;
 	return html`<h2>Payoff statement</h2>
 <p class="muted">A statement of both counts on a date, issued as a file you can keep. It changes no balance.</p>
 <form method="post" action="${view.basePath}/payoff">
@@ -670,7 +699,8 @@ ${noticeForms(view, csrf)}`;
 
 const approvalRowText = (row: OrgNoteView["requests"][number]): string => {
 	const state = row.satisfied ? "approved" : "waiting for approval";
-	return `${ACTION_LABELS[row.action]} for ${row.label}, asked ${row.requestedAt.slice(0, 10)}: ${state}.`;
+	const cure = row.cureDays === null ? "" : ` (${row.cureDays} days to cure)`;
+	return `${ACTION_LABELS[row.action]}${cure} for ${row.label}, asked ${row.requestedAt.slice(0, 10)}: ${state}.`;
 };
 
 const requestForm = (view: NoteView, csrf: string, org: OrgNoteView): Safe => {
@@ -679,8 +709,9 @@ const requestForm = (view: NoteView, csrf: string, org: OrgNoteView): Safe => {
 <input type="hidden" name="csrf" value="${csrf}">
 <label>For <select name="action"><option value="notice.default">A default notice</option><option value="waiver">A waiver</option></select></label>
 <label>About <select name="target">${org.targets.map((target) => html`<option value="${target.id}">${target.label}</option>`)}</select></label>
+<label>Days to cure (for a default notice, 0 to 365) <input type="number" name="cure_days" min="0" max="365" step="1"></label>
 <button type="submit" class="secondary">Ask for approval</button>
-<p class="muted">Name the note that drafts the text, or the start of the record. A release is asked for in its own section.</p>
+<p class="muted">Name the note that drafts the text, or the start of the record. A default notice is approved for the days to cure you enter here, and that is the only notice the approval covers. A release is asked for in its own section.</p>
 </form>`;
 };
 
@@ -718,6 +749,13 @@ const youText = (view: NoteView): string =>
 		? `You are on the lender's team as ${ROLE_WORDS[view.org.agentRole]}.`
 		: `You are the ${view.role}.`;
 
+/** The sign-out button: ends this session on the server (an agent's is the organization session, so it posts there). */
+const logoutForm = (view: NoteView, csrf: string): Safe =>
+	html`<form class="inline" method="post" action="${view.org ? `/o/${view.org.orgId}/logout` : `${view.basePath}/logout`}">
+<input type="hidden" name="csrf" value="${csrf}">
+<button type="submit" class="link">Sign out</button>
+</form>`;
+
 /** The shared record: both counts side by side, the itemised difference, the schedule, and what needs this party. */
 export const notePage = (
 	view: NoteView,
@@ -732,6 +770,7 @@ export const notePage = (
 		html`<h1>Loan record</h1>
 ${noticeBlock(notice)}
 <p class="muted">${youText(view)} As of ${view.asOf}.</p>
+${logoutForm(view, csrf)}
 ${view.org ? html`<p class="muted"><a href="/o/${view.org.orgId}">All of the organization's notes</a></p>` : html``}
 ${view.lenderIsOrg && !view.org ? html`<p class="muted">The lender is an organization. Its team acts through people it registered; their addresses are not shown here.</p>` : html``}
 ${releaseBanner(view)}
@@ -816,6 +855,7 @@ const receiptBody = (document: Record<string, unknown>): Safe => {
 <dt>Lender's count of what is owed that day</dt><dd class="num">${documentMoney(document, textOf(document, "lender_payoff_minor"))}</dd>
 <dt>Borrower's count of what is owed that day</dt><dd class="num">${documentMoney(document, textOf(document, "borrower_payoff_minor"))}</dd>
 </dl>
+<p class="muted">Issued at chain position ${textOf(nestedOf(document, "chain_head"), "seq")}. Events after that are not in it.</p>
 <p class="muted">A receipt records what was entered and how far the two sides agree on it. It does not say the money moved.</p>`;
 };
 

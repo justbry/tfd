@@ -9,7 +9,9 @@ import type {
 } from "./org-store";
 
 /**
- * The `OrgStore` over D1 (migration `0003_notes_org_index.sql`). D1 has no interactive transaction, so every method that
+ * The `OrgStore` over D1 (migrations `0003_notes_org_index.sql` and `0004_notes_agent_refs.sql`). The column
+ * `agent_ref` of `org_agents`, `org_links` and `org_sessions` holds the agent's organization-wide id (`agentId`); the
+ * per-note ref an event carries is `org_note_agents.agent_ref`. D1 has no interactive transaction, so every method that
  * must be atomic is one statement: a claim is an `UPDATE ... RETURNING`, a counter is an upsert with `RETURNING`, an
  * agent is found or made by one `INSERT ... ON CONFLICT ... RETURNING`.
  */
@@ -17,7 +19,7 @@ import type {
 type AgentRow = { agent_ref: string; role: AgentRole; active: number };
 
 const recordOf = (row: AgentRow): OrgAgentRecord => ({
-	agentRef: row.agent_ref,
+	agentId: row.agent_ref,
 	role: row.role,
 	active: row.active === 1,
 });
@@ -60,7 +62,7 @@ export class D1OrgStore implements OrgStore {
 
 	async upsertAgent(
 		orgId: string,
-		entry: { newRef: string; emailHash: string; role: AgentRole; now: string },
+		entry: { newId: string; emailHash: string; role: AgentRole; now: string },
 	): Promise<OrgAgentRecord> {
 		const row = await this.db
 			.prepare(
@@ -68,7 +70,7 @@ export class D1OrgStore implements OrgStore {
 				ON CONFLICT (org_id, email_hash) DO UPDATE SET role = excluded.role, active = 1
 				RETURNING agent_ref, role, active`,
 			)
-			.bind(orgId, entry.newRef, entry.emailHash, entry.role, entry.now)
+			.bind(orgId, entry.newId, entry.emailHash, entry.role, entry.now)
 			.first<AgentRow>();
 		if (row === null) throw new Error("org agent was not written");
 		return recordOf(row);
@@ -89,29 +91,75 @@ export class D1OrgStore implements OrgStore {
 
 	async getAgent(
 		orgId: string,
-		agentRef: string,
+		agentId: string,
 	): Promise<OrgAgentRecord | null> {
 		const row = await this.db
 			.prepare(
 				"SELECT agent_ref, role, active FROM org_agents WHERE org_id = ? AND agent_ref = ?",
 			)
-			.bind(orgId, agentRef)
+			.bind(orgId, agentId)
 			.first<AgentRow>();
 		return row ? recordOf(row) : null;
 	}
 
 	async setAgentActive(
 		orgId: string,
-		agentRef: string,
+		agentId: string,
 		active: boolean,
 	): Promise<boolean> {
 		const row = await this.db
 			.prepare(
 				"UPDATE org_agents SET active = ? WHERE org_id = ? AND agent_ref = ? RETURNING agent_ref",
 			)
-			.bind(active ? 1 : 0, orgId, agentRef)
+			.bind(active ? 1 : 0, orgId, agentId)
 			.first<{ agent_ref: string }>();
 		return row !== null;
+	}
+
+	async bindNoteRef(
+		orgId: string,
+		noteId: string,
+		agentId: string,
+		newRef: string,
+	): Promise<string> {
+		const row = await this.db
+			.prepare(
+				`INSERT INTO org_note_agents (org_id, note_id, agent_id, agent_ref) VALUES (?, ?, ?, ?)
+				ON CONFLICT (org_id, note_id, agent_id) DO UPDATE SET agent_ref = org_note_agents.agent_ref
+				RETURNING agent_ref`,
+			)
+			.bind(orgId, noteId, agentId, newRef)
+			.first<{ agent_ref: string }>();
+		if (row === null) throw new Error("agent ref was not written");
+		return row.agent_ref;
+	}
+
+	async noteRefOf(
+		orgId: string,
+		noteId: string,
+		agentId: string,
+	): Promise<string | null> {
+		const row = await this.db
+			.prepare(
+				"SELECT agent_ref FROM org_note_agents WHERE org_id = ? AND note_id = ? AND agent_id = ?",
+			)
+			.bind(orgId, noteId, agentId)
+			.first<{ agent_ref: string }>();
+		return row?.agent_ref ?? null;
+	}
+
+	async agentIdOfRef(
+		orgId: string,
+		noteId: string,
+		agentRef: string,
+	): Promise<string | null> {
+		const row = await this.db
+			.prepare(
+				"SELECT agent_id FROM org_note_agents WHERE org_id = ? AND note_id = ? AND agent_ref = ?",
+			)
+			.bind(orgId, noteId, agentRef)
+			.first<{ agent_id: string }>();
+		return row?.agent_id ?? null;
 	}
 
 	async putLink(orgId: string, link: OrgLinkRecord): Promise<void> {
@@ -119,7 +167,7 @@ export class D1OrgStore implements OrgStore {
 			.prepare(
 				"INSERT INTO org_links (org_id, hash, agent_ref, expires_at, used_at) VALUES (?, ?, ?, ?, NULL)",
 			)
-			.bind(orgId, link.hash, link.agentRef, link.expiresAt)
+			.bind(orgId, link.hash, link.agentId, link.expiresAt)
 			.run();
 	}
 
@@ -139,10 +187,10 @@ export class D1OrgStore implements OrgStore {
 		return row?.agent_ref ?? null;
 	}
 
-	async deleteLinksOf(orgId: string, agentRef: string): Promise<void> {
+	async deleteLinksOf(orgId: string, agentId: string): Promise<void> {
 		await this.db
 			.prepare("DELETE FROM org_links WHERE org_id = ? AND agent_ref = ?")
-			.bind(orgId, agentRef)
+			.bind(orgId, agentId)
 			.run();
 	}
 
@@ -154,7 +202,7 @@ export class D1OrgStore implements OrgStore {
 			.bind(
 				session.orgId,
 				session.hash,
-				session.agentRef,
+				session.agentId,
 				session.createdAt,
 				session.lastSeenAt,
 				session.absoluteExpiresAt,
@@ -189,7 +237,7 @@ export class D1OrgStore implements OrgStore {
 		return {
 			hash: row.hash,
 			orgId: row.org_id,
-			agentRef: row.agent_ref,
+			agentId: row.agent_ref,
 			createdAt: row.created_at,
 			lastSeenAt: row.last_seen_at,
 			absoluteExpiresAt: row.absolute_expires_at,
@@ -203,10 +251,10 @@ export class D1OrgStore implements OrgStore {
 			.run();
 	}
 
-	async deleteSessionsOf(orgId: string, agentRef: string): Promise<void> {
+	async deleteSessionsOf(orgId: string, agentId: string): Promise<void> {
 		await this.db
 			.prepare("DELETE FROM org_sessions WHERE org_id = ? AND agent_ref = ?")
-			.bind(orgId, agentRef)
+			.bind(orgId, agentId)
 			.run();
 	}
 

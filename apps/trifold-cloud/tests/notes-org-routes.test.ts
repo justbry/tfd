@@ -8,7 +8,9 @@ import {
 	validateStream,
 } from "tfd-notes";
 import { D1OrgStore } from "../src/notes/org-d1-store";
+import { orgSessionCookieName } from "../src/notes/org-sessions";
 import { type NotesDeps, notesRoute } from "../src/notes/routes";
+import { sessionCookieName } from "../src/notes/sessions";
 import { applyD1Migrations, sqliteD1 } from "./fakes";
 import {
 	API,
@@ -31,8 +33,14 @@ import {
 } from "./notes-org-fakes";
 import { type TestSigning, testSigning } from "./notes-signers";
 
-const ORG_COOKIE = "__Secure-tf_org";
-const NOTE_COOKIE = "__Secure-tf_note";
+const ORG_IN_PATH = /^\/o\/([^/?]+)/;
+
+/** The one cookie name of the organization a path belongs to. */
+const orgCookieNameFor = (path: string): string => {
+	const orgId = ORG_IN_PATH.exec(path)?.[1];
+	if (orgId === undefined) throw new Error(`no organization in ${path}`);
+	return orgSessionCookieName(orgId);
+};
 const CSRF_FIELD = /name="csrf" value="([^"]+)"/;
 const CLAIM_WORDS =
 	/\b(proof|enforceable|binding|tamper-proof|legally|credit)\b/i;
@@ -55,11 +63,14 @@ const setup = (options: NotesDeps["options"] = { releaseCoolingMs: 0 }) => {
 		ids: h.ids,
 		orgs,
 		signers: signing.signers,
+		defer: h.queue.defer,
 		...(options ? { options } : {}),
 	};
 	const call = async (url: string, init?: RequestInit): Promise<Response> => {
 		const response = await notesRoute(new Request(url, init), env, deps);
 		if (response === null) throw new Error(`not handled: ${url}`);
+		// Mail a request deferred goes out after its response, as in the Worker; a test reads the mailbox next.
+		await h.flush();
 		return response;
 	};
 	const ledger = (path: string, init?: RequestInit) =>
@@ -96,7 +107,7 @@ const setup = (options: NotesDeps["options"] = { releaseCoolingMs: 0 }) => {
 	};
 	const get = (path: string, cookie?: string) =>
 		ledger(path, {
-			headers: cookie ? { Cookie: `${ORG_COOKIE}=${cookie}` } : {},
+			headers: cookie ? { Cookie: `${orgCookieNameFor(path)}=${cookie}` } : {},
 		});
 	const post = (
 		path: string,
@@ -108,7 +119,7 @@ const setup = (options: NotesDeps["options"] = { releaseCoolingMs: 0 }) => {
 			method: "POST",
 			body: new URLSearchParams(fields),
 			headers: {
-				...(cookie ? { Cookie: `${ORG_COOKIE}=${cookie}` } : {}),
+				...(cookie ? { Cookie: `${orgCookieNameFor(path)}=${cookie}` } : {}),
 				...headers,
 			},
 		});
@@ -124,9 +135,9 @@ const setup = (options: NotesDeps["options"] = { releaseCoolingMs: 0 }) => {
 			...(noteId === undefined ? {} : { n: noteId }),
 		});
 		expect(response.status).toBe(303);
-		const cookie = new RegExp(`${ORG_COOKIE}=([^;]+)`).exec(
-			response.headers.get("Set-Cookie") ?? "",
-		)?.[1];
+		const cookie = new RegExp(
+			`${orgCookieNameFor(`/o/${orgId}`)}=([^;]+)`,
+		).exec(response.headers.get("Set-Cookie") ?? "")?.[1];
 		if (!cookie) throw new Error("no cookie");
 		return { cookie, token, response };
 	};
@@ -266,15 +277,16 @@ describe("signing in as an agent", () => {
 		expect(location).toBe(`${notePath(created.note_id)}?m=entered`);
 		expect(location).not.toContain(token);
 		const setCookie = opened.headers.get("Set-Cookie") ?? "";
-		expect(setCookie).toContain(`${ORG_COOKIE}=`);
+		expect(setCookie).toStartWith(`${orgSessionCookieName(ORG_ID)}=`);
 		for (const part of [
 			"HttpOnly",
 			"Secure",
 			"SameSite=Lax",
-			`Path=/o/${ORG_ID}`,
+			"Path=/",
 			"Max-Age=",
 		])
 			expect(setCookie).toContain(part);
+		expect(setCookie).not.toContain("Domain");
 		expect(opened.headers.get("Cache-Control")).toBe("no-store");
 		expect(opened.headers.get("Referrer-Policy")).toBe("no-referrer");
 		// The link is spent.
@@ -344,11 +356,28 @@ describe("signing in as an agent", () => {
 		expect(blocked.status).toBe(200);
 		expect(await blocked.text()).toBe(sameAnswer);
 		expect(t.h.mailer.to(TREASURER)).toHaveLength(1 + 3);
-		for (let index = 0; index < 20; index += 1)
+		// A flood of other addresses does not use up a team member's own allowance.
+		for (let index = 0; index < 50; index += 1)
 			await t.post(`/o/${ORG_ID}/link`, { email: `x${index}@elsewhere.test` });
 		const before = t.h.mailer.sent.length;
 		await t.post(`/o/${ORG_ID}/link`, { email: BOARD });
-		expect(t.h.mailer.sent).toHaveLength(before);
+		expect(t.h.mailer.sent).toHaveLength(before + 1);
+		// One client address, hashed from CF-Connecting-IP, is held at twenty an hour.
+		for (let index = 0; index < 20; index += 1)
+			await t.post(
+				`/o/${ORG_ID}/link`,
+				{ email: `y${index}@elsewhere.test` },
+				undefined,
+				{ "CF-Connecting-IP": "198.51.100.7" },
+			);
+		await t.post(`/o/${ORG_ID}/link`, { email: VIEWER }, undefined, {
+			"CF-Connecting-IP": "198.51.100.7",
+		});
+		expect(t.h.mailer.to(VIEWER)).toHaveLength(1);
+		await t.post(`/o/${ORG_ID}/link`, { email: VIEWER }, undefined, {
+			"CF-Connecting-IP": "198.51.100.8",
+		});
+		expect(t.h.mailer.to(VIEWER)).toHaveLength(2);
 	});
 });
 
@@ -559,7 +588,7 @@ describe("the organization's pages", () => {
 		expect(target).toBeTruthy();
 		await t.act(
 			`${page}/request`,
-			{ action: "notice.default", target },
+			{ action: "notice.default", target, cure_days: "30" },
 			w.treasurer,
 			page,
 		);
@@ -573,7 +602,7 @@ describe("the organization's pages", () => {
 		);
 		const ready = await (await t.get(page, w.treasurer)).text();
 		expect(ready).toContain(
-			"One approval is ready. Each approval covers one default notice.",
+			"Approved and ready: 30 days to cure. Each approval covers one default notice, with the days to cure it was asked for.",
 		);
 		expect(ready).not.toMatch(/disabled>Record a default notice/);
 		const asked = await t.act(
@@ -626,7 +655,9 @@ describe("the organization's pages", () => {
 		expect(asViewer).toContain(
 			"Your role is viewer: you can read this record but not change it.",
 		);
-		expect(asViewer).not.toContain('method="post"');
+		// A viewer presses nothing but sign-out.
+		expect(asViewer).not.toContain(`action="${page}`);
+		expect(asViewer).toContain(`action="/o/${ORG_ID}/logout"`);
 		for (const text of [asTreasurer, asBoard, asViewer]) {
 			expect(text).not.toContain("@");
 			for (const ref of Object.values(w.refs)) expect(text).not.toContain(ref);
@@ -734,27 +765,30 @@ describe("the organization's pages", () => {
 			w.board,
 		);
 
-		const link = /\/n\/([A-Za-z0-9_-]+)\/enter\?t=([A-Za-z0-9_-]+)/.exec(
+		const link = /\/n\/([A-Za-z0-9_.-]+)\/enter\?t=([A-Za-z0-9_-]+)/.exec(
 			t.h.mailer.to(BORROWER_EMAIL)[0]?.text ?? "",
 		);
 		const entered = await t.ledger(`/n/${link?.[1]}/enter`, {
 			method: "POST",
 			body: new URLSearchParams({ t: link?.[2] as string }),
 		});
-		const borrowerCookie = /__Secure-tf_note=([^;]+)/.exec(
+		const noteCookie = sessionCookieName(w.noteId);
+		const borrowerCookie = new RegExp(`${noteCookie}=([^;]+)`).exec(
 			entered.headers.get("Set-Cookie") ?? "",
 		)?.[1] as string;
 		const borrowerPage = await (
 			await t.ledger(`/n/${w.noteId}`, {
-				headers: { Cookie: `${NOTE_COOKIE}=${borrowerCookie}` },
+				headers: { Cookie: `${noteCookie}=${borrowerCookie}` },
 			})
 		).text();
 		expect(borrowerPage).toContain("The lender is an organization.");
 		expect(borrowerPage).toContain("The lender&#39;s team recorded a payment");
-		expect(borrowerPage).toContain(
-			"The lender&#39;s team asked for a second person to approve confirming a release.",
-		);
-		expect(borrowerPage).toContain("The lender&#39;s team approved a request.");
+		// How the lender's team runs its own two-person rule is not the borrower's to read: no approval entry, and
+		// none of the words about asking a second person, in the history or anywhere else on the page.
+		expect(borrowerPage).not.toContain("asked for a second person");
+		expect(borrowerPage).not.toContain("approved a request");
+		expect(borrowerPage).not.toContain("second person");
+		expect(borrowerPage).not.toContain("approval");
 		expect(borrowerPage).not.toContain("agent_ref");
 		for (const ref of Object.values(w.refs))
 			expect(borrowerPage).not.toContain(ref);
@@ -766,7 +800,7 @@ describe("the organization's pages", () => {
 		// A guest cookie opens nothing under the organization's paths.
 		const crossing = await t.ledger(`${page}`, {
 			headers: {
-				Cookie: `${NOTE_COOKIE}=${borrowerCookie}; ${ORG_COOKIE}=${borrowerCookie}`,
+				Cookie: `${noteCookie}=${borrowerCookie}; ${orgSessionCookieName(ORG_ID)}=${borrowerCookie}`,
 			},
 		});
 		expect(crossing.status).toBe(401);
@@ -814,7 +848,7 @@ describe("the organization's pages", () => {
 });
 
 describe("separate organizations over HTTP", () => {
-	test("a session of one organization reads nothing of another, and a missing organization is a 404", async () => {
+	test("a session of one organization reads nothing of another, and a missing organization answers like a known one with nobody signed in", async () => {
 		const t = setup();
 		const a = await t.createNote({ orgId: "org-a", idem: "a" });
 		const b = await t.createNote({
@@ -877,18 +911,33 @@ describe("separate organizations over HTTP", () => {
 		const pageB = await (await t.get("/o/org-b", asB)).text();
 		expect(pageB).not.toContain(a.note_id);
 
-		// Nothing is registered under these ids.
-		for (const path of [
-			"/o/ghost",
-			"/o/ghost/enter",
-			"/o/ghost/board.csv",
-			notePath(a.note_id, "ghost"),
-		]) {
-			expect((await t.get(path, asA)).status).toBe(404);
-		}
-		expect((await t.post("/o/ghost/link", { email: TREASURER })).status).toBe(
-			404,
-		);
+		// An organization nobody registered answers exactly as a known one does to a visitor who is not signed in: the
+		// same status and the same page (the organization's own name aside), so nothing says which organizations exist.
+		const alike = async (path: (orgId: string) => string, post = false) => {
+			const answer = async (orgId: string) => {
+				const response = post
+					? await t.post(path(orgId), { email: TREASURER })
+					: await t.get(path(orgId));
+				return {
+					status: response.status,
+					cookie:
+						response.headers.get("Set-Cookie")?.replace(orgId, "ORG") ?? null,
+					body: (await response.text()).replaceAll(orgId, "ORG"),
+				};
+			};
+			expect(await answer("ghost")).toEqual(await answer("org-b"));
+		};
+		await alike((orgId) => `/o/${orgId}`);
+		await alike((orgId) => `/o/${orgId}/enter?t=x`);
+		await alike((orgId) => `/o/${orgId}/board.csv`);
+		await alike((orgId) => `/o/${orgId}/board.json`);
+		await alike((orgId) => notePath(a.note_id, orgId));
+		await alike((orgId) => `${notePath(a.note_id, orgId)}/bundle.json`);
+		await alike((orgId) => `/o/${orgId}/link`, true);
+		await alike((orgId) => `/o/${orgId}/enter`, true);
+		expect((await t.get("/o/ghost")).status).toBe(401);
+		// A signed-in agent of another organization is no better known there.
+		expect((await t.get("/o/ghost", asA)).status).toBe(401);
 	});
 
 	test("every organization route answers 404 outside staging and 503 without the secret", async () => {
@@ -937,6 +986,7 @@ describe("the board report", () => {
 		"awaiting_confirmation",
 		"disputed",
 		"terms_pending",
+		"declined",
 	]);
 
 	/** Every key of every object in `value`, with its path. */
@@ -1069,7 +1119,7 @@ describe("the board report", () => {
 		const posted = await notesRoute(
 			new Request(`https://${LEDGER}/o/${ORG_ID}/board.csv`, {
 				method: "POST",
-				headers: { Cookie: `${ORG_COOKIE}=${w.board}` },
+				headers: { Cookie: `${orgSessionCookieName(ORG_ID)}=${w.board}` },
 			}),
 			t.env,
 			t.deps,

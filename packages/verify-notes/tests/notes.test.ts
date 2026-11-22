@@ -180,6 +180,16 @@ describe("the CC0 vectors verify", () => {
 		});
 	});
 
+	test("the vector's seal is at the head of its chain, so the bundle names it", async () => {
+		const verdict = await verifyNoteBundle(bundle);
+		expect(verdict.seal).toMatchObject({
+			ok: true,
+			key_id: TEST_SEAL_KEY_ID,
+			head: { seq: 9 },
+		});
+		expect(verdict.code).toBeUndefined();
+	});
+
 	test("the chain and the whole bundle verify", async () => {
 		const chain = await verifyNoteChain(events, links, "note-demo-1");
 		expect(chain).toMatchObject({
@@ -684,8 +694,14 @@ describe("bundle failures", () => {
 			ISSUED_AT,
 		);
 		const signed = await signDocument(body, receiptSigner);
-		const verdict = await verifyBundle({ documents: [signed] });
-		expect(verdict.ok).toBe(true);
+		const sealed = await verifyBundle({
+			documents: [signed, documents.chain_seal],
+		});
+		expect(sealed.ok).toBe(true);
+		const unsealed = await verifyBundle({ documents: [signed] });
+		expect(codesOf(unsealed)).toEqual(["ok"]);
+		expect(unsealed.ok).toBe(false);
+		expect(unsealed.code).toBe("chain_unsealed");
 	});
 
 	const headHashAt = async (seq: number): Promise<string> => {
@@ -842,6 +858,253 @@ describe("portability and size", () => {
 			for (const line of imports) {
 				expect(line).not.toMatch(/tfd-notes|notes/u);
 			}
+		}
+	});
+});
+
+describe("the seal at the head of the chain", () => {
+	const keys = (): PublicKeys => windowedKeys;
+
+	const sealOfLinks = async (
+		chainLinks: ChainLink[],
+		noteId = "note-demo-1",
+	): Promise<Json> =>
+		(await signDocument(
+			await chainSealBody(noteId, chainLinks, ISSUED_AT),
+			sealSigner,
+		)) as unknown as Json;
+
+	/** The vector's events with one forged payment appended at seq 10, and the chain rebuilt over all ten. */
+	const extendedChain = async (): Promise<{
+		forged: Json[];
+		forgedLinks: ChainLink[];
+	}> => {
+		const forgedEvent: Json = {
+			schema: "tfd.note-event.v1",
+			id: "evt-10",
+			note_id: "note-demo-1",
+			seq: 10,
+			entered_at: "2026-03-03T10:00:00Z",
+			entered_by: "lender",
+			type: "payment.recorded",
+			kind: "payment",
+			amount_minor: "99999",
+			value_date: "2026-03-03",
+		};
+		const forged = [...clone(events as Json[]), forgedEvent];
+		return { forged, forgedLinks: await buildChain(validateStream(forged)) };
+	};
+
+	test("the attack of editing an amount and rebuilding the chain, without documents, is not ok", async () => {
+		const edited = clone(events) as Json[];
+		edited[2] = { ...edited[2], amount_minor: "1" };
+		const rebuilt = await buildChain(validateStream(edited));
+		const alone = await verifyNoteChain(edited, rebuilt);
+		// The chain by itself is only consistent: it cannot say it is the chain anyone signed.
+		expect(alone.ok).toBe(true);
+		const verdict = await verifyNoteBundle({
+			events: edited,
+			links: rebuilt,
+			documents: [],
+			keys: keys(),
+		});
+		expect(verdict.chain.ok).toBe(true);
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_unsealed");
+		expect(verdict.seal).toMatchObject({ ok: false, code: "chain_unsealed" });
+	});
+
+	test("the same edit with the real seal and receipts is not ok either: the head no longer matches", async () => {
+		const edited = clone(events) as Json[];
+		edited[2] = { ...edited[2], amount_minor: "1" };
+		const rebuilt = await buildChain(validateStream(edited));
+		const verdict = await verifyNoteBundle({
+			events: edited,
+			links: rebuilt,
+			documents: bundle.documents,
+			keys: keys(),
+		});
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_seal_mismatch");
+		expect(verdict.documents.some((entry) => !entry.ok)).toBe(true);
+	});
+
+	test("the attack of appending a forged event after the real seal is chain_seal_stale, with the count", async () => {
+		const { forged, forgedLinks } = await extendedChain();
+		expect((await verifyNoteChain(forged, forgedLinks)).ok).toBe(true);
+		const verdict = await verifyNoteBundle({
+			events: forged,
+			links: forgedLinks,
+			documents: bundle.documents,
+			keys: keys(),
+		});
+		expect(verdict.chain.ok).toBe(true);
+		// The real seal and receipts still fit their own head at seq 9.
+		expect(verdict.documents.every((entry) => entry.ok)).toBe(true);
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_seal_stale");
+		expect(verdict.seal).toMatchObject({
+			ok: false,
+			code: "chain_seal_stale",
+			unsealed_events: 1,
+		});
+	});
+
+	test("two events after the seal are counted as two", async () => {
+		const { forged, forgedLinks } = await extendedChain();
+		const second = {
+			...clone(forged[9] as Json),
+			id: "evt-11",
+			seq: 11,
+			amount_minor: "1",
+		};
+		const longer = [...forged, second];
+		const verdict = await verifyNoteBundle({
+			events: longer,
+			links: await buildChain(validateStream(longer)),
+			documents: bundle.documents,
+			keys: keys(),
+		});
+		expect(forgedLinks).toHaveLength(10);
+		expect(verdict.seal).toMatchObject({
+			code: "chain_seal_stale",
+			unsealed_events: 2,
+		});
+	});
+
+	test("a new seal at the extended head makes the extended chain ok, a stale one beside it does not matter", async () => {
+		const { forged, forgedLinks } = await extendedChain();
+		const headSeal = await sealOfLinks(forgedLinks);
+		const verdict = await verifyNoteBundle({
+			events: forged,
+			links: forgedLinks,
+			documents: [...bundle.documents, headSeal],
+			keys: keys(),
+		});
+		expect(verdict.documents.every((entry) => entry.ok)).toBe(true);
+		expect(verdict.ok).toBe(true);
+		expect(verdict.seal).toMatchObject({ ok: true, head: { seq: 10 } });
+	});
+
+	test("a seal with a bad signature is not a seal", async () => {
+		const forgedSeal = clone(documents.chain_seal) as Json;
+		(forgedSeal.signature as Json).sig = toBase64Url(new Uint8Array(64));
+		const verdict = await verifyBundle({ documents: [forgedSeal] });
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_unsealed");
+		expect(verdict.documents[0]).toMatchObject({
+			ok: false,
+			code: "bad_signature",
+		});
+	});
+
+	test("a seal signed by a key that is not published for seals is not a seal", async () => {
+		const wrongKey = await signWith(
+			bodyOf(documents.chain_seal),
+			receiptSigner,
+			{
+				purpose: "seal",
+			},
+		);
+		const verdict = await verifyBundle({ documents: [wrongKey] });
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_unsealed");
+	});
+
+	test("a seal of another note does not seal this one", async () => {
+		const other = await signDocument(
+			await chainSealBody("note-other", links, ISSUED_AT),
+			sealSigner,
+		);
+		const verdict = await verifyBundle({ documents: [other] });
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_unsealed");
+	});
+
+	test("a receipt, payoff statement or release is not a seal", async () => {
+		const verdict = await verifyBundle({
+			documents: [
+				documents.payment_receipt,
+				documents.payoff_statement,
+				documents.release,
+			],
+		});
+		expect(verdict.documents.every((entry) => entry.ok)).toBe(true);
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_unsealed");
+	});
+
+	test("a seal of an earlier seq with a hash that is not the chain's is a mismatch, not stale", async () => {
+		const wrong = await signWith(
+			{
+				...bodyOf(documents.chain_seal),
+				head_seq: 5,
+				head_hash: "b".repeat(64),
+			},
+			sealSigner,
+		);
+		const verdict = await verifyBundle({ documents: [wrong] });
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_seal_mismatch");
+		expect(verdict.seal).not.toHaveProperty("unsealed_events");
+	});
+
+	test("a seal at the right seq with the wrong hash is a mismatch", async () => {
+		const wrong = await signWith(
+			{ ...bodyOf(documents.chain_seal), head_hash: "c".repeat(64) },
+			sealSigner,
+		);
+		const verdict = await verifyBundle({ documents: [wrong] });
+		expect(verdict.code).toBe("chain_seal_mismatch");
+	});
+
+	test("a chain cut short below the seal is a mismatch and the seal's own document is chain_head_unknown", async () => {
+		const verdict = await verifyNoteBundle({
+			events: events.slice(0, 8),
+			links: links.slice(0, 8),
+			documents: [documents.chain_seal],
+			keys: keys(),
+		});
+		expect(verdict.ok).toBe(false);
+		expect(verdict.code).toBe("chain_seal_mismatch");
+		expect(verdict.documents[0]).toMatchObject({
+			ok: false,
+			code: "chain_head_unknown",
+		});
+	});
+
+	test("a chain that does not verify has no seal verdict and no code", async () => {
+		const edited = clone(events) as Json[];
+		edited[2] = { ...edited[2], amount_minor: "30001" };
+		const verdict = await verifyBundle({ events: edited });
+		expect(verdict.seal).toBeNull();
+		expect(verdict.code).toBeUndefined();
+	});
+
+	test("an unreadable bundle has no seal verdict either", async () => {
+		const verdict = await verifyNoteBundle(null as never);
+		expect(verdict).toMatchObject({ ok: false, seal: null });
+	});
+
+	test("the messages avoid words a record does not earn", async () => {
+		const forbidden = /proof|enforceable|binding|tamper-proof|legally/iu;
+		const { forged, forgedLinks } = await extendedChain();
+		const stale = await verifyNoteBundle({
+			events: forged,
+			links: forgedLinks,
+			documents: bundle.documents,
+			keys: keys(),
+		});
+		const unsealed = await verifyBundle({ documents: [] });
+		for (const verdict of [stale, unsealed]) {
+			expect(
+				verdict.seal && !verdict.seal.ok && verdict.seal.message,
+			).toBeTruthy();
+			expect(
+				verdict.seal &&
+					!verdict.seal.ok &&
+					forbidden.test(verdict.seal.message),
+			).toBe(false);
 		}
 	});
 });

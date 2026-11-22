@@ -1,5 +1,7 @@
 import {
 	type ApprovalAction,
+	type ApprovalAgents,
+	type ApprovalPolicy,
 	addDays,
 	approvalStatus,
 	buildChain,
@@ -12,6 +14,7 @@ import {
 	documentSha256,
 	extendChain,
 	type Grant,
+	type GrantPurpose,
 	type GrantStatus,
 	grantsOf,
 	isValidCivilDate,
@@ -45,12 +48,14 @@ import {
 	releaseSummary,
 } from "./documents-service";
 import { isPlausibleEmail, maskEmail, normalizeEmail } from "./masking";
+import { isValidNoteId, noteIdFor } from "./note-ids";
 import {
 	type AgentIdentity,
 	type AgentRole,
 	NO_APPROVALS,
 	ORG_ID_PATTERN,
-	ORG_POLICY,
+	orgNotePath,
+	orgPolicyFor,
 } from "./org";
 import {
 	type OrgService,
@@ -58,16 +63,24 @@ import {
 	type RegisteredAgent,
 } from "./org-service";
 import { type Failure, failure, type Outcome } from "./outcome";
-import type { Clock, IdSource, MailSender } from "./ports";
+import {
+	type Clock,
+	type Defer,
+	type IdSource,
+	type MailSender,
+	unawaited,
+} from "./ports";
 import {
 	type ActiveSession,
 	basePathOf,
 	constantTimeEqual,
 	hashPrefix,
+	hmac,
 	SessionManager,
 	type SessionOptions,
 } from "./sessions";
 import {
+	disclosureEmail,
 	expiryAfter,
 	isProposer,
 	linkRefOf,
@@ -93,14 +106,13 @@ export type { ErrorCode, Failure, Outcome } from "./outcome";
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
-export const LINK_REQUESTS_PER_NOTE = 10;
+/** Link requests one client address (hashed) may make for one note in a window. */
+export const LINK_REQUESTS_PER_CLIENT = 10;
+/** Link requests one email address (hashed) may make for one note in a window. */
 export const LINK_REQUESTS_PER_ADDRESS = 3;
 export const LINK_WINDOW_MS = HOUR_MS;
-export const CODE_REQUESTS_PER_WINDOW = 5;
-export const CODE_REQUEST_WINDOW_MS = 10 * MINUTE_MS;
 const MAX_TEXT_LENGTH = 2000;
 const MAX_IDEM_LENGTH = 200;
-const ID_HEX_LENGTH = 32;
 const DATE_LENGTH = 10;
 const MINUTE_LENGTH = 16;
 const SEQ_START = 0;
@@ -108,12 +120,7 @@ const MAX_APPEND_ATTEMPTS = 2;
 /** The caller recorded on an idempotency record: there is one API key today. */
 export const API_CALLER = "api";
 
-/** The note id for a `(caller, idem)` pair: the same pair always names the same note, so a retry finds it. */
-export const noteIdFor = async (
-	caller: string,
-	idem: string,
-): Promise<string> =>
-	`nt_${(await sha256Hex(`tfd.note-id.v1:${caller}\n${idem}`)).slice(0, ID_HEX_LENGTH)}`;
+export { isValidNoteId, noteIdFor };
 
 type EventRule = {
 	roles: readonly Role[];
@@ -345,6 +352,8 @@ export interface NoteServiceDeps {
 	signers?: DocumentSigners | null;
 	/** The organization side. Absent: a note with an organization lender cannot be created. */
 	org?: OrgService | null;
+	/** Runs work after the response is sent (`ctx.waitUntil`). Absent: the work starts and nobody waits for it. */
+	defer?: Defer;
 	options?: {
 		/** How long after a release is drafted the lender may confirm it. Default 24 hours. */
 		releaseCoolingMs?: number;
@@ -392,41 +401,85 @@ const WAIVER_ANNOTATION =
 const agentStamp = (session: ActiveSession): { agent_ref?: string } =>
 	session.agent ? { agent_ref: session.agent.agentRef } : {};
 
-/** Two-person approval applies when the lender is an organization, which is exactly when the session is an agent's. */
-const policyFor = (session: ActiveSession) =>
-	session.agent ? ORG_POLICY : NO_APPROVALS;
+const REJECTED_DECLINED =
+	"The borrower said this is not their loan. Payments and notes can still be recorded; payoff statements and notices are paused.";
 
 /**
- * The failure for an event `checkAppend` refused. A release confirmation or a default notice without its approval is
- * `approval_required` and says what is missing; any other refusal (an agent approving their own request, say) is `rejected`.
+ * The failure for a release confirmation `checkAppend` refused. Without its approval it is `approval_required` and says
+ * what is missing; any other refusal (an agent approving their own request, say) is `rejected`. The release is the only
+ * step that comes here: a default notice picks its own approval first (`pickNoticeApproval`).
  */
 const approvalFailure = (
 	type: string,
 	earlier: readonly NoteEvent[],
 	candidate: Record<string, unknown>,
 	error: unknown,
+	agents: ApprovalAgents,
 ): Failure => {
-	if (type !== "release.confirmed" && type !== "notice.sent")
+	if (type !== "release.confirmed")
 		return failure("rejected", validatorReason(error));
-	const thing = type === "release.confirmed" ? "release" : "default notice";
-	const requested =
-		type === "release.confirmed"
-			? approvalStatus(earlier, {
-					action: "release.confirm",
-					target: typeof candidate.target === "string" ? candidate.target : "",
-				}).requested
-			: pendingApprovals(earlier, ORG_POLICY).some(
-					(pending) => pending.action === "notice.default",
-				);
+	const requested = approvalStatus(
+		earlier,
+		{
+			action: "release.confirm",
+			target: typeof candidate.target === "string" ? candidate.target : "",
+		},
+		agents,
+	).requested;
 	return requested
 		? failure(
 				"approval_required",
-				`The ${thing} is waiting for approval: a board member other than the person who asked must approve it first.`,
+				"The release is waiting for approval: a board member other than the person who asked must approve it first.",
 				{ missing: "approval" },
 			)
 		: failure(
 				"approval_required",
-				`A ${thing} needs two people. Ask for approval first; a board member other than you must then approve it.`,
+				"A release needs two people. Ask for approval first; a board member other than you must then approve it.",
+				{ missing: "request" },
+			);
+};
+
+/**
+ * The approval request a default notice for `cureDays` will use: the oldest request for `notice.default` with those cure
+ * days that has an approver (an agent still on the team) and that no notice has used yet. When there is none, the
+ * failure says whether to ask for one or to wait for a board member.
+ */
+const pickNoticeApproval = (
+	events: readonly NoteEvent[],
+	cureDays: number,
+	agents: ApprovalAgents,
+): { requestId: string } | Failure => {
+	const used = new Set<string>();
+	for (const event of events) {
+		if (event.type === "notice.sent" && event.approval !== undefined)
+			used.add(event.approval);
+	}
+	let waiting = false;
+	for (const event of events) {
+		if (
+			event.type !== "approval.requested" ||
+			event.action !== "notice.default" ||
+			event.cure_days !== cureDays ||
+			used.has(event.id)
+		)
+			continue;
+		const status = approvalStatus(
+			events,
+			{ action: event.action, target: event.target },
+			agents,
+		);
+		if (status.satisfied) return { requestId: event.id };
+		waiting = true;
+	}
+	return waiting
+		? failure(
+				"approval_required",
+				`The default notice for ${cureDays} days to cure is waiting for approval: a board member other than the person who asked must approve it first.`,
+				{ missing: "approval" },
+			)
+		: failure(
+				"approval_required",
+				`A default notice needs two people. Ask for approval for ${cureDays} days to cure first; a board member other than you must then approve it.`,
 				{ missing: "request" },
 			);
 };
@@ -449,6 +502,20 @@ export class NoteService {
 		);
 	}
 
+	/**
+	 * What needs two people for this session: for an organization agent the org policy, counting only the agents on the
+	 * team now (a request or an approval by someone who has left counts for nothing); for a guest, nothing.
+	 */
+	private async policyOf(session: ActiveSession): Promise<ApprovalPolicy> {
+		const { agent } = session;
+		if (agent === undefined) return NO_APPROVALS;
+		return orgPolicyFor(
+			this.deps.org
+				? await this.deps.org.activeAgentRefs(agent.orgId, session.noteId)
+				: new Set(),
+		);
+	}
+
 	private async loadLog(
 		noteId: string,
 	): Promise<{ raw: unknown[]; links: ChainLink[] }> {
@@ -460,8 +527,9 @@ export class NoteService {
 		noteId: string,
 		role: Role,
 		email: string,
+		options: { replace?: boolean } = {},
 	): Promise<void> {
-		const token = await this.sessions.issueInvite(noteId, role);
+		const token = await this.sessions.issueInvite(noteId, role, options);
 		await this.deps.mailer.send({
 			to: email,
 			subject: "A loan record is waiting for you",
@@ -510,7 +578,7 @@ export class NoteService {
 				"Send an idempotency key of 1 to 200 characters.",
 			);
 		const caller = input.caller ?? API_CALLER;
-		const noteId = await noteIdFor(caller, idem);
+		const noteId = await noteIdFor(this.deps.secret, caller, idem);
 		let fingerprint: string;
 		try {
 			fingerprint = await sha256Hex(
@@ -674,21 +742,32 @@ export class NoteService {
 	}
 
 	/**
-	 * A fresh link for the party whose address matches. The caller always answers the same text, whether or not an
-	 * address matched or a limit was hit, so the answer reveals nothing about who is on a note. Limits: per note and
-	 * per address (counted by a hash of the address, never the address).
+	 * A fresh link for the party whose address matches; that party's older links nobody opened stop working. The caller
+	 * always answers the same text, whether or not an address matched or a limit was hit, so the answer reveals nothing
+	 * about who is on a note, and the answer does not wait for the mail: the matching branch hands its work to `defer`,
+	 * so the response takes the same time either way. The caller has already checked the note id (`isValidNoteId`):
+	 * nothing is read or written for a made-up one. Limits: per address (counted by the sha256 of it, never the address)
+	 * and per client (a keyed hash of `CF-Connecting-IP`, when there is one), each per note and hour, so a flood of junk
+	 * addresses cannot use up the real party's allowance.
 	 */
-	async requestLink(noteId: string, email: string): Promise<void> {
+	async requestLink(
+		noteId: string,
+		email: string,
+		clientIp?: string,
+	): Promise<void> {
 		const { store, clock } = this.deps;
 		const address = normalizeEmail(email);
 		const now = clock.now();
-		const noteAllowed = await store.hit(
-			noteId,
-			"link:note",
-			now,
-			LINK_WINDOW_MS,
-			LINK_REQUESTS_PER_NOTE,
-		);
+		const clientAllowed =
+			clientIp === undefined
+				? true
+				: await store.hit(
+						noteId,
+						`link:client:${await hmac(this.deps.secret, `ip:${clientIp}`)}`,
+						now,
+						LINK_WINDOW_MS,
+						LINK_REQUESTS_PER_CLIENT,
+					);
 		const addressAllowed = await store.hit(
 			noteId,
 			`link:address:${await hashPrefix(address)}`,
@@ -696,7 +775,7 @@ export class NoteService {
 			LINK_WINDOW_MS,
 			LINK_REQUESTS_PER_ADDRESS,
 		);
-		if (!(noteAllowed && addressAllowed)) return;
+		if (!(clientAllowed && addressAllowed)) return;
 		const contacts = await store.getContacts(noteId);
 		if (contacts === null || address === "") return;
 		// An organization lender has no address on the note: its agents ask for a link on the organization's page.
@@ -711,13 +790,15 @@ export class NoteService {
 				? "borrower"
 				: null;
 		if (role === null) return;
-		try {
-			await this.sendInvite(noteId, role, contacts[role]);
-		} catch (error) {
-			console.error(
-				`notes: link email failed: ${error instanceof Error ? error.name : "error"}`,
-			);
-		}
+		(this.deps.defer ?? unawaited)(
+			this.sendInvite(noteId, role, contacts[role], { replace: true }).catch(
+				(error: unknown) => {
+					console.error(
+						`notes: link email failed: ${error instanceof Error ? error.name : "error"}`,
+					);
+				},
+			),
+		);
 	}
 
 	/** Emails a fresh step-up code for one kind of action to the session's own party. */
@@ -729,18 +810,8 @@ export class NoteService {
 			return failure("bad_request", "That action does not need a code.");
 		const denied = await this.gate(session, "act");
 		if (denied) return denied;
-		const allowed = await this.deps.store.hit(
-			session.noteId,
-			`code:${await hashPrefix(session.hash)}`,
-			this.deps.clock.now(),
-			CODE_REQUEST_WINDOW_MS,
-			CODE_REQUESTS_PER_WINDOW,
-		);
-		if (!allowed)
-			return failure(
-				"rate_limited",
-				"Too many codes. Try again in a few minutes.",
-			);
+		if (!(await this.sessions.canIssueCode(session)))
+			return failure("rate_limited", "Too many codes. Try again in an hour.");
 		const contacts = await this.deps.store.getContacts(session.noteId);
 		if (contacts === null) return failure("not_found", "No such note.");
 		// The code goes to the person acting: an agent's own address, never a shared one.
@@ -806,7 +877,11 @@ export class NoteService {
 			let ordered: NoteEvent[];
 			try {
 				ordered = validateStream([...raw, candidate]);
-				checkAppend(ordered.slice(0, -1), candidate, policyFor(session));
+				checkAppend(
+					ordered.slice(0, -1),
+					candidate,
+					await this.policyOf(session),
+				);
 			} catch (error) {
 				return failure("rejected", validatorReason(error));
 			}
@@ -901,7 +976,7 @@ export class NoteService {
 			case "locked":
 				return failure(
 					"step_up_invalid",
-					"Too many wrong tries. Ask for a new code.",
+					"Too many wrong tries. Try again in an hour.",
 				);
 			default:
 				return failure("step_up_invalid", "That code is not right.");
@@ -969,7 +1044,14 @@ export class NoteService {
 			basePath: basePathOf(session),
 			role,
 			lenderIsOrg,
-			org: agent ? orgViewOf(events, agent, release.draft?.id ?? null) : null,
+			org: agent
+				? orgViewOf(
+						events,
+						agent,
+						release.draft?.id ?? null,
+						await this.policyOf(session),
+					)
+				: null,
 			asOf,
 			terms: created.terms,
 			statement: current,
@@ -1121,11 +1203,13 @@ export class NoteService {
 		eventId: string | null,
 		sha256: string,
 		now: string,
+		variant = "",
 	): StoredDocument {
 		return {
 			id: this.deps.ids.next(),
 			type: body.type,
 			eventId,
+			variant,
 			sha256,
 			json: JSON.stringify(signed),
 			createdAt: now,
@@ -1176,10 +1260,17 @@ export class NoteService {
 			} catch (error) {
 				return failure("rejected", validatorReason(error));
 			}
+			const policy = await this.policyOf(session);
 			try {
-				checkAppend(ordered.slice(0, -1), candidate, policyFor(session));
+				checkAppend(ordered.slice(0, -1), candidate, policy);
 			} catch (error) {
-				return approvalFailure(type, ordered.slice(0, -1), candidate, error);
+				return approvalFailure(
+					type,
+					ordered.slice(0, -1),
+					candidate,
+					error,
+					policy,
+				);
 			}
 			const event = ordered[ordered.length - 1] as NoteEvent;
 			if (stepUp && !stepUpDone) {
@@ -1227,8 +1318,10 @@ export class NoteService {
 	}
 
 	/**
-	 * A signed receipt for one recorded payment, built against the chain head as it stands now. Either party may ask.
-	 * The first receipt issued for a payment is the only one: asking again returns the same stored bytes.
+	 * A signed receipt for one recorded payment, built against the chain head as it stands now. Either party may ask. A
+	 * payment has one receipt per status label ("claimed by borrower", "confirmed", "disputed", ...): asking again while
+	 * the label is the same returns the same stored bytes, and once the label has changed (a confirmation, a dispute, a
+	 * reversal) a new receipt is issued at the new chain head. A receipt holds only the entries up to its chain position.
 	 */
 	async issueReceipt(
 		session: ActiveSession,
@@ -1242,12 +1335,6 @@ export class NoteService {
 			return failure("bad_request", "Say which payment the receipt is for.");
 		const loaded = await this.loadVerified(session.noteId);
 		if (!loaded.ok) return loaded;
-		const existing = (await this.deps.store.listDocuments(session.noteId)).find(
-			(document) =>
-				document.type === "note.payment-receipt" &&
-				document.eventId === paymentEventId,
-		);
-		if (existing) return { ok: true, document: existing, created: false };
 		const now = this.deps.clock.now();
 		let body: NoteDocumentBody;
 		try {
@@ -1260,6 +1347,14 @@ export class NoteService {
 		} catch {
 			return failure("bad_request", "That is not a payment on this note.");
 		}
+		const label = body.type === "note.payment-receipt" ? body.status : "";
+		const existing = (await this.deps.store.listDocuments(session.noteId)).find(
+			(document) =>
+				document.type === "note.payment-receipt" &&
+				document.eventId === paymentEventId &&
+				document.variant === label,
+		);
+		if (existing) return { ok: true, document: existing, created: false };
 		const signed = await signDocument(body, configured.signers.receipt);
 		const candidate = this.storedDocument(
 			body,
@@ -1267,6 +1362,7 @@ export class NoteService {
 			paymentEventId,
 			await documentSha256(body),
 			now,
+			label,
 		);
 		const stored = await this.deps.store.putDocumentOnce(
 			session.noteId,
@@ -1315,6 +1411,8 @@ export class NoteService {
 			session,
 			"payoff.issued",
 			async (context) => {
+				if (this.stateOf(context.loaded.events).terms === "declined")
+					return failure("terms_declined", REJECTED_DECLINED);
 				let body: NoteDocumentBody;
 				try {
 					body = await payoffStatementBody(
@@ -1507,12 +1605,27 @@ export class NoteService {
 					"Too many notices today. Try again tomorrow.",
 				);
 		}
+		const agents = await this.policyOf(session);
 		const result = await this.commit(
 			session,
 			"notice.sent",
-			async () => ({
-				payload: kind === "default" ? { kind, cure_days: cureDays } : { kind },
-			}),
+			async ({ loaded }) => {
+				if (this.stateOf(loaded.events).terms === "declined")
+					return failure("terms_declined", REJECTED_DECLINED);
+				if (kind === "reminder") return { payload: { kind } };
+				// An organization's default notice names the approval it uses: which request, by its id.
+				if (session.agent === undefined)
+					return { payload: { kind, cure_days: cureDays } };
+				const picked = pickNoticeApproval(
+					loaded.events,
+					cureDays as number,
+					agents,
+				);
+				if ("ok" in picked) return picked;
+				return {
+					payload: { kind, cure_days: cureDays, approval: picked.requestId },
+				};
+			},
 			kind === "default" ? { code: options.code } : undefined,
 		);
 		if (!result.ok) return result;
@@ -1533,7 +1646,7 @@ export class NoteService {
 	 */
 	async requestApproval(
 		session: ActiveSession,
-		input: { action: unknown; target: unknown },
+		input: { action: unknown; target: unknown; cure_days?: unknown },
 	): Promise<Outcome<{ event: NoteEvent }>> {
 		if (session.agent === undefined)
 			return failure(
@@ -1550,11 +1663,33 @@ export class NoteService {
 			);
 		if (typeof target !== "string" || target === "" || target.length > 200)
 			return failure("bad_request", "Say what the approval is about.");
+		const cureDays = input.cure_days;
+		if (
+			action === "notice.default" &&
+			!(
+				typeof cureDays === "number" &&
+				Number.isInteger(cureDays) &&
+				cureDays >= 0 &&
+				cureDays <= MAX_CURE_DAYS
+			)
+		)
+			return failure(
+				"bad_request",
+				`Say how many days to cure the default notice gives, from 0 to ${MAX_CURE_DAYS}.`,
+			);
+		if (action !== "notice.default" && cureDays !== undefined)
+			return failure("bad_request", "Only a default notice has cure days.");
+		const agents = await this.policyOf(session);
 		const result = await this.commit(
 			session,
 			"approval.requested",
 			async ({ loaded }) => {
 				const known = loaded.events.find((event) => event.id === target);
+				if (
+					action === "notice.default" &&
+					this.stateOf(loaded.events).terms === "declined"
+				)
+					return failure("terms_declined", REJECTED_DECLINED);
 				if (action === "release.confirm") {
 					if (known?.type !== "release.drafted")
 						return failure("bad_request", "No such release draft.");
@@ -1583,7 +1718,7 @@ export class NoteService {
 							"bad_request",
 							"That is not an entry of this record.",
 						);
-					const waiting = pendingApprovals(loaded.events, ORG_POLICY).some(
+					const waiting = pendingApprovals(loaded.events, agents).some(
 						(pending) => pending.action === action && pending.target === target,
 					);
 					if (waiting)
@@ -1592,7 +1727,12 @@ export class NoteService {
 							"An approval for this is already waiting for a board member.",
 						);
 				}
-				return { payload: { action, target } };
+				return {
+					payload:
+						action === "notice.default"
+							? { action, target, cure_days: cureDays }
+							: { action, target },
+				};
 			},
 		);
 		if (!result.ok) return result;
@@ -1807,7 +1947,59 @@ export class NoteService {
 			expiresAt,
 			false,
 		);
+		await this.notifyOtherParty(session, {
+			recipientEmail: spec.recipientEmail,
+			purpose: spec.carveOut.purpose as GrantPurpose,
+			expiresAt,
+		});
 		return { ok: true, grantId, status: "active", mailed };
+	}
+
+	/**
+	 * Tells the party who did not make a disclosure that it exists: the proposer needs no consent from them, so this
+	 * email is how they hear of it. For an organization lender the other party is its team (treasurers and board
+	 * members); for a person it is the address on the note. Best effort: the disclosure stands and is listed on the
+	 * other party's page even when a message cannot be sent.
+	 */
+	private async notifyOtherParty(
+		session: ActiveSession,
+		disclosure: {
+			recipientEmail: string;
+			purpose: GrantPurpose;
+			expiresAt: string;
+		},
+	): Promise<void> {
+		const { store, mailer, baseUrl } = this.deps;
+		const { noteId } = session;
+		const contacts = await store.getContacts(noteId);
+		if (contacts === null) return;
+		const orgId = await store.getOrg(noteId);
+		const targets: { to: string; url: string }[] = [];
+		if (session.role === "lender") {
+			targets.push({ to: contacts.borrower, url: `${baseUrl}/n/${noteId}` });
+		} else if (orgId === null) {
+			targets.push({ to: contacts.lender, url: `${baseUrl}/n/${noteId}` });
+		} else {
+			for (const agent of await store.listAgents(noteId)) {
+				if (agent.active && agent.role !== "viewer")
+					targets.push({
+						to: agent.email,
+						url: `${baseUrl}${orgNotePath(orgId, noteId)}`,
+					});
+			}
+		}
+		for (const target of targets) {
+			try {
+				await mailer.send({
+					to: target.to,
+					...disclosureEmail({ ...disclosure, notePageUrl: target.url }),
+				});
+			} catch (error) {
+				console.error(
+					`notes: disclosure email failed: ${error instanceof Error ? error.name : "error"}`,
+				);
+			}
+		}
 	}
 
 	/**

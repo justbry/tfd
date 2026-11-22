@@ -3,9 +3,11 @@ import { type AgentRole, orgCsrfMessage } from "./org";
 import type { OrgStore } from "./org-store";
 import type { Clock, IdSource } from "./ports";
 import {
+	COOKIE_ATTRIBUTES,
 	constantTimeEqual,
 	hmac,
 	INVITE_TTL_MS,
+	readCookie,
 	SESSION_ABSOLUTE_MS,
 	SESSION_IDLE_MS,
 } from "./sessions";
@@ -20,31 +22,32 @@ import {
 const SECOND_MS = 1000;
 const TOKEN_BYTES = 32;
 
-export const ORG_SESSION_COOKIE = "__Secure-tf_org";
+/** One cookie name per organization (`__Host-` needs `Path=/`, so the scope is in the name). */
+export const orgSessionCookieName = (orgId: string): string =>
+	`__Host-tf_org_${orgId}`;
 
 export const orgSessionCookie = (
 	orgId: string,
 	value: string,
 	maxAgeSeconds: number,
 ): string =>
-	`${ORG_SESSION_COOKIE}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/o/${orgId}; Max-Age=${maxAgeSeconds}`;
+	`${orgSessionCookieName(orgId)}=${value}; ${COOKIE_ATTRIBUTES}; Max-Age=${maxAgeSeconds}`;
 
 export const clearedOrgSessionCookie = (orgId: string): string =>
-	`${ORG_SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/o/${orgId}; Max-Age=0`;
+	`${orgSessionCookieName(orgId)}=; ${COOKIE_ATTRIBUTES}; Max-Age=0`;
 
-export const readOrgSessionCookie = (header: string | null): string | null => {
-	if (!header) return null;
-	for (const part of header.split(";")) {
-		const [name, ...rest] = part.trim().split("=");
-		if (name === ORG_SESSION_COOKIE) return rest.join("=") || null;
-	}
-	return null;
-};
+export const readOrgSessionCookie = (
+	header: string | null,
+	orgId: string,
+): string | null => readCookie(header, orgSessionCookieName(orgId));
 
-/** A signed-in agent. `hash` is the key of the session row, not the cookie. */
+/**
+ * A signed-in agent. `hash` is the key of the session row, not the cookie. `agentId` is the agent's organization-wide
+ * identity: it never reaches a note, an event or a page (a note carries a per-note `agentRef`).
+ */
 export interface OrgSession {
 	orgId: string;
-	agentRef: string;
+	agentId: string;
 	role: AgentRole;
 	hash: string;
 }
@@ -64,11 +67,16 @@ export class OrgSessionManager {
 	}
 
 	/** A fresh single-use link token for one agent. Returns the token; the store keeps its hash. */
-	async issueLink(orgId: string, agentRef: string): Promise<string> {
+	async issueLink(
+		orgId: string,
+		agentId: string,
+		options: { replace?: boolean } = {},
+	): Promise<string> {
+		if (options.replace) await this.deps.orgs.deleteLinksOf(orgId, agentId);
 		const token = this.deps.ids.token(TOKEN_BYTES);
 		await this.deps.orgs.putLink(orgId, {
 			hash: await sha256Hex(token),
-			agentRef,
+			agentId,
 			expiresAt: this.after(INVITE_TTL_MS),
 		});
 		return token;
@@ -81,15 +89,15 @@ export class OrgSessionManager {
 	): Promise<{ cookieValue: string; maxAgeSeconds: number } | null> {
 		const { orgs, clock, ids } = this.deps;
 		const now = clock.now();
-		const agentRef = await orgs.redeemLink(orgId, await sha256Hex(token), now);
-		if (agentRef === null) return null;
-		const agent = await orgs.getAgent(orgId, agentRef);
+		const agentId = await orgs.redeemLink(orgId, await sha256Hex(token), now);
+		if (agentId === null) return null;
+		const agent = await orgs.getAgent(orgId, agentId);
 		if (!agent?.active) return null;
 		const cookieValue = ids.token(TOKEN_BYTES);
 		await orgs.putSession({
 			hash: await sha256Hex(cookieValue),
 			orgId,
-			agentRef,
+			agentId,
 			createdAt: now,
 			lastSeenAt: now,
 			absoluteExpiresAt: this.after(SESSION_ABSOLUTE_MS),
@@ -117,15 +125,20 @@ export class OrgSessionManager {
 			SESSION_IDLE_MS,
 		);
 		if (record === null || record.orgId !== orgId) return null;
-		const agent = await this.deps.orgs.getAgent(orgId, record.agentRef);
+		const agent = await this.deps.orgs.getAgent(orgId, record.agentId);
 		if (!agent?.active) return null;
-		return { orgId, agentRef: record.agentRef, role: agent.role, hash };
+		return { orgId, agentId: record.agentId, role: agent.role, hash };
+	}
+
+	/** Ends this one session on the server: its cookie opens nothing from now on. */
+	end(session: Pick<OrgSession, "orgId" | "hash">): Promise<void> {
+		return this.deps.orgs.deleteSession(session.orgId, session.hash);
 	}
 
 	/** Ends every live session and pending link of an agent. */
-	async revokeAgent(orgId: string, agentRef: string): Promise<void> {
-		await this.deps.orgs.deleteSessionsOf(orgId, agentRef);
-		await this.deps.orgs.deleteLinksOf(orgId, agentRef);
+	async revokeAgent(orgId: string, agentId: string): Promise<void> {
+		await this.deps.orgs.deleteSessionsOf(orgId, agentId);
+		await this.deps.orgs.deleteLinksOf(orgId, agentId);
 	}
 
 	csrfToken(session: Pick<OrgSession, "orgId" | "hash">): Promise<string> {

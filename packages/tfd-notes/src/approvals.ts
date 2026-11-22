@@ -6,17 +6,30 @@
  * append, never read a clock and never change their input.
  */
 
+import { addDaysToInstant, compareInstants, isInstant } from "./instant";
 import type {
 	ApprovalAction,
 	ApprovalGrantedEvent,
 	ApprovalRequestedEvent,
 	NoteEvent,
+	NoticeSentEvent,
 } from "./types";
+
+/** An approval request may be used by a default notice entered up to this many days after the request. */
+export const APPROVAL_MAX_AGE_DAYS = 30;
 
 /** The actions that need two distinct agents. An action absent from the set needs no second approver. */
 export interface ApprovalPolicy {
 	twoPerson: ReadonlySet<ApprovalAction>;
+	/**
+	 * The `agent_ref`s that may act for the organization now. When present, a request or a grant by any other agent
+	 * (one who has left, say) counts for nothing. Absent means every agent counts.
+	 */
+	activeAgents?: ReadonlySet<string>;
 }
+
+/** The part of a policy that decides which agents count. */
+export type ApprovalAgents = Pick<ApprovalPolicy, "activeAgents">;
 
 export interface ApprovalRequestKey {
 	action: ApprovalAction;
@@ -48,13 +61,20 @@ const isRequest = (event: NoteEvent): event is ApprovalRequestedEvent =>
 const isGrant = (event: NoteEvent): event is ApprovalGrantedEvent =>
 	event.type === "approval.granted";
 
-/** Approvers of one request: the distinct agents of its grants, excluding the requester. Order of first grant. */
+const isActive = (agents: ApprovalAgents, agent: string): boolean =>
+	agents.activeAgents === undefined || agents.activeAgents.has(agent);
+
+/**
+ * Approvers of one request: the distinct agents of its grants, excluding the requester, in order of first grant. A
+ * request by an agent who is not active has none, and a grant by an agent who is not active is skipped.
+ */
 const approversOf = (
 	events: readonly NoteEvent[],
 	request: ApprovalRequestedEvent,
+	agents: ApprovalAgents,
 ): string[] => {
 	const approvers: string[] = [];
-	if (request.agent_ref === undefined) {
+	if (request.agent_ref === undefined || !isActive(agents, request.agent_ref)) {
 		return approvers;
 	}
 	for (const event of events) {
@@ -64,6 +84,7 @@ const approversOf = (
 		const agent = event.agent_ref;
 		if (
 			agent !== undefined &&
+			isActive(agents, agent) &&
 			agent !== request.agent_ref &&
 			!approvers.includes(agent)
 		) {
@@ -76,8 +97,9 @@ const approversOf = (
 const statusOfRequest = (
 	events: readonly NoteEvent[],
 	request: ApprovalRequestedEvent,
+	agents: ApprovalAgents,
 ): ApprovalStatus => {
-	const grantedBy = approversOf(events, request);
+	const grantedBy = approversOf(events, request, agents);
 	return {
 		requested: true,
 		requester_agent: request.agent_ref ?? null,
@@ -99,11 +121,13 @@ const findRequest = (
 
 /**
  * Where one approval request stands. When the same action and target were requested more than once, the first request
- * answers (grants name a request by id, so a later duplicate has its own count).
+ * answers (grants name a request by id, so a later duplicate has its own count). With `agents.activeAgents`, only
+ * active agents count (see `ApprovalPolicy`).
  */
 export const approvalStatus = (
 	events: readonly NoteEvent[],
 	request: ApprovalRequestKey,
+	agents: ApprovalAgents = {},
 ): ApprovalStatus => {
 	const found = findRequest(events, request);
 	if (found === undefined) {
@@ -114,7 +138,7 @@ export const approvalStatus = (
 			satisfied: false,
 		};
 	}
-	return statusOfRequest(events, found);
+	return statusOfRequest(events, found, agents);
 };
 
 const fail = (message: string): never => {
@@ -145,7 +169,11 @@ const checkRelease = (
 		return;
 	}
 	const target = requireString(candidate, "release.confirmed", "target");
-	const status = approvalStatus(events, { action: "release.confirm", target });
+	const status = approvalStatus(
+		events,
+		{ action: "release.confirm", target },
+		policy,
+	);
 	if (!status.requested) {
 		fail(
 			`release.confirmed: draft ${JSON.stringify(target)} has no approval request (action release.confirm)`,
@@ -158,6 +186,46 @@ const checkRelease = (
 	}
 };
 
+/** Why `request` cannot back a default notice with this `cure_days`, entered at `enteredAt`, or null when it can. */
+const requestProblem = (
+	events: readonly NoteEvent[],
+	request: ApprovalRequestedEvent,
+	candidate: Record<string, unknown>,
+	enteredAt: string,
+	policy: ApprovalPolicy,
+): string | null => {
+	if (!statusOfRequest(events, request, policy).satisfied) {
+		return "has no approval from a second agent";
+	}
+	const usedBy = events.find(
+		(event): event is NoticeSentEvent =>
+			event.type === "notice.sent" && event.approval === request.id,
+	);
+	if (usedBy !== undefined) {
+		return `is already used by the notice at seq ${usedBy.seq}`;
+	}
+	if (request.cure_days !== candidate.cure_days) {
+		return `covers cure_days ${request.cure_days}, not ${JSON.stringify(candidate.cure_days)}`;
+	}
+	if (compareInstants(request.entered_at, enteredAt) > 0) {
+		return "was entered after the notice";
+	}
+	if (
+		compareInstants(
+			enteredAt,
+			addDaysToInstant(request.entered_at, APPROVAL_MAX_AGE_DAYS),
+		) > 0
+	) {
+		return `is more than ${APPROVAL_MAX_AGE_DAYS} days older than the notice`;
+	}
+	return null;
+};
+
+/**
+ * A default notice, when the policy requires two people for it, names its own approval: a satisfied request for
+ * `notice.default` that no other notice uses, with the same `cure_days`, entered at most `APPROVAL_MAX_AGE_DAYS` days
+ * before the notice. The candidate's `entered_at` is the notice's time and must be a valid instant.
+ */
 const checkDefaultNotice = (
 	events: readonly NoteEvent[],
 	candidate: Record<string, unknown>,
@@ -166,30 +234,33 @@ const checkDefaultNotice = (
 	if (candidate.kind !== "default" || !policy.twoPerson.has("notice.default")) {
 		return;
 	}
-	let satisfied = 0;
-	let sent = 0;
-	for (const event of events) {
-		if (
-			isRequest(event) &&
-			event.action === "notice.default" &&
-			statusOfRequest(events, event).satisfied
-		) {
-			satisfied += 1;
-		}
-		if (event.type === "notice.sent" && event.kind === "default") {
-			sent += 1;
-		}
+	const label = "notice.sent";
+	const approvalId = requireString(candidate, label, "approval");
+	const { entered_at: enteredAt } = candidate;
+	if (!isInstant(enteredAt)) {
+		fail(`${label}: entered_at must be an ISO 8601 UTC instant ending in Z`);
+		return;
 	}
-	if (satisfied <= sent) {
+	const request = events.find(
+		(event): event is ApprovalRequestedEvent =>
+			isRequest(event) && event.id === approvalId,
+	);
+	if (request === undefined || request.action !== "notice.default") {
 		fail(
-			`notice.sent: a default notice needs its own approved request (action notice.default); ${satisfied} approved, ${sent} already sent`,
+			`${label}: approval ${JSON.stringify(approvalId)} is not an approval request for notice.default`,
 		);
+		return;
+	}
+	const problem = requestProblem(events, request, candidate, enteredAt, policy);
+	if (problem !== null) {
+		fail(`${label}: approval ${JSON.stringify(approvalId)} ${problem}`);
 	}
 };
 
 const checkGrant = (
 	events: readonly NoteEvent[],
 	candidate: Record<string, unknown>,
+	policy: ApprovalPolicy,
 ): void => {
 	const label = "approval.granted";
 	const requestId = requireString(candidate, label, "request");
@@ -211,7 +282,10 @@ const checkGrant = (
 	if (agent === request.agent_ref) {
 		fail(`${label}: an agent cannot approve their own request`);
 	}
-	if (approversOf(events, request).includes(agent)) {
+	if (!isActive(policy, agent)) {
+		fail(`${label}: agent ${JSON.stringify(agent)} is not an active agent`);
+	}
+	if (approversOf(events, request, {}).includes(agent)) {
 		fail(
 			`${label}: agent ${JSON.stringify(agent)} already approved request ${JSON.stringify(requestId)}`,
 		);
@@ -221,7 +295,8 @@ const checkGrant = (
 /**
  * Refuses, with a one-line error, a new event the approval rules forbid. Call it before appending. It reads only the
  * fields it needs from `candidate`, which may be unvalidated. A `release.confirmed` and a `default` `notice.sent` need
- * approval only when the policy lists the action; an `approval.granted` is always checked. Anything else passes.
+ * approval only when the policy lists the action; an `approval.granted` is always checked (and refused from an agent
+ * outside `policy.activeAgents`). Anything else passes.
  */
 export const checkAppend = (
 	events: readonly NoteEvent[],
@@ -240,7 +315,7 @@ export const checkAppend = (
 			checkDefaultNotice(events, candidate, policy);
 			return;
 		case "approval.granted":
-			checkGrant(events, candidate);
+			checkGrant(events, candidate, policy);
 			return;
 		default:
 			return;
@@ -257,7 +332,7 @@ export const pendingApprovals = (
 		if (
 			!isRequest(event) ||
 			!policy.twoPerson.has(event.action) ||
-			statusOfRequest(events, event).satisfied
+			statusOfRequest(events, event, policy).satisfied
 		) {
 			continue;
 		}

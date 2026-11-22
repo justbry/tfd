@@ -7,19 +7,9 @@
  *
  * Documents carry no name or email: `parties` holds only opaque references the caller chose.
  */
-import {
-	canonicalJson,
-	sha256Hex,
-	toBase64Url,
-	utf8Bytes,
-} from "./canonical.js";
-import {
-	type ChainHead,
-	type ChainLink,
-	chainHead,
-	eventHash,
-} from "./chain.js";
-import { statement, statusLabel } from "./statement.js";
+import { canonicalJson, sha256Hex, toBase64Url, utf8Bytes } from "./canonical";
+import { type ChainHead, type ChainLink, chainHead, eventHash } from "./chain";
+import { statement, statusLabel } from "./statement";
 import {
 	type CivilDate,
 	ENGINE_VERSION,
@@ -29,7 +19,7 @@ import {
 	type PaymentRecordedEvent,
 	type PaymentStatus,
 	type Role,
-} from "./types.js";
+} from "./types";
 
 export const NOTE_DOCUMENT_SCHEMA = "tfd.note-document.v1";
 

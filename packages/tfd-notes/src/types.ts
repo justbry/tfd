@@ -171,6 +171,11 @@ export interface NoticeSentEvent extends EventBase {
 	kind: NoticeKind;
 	/** Days the borrower has to cure, 0 to 365. Required when `kind` is `default`, forbidden for `reminder`. */
 	cure_days?: number;
+	/**
+	 * The `id` of the `approval.requested` (action `notice.default`, same `cure_days`) this notice uses. Allowed only
+	 * when `kind` is `default`. An organization's policy may make it required (`checkAppend`).
+	 */
+	approval?: string;
 }
 
 /** A new contact commitment for `role`, confirmed by the other party (who is `entered_by`). Carries no email. */
@@ -192,12 +197,7 @@ export interface GrantAudience {
 }
 
 /** Why a carve-out disclosure is made: the person needs it for their own books, legal advice, enforcement or assignment. */
-export type GrantPurpose =
-	| "accountant"
-	| "lawyer"
-	| "court"
-	| "assignee"
-	| "other";
+export type GrantPurpose = "accountant" | "lawyer" | "court" | "assignee";
 
 export interface GrantProposedEvent extends EventBase {
 	type: "visibility.changed";
@@ -205,13 +205,13 @@ export interface GrantProposedEvent extends EventBase {
 	grant_id: string;
 	audience: GrantAudience;
 	level: GrantLevel;
-	/** Required. UTC instant ending in Z, at most 365 days after `entered_at`. */
+	/** Required. UTC instant ending in Z, at most 365 days after `entered_at` (90 days for a carve-out). */
 	expires_at: string;
 	/** Required when `carve_out` is true. */
 	purpose?: GrantPurpose;
 	/**
 	 * The typed carve-out disclosure: either party may disclose to a person who needs it for their own books, legal
-	 * advice, enforcement or assignment. Only to a `person`, at `summary` or `statement` level.
+	 * advice, enforcement or assignment. Only to a `person`, at `summary` or `statement` level, for at most 90 days.
 	 */
 	carve_out?: boolean;
 }
@@ -232,6 +232,11 @@ export interface ApprovalRequestedEvent extends EventBase {
 	action: ApprovalAction;
 	/** The `id` of an earlier event the action is about. */
 	target: string;
+	/**
+	 * The cure period, in days (0 to 365), this approval covers. Required when `action` is `notice.default`, forbidden
+	 * otherwise: the default notice that uses the approval must carry the same `cure_days`.
+	 */
+	cure_days?: number;
 }
 
 export interface ApprovalGrantedEvent extends EventBase {

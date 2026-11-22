@@ -13,6 +13,7 @@ import {
 	validateStream,
 } from "tfd-notes";
 import { verifyNoteBundle, verifyNoteDocument } from "tfd-verify-notes";
+import { durableSqlDatabase } from "../src/do-sql";
 import {
 	migrateNote,
 	NOTE_MIGRATIONS,
@@ -732,6 +733,7 @@ describe("the stores", () => {
 		id,
 		type: "note.payment-receipt",
 		eventId,
+		variant: "",
 		sha256: "a".repeat(64),
 		json: `{"id":"${id}"}`,
 		createdAt: "2026-11-22T09:00:00.000Z",
@@ -769,6 +771,70 @@ describe("the stores", () => {
 	);
 
 	test.each(both)(
+		"%s: a document is one per (type, event, variant): the same event with another variant is a new document",
+		async (_name, make) => {
+			const store = make();
+			const confirmed = { ...sample("d1", "e1"), variant: "confirmed" };
+			const disputed = { ...sample("d2", "e1"), variant: "disputed" };
+			expect((await store.putDocumentOnce("nt_a", confirmed)).id).toBe("d1");
+			expect((await store.putDocumentOnce("nt_a", disputed)).id).toBe("d2");
+			expect(
+				(
+					await store.putDocumentOnce("nt_a", {
+						...sample("d3", "e1"),
+						variant: "disputed",
+					})
+				).id,
+			).toBe("d2");
+			expect(
+				(await store.listDocuments("nt_a")).map((d) => [d.id, d.variant]),
+			).toEqual([
+				["d1", "confirmed"],
+				["d2", "disputed"],
+			]);
+		},
+	);
+
+	test.each(both)(
+		"%s: a party's unopened links can be deleted, and a share session can be ended",
+		async (_name, make) => {
+			const store = make();
+			const later = "2026-11-23T09:00:00.000Z";
+			const now = "2026-11-22T09:00:00.000Z";
+			await store.putInvite("nt_a", {
+				hash: "h1",
+				role: "borrower",
+				expiresAt: later,
+			});
+			await store.putInvite("nt_a", {
+				hash: "h2",
+				role: "borrower",
+				expiresAt: later,
+			});
+			await store.putInvite("nt_a", {
+				hash: "h3",
+				role: "lender",
+				expiresAt: later,
+			});
+			expect(await store.redeemInvite("nt_a", "h1", now)).toBe("borrower");
+			await store.deleteInvites("nt_a", "borrower");
+			expect(await store.redeemInvite("nt_a", "h2", now)).toBeNull();
+			expect(await store.redeemInvite("nt_a", "h3", now)).toBe("lender");
+			await store.putShareSession("nt_a", {
+				hash: "s1",
+				grantId: "g1",
+				createdAt: now,
+				absoluteExpiresAt: later,
+			});
+			expect((await store.getShareSession("nt_a", "s1", now))?.grantId).toBe(
+				"g1",
+			);
+			await store.deleteShareSession("nt_a", "s1");
+			expect(await store.getShareSession("nt_a", "s1", now)).toBeNull();
+		},
+	);
+
+	test.each(both)(
 		"%s: an older seal never replaces a newer one",
 		async (_name, make) => {
 			const store = make();
@@ -796,6 +862,28 @@ describe("the stores", () => {
 			.map((row) => String(row.name));
 		expect(tables).toContain("note_documents");
 		expect(tables).toContain("note_seal");
+	});
+
+	test("a Durable Object made before step 6 keeps its documents (variant empty) and then takes one receipt per status", async () => {
+		const state = durableState(new Database(":memory:"));
+		const { sql } = state.storage;
+		// The schema as released before the variant column: steps 1 to 5 only.
+		sql.exec("CREATE TABLE schema_version (version INTEGER NOT NULL)");
+		sql.exec("INSERT INTO schema_version (version) VALUES (5)");
+		const db = durableSqlDatabase(state.storage);
+		for (const step of NOTE_MIGRATIONS.slice(0, 5)) db.exec(step);
+		sql.exec(
+			"INSERT INTO note_documents (doc_id, note_id, doc_type, event_id, sha256, body, created_at) VALUES ('old', 'nt_a', 'note.payment-receipt', 'e1', 'x', '{}', 't')",
+		);
+		expect(migrateNote(state)).toBe(NOTE_MIGRATIONS.length);
+		const store = new SqliteNoteStore(state);
+		const [old] = await store.listDocuments("nt_a");
+		expect(old).toMatchObject({ id: "old", variant: "" });
+		const next = await store.putDocumentOnce("nt_a", {
+			...sample("new", "e1"),
+			variant: "disputed",
+		});
+		expect(next.id).toBe("new");
 	});
 
 	test.each(both)(

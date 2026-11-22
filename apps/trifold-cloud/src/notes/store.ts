@@ -55,12 +55,14 @@ export interface CodeRecord {
 /**
  * One signed document, kept as the exact JSON text that was issued so it can be served again byte for byte. `eventId`
  * is the event the document is about (the payment of a receipt, the `payoff.issued` or `release.confirmed` event), or
- * null; one document exists per `(type, eventId)` when `eventId` is set.
+ * null; one document exists per `(type, eventId, variant)` when `eventId` is set. `variant` is `""` except on a payment
+ * receipt, where it is the status label the receipt shows (so a payment that is later disputed gets a new receipt).
  */
 export interface StoredDocument {
 	id: string;
 	type: NoteDocumentBody["type"];
 	eventId: string | null;
+	variant: string;
 	/** sha256 hex of the body's canonical JSON (`documentSha256`). */
 	sha256: string;
 	json: string;
@@ -127,8 +129,8 @@ export interface NoteStore {
 		entry: { eventJson: string; link: ChainLink; document?: StoredDocument },
 	): Promise<AppendResult>;
 	/**
-	 * Stores `document`, unless one with the same `(type, eventId)` exists (only when `eventId` is not null): then
-	 * nothing is written and the existing one is returned. So the first issued receipt of a payment is the only one.
+	 * Stores `document`, unless one with the same `(type, eventId, variant)` exists (only when `eventId` is not null):
+	 * then nothing is written and the existing one is returned. So a payment gets one receipt per status label.
 	 */
 	putDocumentOnce(
 		noteId: string,
@@ -162,6 +164,8 @@ export interface NoteStore {
 	putInvite(noteId: string, invite: InviteRecord): Promise<void>;
 	/** Marks the invite used and returns its role, or null when it is unknown, used or past `expiresAt`. */
 	redeemInvite(noteId: string, hash: string, now: string): Promise<Role | null>;
+	/** Deletes the links of `role` that nobody has opened, so only a newer one works. */
+	deleteInvites(noteId: string, role: Role): Promise<void>;
 	putSession(noteId: string, session: SessionRecord): Promise<void>;
 	/**
 	 * The session, with its last-seen moved to `now`, or null when it is unknown, idle for more than `idleMs` or past
@@ -174,7 +178,7 @@ export interface NoteStore {
 		idleMs: number,
 	): Promise<SessionRecord | null>;
 	deleteSession(noteId: string, hash: string): Promise<void>;
-	/** Replaces the session's code and resets its attempts. */
+	/** Replaces the session's code. The caller counts tries over time (`hit`), so a new code buys no new guesses. */
 	putCode(noteId: string, sessionHash: string, code: CodeRecord): Promise<void>;
 	takeAttempt(
 		noteId: string,
@@ -221,6 +225,7 @@ export interface NoteStore {
 		hash: string,
 		now: string,
 	): Promise<ShareSessionRecord | null>;
+	deleteShareSession(noteId: string, hash: string): Promise<void>;
 	/**
 	 * Records `(caller, key)` with the request's fingerprint the first time: `new`. The same fingerprint again is
 	 * `same`; a different one is `different` (the key was reused for another request).

@@ -22,7 +22,7 @@ import {
 	orgSessionCookie,
 	readOrgSessionCookie,
 } from "./org-sessions";
-import { messagePage } from "./pages";
+import { messagePage, signedOutPage } from "./pages";
 import type { GetSession } from "./sessions";
 
 /**
@@ -33,6 +33,7 @@ import type { GetSession } from "./sessions";
  * | ledger | `GET /o/:orgId/enter?t=&n=` | none; shows a button, redeems nothing |
  * | ledger | `POST /o/:orgId/enter` | the link token in the form |
  * | ledger | `POST /o/:orgId/link` | none; same answer for any address |
+ * | ledger | `POST /o/:orgId/logout` | organization session and CSRF token; ends the session on the server |
  * | ledger | `GET /o/:orgId` | organization session, any role |
  * | ledger | `GET /o/:orgId/board.csv`, `/board.json` | organization session, treasurer or board |
  *
@@ -40,8 +41,8 @@ import type { GetSession } from "./sessions";
  */
 
 const ORG_PATH =
-	/^\/o\/([A-Za-z0-9_-]{1,64})(?:\/(enter|link|board\.csv|board\.json))?\/?$/;
-const NOTE_PARAM = /^[A-Za-z0-9_-]{8,80}$/;
+	/^\/o\/([A-Za-z0-9_-]{1,64})(?:\/(enter|link|logout|board\.csv|board\.json))?\/?$/;
+const NOTE_PARAM = /^[A-Za-z0-9_.-]{8,80}$/;
 
 export const ownsOrgPath = (url: URL): boolean => ORG_PATH.test(url.pathname);
 
@@ -55,7 +56,7 @@ const orgSessionOf = (
 ): Promise<OrgSession | null> =>
 	org.sessions.resolve(
 		orgId,
-		readOrgSessionCookie(request.headers.get("Cookie")),
+		readOrgSessionCookie(request.headers.get("Cookie"), orgId),
 	);
 
 const signedOut = (orgId: string, clear: boolean): Response =>
@@ -123,8 +124,33 @@ const handleLink = async (
 	if (!sameOrigin(request, url))
 		return forbiddenPage("That request came from another site.");
 	const form = await readForm(request);
-	await org.requestLink(orgId, form?.email ?? "");
+	await org.requestLink(
+		orgId,
+		form?.email ?? "",
+		request.headers.get("CF-Connecting-IP") ?? undefined,
+	);
 	return page(orgLinkRequestedPage());
+};
+
+/** Ends this organization session on the server and clears the cookie. A form post with the CSRF token. */
+const handleLogout = async (
+	request: Request,
+	url: URL,
+	org: OrgService,
+	orgId: string,
+): Promise<Response | null> => {
+	if (request.method !== "POST") return null;
+	if (!sameOrigin(request, url))
+		return forbiddenPage("That request came from another site.");
+	const session = await orgSessionOf(org, request, orgId);
+	if (session === null) return signedOut(orgId, false);
+	const form = await readForm(request);
+	if (!(await org.sessions.checkCsrf(session, form?.csrf ?? null)))
+		return forbiddenPage("That form has expired. Go back and try again.");
+	await org.sessions.end(session);
+	return page(signedOutPage(), 200, {
+		"Set-Cookie": clearedOrgSessionCookie(orgId),
+	});
 };
 
 const handlePortfolio = async (
@@ -135,7 +161,7 @@ const handlePortfolio = async (
 	if (request.method !== "GET") return null;
 	const session = await orgSessionOf(org, request, orgId);
 	if (session === null) return signedOut(orgId, true);
-	const result = await org.portfolio(orgId);
+	const result = await org.portfolio(orgId, undefined, session.agentId);
 	if (!result.ok)
 		return page(
 			messagePage("Not available", result.message),
@@ -145,7 +171,6 @@ const handlePortfolio = async (
 		portfolioPage({
 			orgId,
 			role: session.role,
-			agentRef: session.agentRef,
 			csrf: await org.sessions.csrfToken(session),
 			asOf: result.asOf,
 			data: result,
@@ -190,7 +215,11 @@ const handleBoard = async (
 		: download(JSON.stringify(report), `board-report-${result.asOf}.json`);
 };
 
-/** An organization-level request, or null when the path is not one. An organization nobody registered is a 404. */
+/**
+ * An organization-level request, or null when the path is not one. An organization nobody registered gets exactly what
+ * a known one gets from a visitor who is not signed in (the sign-in page, the same form, the same link answer), so
+ * the answers tell a stranger nothing about which organizations exist.
+ */
 export const orgRoute = async (
 	request: Request,
 	url: URL,
@@ -199,12 +228,13 @@ export const orgRoute = async (
 	const matched = ORG_PATH.exec(url.pathname);
 	if (matched === null) return null;
 	const orgId = matched[1] as string;
-	if (!(await org.exists(orgId))) return notFoundPage();
 	switch (matched[2]) {
 		case "enter":
 			return handleEnter(request, url, org, orgId);
 		case "link":
 			return handleLink(request, url, org, orgId);
+		case "logout":
+			return handleLogout(request, url, org, orgId);
 		case "board.csv":
 			return handleBoard(request, url, org, orgId, true);
 		case "board.json":

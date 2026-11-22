@@ -5,8 +5,8 @@
  * or inserting an event changes every later link. The chain reads `seq` and the event's own bytes only: `value_date` is
  * a payload field and `entered_at` is never consulted for ordering.
  */
-import { canonicalJson, sha256Hex } from "./canonical.js";
-import type { NoteEvent } from "./types.js";
+import { canonicalJson, sha256Hex } from "./canonical";
+import type { NoteEvent } from "./types";
 
 /** What the genesis hash is made from, followed by the note id. */
 export const CHAIN_GENESIS_PREFIX = "tfd.note-chain.v1:";
@@ -201,8 +201,9 @@ const checkEventsShape = (
  * - `wrong_genesis`: link 1 is not bound to this note's genesis hash.
  * - `broken_link`: a link's `prev_hash` is not the hash of the link before it.
  *
- * A chain whose last event was edited and whose last link was rewritten to match verifies on its own; the head seal
- * (a signed `note.chain-seal`) is what pins the head.
+ * A pass shows hash-chain consistency only, not authenticity: any event can be edited and every link rebuilt to match,
+ * and the result verifies on its own. The head seal (a signed `note.chain-seal` whose head is this chain's head) is what
+ * pins the chain to a signer; `tfd-verify-notes` checks it.
  */
 export const verifyChain = async (
 	events: readonly NoteEvent[],

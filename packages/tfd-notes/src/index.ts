@@ -4,16 +4,22 @@
  * re-exported explicitly so the public surface is the list below.
  */
 
-export type { CountedPayment } from "./accrual.js";
+export type { CountedPayment } from "./accrual";
 
-export { daysOverdue, expectedDueToDate, replayBalance } from "./accrual.js";
+export { daysOverdue, expectedDueToDate, replayBalance } from "./accrual";
 export type {
+	ApprovalAgents,
 	ApprovalPolicy,
 	ApprovalRequestKey,
 	ApprovalStatus,
 	PendingApproval,
-} from "./approvals.js";
-export { approvalStatus, checkAppend, pendingApprovals } from "./approvals.js";
+} from "./approvals";
+export {
+	APPROVAL_MAX_AGE_DAYS,
+	approvalStatus,
+	checkAppend,
+	pendingApprovals,
+} from "./approvals";
 export {
 	canonicalJson,
 	fromBase64Url,
@@ -21,13 +27,13 @@ export {
 	toBase64Url,
 	toHex,
 	utf8Bytes,
-} from "./canonical.js";
+} from "./canonical";
 export type {
 	ChainFailure,
 	ChainHead,
 	ChainLink,
 	ChainVerdict,
-} from "./chain.js";
+} from "./chain";
 export {
 	buildChain,
 	CHAIN_GENESIS_PREFIX,
@@ -37,16 +43,13 @@ export {
 	genesisHash,
 	linkHash,
 	verifyChain,
-} from "./chain.js";
-export type { CivilParts } from "./date.js";
+} from "./chain";
 export {
 	addDays,
-	addMonthsAnchored,
 	compareDates,
 	daysBetween,
 	isValidCivilDate,
-	parseCivilDate,
-} from "./date.js";
+} from "./date";
 export type {
 	ChainSealBody,
 	DocumentParties,
@@ -59,7 +62,7 @@ export type {
 	SignedDocument,
 	SigningPurpose,
 	ViewBalance,
-} from "./documents.js";
+} from "./documents";
 export {
 	chainSealBody,
 	documentBody,
@@ -72,25 +75,23 @@ export {
 	RELEASE_WORDING,
 	releaseBody,
 	signDocument,
-} from "./documents.js";
-export { parseNoteEvent, parseNoteTerms, validateStream } from "./events.js";
-export type { DisclosureEntry, Grant, GrantStatus } from "./grants.js";
+} from "./documents";
+export {
+	MAX_CARVE_OUT_DAYS,
+	MAX_GRANT_DAYS,
+	parseNoteEvent,
+	parseNoteTerms,
+	validateStream,
+} from "./events";
+export type { DisclosureEntry, Grant, GrantStatus } from "./grants";
 export {
 	activeGrants,
 	disclosureLog,
 	grantsOf,
 	REVOKE_NOTICE,
-} from "./grants.js";
-export type { Rational } from "./money.js";
-export {
-	ceilDiv,
-	formatMinor,
-	maxBigint,
-	minBigint,
-	parseMinor,
-	parseRate,
-	roundHalfUp,
-} from "./money.js";
+} from "./grants";
+export type { Rational } from "./money";
+export { formatMinor, parseMinor, parseRate, roundHalfUp } from "./money";
 export type {
 	AgingBucket,
 	BoardReport,
@@ -101,29 +102,28 @@ export type {
 	Portfolio,
 	PortfolioNote,
 	PortfolioRow,
-} from "./portfolio.js";
+} from "./portfolio";
 export {
-	AGING_BUCKETS,
 	agingBucket,
 	BOARD_CSV_HEADER,
 	boardReport,
 	boardReportCsv,
 	portfolio,
-} from "./portfolio.js";
-export { generateSchedule } from "./schedule.js";
-export type { AgreedPayment, AgreedView } from "./statement.js";
-export { agreedView, statement, statusLabel } from "./statement.js";
-export * from "./types.js";
+} from "./portfolio";
+export { generateSchedule } from "./schedule";
+export type { AgreedPayment, AgreedView } from "./statement";
+export { agreedView, statement, statusLabel } from "./statement";
+export * from "./types";
 export type {
 	SharedPayment,
 	SharedView,
 	StatementView,
 	SummaryView,
 	VerifyView,
-} from "./visibility.js";
+} from "./visibility";
 export {
 	AGREED_PAYMENTS_LABEL,
 	agreedBalance,
 	sharedView,
 	viewFor,
-} from "./visibility.js";
+} from "./visibility";

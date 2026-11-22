@@ -1,5 +1,6 @@
 import type {
 	ApprovalAction,
+	ApprovalAgents,
 	ApprovalRequestedEvent,
 	NoteEvent,
 } from "tfd-notes";
@@ -24,6 +25,8 @@ export interface ApprovalRow {
 	/** A readable name for what the request is about. Free text from an annotation is possible: escape it. */
 	label: string;
 	requestedAt: string;
+	/** Days to cure of a default notice request; null for the other actions. */
+	cureDays: number | null;
 	/** The viewer asked for this one. */
 	mine: boolean;
 	satisfied: boolean;
@@ -45,8 +48,8 @@ export interface OrgNoteView {
 	requests: ApprovalRow[];
 	/** For the release that is drafted and not yet confirmed; `null` when there is no such draft. */
 	releaseApproval: ReleaseApproval | null;
-	/** Default notices the approvals allow and that have not been sent yet. */
-	defaultNoticesApproved: number;
+	/** Default notices the approvals allow and that have not been sent yet: one per approved request nobody has used. */
+	approvedNotices: { requestId: string; cureDays: number }[];
 	/** Earlier entries a request for a default notice or a waiver may name: the annotations, and the start of the record. */
 	targets: { id: string; label: string }[];
 }
@@ -55,12 +58,16 @@ const isRequest = (event: NoteEvent): event is ApprovalRequestedEvent =>
 	event.type === "approval.requested";
 
 /**
- * The ids of requests with an approver: a grant by a distinct agent, never the requester's own. This is the rule of
- * `tfd-notes` `approvalStatus`, applied to each request by its id so two requests for the same target stay apart.
+ * The ids of requests with an approver: a grant by a distinct agent, never the requester's own, both still on the team
+ * when `agents.activeAgents` is given. This is the rule of `tfd-notes` `approvalStatus`, applied to each request by its
+ * id so two requests for the same target stay apart.
  */
 export const satisfiedRequestIds = (
 	events: readonly NoteEvent[],
+	agents: ApprovalAgents = {},
 ): Set<string> => {
+	const isActive = (agent: string): boolean =>
+		agents.activeAgents === undefined || agents.activeAgents.has(agent);
 	const requests = new Map<string, ApprovalRequestedEvent>();
 	for (const event of events) {
 		if (isRequest(event)) requests.set(event.id, event);
@@ -72,7 +79,9 @@ export const satisfiedRequestIds = (
 		if (
 			request?.agent_ref !== undefined &&
 			event.agent_ref !== undefined &&
-			event.agent_ref !== request.agent_ref
+			event.agent_ref !== request.agent_ref &&
+			isActive(request.agent_ref) &&
+			isActive(event.agent_ref)
 		)
 			satisfied.add(request.id);
 	}
@@ -100,8 +109,9 @@ const targetLabel = (
 const requestRows = (
 	events: readonly NoteEvent[],
 	agentRef: string,
+	agents: ApprovalAgents,
 ): ApprovalRow[] => {
-	const satisfied = satisfiedRequestIds(events);
+	const satisfied = satisfiedRequestIds(events, agents);
 	const rows: ApprovalRow[] = [];
 	for (const event of events) {
 		if (!isRequest(event)) continue;
@@ -110,6 +120,7 @@ const requestRows = (
 			action: event.action,
 			label: targetLabel(events, event.action, event.target),
 			requestedAt: event.entered_at,
+			cureDays: event.cure_days ?? null,
 			mine: event.agent_ref === agentRef,
 			satisfied: satisfied.has(event.id),
 			approvedByYou: events.some(
@@ -151,17 +162,27 @@ const releaseApprovalFor = (
 	};
 };
 
+/** The approved default-notice requests no notice has used yet (a notice names its request in `approval`). */
 const approvedDefaultNotices = (
 	rows: readonly ApprovalRow[],
 	events: readonly NoteEvent[],
-): number => {
-	const approved = rows.filter(
-		(row) => row.action === "notice.default" && row.satisfied,
-	).length;
-	const sent = events.filter(
-		(event) => event.type === "notice.sent" && event.kind === "default",
-	).length;
-	return Math.max(0, approved - sent);
+): { requestId: string; cureDays: number }[] => {
+	const used = new Set<string>();
+	for (const event of events) {
+		if (event.type === "notice.sent" && event.approval !== undefined)
+			used.add(event.approval);
+	}
+	const ready: { requestId: string; cureDays: number }[] = [];
+	for (const row of rows) {
+		if (
+			row.action === "notice.default" &&
+			row.satisfied &&
+			row.cureDays !== null &&
+			!used.has(row.requestId)
+		)
+			ready.push({ requestId: row.requestId, cureDays: row.cureDays });
+	}
+	return ready;
 };
 
 const requestTargets = (
@@ -182,14 +203,15 @@ export const orgViewOf = (
 	events: readonly NoteEvent[],
 	agent: AgentIdentity,
 	draftId: string | null,
+	agents: ApprovalAgents = {},
 ): OrgNoteView => {
-	const requests = requestRows(events, agent.agentRef);
+	const requests = requestRows(events, agent.agentRef, agents);
 	return {
 		orgId: agent.orgId,
 		agentRole: agent.role,
 		requests,
 		releaseApproval: releaseApprovalFor(requests, events, draftId),
-		defaultNoticesApproved: approvedDefaultNotices(requests, events),
+		approvedNotices: approvedDefaultNotices(requests, events),
 		targets: requestTargets(events),
 	};
 };

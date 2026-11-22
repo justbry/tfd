@@ -1,7 +1,9 @@
 import { expect } from "bun:test";
 import type { NoteEvent, Role } from "tfd-notes";
+import { orgSessionCookieName } from "../src/notes/org-sessions";
 import { type NotesDeps, notesRoute } from "../src/notes/routes";
-import type { ActiveSession } from "../src/notes/sessions";
+import { type ActiveSession, sessionCookieName } from "../src/notes/sessions";
+import { shareCookieName } from "../src/notes/share-routes";
 import {
 	BORROWER_EMAIL,
 	LEDGER,
@@ -12,9 +14,7 @@ import {
 import { expectOk, ORG_ID, orgHarness } from "./notes-org-fakes";
 import type { TestSigning } from "./notes-signers";
 
-export const NOTE_COOKIE = "__Secure-tf_note";
-export const ORG_COOKIE = "__Secure-tf_org";
-export const SHARE_COOKIE = "__Secure-tf_share";
+export { orgSessionCookieName, sessionCookieName, shareCookieName };
 export const RECIPIENT = "accountant@firm.example";
 export const OTHER_RECIPIENT = "lawyer@counsel.example";
 export const DAY = 24 * 3_600_000;
@@ -49,6 +49,7 @@ export const shareWorld = (
 		orgs: h.orgs,
 		signers: signing.signers,
 		publicKeys: { get: async () => signing.keys },
+		defer: h.queue.defer,
 		...overrides,
 	};
 	const ledger = async (
@@ -61,6 +62,8 @@ export const shareWorld = (
 			deps,
 		);
 		if (response === null) throw new Error(`not handled: ${path}`);
+		// Mail a request deferred is sent after its response, as in the Worker; a test reads the mailbox next.
+		await h.flush();
 		return response;
 	};
 	const get = (path: string, cookie?: string) =>
@@ -95,7 +98,7 @@ export const shareWorld = (
 		return {
 			session,
 			cookie: opened.cookieValue,
-			cookieName: NOTE_COOKIE,
+			cookieName: sessionCookieName(noteId),
 			base: `/n/${noteId}`,
 			csrf: await h.service.sessions.csrfToken(session),
 			email,
@@ -119,7 +122,7 @@ export const shareWorld = (
 		return {
 			session,
 			cookie: opened.cookieValue,
-			cookieName: ORG_COOKIE,
+			cookieName: orgSessionCookieName(orgId),
 			base: `/o/${orgId}/n/${noteId}`,
 			csrf: await h.service.sessions.csrfToken(session),
 			email,
@@ -191,7 +194,7 @@ export const shareWorld = (
 	const openShare = async (email = RECIPIENT) => {
 		const text = h.mailer.to(email).at(-1)?.text ?? "";
 		const matched =
-			/\/s\/([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\/enter\?t=([A-Za-z0-9_-]+)/.exec(
+			/\/s\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_-]+)\/enter\?t=([A-Za-z0-9_-]+)/.exec(
 				text,
 			);
 		if (!matched) throw new Error(`no share link emailed to ${email}`);
@@ -227,17 +230,33 @@ export const shareWorld = (
 	};
 };
 
-const SHARE_COOKIE_VALUE = new RegExp(`${SHARE_COOKIE}=([^;]*)`);
+const SHARE_COOKIE_SET = /(__Host-tf_share_[^=;]+)=([^;]*)/;
 
 /** The share cookie a redeem response set, as the value and as the header a browser would send back. */
 export const cookieOf = (
 	response: Response,
-): { cookie: string | null; header: string } => {
-	const cookie =
-		SHARE_COOKIE_VALUE.exec(response.headers.get("Set-Cookie") ?? "")?.[1] ??
-		null;
-	return { cookie, header: cookie ? `${SHARE_COOKIE}=${cookie}` : "" };
+): { cookie: string | null; name: string | null; header: string } => {
+	const matched = SHARE_COOKIE_SET.exec(
+		response.headers.get("Set-Cookie") ?? "",
+	);
+	const name = matched?.[1] ?? null;
+	const cookie = matched?.[2] ?? null;
+	return {
+		cookie,
+		name,
+		header: name && cookie ? `${name}=${cookie}` : "",
+	};
 };
+
+const SIGN_OUT_FORM =
+	/<form method="post" action="\/s\/[^"]+\/logout">[\s\S]*?<\/form>\n?/;
+
+/**
+ * A viewer's page without its sign-out button. The button carries the grant's own address and a token made for the
+ * session, so it differs between sessions by design; every comparison of what a page says leaves it out.
+ */
+export const withoutSignOut = (html: string): string =>
+	html.replace(SIGN_OUT_FORM, "");
 
 /** The visible text of a page: tags and their attributes removed. */
 export const textOf = (html: string): string =>

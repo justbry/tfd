@@ -8,7 +8,7 @@ import type {
 } from "./org-store";
 
 interface AgentRow {
-	agentRef: string;
+	agentId: string;
 	emailHash: string;
 	role: AgentRole;
 	active: boolean;
@@ -17,6 +17,8 @@ interface AgentRow {
 interface OrgData {
 	notes: Map<string, Role>;
 	agents: Map<string, AgentRow>;
+	/** `noteId` then `agentId` to the ref the agent carries on that note. */
+	noteRefs: Map<string, Map<string, string>>;
 	links: Map<string, OrgLinkRecord & { used: boolean }>;
 	sessions: Map<string, OrgSessionRecord>;
 	counters: Map<string, { windowStart: number; count: number }>;
@@ -25,7 +27,7 @@ interface OrgData {
 const instant = (value: string): number => Date.parse(value);
 
 const recordOf = (row: AgentRow): OrgAgentRecord => ({
-	agentRef: row.agentRef,
+	agentId: row.agentId,
 	role: row.role,
 	active: row.active,
 });
@@ -40,6 +42,7 @@ export class MemoryOrgStore implements OrgStore {
 		const created: OrgData = {
 			notes: new Map(),
 			agents: new Map(),
+			noteRefs: new Map(),
 			links: new Map(),
 			sessions: new Map(),
 			counters: new Map(),
@@ -63,7 +66,7 @@ export class MemoryOrgStore implements OrgStore {
 
 	async upsertAgent(
 		orgId: string,
-		entry: { newRef: string; emailHash: string; role: AgentRole },
+		entry: { newId: string; emailHash: string; role: AgentRole },
 	): Promise<OrgAgentRecord> {
 		const { agents } = this.org(orgId);
 		const existing = [...agents.values()].find(
@@ -75,12 +78,12 @@ export class MemoryOrgStore implements OrgStore {
 			return recordOf(existing);
 		}
 		const created: AgentRow = {
-			agentRef: entry.newRef,
+			agentId: entry.newId,
 			emailHash: entry.emailHash,
 			role: entry.role,
 			active: true,
 		};
-		agents.set(created.agentRef, created);
+		agents.set(created.agentId, created);
 		return recordOf(created);
 	}
 
@@ -96,21 +99,60 @@ export class MemoryOrgStore implements OrgStore {
 
 	async getAgent(
 		orgId: string,
-		agentRef: string,
+		agentId: string,
 	): Promise<OrgAgentRecord | null> {
-		const found = this.org(orgId).agents.get(agentRef);
+		const found = this.org(orgId).agents.get(agentId);
 		return found ? recordOf(found) : null;
 	}
 
 	async setAgentActive(
 		orgId: string,
-		agentRef: string,
+		agentId: string,
 		active: boolean,
 	): Promise<boolean> {
-		const found = this.org(orgId).agents.get(agentRef);
+		const found = this.org(orgId).agents.get(agentId);
 		if (!found) return false;
 		found.active = active;
 		return true;
+	}
+
+	async bindNoteRef(
+		orgId: string,
+		noteId: string,
+		agentId: string,
+		newRef: string,
+	): Promise<string> {
+		const { noteRefs } = this.org(orgId);
+		let refs = noteRefs.get(noteId);
+		if (refs === undefined) {
+			refs = new Map();
+			noteRefs.set(noteId, refs);
+		}
+		const existing = refs.get(agentId);
+		if (existing !== undefined) return existing;
+		refs.set(agentId, newRef);
+		return newRef;
+	}
+
+	async noteRefOf(
+		orgId: string,
+		noteId: string,
+		agentId: string,
+	): Promise<string | null> {
+		return this.org(orgId).noteRefs.get(noteId)?.get(agentId) ?? null;
+	}
+
+	async agentIdOfRef(
+		orgId: string,
+		noteId: string,
+		agentRef: string,
+	): Promise<string | null> {
+		const refs = this.org(orgId).noteRefs.get(noteId);
+		if (refs === undefined) return null;
+		for (const [agentId, ref] of refs) {
+			if (ref === agentRef) return agentId;
+		}
+		return null;
 	}
 
 	async putLink(orgId: string, link: OrgLinkRecord): Promise<void> {
@@ -126,13 +168,13 @@ export class MemoryOrgStore implements OrgStore {
 		if (!link || link.used || instant(now) >= instant(link.expiresAt))
 			return null;
 		link.used = true;
-		return link.agentRef;
+		return link.agentId;
 	}
 
-	async deleteLinksOf(orgId: string, agentRef: string): Promise<void> {
+	async deleteLinksOf(orgId: string, agentId: string): Promise<void> {
 		const { links } = this.org(orgId);
 		for (const [hash, link] of [...links]) {
-			if (link.agentRef === agentRef) links.delete(hash);
+			if (link.agentId === agentId) links.delete(hash);
 		}
 	}
 
@@ -164,10 +206,10 @@ export class MemoryOrgStore implements OrgStore {
 		this.org(orgId).sessions.delete(hash);
 	}
 
-	async deleteSessionsOf(orgId: string, agentRef: string): Promise<void> {
+	async deleteSessionsOf(orgId: string, agentId: string): Promise<void> {
 		const { sessions } = this.org(orgId);
 		for (const [hash, session] of [...sessions]) {
-			if (session.agentRef === agentRef) sessions.delete(hash);
+			if (session.agentId === agentId) sessions.delete(hash);
 		}
 	}
 
@@ -189,6 +231,11 @@ export class MemoryOrgStore implements OrgStore {
 		return current.count <= limit;
 	}
 
+	/** Test hook: the keys of an organization's rate counters (empty for a name nobody registered). */
+	countersForTest(orgId: string): string[] {
+		return [...(this.orgs.get(orgId)?.counters.keys() ?? [])];
+	}
+
 	/** Test hook: every address hash and note id the index holds, to check it keeps no address. */
 	dumpForTest(): string {
 		return JSON.stringify(
@@ -196,6 +243,10 @@ export class MemoryOrgStore implements OrgStore {
 				orgId,
 				notes: [...data.notes],
 				agents: [...data.agents.values()],
+				noteRefs: [...data.noteRefs].map(([noteId, refs]) => [
+					noteId,
+					[...refs],
+				]),
 			})),
 		);
 	}

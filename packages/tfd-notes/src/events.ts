@@ -9,8 +9,10 @@
  * type and the field.
  */
 
-import { addDays, isValidCivilDate } from "./date.js";
-import { dueDateFor, MAX_INSTALLMENTS } from "./schedule.js";
+import { isValidCivilDate } from "./date";
+import { addDaysToInstant, compareInstants, isInstant } from "./instant";
+import { dueDateFor, MAX_INSTALLMENTS } from "./schedule";
+import { findUnsafeCharacter } from "./text";
 import {
 	type AnnotationAddedEvent,
 	type ApprovalAction,
@@ -43,7 +45,7 @@ import {
 	type TermsAcceptedEvent,
 	type TermsDeclinedEvent,
 	type VisibilityChangedEvent,
-} from "./types.js";
+} from "./types";
 
 type JsonRecord = Record<string, unknown>;
 type BaseFields = Pick<
@@ -59,8 +61,6 @@ const MONEY_PATTERN = /^(0|[1-9][0-9]{0,19})$/;
 const RATE_PATTERN = /^(0|0\.[0-9]{1,6})$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
-const INSTANT_PATTERN =
-	/^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,9})?Z$/;
 
 const MAX_EXPONENT = 4;
 const MAX_AGENT_REF_LENGTH = 128;
@@ -88,15 +88,11 @@ const GRANT_CHANGES = [
 ] as const;
 const GRANT_AUDIENCE_KINDS = ["person", "org", "link"] as const;
 const GRANT_LEVELS = ["summary", "statement", "verify"] as const;
-const GRANT_PURPOSES = [
-	"accountant",
-	"lawyer",
-	"court",
-	"assignee",
-	"other",
-] as const;
+const GRANT_PURPOSES = ["accountant", "lawyer", "court", "assignee"] as const;
 /** The longest a grant may run past the event that proposed it. */
-const MAX_GRANT_DAYS = 365;
+export const MAX_GRANT_DAYS = 365;
+/** The longest a carve-out disclosure may run past the event that proposed it. */
+export const MAX_CARVE_OUT_DAYS = 90;
 const APPROVAL_ACTIONS = [
 	"release.confirm",
 	"notice.default",
@@ -173,9 +169,28 @@ const readString = (label: string, path: string, value: unknown): string => {
 	return value;
 };
 
-const readText = (label: string, path: string, value: unknown): string => {
-	if (typeof value !== "string") {
-		return fail(label, `${path} must be a string, got ${show(value)}`);
+/**
+ * Free text a person can read: a string with no control or bidirectional character (src/text.ts). `multiline` lets a
+ * field that already holds several lines keep `\n` and `\t`. `allowEmpty` is for the optional method and reference.
+ */
+const readFreeText = (
+	label: string,
+	path: string,
+	value: unknown,
+	{ multiline, allowEmpty }: { multiline: boolean; allowEmpty: boolean },
+): string => {
+	if (typeof value !== "string" || (!allowEmpty && value.length === 0)) {
+		return fail(
+			label,
+			`${path} must be ${allowEmpty ? "a string" : "a non-empty string"}, got ${show(value)}`,
+		);
+	}
+	const unsafe = findUnsafeCharacter(value, multiline);
+	if (unsafe !== null) {
+		return fail(
+			label,
+			`${path} must not contain control or bidirectional characters, found ${unsafe.label} at character ${unsafe.position}`,
+		);
 	}
 	return value;
 };
@@ -224,12 +239,7 @@ const readSha256 = (label: string, path: string, value: unknown): string => {
 };
 
 const readInstant = (label: string, path: string, value: unknown): string => {
-	const match = typeof value === "string" ? INSTANT_PATTERN.exec(value) : null;
-	if (
-		typeof value !== "string" ||
-		match === null ||
-		!isValidCivilDate(match[1] ?? "")
-	) {
+	if (!isInstant(value)) {
 		return fail(
 			label,
 			`${path} must be an ISO 8601 UTC instant ending in Z, got ${show(value)}`,
@@ -282,7 +292,10 @@ const readVia = (label: string, value: unknown): EventVia => {
 
 /** A non-empty reference of at most 128 characters (code points, as the schema's `maxLength` counts them). */
 const readAgentReference = (label: string, value: unknown): string => {
-	const reference = readString(label, "agent_ref", value);
+	const reference = readFreeText(label, "agent_ref", value, {
+		multiline: false,
+		allowEmpty: false,
+	});
 	const length = Array.from(reference).length;
 	if (length > MAX_AGENT_REF_LENGTH) {
 		return fail(
@@ -344,20 +357,6 @@ const requireRole = <Required extends Role>(
 		);
 	}
 	return { ...base, entered_by: role };
-};
-
-/** Orders two validated instants, comparing fractional seconds as numbers (`.5Z` is after `Z` and before `.51Z`). */
-const compareInstants = (left: string, right: string): number => {
-	const [leftSeconds, leftFraction = ""] = left.slice(0, -1).split(".");
-	const [rightSeconds, rightFraction = ""] = right.slice(0, -1).split(".");
-	if (leftSeconds !== rightSeconds) {
-		return leftSeconds < rightSeconds ? -1 : 1;
-	}
-	const width = Math.max(leftFraction.length, rightFraction.length);
-	const paddedLeft = leftFraction.padEnd(width, "0");
-	const paddedRight = rightFraction.padEnd(width, "0");
-	if (paddedLeft === paddedRight) return 0;
-	return paddedLeft < paddedRight ? -1 : 1;
 };
 
 const readAmortized = (
@@ -603,10 +602,16 @@ const parsePaymentRecorded = (record: JsonRecord): PaymentRecordedEvent => {
 		event.reverses = readString(label, "reverses", record.reverses);
 	}
 	if ("method" in record) {
-		event.method = readText(label, "method", record.method);
+		event.method = readFreeText(label, "method", record.method, {
+			multiline: false,
+			allowEmpty: true,
+		});
 	}
 	if ("reference" in record) {
-		event.reference = readText(label, "reference", record.reference);
+		event.reference = readFreeText(label, "reference", record.reference, {
+			multiline: false,
+			allowEmpty: true,
+		});
 	}
 	if ("source" in record) {
 		event.source = readSource(label, record.source);
@@ -654,7 +659,10 @@ const parsePaymentDisputed = (record: JsonRecord): PaymentDisputedEvent => {
 			"counter_amount_minor",
 			record.counter_amount_minor,
 		),
-		reason: readString(label, "reason", record.reason),
+		reason: readFreeText(label, "reason", record.reason, {
+			multiline: true,
+			allowEmpty: false,
+		}),
 	};
 };
 
@@ -681,7 +689,10 @@ const parseAnnotationAdded = (record: JsonRecord): AnnotationAddedEvent => {
 	const event: AnnotationAddedEvent = {
 		...base,
 		type: "annotation.added",
-		text: readString(label, "text", record.text),
+		text: readFreeText(label, "text", record.text, {
+			multiline: true,
+			allowEmpty: false,
+		}),
 	};
 	if ("attachment_sha256" in record) {
 		event.attachment_sha256 = readSha256(
@@ -761,7 +772,7 @@ const readCureDays = (label: string, value: unknown): number => {
 
 const parseNoticeSent = (record: JsonRecord): NoticeSentEvent => {
 	const label = "notice.sent";
-	checkEventKeys(record, label, ["kind"], ["cure_days"]);
+	checkEventKeys(record, label, ["kind"], ["cure_days", "approval"]);
 	const base = requireRole(label, readBase(record, label), "lender");
 	if (!isOneOf(NOTICE_KINDS, record.kind)) {
 		return fail(
@@ -776,9 +787,15 @@ const parseNoticeSent = (record: JsonRecord): NoticeSentEvent => {
 	if (kind === "reminder" && "cure_days" in record) {
 		fail(label, "cure_days is not allowed when kind is reminder");
 	}
+	if (kind === "reminder" && "approval" in record) {
+		fail(label, "approval is not allowed when kind is reminder");
+	}
 	const event: NoticeSentEvent = { ...base, type: "notice.sent", kind };
 	if ("cure_days" in record) {
 		event.cure_days = readCureDays(label, record.cure_days);
+	}
+	if ("approval" in record) {
+		event.approval = readString(label, "approval", record.approval);
 	}
 	return event;
 };
@@ -839,7 +856,7 @@ const readGrantPurpose = (label: string, value: unknown): GrantPurpose => {
 	if (!isOneOf(GRANT_PURPOSES, value)) {
 		return fail(
 			label,
-			`purpose must be "accountant", "lawyer", "court", "assignee" or "other", got ${show(value)}`,
+			`purpose must be "accountant", "lawyer", "court" or "assignee", got ${show(value)}`,
 		);
 	}
 	return value;
@@ -852,14 +869,17 @@ const readCarveOut = (label: string, value: unknown): boolean => {
 	return value;
 };
 
-/** A grant ends at most `MAX_GRANT_DAYS` days after the event that proposed it (the same time of day on that date). */
+/**
+ * A grant ends after the event that proposed it and at most `maximumDays` days after it (the same time of day on that
+ * date): `MAX_GRANT_DAYS`, or `MAX_CARVE_OUT_DAYS` for a carve-out.
+ */
 const checkGrantExpiry = (
 	label: string,
 	enteredAt: string,
 	expiresAt: string,
+	maximumDays: number,
 ): void => {
-	const [enteredDate = "", enteredTime = ""] = enteredAt.split("T");
-	const latest = `${addDays(enteredDate, MAX_GRANT_DAYS)}T${enteredTime}`;
+	const latest = addDaysToInstant(enteredAt, maximumDays);
 	if (compareInstants(expiresAt, enteredAt) <= 0) {
 		fail(
 			label,
@@ -869,7 +889,7 @@ const checkGrantExpiry = (
 	if (compareInstants(expiresAt, latest) > 0) {
 		fail(
 			label,
-			`expires_at ${expiresAt} is more than ${MAX_GRANT_DAYS} days after entered_at ${enteredAt}`,
+			`expires_at ${expiresAt} is more than ${maximumDays} days after entered_at ${enteredAt}`,
 		);
 	}
 };
@@ -924,9 +944,14 @@ const parseVisibilityChanged = (record: JsonRecord): VisibilityChangedEvent => {
 	const audience = readGrantAudience(label, record.audience);
 	const level = readGrantLevel(label, record.level);
 	const expiresAt = readInstant(label, "expires_at", record.expires_at);
-	checkGrantExpiry(label, base.entered_at, expiresAt);
 	const carveOut =
 		"carve_out" in record ? readCarveOut(label, record.carve_out) : undefined;
+	checkGrantExpiry(
+		label,
+		base.entered_at,
+		expiresAt,
+		carveOut === true ? MAX_CARVE_OUT_DAYS : MAX_GRANT_DAYS,
+	);
 	if (audience.kind === "link" && level !== "verify") {
 		fail(label, `a link audience may only have level "verify", got "${level}"`);
 	}
@@ -953,7 +978,7 @@ const parseVisibilityChanged = (record: JsonRecord): VisibilityChangedEvent => {
 
 const parseApprovalRequested = (record: JsonRecord): ApprovalRequestedEvent => {
 	const label = "approval.requested";
-	checkEventKeys(record, label, ["action", "target"]);
+	checkEventKeys(record, label, ["action", "target"], ["cure_days"]);
 	const base = readBase(record, label);
 	if (!isOneOf(APPROVAL_ACTIONS, record.action)) {
 		return fail(
@@ -962,12 +987,22 @@ const parseApprovalRequested = (record: JsonRecord): ApprovalRequestedEvent => {
 		);
 	}
 	const action: ApprovalAction = record.action;
-	return {
+	if (action === "notice.default" && !("cure_days" in record)) {
+		fail(label, "cure_days is required when action is notice.default");
+	}
+	if (action !== "notice.default" && "cure_days" in record) {
+		fail(label, "cure_days is only allowed when action is notice.default");
+	}
+	const event: ApprovalRequestedEvent = {
 		...base,
 		type: "approval.requested",
 		action,
 		target: readString(label, "target", record.target),
 	};
+	if ("cure_days" in record) {
+		event.cure_days = readCureDays(label, record.cure_days);
+	}
+	return event;
 };
 
 const parseApprovalGranted = (record: JsonRecord): ApprovalGrantedEvent => {
@@ -1040,6 +1075,8 @@ interface StreamState {
 	/** Each proposed grant by its `grant_id`. */
 	grants: Map<string, GrantProposedEvent>;
 	approvalRequests: Map<string, ApprovalRequestedEvent>;
+	/** True while the latest `terms.accepted` or `terms.declined` is a decline. */
+	termsDeclined: boolean;
 }
 
 function streamFail(event: NoteEvent, message: string): never {
@@ -1133,6 +1170,46 @@ const checkVisibilityChanged = (
 	}
 };
 
+const DECLINED_TERMS_RULE =
+	"the borrower has declined the terms (terms.declined), so no payoff statement, notice or default-notice approval is allowed until they accept";
+
+/** While the terms stand declined, no payoff statement is issued and no notice or default approval is started. */
+const checkTermsNotDeclined = (state: StreamState, event: NoteEvent): void => {
+	if (state.termsDeclined) {
+		streamFail(event, DECLINED_TERMS_RULE);
+	}
+};
+
+/** A notice that names an approval names an earlier default-notice request with the same cure period. */
+const checkNoticeApproval = (
+	state: StreamState,
+	event: NoticeSentEvent,
+): void => {
+	if (event.approval === undefined) {
+		return;
+	}
+	const request = findEarlier(
+		state,
+		event,
+		"approval",
+		event.approval,
+		state.approvalRequests.get(event.approval),
+		"approval.requested",
+	);
+	if (request.action !== "notice.default") {
+		streamFail(
+			event,
+			`approval ${show(event.approval)} is a request for ${request.action}, not notice.default`,
+		);
+	}
+	if (request.cure_days !== event.cure_days) {
+		streamFail(
+			event,
+			`cure_days ${show(event.cure_days)} differs from the ${show(request.cure_days)} of the approval request ${show(event.approval)}`,
+		);
+	}
+};
+
 const checkResponder = (
 	state: StreamState,
 	event: PaymentConfirmedEvent | PaymentDisputedEvent,
@@ -1222,10 +1299,20 @@ const checkEventAgainstStream = (
 		case "release.confirmed":
 			checkReleaseConfirmed(state, event);
 			return;
+		case "payoff.issued":
+			checkTermsNotDeclined(state, event);
+			return;
+		case "notice.sent":
+			checkTermsNotDeclined(state, event);
+			checkNoticeApproval(state, event);
+			return;
 		case "visibility.changed":
 			checkVisibilityChanged(state, event);
 			return;
 		case "approval.requested":
+			if (event.action === "notice.default") {
+				checkTermsNotDeclined(state, event);
+			}
 			if (!state.seen.has(event.target)) {
 				streamFail(
 					event,
@@ -1266,6 +1353,8 @@ const recordInState = (state: StreamState, event: NoteEvent): void => {
 	if (event.type === "approval.requested") {
 		state.approvalRequests.set(event.id, event);
 	}
+	if (event.type === "terms.accepted") state.termsDeclined = false;
+	if (event.type === "terms.declined") state.termsDeclined = true;
 };
 
 const orderBySeq = (events: NoteEvent[]): NoteEvent[] => {
@@ -1315,6 +1404,7 @@ export const validateStream = (events: unknown[]): NoteEvent[] => {
 		drafts: new Map(),
 		grants: new Map(),
 		approvalRequests: new Map(),
+		termsDeclined: false,
 	};
 	for (const event of ordered) {
 		if (event.note_id !== state.noteId) {

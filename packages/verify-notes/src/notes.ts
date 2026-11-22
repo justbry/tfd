@@ -626,6 +626,9 @@ const verifyReadChain = async (
  * Shape-checks `events` (each must be a note event) and `links` (each exactly seq, event_id, event_hash, prev_hash), then
  * has tfd-notes recompute the chain from the events and compare it with the links. `events` must be in seq order.
  * Never throws.
+ *
+ * A pass proves hash-chain consistency only, not authenticity: anyone can edit an event, rebuild every link and pass
+ * this check. Authenticity needs a verified `note.chain-seal` at the head of the chain, which `verifyNoteBundle` checks.
  */
 export const verifyNoteChain = async (
 	events: unknown[],
@@ -642,6 +645,28 @@ export const verifyNoteChain = async (
 };
 
 // ---- the bundle ----
+
+/** Why a bundle has no verified seal at the head of its chain. */
+export type NoteSealFailure =
+	| "chain_unsealed"
+	| "chain_seal_stale"
+	| "chain_seal_mismatch";
+
+export type NoteSealVerdict =
+	| {
+			ok: true;
+			key_id: string;
+			sealed_at: string;
+			/** The head the seal names, which is the head of the supplied chain. */
+			head: ChainHead;
+	  }
+	| {
+			ok: false;
+			code: NoteSealFailure;
+			message: string;
+			/** For `chain_seal_stale`: how many events come after the latest seal's head. */
+			unsealed_events?: number;
+	  };
 
 /** Why a document that verified on its own does not fit the chain it came with. */
 export type NoteBundleFailure =
@@ -670,9 +695,16 @@ export interface NoteBundle {
 }
 
 export interface NoteBundleVerdict {
-	/** True only when the chain and every document pass, and every document fits the chain. */
+	/**
+	 * True only when the chain passes, every document passes and fits the chain, and a verified `note.chain-seal` names
+	 * the chain's head: its `head_seq` is the number of links and its `head_hash` is the recomputed head.
+	 */
 	ok: boolean;
+	/** Set when `ok` is false only because the chain has no verified seal at its head (see `seal`). */
+	code?: NoteSealFailure;
 	chain: NoteChainVerdict;
+	/** The seal at the head of the chain, or why there is none; null when the chain itself did not verify. */
+	seal: NoteSealVerdict | null;
 	/** One verdict per supplied document, in the order they were given. */
 	documents: NoteBundleDocumentVerdict[];
 }
@@ -799,6 +831,77 @@ const fitDocumentToChain = (
 	return verdict;
 };
 
+/** A seal that verified on its own, for this note: the document verdicts before they are fitted to the chain. */
+type VerifiedSeal = Extract<NoteVerdict, { ok: true }> & {
+	document: Extract<SignedDocument, { type: "note.chain-seal" }>;
+};
+
+const isSealOf = (
+	verdict: NoteVerdict,
+	noteId: string,
+): verdict is VerifiedSeal =>
+	verdict.ok &&
+	verdict.document.type === "note.chain-seal" &&
+	verdict.document.note_id === noteId;
+
+const sealFailure = (
+	code: NoteSealFailure,
+	message: string,
+	unsealedEvents?: number,
+): NoteSealVerdict =>
+	unsealedEvents === undefined
+		? { ok: false, code, message }
+		: { ok: false, code, message, unsealed_events: unsealedEvents };
+
+/**
+ * Whether a verified seal names the head of the chain. Among the verified seals of this note it looks at the latest one
+ * (highest `head_seq`): equal to the chain's length with the recomputed head hash is sealed; an earlier seq whose hash
+ * is the chain's head at that seq is stale (events came after it); anything else does not match the chain.
+ */
+const sealAtHead = (
+	verdicts: readonly NoteVerdict[],
+	index: ChainIndex,
+): NoteSealVerdict => {
+	const seals = verdicts.filter((verdict): verdict is VerifiedSeal =>
+		isSealOf(verdict, index.noteId),
+	);
+	if (seals.length === 0) {
+		return sealFailure(
+			"chain_unsealed",
+			"no verified chain seal came with the chain, so nothing shows it is the chain the keys signed",
+		);
+	}
+	const length = index.headHashBySeq.size;
+	const exact = seals.find(
+		(seal) =>
+			seal.document.head_seq === length &&
+			seal.document.head_hash === index.headHashBySeq.get(length),
+	);
+	if (exact !== undefined) {
+		return {
+			ok: true,
+			key_id: exact.key_id,
+			sealed_at: exact.signed_at,
+			head: exact.chain_head,
+		};
+	}
+	const latest = seals.reduce((best, seal) =>
+		seal.document.head_seq > best.document.head_seq ? seal : best,
+	);
+	const { head_seq: headSeq, head_hash: headHash } = latest.document;
+	if (headSeq < length && index.headHashBySeq.get(headSeq) === headHash) {
+		return sealFailure(
+			"chain_seal_stale",
+			`the latest chain seal is at seq ${headSeq}, and ${length - headSeq} event(s) come after it without a seal`,
+			length - headSeq,
+		);
+	}
+	return sealFailure(
+		"chain_seal_mismatch",
+		`the chain seal at seq ${headSeq} does not name the head of the supplied chain (${length} events)`,
+	);
+};
+
 const verifyBundleChecked = async (
 	bundle: unknown,
 ): Promise<NoteBundleVerdict> => {
@@ -815,6 +918,7 @@ const verifyBundleChecked = async (
 				"bad_input",
 				"a bundle needs events, links, documents and keys",
 			),
+			seal: null,
 			documents: [],
 		};
 	}
@@ -826,8 +930,10 @@ const verifyBundleChecked = async (
 	const index =
 		chain.ok && isReadChain(read) ? await indexChain(read) : undefined;
 	const documents: NoteBundleDocumentVerdict[] = [];
+	const alone: NoteVerdict[] = [];
 	for (const document of bundle.documents) {
 		const verdict = await verifyNoteDocument(document, keys);
+		alone.push(verdict);
 		if (!verdict.ok) {
 			documents.push(verdict);
 		} else if (index === undefined) {
@@ -841,18 +947,27 @@ const verifyBundleChecked = async (
 			documents.push(fitDocumentToChain(verdict, index));
 		}
 	}
-	return {
-		ok: chain.ok && documents.every((verdict) => verdict.ok),
+	const seal = index === undefined ? null : sealAtHead(alone, index);
+	const documentsOk = documents.every((verdict) => verdict.ok);
+	const verdict: NoteBundleVerdict = {
+		ok: chain.ok && documentsOk && seal?.ok === true,
 		chain,
+		seal,
 		documents,
 	};
+	if (seal !== null && !seal.ok) verdict.code = seal.code;
+	return verdict;
 };
 
 /**
  * Verifies a note's chain and every document that came with it, then checks that each document fits the chain: it is
  * for this note, the head it names is the chain's head at that seq (`chain_head_unknown` when that seq is beyond the
  * supplied chain), a chain seal's head equals a recomputed link head, and a payment receipt's or release's event hash is
- * the hash of the event it names. `ok` is true only when everything passes. Never throws.
+ * the hash of the event it names. It then needs a seal at the head: `ok` is true only when a `note.chain-seal` document
+ * verifies and names the chain's head (`head_seq` equal to the number of links, `head_hash` equal to the recomputed
+ * head). Without one `ok` is false with `code` `chain_unsealed` (no verified seal), `chain_seal_stale` (the latest seal
+ * is at an earlier seq; `seal.unsealed_events` counts the events after it) or `chain_seal_mismatch`. A chain with no
+ * seal, or an event added after the last seal, therefore never passes. Never throws.
  */
 export const verifyNoteBundle = async (
 	bundle: NoteBundle,
@@ -863,6 +978,7 @@ export const verifyNoteBundle = async (
 		return {
 			ok: false,
 			chain: chainFailure("bad_input", "the bundle could not be read"),
+			seal: null,
 			documents: [],
 		};
 	}

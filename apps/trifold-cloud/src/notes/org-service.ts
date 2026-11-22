@@ -1,5 +1,6 @@
 import {
 	type ApprovalAction,
+	type ApprovalPolicy,
 	portfolio as buildPortfolio,
 	isValidCivilDate,
 	type NoteEvent,
@@ -15,13 +16,18 @@ import {
 	emailHash,
 	isAgentRole,
 	MAX_AGENTS_PER_REQUEST,
-	ORG_POLICY,
+	orgPolicyFor,
 } from "./org";
 import { type OrgSession, OrgSessionManager } from "./org-sessions";
 import type { OrgStore } from "./org-store";
 import { type Failure, failure, type Outcome } from "./outcome";
-import type { Clock, IdSource, MailSender } from "./ports";
-import { type ActiveSession, constantTimeEqual, hashPrefix } from "./sessions";
+import type { Clock, Defer, IdSource, MailSender } from "./ports";
+import {
+	type ActiveSession,
+	constantTimeEqual,
+	hashPrefix,
+	hmac,
+} from "./sessions";
 import type { NoteStore } from "./store";
 
 /**
@@ -31,7 +37,8 @@ import type { NoteStore } from "./store";
 
 const HOUR_MS = 3_600_000;
 const DATE_LENGTH = 10;
-export const ORG_LINK_REQUESTS_PER_ORG = 20;
+/** Link requests one client address (hashed) may make for one organization in a window. */
+export const ORG_LINK_REQUESTS_PER_CLIENT = 20;
 export const ORG_LINK_REQUESTS_PER_ADDRESS = 3;
 export const ORG_LINK_WINDOW_MS = HOUR_MS;
 /** The most notes one portfolio reads. More than this needs paging, which is not built. */
@@ -39,6 +46,7 @@ export const MAX_PORTFOLIO_NOTES = 500;
 /** The most agents one organization may have registered on one note. */
 export const MAX_AGENTS_PER_NOTE = 50;
 const PORTFOLIO_BATCH = 10;
+const AGENT_ID_BYTES = 12;
 const AGENT_REF_BYTES = 12;
 
 export interface OrgServiceDeps {
@@ -51,6 +59,8 @@ export interface OrgServiceDeps {
 	secret: string;
 	/** `https://<ledger host>`, no trailing slash: where emailed links point. */
 	baseUrl: string;
+	/** Runs work after the response is sent (`ctx.waitUntil`). Absent: the work starts and nobody waits for it. */
+	defer?: Defer;
 }
 
 /** An agent as a caller states it: a plain address and a role name. */
@@ -60,6 +70,9 @@ export interface AgentInput {
 }
 
 export interface RegisteredAgent {
+	/** The organization-wide identity; never leaves the server. */
+	agentId: string;
+	/** What this agent's events on this note carry. Random, and different on every note. */
 	agentRef: string;
 	email: string;
 	role: AgentRole;
@@ -71,8 +84,8 @@ export interface QueueItem {
 	requestId: string;
 	action: ApprovalAction;
 	requestedAt: string;
-	/** Internal: whose request it is, so a page can hide Approve on the agent's own. Never rendered or returned by the API. */
-	requestedByRef: string | null;
+	/** The asking agent made this request, so a page can hide Approve on it. Never an id; false when no agent was named. */
+	mine: boolean;
 }
 
 export interface OrgPortfolio {
@@ -136,8 +149,9 @@ export class OrgService {
 
 	/**
 	 * Registers a note in the organization's index and its agents on the note, the organization-wide agent rows first.
-	 * Every write is idempotent, so a retried create finds the same agents with the same refs. An address already known to
-	 * the organization keeps its ref (and gets the role stated here, active again).
+	 * Every write is idempotent, so a retried create finds the same agents with the same refs. An address already known
+	 * to the organization keeps its organization-wide id (and gets the role stated here, active again) but gets a ref of
+	 * its own on each note, so a borrower with two notes cannot link one staff member across them.
 	 */
 	async registerNote(
 		noteId: string,
@@ -150,20 +164,27 @@ export class OrgService {
 		await store.putOrg(noteId, orgId);
 		for (const agent of agents) {
 			const record = await orgs.upsertAgent(orgId, {
-				newRef: `ag_${ids.token(AGENT_REF_BYTES)}`,
+				newId: `ag_${ids.token(AGENT_ID_BYTES)}`,
 				emailHash: await emailHash(secret, orgId, agent.email),
 				role: agent.role,
 				now,
 			});
+			const agentRef = await orgs.bindNoteRef(
+				orgId,
+				noteId,
+				record.agentId,
+				`ar_${ids.token(AGENT_REF_BYTES)}`,
+			);
 			await store.putAgent(noteId, {
-				agentRef: record.agentRef,
+				agentRef,
 				email: agent.email,
 				role: record.role,
 				active: true,
 				addedAt: now,
 			});
 			registered.push({
-				agentRef: record.agentRef,
+				agentId: record.agentId,
+				agentRef,
 				email: agent.email,
 				role: record.role,
 			});
@@ -175,10 +196,11 @@ export class OrgService {
 	/** Emails one agent a single-use link. The text names no borrower and no other agent. */
 	async inviteAgent(
 		orgId: string,
-		agent: RegisteredAgent,
+		agent: Pick<RegisteredAgent, "agentId" | "email" | "role">,
 		noteId?: string,
+		options: { replace?: boolean } = {},
 	): Promise<void> {
-		const token = await this.sessions.issueLink(orgId, agent.agentRef);
+		const token = await this.sessions.issueLink(orgId, agent.agentId, options);
 		const note = noteId === undefined ? "" : `&n=${noteId}`;
 		await this.deps.mailer.send({
 			to: agent.email,
@@ -196,21 +218,32 @@ export class OrgService {
 	}
 
 	/**
-	 * A fresh link for the agent whose address matches, sent to the address given. The caller always shows the same
-	 * answer, whether or not an address matched or a limit was hit. Limits: per organization and per address (counted by a
-	 * hash of the address, never the address).
+	 * A fresh link for the agent whose address matches, sent to the address given; the agent's older links that were
+	 * never opened stop working. The caller always shows the same answer, whether or not an address matched or a limit was
+	 * hit, and it does not wait for the mail: the matching branch hands its work to `defer`, so the response takes the
+	 * same time either way. Limits: per address (counted by a hash of it, never the address) and per client (a hashed
+	 * `CF-Connecting-IP`, when there is one), so junk requests cannot use up the real agent's allowance.
 	 */
-	async requestLink(orgId: string, email: string): Promise<void> {
+	async requestLink(
+		orgId: string,
+		email: string,
+		clientIp?: string,
+	): Promise<void> {
 		const { orgs, clock, secret } = this.deps;
 		const address = normalizeEmail(email);
 		const now = clock.now();
-		const orgAllowed = await orgs.hit(
-			orgId,
-			"link:org",
-			now,
-			ORG_LINK_WINDOW_MS,
-			ORG_LINK_REQUESTS_PER_ORG,
-		);
+		// Nothing is counted for an organization that does not exist (no rows for made-up names); the answer is the same.
+		if (!(await this.exists(orgId))) return;
+		const clientAllowed =
+			clientIp === undefined
+				? true
+				: await orgs.hit(
+						orgId,
+						`link:client:${await hmac(secret, `ip:${clientIp}`)}`,
+						now,
+						ORG_LINK_WINDOW_MS,
+						ORG_LINK_REQUESTS_PER_CLIENT,
+					);
 		const addressAllowed = await orgs.hit(
 			orgId,
 			`link:address:${await hashPrefix(address)}`,
@@ -218,28 +251,35 @@ export class OrgService {
 			ORG_LINK_WINDOW_MS,
 			ORG_LINK_REQUESTS_PER_ADDRESS,
 		);
-		if (!(orgAllowed && addressAllowed) || !isPlausibleEmail(address)) return;
+		if (!(clientAllowed && addressAllowed) || !isPlausibleEmail(address))
+			return;
 		const known = await orgs.findAgent(
 			orgId,
 			await emailHash(secret, orgId, address),
 		);
 		if (known === null || !known.active) return;
-		try {
-			await this.inviteAgent(orgId, {
-				agentRef: known.agentRef,
-				email: address,
-				role: known.role,
-			});
-		} catch (error) {
-			console.error(
-				`notes: org link email failed: ${error instanceof Error ? error.name : "error"}`,
-			);
-		}
+		this.defer(
+			this.inviteAgent(
+				orgId,
+				{ agentId: known.agentId, email: address, role: known.role },
+				undefined,
+				{ replace: true },
+			).catch((error: unknown) => {
+				console.error(
+					`notes: org link email failed: ${error instanceof Error ? error.name : "error"}`,
+				);
+			}),
+		);
+	}
+
+	private defer(work: Promise<unknown>): void {
+		(this.deps.defer ?? ((promise) => void promise))(work);
 	}
 
 	/**
-	 * What this agent may do on this note now: their role, or null when the note is not this organization's lender side,
-	 * or the agent is unknown or inactive in the organization or on the note. The role is read live.
+	 * What this agent may do on this note now, named by the ref their events carry: their role, or null when the note is
+	 * not this organization's lender side, or the agent is unknown or inactive in the organization or on the note. The
+	 * role is read live.
 	 */
 	async roleOnNote(
 		orgId: string,
@@ -248,10 +288,29 @@ export class OrgService {
 	): Promise<AgentRole | null> {
 		const { orgs, store } = this.deps;
 		if ((await store.getOrg(noteId)) !== orgId) return null;
-		const agent = await orgs.getAgent(orgId, agentRef);
+		const agentId = await orgs.agentIdOfRef(orgId, noteId, agentRef);
+		if (agentId === null) return null;
+		const agent = await orgs.getAgent(orgId, agentId);
 		if (!agent?.active) return null;
 		const record = await store.getAgent(noteId, agentRef);
 		return record?.active ? agent.role : null;
+	}
+
+	/**
+	 * The refs of the agents who may act on this note now: active on the note and active in the organization. Passed to
+	 * the approval rules, so a request or a grant by someone who has left counts for nothing.
+	 */
+	async activeAgentRefs(orgId: string, noteId: string): Promise<Set<string>> {
+		const { orgs, store } = this.deps;
+		const active = new Set<string>();
+		for (const record of await store.listAgents(noteId)) {
+			if (!record.active) continue;
+			const agentId = await orgs.agentIdOfRef(orgId, noteId, record.agentRef);
+			if (agentId === null) continue;
+			if ((await orgs.getAgent(orgId, agentId))?.active)
+				active.add(record.agentRef);
+		}
+		return active;
 	}
 
 	/** The note session of a signed-in agent, or null when the note is not theirs to open. */
@@ -259,13 +318,24 @@ export class OrgService {
 		session: OrgSession,
 		noteId: string,
 	): Promise<ActiveSession | null> {
-		const role = await this.roleOnNote(session.orgId, noteId, session.agentRef);
+		const agentRef = await this.deps.orgs.noteRefOf(
+			session.orgId,
+			noteId,
+			session.agentId,
+		);
+		if (agentRef === null) return null;
+		const role = await this.roleOnNote(session.orgId, noteId, agentRef);
 		if (role === null) return null;
 		return {
 			noteId,
 			role: "lender",
 			hash: session.hash,
-			agent: { orgId: session.orgId, agentRef: session.agentRef, role },
+			agent: {
+				orgId: session.orgId,
+				agentId: session.agentId,
+				agentRef,
+				role,
+			},
 		};
 	}
 
@@ -306,9 +376,10 @@ export class OrgService {
 	}
 
 	/**
-	 * Deactivates an agent of the note's organization, named by ref or by address. The organization-wide flag goes first,
-	 * so access stops at once; then their sessions and pending links go, and the agent is switched off on every note of
-	 * the organization. History keeps the `agent_ref` on what they entered.
+	 * Deactivates an agent of the note's organization, named by the ref they carry on this note or by address. The
+	 * organization-wide flag goes first, so access stops at once; then their sessions and pending links go, and the agent
+	 * is switched off on every note of the organization. History keeps the ref on what they entered (and an approval they
+	 * gave or asked for stops counting: see `activeAgentRefs`).
 	 */
 	async deactivateAgent(
 		noteId: string,
@@ -318,21 +389,25 @@ export class OrgService {
 		const orgId = await store.getOrg(noteId);
 		if (orgId === null)
 			return failure("not_found", "No such organization note.");
-		let agentRef: string | null = null;
+		let agentId: string | null = null;
 		if (who.agentRef !== undefined) {
-			agentRef = (await store.getAgent(noteId, who.agentRef))?.agentRef ?? null;
+			agentId = await orgs.agentIdOfRef(orgId, noteId, who.agentRef);
 		} else if (who.email !== undefined) {
 			const found = await orgs.findAgent(
 				orgId,
 				await emailHash(secret, orgId, normalizeEmail(who.email)),
 			);
-			agentRef = found?.agentRef ?? null;
+			agentId = found?.agentId ?? null;
 		}
-		if (agentRef === null) return failure("not_found", "No such agent.");
-		await orgs.setAgentActive(orgId, agentRef, false);
-		await this.sessions.revokeAgent(orgId, agentRef);
+		const agentRef =
+			agentId === null ? null : await orgs.noteRefOf(orgId, noteId, agentId);
+		if (agentId === null || agentRef === null)
+			return failure("not_found", "No such agent.");
+		await orgs.setAgentActive(orgId, agentId, false);
+		await this.sessions.revokeAgent(orgId, agentId);
 		for (const id of await orgs.listNotes(orgId, MAX_PORTFOLIO_NOTES)) {
-			await store.setAgentActive(id, agentRef, false);
+			const ref = await orgs.noteRefOf(orgId, id, agentId);
+			if (ref !== null) await store.setAgentActive(id, ref, false);
 		}
 		return { ok: true, agentRef };
 	}
@@ -344,8 +419,9 @@ export class OrgService {
 	private async loadNote(
 		orgId: string,
 		noteId: string,
+		agentId: string | undefined,
 	): Promise<
-		| { note: PortfolioNote; events: NoteEvent[] }
+		| { note: PortfolioNote; queue: QueueItem[] }
 		| { invalid: { note_id: string; error: string } }
 	> {
 		const { store } = this.deps;
@@ -368,7 +444,15 @@ export class OrgService {
 						error: `record check failed (${verdict.reason})`,
 					},
 				};
-			return { note: { note_id: noteId, role: "lender", events: raw }, events };
+			const policy = orgPolicyFor(await this.activeAgentRefs(orgId, noteId));
+			const myRef =
+				agentId === undefined
+					? null
+					: await this.deps.orgs.noteRefOf(orgId, noteId, agentId);
+			return {
+				note: { note_id: noteId, role: "lender", events: raw },
+				queue: queueOf(noteId, events, policy, myRef),
+			};
 		} catch (error) {
 			return { invalid: { note_id: noteId, error: sentence(error) } };
 		}
@@ -382,6 +466,8 @@ export class OrgService {
 	async portfolio(
 		orgId: string,
 		asOf?: string,
+		/** The signed-in agent, to mark the requests they made (`QueueItem.mine`). */
+		agentId?: string,
 	): Promise<Outcome<OrgPortfolio & { asOf: string }>> {
 		if (asOf !== undefined && !isValidCivilDate(asOf))
 			return failure("bad_request", "as_of must be a date, YYYY-MM-DD.");
@@ -402,7 +488,7 @@ export class OrgService {
 			const loaded = await Promise.all(
 				noteIds
 					.slice(start, start + PORTFOLIO_BATCH)
-					.map((noteId) => this.loadNote(orgId, noteId)),
+					.map((noteId) => this.loadNote(orgId, noteId, agentId)),
 			);
 			for (const entry of loaded) {
 				if ("invalid" in entry) {
@@ -410,7 +496,7 @@ export class OrgService {
 					continue;
 				}
 				notes.push(entry.note);
-				queue.push(...queueOf(entry.note.note_id, entry.events));
+				queue.push(...entry.queue);
 			}
 		}
 		const computed = buildPortfolio(notes, date);
@@ -425,9 +511,14 @@ export class OrgService {
 }
 
 /** The approval requests of one note that still wait for a board member, oldest first. */
-const queueOf = (noteId: string, events: readonly NoteEvent[]): QueueItem[] => {
+const queueOf = (
+	noteId: string,
+	events: readonly NoteEvent[],
+	policy: ApprovalPolicy,
+	myRef: string | null,
+): QueueItem[] => {
 	const items: QueueItem[] = [];
-	for (const pending of pendingApprovals(events, ORG_POLICY)) {
+	for (const pending of pendingApprovals(events, policy)) {
 		const request = events.find(
 			(event) =>
 				event.type === "approval.requested" &&
@@ -442,7 +533,7 @@ const queueOf = (noteId: string, events: readonly NoteEvent[]): QueueItem[] => {
 			requestId: request.id,
 			action: pending.action,
 			requestedAt: pending.requested_at,
-			requestedByRef: pending.requested_by_agent,
+			mine: myRef !== null && pending.requested_by_agent === myRef,
 		});
 	}
 	return items;

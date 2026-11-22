@@ -77,7 +77,7 @@ describe("an organization lender: the registry", () => {
 		const refs = h.refsOf(created.agents);
 		expect(Object.keys(refs).sort()).toEqual(["board", "treasurer", "viewer"]);
 		for (const ref of Object.values(refs)) {
-			expect(ref).toMatch(/^ag_/);
+			expect(ref).toMatch(/^ar_/);
 			// A ref is random, never derived from an address.
 			for (const email of [TREASURER, BOARD, VIEWER])
 				expect(ref).not.toContain(email.split("@")[0] as string);
@@ -224,12 +224,58 @@ describe("an organization lender: the registry", () => {
 		);
 	});
 
-	test("an address the organization already knows keeps its ref across notes", async () => {
+	test("an address the organization already knows is one agent of the organization but has a fresh ref on every note", async () => {
 		const h = orgHarness();
 		const one = await h.createOrgNote({ idem: "n1" });
 		const two = await h.createOrgNote({ idem: "n2" });
-		expect(h.refsOf(two.agents)).toEqual(h.refsOf(one.agents));
+		const first = h.refsOf(one.agents);
+		const second = h.refsOf(two.agents);
+		// A borrower with two notes cannot tell that the same person acted on both.
+		for (const role of ["treasurer", "board", "viewer"])
+			expect(first[role]).not.toBe(second[role]);
+		expect(
+			new Set([...Object.values(first), ...Object.values(second)]).size,
+		).toBe(6);
 		expect(await h.orgs.listNotes(ORG_ID, 10)).toHaveLength(2);
+		// One link and one session still open both notes: the organization knows it is one person.
+		const { orgSession } = await h.enterAgent(one.noteId, TREASURER);
+		const onTwo = await h.org.noteSession(orgSession, two.noteId);
+		expect(onTwo?.agent?.agentRef).toBe(second.treasurer);
+		expect(onTwo?.agent?.agentId).toBe(orgSession.agentId);
+	});
+
+	test("what each note's events carry for the same person differs, so a borrower with two notes cannot link them", async () => {
+		const h = orgHarness();
+		const one = await h.createOrgNote({
+			idem: "n1",
+			borrower: "ana@example.com",
+		});
+		const two = await h.createOrgNote({
+			idem: "n2",
+			borrower: "ana@example.com",
+		});
+		const signedIn = await h.enterAgent(one.noteId, TREASURER);
+		const asOne = signedIn.session;
+		const asTwo = await h.org.noteSession(signedIn.orgSession, two.noteId);
+		expectOk(await h.service.append(asOne, PAYMENT));
+		expectOk(await h.service.append(asTwo as ActiveSession, PAYMENT));
+		const refsIn = async (noteId: string) =>
+			new Set(
+				(await eventsOf(h, noteId))
+					.map((event) => event.agent_ref)
+					.filter((ref): ref is string => ref !== undefined),
+			);
+		const inOne = await refsIn(one.noteId);
+		const inTwo = await refsIn(two.noteId);
+		expect(inOne.size).toBe(1);
+		expect(inTwo.size).toBe(1);
+		for (const ref of inOne) expect(inTwo.has(ref)).toBe(false);
+		// Neither log carries the organization-wide id.
+		const logs = [
+			...(await h.store.readLog(one.noteId)).events,
+			...(await h.store.readLog(two.noteId)).events,
+		].join("\n");
+		expect(logs).not.toContain("ag_");
 	});
 
 	test("the index keeps a salted hash of an address and never the address", async () => {
@@ -320,6 +366,7 @@ describe("an organization lender: who may act", () => {
 			await h.service.requestApproval(board, {
 				action: "notice.default",
 				target: annotation.id,
+				cure_days: 30,
 			}),
 		).event;
 		expectFailure(
@@ -547,6 +594,7 @@ describe("two-person approval", () => {
 				await h.service.requestApproval(treasurer, {
 					action: "notice.default",
 					target: annotation.id,
+					cure_days: 30,
 				}),
 			).event;
 		const approve = async (requestId: string) =>
@@ -569,9 +617,12 @@ describe("two-person approval", () => {
 			"step_up_required",
 		);
 		const sent = expectOk(await send());
+		// The notice names the request it uses, with the same days to cure.
 		expect(sent.event).toMatchObject({
 			type: "notice.sent",
 			kind: "default",
+			cure_days: 30,
+			approval: first.id,
 			agent_ref: refs.treasurer,
 		});
 		expect(sent.mailed).toBe(true);
@@ -740,14 +791,18 @@ describe("agents come and go", () => {
 		const one = await h.createOrgNote({ idem: "n1" });
 		const two = await h.createOrgNote({ idem: "n2" });
 		const refs = h.refsOf(one.agents);
+		const refsTwo = h.refsOf(two.agents);
 		expectOk(
 			await h.org.deactivateAgent(one.noteId, { email: BOARD.toUpperCase() }),
 		);
 		expect(
-			(await h.store.getAgent(two.noteId, refs.board as string))?.active,
+			(await h.store.getAgent(two.noteId, refsTwo.board as string))?.active,
 		).toBe(false);
 		expect(
-			await h.org.roleOnNote(ORG_ID, two.noteId, refs.board as string),
+			await h.org.roleOnNote(ORG_ID, one.noteId, refs.board as string),
+		).toBeNull();
+		expect(
+			await h.org.roleOnNote(ORG_ID, two.noteId, refsTwo.board as string),
 		).toBeNull();
 		expectFailure(
 			await h.org.deactivateAgent(one.noteId, { agentRef: "ag_nobody" }),
@@ -768,7 +823,7 @@ describe("agents come and go", () => {
 		const added = expectOk(
 			await h.org.addAgent(noteId, { email: BOARD_TWO, role: "board" }),
 		);
-		expect(added.agentRef).toMatch(/^ag_/);
+		expect(added.agentRef).toMatch(/^ar_/);
 		expect(h.mailer.sent).toHaveLength(sent + 1);
 		expect(h.mailer.to(BOARD_TWO)).toHaveLength(1);
 		expect(h.mailer.to(BOARD_TWO)[0]?.text).not.toContain(BORROWER_EMAIL);
@@ -853,17 +908,39 @@ describe("link requests", () => {
 		expect(h.mailer.to(TREASURER)).toHaveLength(1 + 3 + 1);
 	});
 
-	test("per organization: after twenty requests an hour nothing more is sent, whoever asks", async () => {
+	test("junk addresses do not use up an agent's allowance, but one client address is limited", async () => {
 		const h = orgHarness();
 		await h.createOrgNote();
-		for (let index = 0; index < 20; index += 1)
+		for (let index = 0; index < 50; index += 1)
 			await h.org.requestLink(ORG_ID, `nobody${index}@elsewhere.test`);
 		const sent = h.mailer.sent.length;
 		await h.org.requestLink(ORG_ID, BOARD);
-		expect(h.mailer.sent).toHaveLength(sent);
-		h.clock.advance(HOUR);
-		await h.org.requestLink(ORG_ID, BOARD);
 		expect(h.mailer.sent).toHaveLength(sent + 1);
+		// A client that has asked twenty times in the hour is held, whichever address it types.
+		for (let index = 0; index < 20; index += 1)
+			await h.org.requestLink(
+				ORG_ID,
+				`junk${index}@elsewhere.test`,
+				"198.51.100.7",
+			);
+		await h.org.requestLink(ORG_ID, TREASURER, "198.51.100.7");
+		expect(h.mailer.to(TREASURER)).toHaveLength(1);
+		await h.org.requestLink(ORG_ID, TREASURER, "198.51.100.8");
+		expect(h.mailer.to(TREASURER)).toHaveLength(2);
+	});
+
+	test("a new link request revokes the agent's older links that nobody opened; nothing is counted for an unknown organization", async () => {
+		const h = orgHarness();
+		await h.createOrgNote();
+		const first = h.mailer.linkTokenFor(TREASURER);
+		await h.org.requestLink(ORG_ID, TREASURER);
+		const second = h.mailer.linkTokenFor(TREASURER);
+		expect(await h.org.sessions.redeem(ORG_ID, first)).toBeNull();
+		expect(await h.org.sessions.redeem(ORG_ID, second)).not.toBeNull();
+		await h.org.requestLink("no-such-org", TREASURER);
+		expect((h.orgs as MemoryOrgStore).countersForTest("no-such-org")).toEqual(
+			[],
+		);
 	});
 
 	test("a link request on a note page never reaches an organization's lender side", async () => {
@@ -916,9 +993,16 @@ describe("separate organizations", () => {
 			"wrong_role",
 		);
 		const asB = await h.enterAgent(b.noteId, "bob@other.test", "org-b");
-		// A's agent ref means nothing in B.
+		// A's agent means nothing in B: neither its id nor its ref on A's note.
 		expect(
-			await h.org.roleOnNote("org-b", b.noteId, asA.orgSession.agentRef),
+			await h.org.roleOnNote("org-b", b.noteId, asA.orgSession.agentId),
+		).toBeNull();
+		expect(
+			await h.org.roleOnNote(
+				"org-b",
+				b.noteId,
+				asA.session.agent?.agentRef as string,
+			),
 		).toBeNull();
 		// Portfolios hold only their own notes.
 		const folioA = expectOk(await h.org.portfolio("org-a", "2026-11-22"));
