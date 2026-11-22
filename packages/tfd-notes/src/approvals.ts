@@ -108,11 +108,11 @@ const statusOfRequest = (
 	};
 };
 
-const findRequest = (
+const requestsFor = (
 	events: readonly NoteEvent[],
 	key: ApprovalRequestKey,
-): ApprovalRequestedEvent | undefined =>
-	events.find(
+): ApprovalRequestedEvent[] =>
+	events.filter(
 		(event): event is ApprovalRequestedEvent =>
 			isRequest(event) &&
 			event.action === key.action &&
@@ -120,25 +120,32 @@ const findRequest = (
 	);
 
 /**
- * Where one approval request stands. When the same action and target were requested more than once, the first request
- * answers (grants name a request by id, so a later duplicate has its own count). With `agents.activeAgents`, only
- * active agents count (see `ApprovalPolicy`).
+ * Where an approval stands for one action and target. Grants name a request by id, so each request has its own count;
+ * when the same action and target were requested more than once the key is satisfied if ANY request is (a first
+ * requester who has left must not block a fresh request). The satisfied request answers, else the first request. With
+ * `agents.activeAgents`, only active agents count (see `ApprovalPolicy`).
  */
 export const approvalStatus = (
 	events: readonly NoteEvent[],
 	request: ApprovalRequestKey,
 	agents: ApprovalAgents = {},
 ): ApprovalStatus => {
-	const found = findRequest(events, request);
-	if (found === undefined) {
-		return {
+	let first: ApprovalStatus | undefined;
+	for (const found of requestsFor(events, request)) {
+		const status = statusOfRequest(events, found, agents);
+		if (status.satisfied) {
+			return status;
+		}
+		first ??= status;
+	}
+	return (
+		first ?? {
 			requested: false,
 			requester_agent: null,
 			granted_by: [],
 			satisfied: false,
-		};
-	}
-	return statusOfRequest(events, found, agents);
+		}
+	);
 };
 
 const fail = (message: string): never => {
@@ -322,30 +329,42 @@ export const checkAppend = (
 	}
 };
 
-/** Requests for a two-person action still without an approver, oldest first (by seq). For an approvals queue. */
+const pendingEntry = (event: ApprovalRequestedEvent): PendingApproval => ({
+	action: event.action,
+	target: event.target,
+	requested_by_agent: event.agent_ref ?? null,
+	requested_at: event.entered_at,
+});
+
+/**
+ * Requests for a two-person action still without an approver, oldest first (by seq). For an approvals queue. A
+ * `notice.default` request is its own item (a notice names the request it uses). Any other action and target appears
+ * once (by its first request), and not at all when any request for it is satisfied.
+ */
 export const pendingApprovals = (
 	events: readonly NoteEvent[],
 	policy: ApprovalPolicy,
 ): PendingApproval[] => {
-	const pending: { seq: number; entry: PendingApproval }[] = [];
+	const pending: PendingApproval[] = [];
+	const seen = new Set<string>();
 	for (const event of events) {
-		if (
-			!isRequest(event) ||
-			!policy.twoPerson.has(event.action) ||
-			statusOfRequest(events, event, policy).satisfied
-		) {
+		if (!isRequest(event) || !policy.twoPerson.has(event.action)) {
 			continue;
 		}
-		pending.push({
-			seq: event.seq,
-			entry: {
-				action: event.action,
-				target: event.target,
-				requested_by_agent: event.agent_ref ?? null,
-				requested_at: event.entered_at,
-			},
-		});
+		if (event.action === "notice.default") {
+			if (!statusOfRequest(events, event, policy).satisfied) {
+				pending.push(pendingEntry(event));
+			}
+			continue;
+		}
+		const key = JSON.stringify([event.action, event.target]);
+		if (seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		if (!approvalStatus(events, event, policy).satisfied) {
+			pending.push(pendingEntry(event));
+		}
 	}
-	pending.sort((left, right) => left.seq - right.seq);
-	return pending.map(({ entry }) => entry);
+	return pending;
 };

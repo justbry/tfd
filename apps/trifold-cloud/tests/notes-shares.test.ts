@@ -219,6 +219,76 @@ describe("proposing a share", () => {
 		expect(w.h.mailer.to(RECIPIENT)).toHaveLength(0);
 	});
 
+	test("a proposal whose event is not committed leaves no share row and no address behind", async () => {
+		const { w, noteId, lender } = await setup();
+		const { store } = w.h;
+		const append = store.append.bind(store);
+		// A forced chain conflict: every compare-and-append loses.
+		store.append = async (_noteId, expectedSeq) => ({
+			ok: false,
+			reason: "conflict",
+			seq: expectedSeq + 1,
+		});
+		const refused = await w.h.service.proposeShare(
+			lender.session,
+			person({ carve_out: { purpose: "accountant" } }),
+		);
+		store.append = append;
+		expect(refused).toMatchObject({ ok: false, error: "conflict" });
+		expect(await store.listShares(noteId)).toEqual([]);
+		const listed = expectOk(await w.h.service.listShares(lender.session));
+		expect(listed.sharing.shares).toEqual([]);
+		expect(JSON.stringify(listed)).not.toContain(RECIPIENT);
+		expect(w.h.mailer.to(RECIPIENT)).toHaveLength(0);
+		// The retry that follows works and keeps its address.
+		const proposed = expectOk(
+			await w.h.service.proposeShare(lender.session, person()),
+		);
+		expect(await store.listShares(noteId)).toHaveLength(1);
+		expect(
+			(await store.getShare(noteId, proposed.grantId))?.recipientEmail,
+		).toBe(RECIPIENT);
+	});
+
+	test("a conflict that clears on retry still stores the share once", async () => {
+		const { w, noteId, lender } = await setup();
+		const { store } = w.h;
+		const append = store.append.bind(store);
+		let losses = 1;
+		store.append = async (id, expectedSeq, entry) => {
+			if (losses > 0) {
+				losses -= 1;
+				return { ok: false, reason: "conflict", seq: expectedSeq + 1 };
+			}
+			return append(id, expectedSeq, entry);
+		};
+		const proposed = expectOk(
+			await w.h.service.proposeShare(lender.session, person()),
+		);
+		expect(await store.listShares(noteId)).toHaveLength(1);
+		expect((await store.getShare(noteId, proposed.grantId))?.grantId).toBe(
+			proposed.grantId,
+		);
+	});
+
+	test("a refused proposal still uses its slot of the daily limit", async () => {
+		const { w, noteId, lender } = await setup();
+		const { store } = w.h;
+		const append = store.append.bind(store);
+		store.append = async (_id, expectedSeq) => ({
+			ok: false,
+			reason: "conflict",
+			seq: expectedSeq + 1,
+		});
+		for (let count = 0; count < 10; count += 1)
+			await w.h.service.proposeShare(lender.session, person());
+		store.append = append;
+		expect(await store.listShares(noteId)).toEqual([]);
+		expect(
+			await w.h.service.proposeShare(lender.session, person()),
+		).toMatchObject({ ok: false, error: "rate_limited" });
+	});
+
 	test("proposals are limited to ten per note per day", async () => {
 		const { w, noteId, lender } = await setup();
 		for (let count = 0; count < 10; count += 1)
@@ -418,6 +488,45 @@ describe("resending a person's link", () => {
 		expect(
 			await w.h.service.resendShare(lender.session, pending.grantId),
 		).toMatchObject({ ok: false });
+	});
+});
+
+describe("resending when the mail fails", () => {
+	test("the old link still works after a failed resend, and the failure is not silent", async () => {
+		const { w, noteId, lender, access } = await setup();
+		const { grantId } = expectOk(
+			await w.h.service.proposeShare(
+				lender.session,
+				person({ carve_out: { purpose: "accountant" } }),
+			),
+		);
+		const oldToken = w.h.mailer.linkTokenFor(RECIPIENT);
+		w.h.mailer.failNext = true;
+		const failed = await w.h.service.resendShare(lender.session, grantId);
+		expect(failed).toMatchObject({ ok: false, error: "mail_failed" });
+		expect((failed as { message: string }).message).toContain(
+			"old link still works",
+		);
+		expect(w.h.mailer.to(RECIPIENT)).toHaveLength(1);
+		expect(await access.redeem(noteId, grantId, oldToken)).not.toBeNull();
+	});
+
+	test("a successful resend after a failed one retires the old link and the new one redeems", async () => {
+		const { w, noteId, lender, access } = await setup();
+		const { grantId } = expectOk(
+			await w.h.service.proposeShare(
+				lender.session,
+				person({ carve_out: { purpose: "accountant" } }),
+			),
+		);
+		const oldToken = w.h.mailer.linkTokenFor(RECIPIENT);
+		w.h.mailer.failNext = true;
+		await w.h.service.resendShare(lender.session, grantId);
+		expectOk(await w.h.service.resendShare(lender.session, grantId));
+		const newToken = w.h.mailer.linkTokenFor(RECIPIENT);
+		expect(newToken).not.toBe(oldToken);
+		expect(await access.redeem(noteId, grantId, oldToken)).toBeNull();
+		expect(await access.redeem(noteId, grantId, newToken)).not.toBeNull();
 	});
 });
 

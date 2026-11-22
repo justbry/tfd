@@ -816,3 +816,75 @@ describe("active agents", () => {
 		expect(pendingApprovals(events, withActive(ACTIVE))).toEqual([]);
 	});
 });
+
+describe("several requests for the same action and target", () => {
+	const release = { action: "release.confirm", target: "evt-2" } as const;
+	const candidate = { type: "release.confirmed", target: "evt-2" };
+	/** Alice asked first; she has since left. Bob asked again and carol granted his request. */
+	const reRequested = (): NoteEvent[] =>
+		stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", "alice"),
+			requested(4, "release.confirm", "evt-2", "bob"),
+			granted(5, "evt-4", "carol"),
+		);
+	const withoutAlice: ApprovalPolicy = {
+		...BOTH,
+		activeAgents: new Set(["bob", "carol"]),
+	};
+
+	it("accepts the release when a later request is satisfied and the first requester is inactive", () => {
+		expect(() =>
+			checkAppend(reRequested(), candidate, withoutAlice),
+		).not.toThrow();
+		const status = approvalStatus(reRequested(), release, withoutAlice);
+		expect(status.satisfied).toBe(true);
+		expect(status.requester_agent).toBe("bob");
+		expect(status.granted_by).toEqual(["carol"]);
+	});
+
+	it("accepts the release when the first request is the satisfied one", () => {
+		const events = stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", "alice"),
+			granted(4, "evt-3", "carol"),
+			requested(5, "release.confirm", "evt-2", "bob"),
+		);
+		expect(() => checkAppend(events, candidate, BOTH)).not.toThrow();
+		expect(approvalStatus(events, release).requester_agent).toBe("alice");
+	});
+
+	it("still refuses when no request is satisfied, and reports the first", () => {
+		const events = stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", "alice"),
+			requested(4, "release.confirm", "evt-2", "bob"),
+		);
+		expect(() => checkAppend(events, candidate, BOTH)).toThrow(
+			"has no approval from a second agent",
+		);
+		const status = approvalStatus(events, release);
+		expect(status.satisfied).toBe(false);
+		expect(status.requester_agent).toBe("alice");
+	});
+
+	it("accepts the same stream when nobody is inactive", () => {
+		expect(() => checkAppend(reRequested(), candidate, BOTH)).not.toThrow();
+		expect(approvalStatus(reRequested(), release).requester_agent).toBe("bob");
+	});
+
+	it("lists an unsatisfied action and target once, and not at all when one request is satisfied", () => {
+		const unsatisfied = stream(
+			drafted(2),
+			requested(3, "release.confirm", "evt-2", "alice"),
+			requested(4, "release.confirm", "evt-2", "bob"),
+		);
+		expect(
+			pendingApprovals(unsatisfied, BOTH).map(
+				(entry) => entry.requested_by_agent,
+			),
+		).toEqual(["alice"]);
+		expect(pendingApprovals(reRequested(), withoutAlice)).toEqual([]);
+		expect(pendingApprovals(reRequested(), BOTH)).toEqual([]);
+	});
+});

@@ -1882,8 +1882,9 @@ export class NoteService {
 	}
 
 	/**
-	 * Writes the share's store row first (an address is kept only there), then appends the `grant.proposed` event with
-	 * the server's own grant id, opaque reference and expiry. A carve-out is active on the proposer's consent alone, so
+	 * Appends the `grant.proposed` event with the server's own grant id, opaque reference and expiry, then writes the
+	 * share's store row (an address is kept only there). The row comes after the commit, so a refused or conflicting
+	 * proposal leaves no address behind. A carve-out is active on the proposer's consent alone, so
 	 * its recipient is emailed at once; anything else stays pending until the other party consents.
 	 */
 	private async proposeGrant(
@@ -1908,15 +1909,6 @@ export class NoteService {
 		const grantId = ids.next();
 		const audienceRef =
 			spec.kind === "person" ? personRefOf(ids.next()) : linkRefOf(ids.next());
-		await store.putShare(noteId, {
-			grantId,
-			kind: spec.kind,
-			audienceRef,
-			recipientEmail: spec.recipientEmail,
-			linkHash: null,
-			linkUsedAt: null,
-			createdAt: clock.now(),
-		});
 		let expiresAt = "";
 		const result = await this.commit(
 			session,
@@ -1938,6 +1930,15 @@ export class NoteService {
 			},
 		);
 		if (!result.ok) return result;
+		await store.putShare(noteId, {
+			grantId,
+			kind: spec.kind,
+			audienceRef,
+			recipientEmail: spec.recipientEmail,
+			linkHash: null,
+			linkUsedAt: null,
+			createdAt: clock.now(),
+		});
 		if (spec.carveOut === null || spec.recipientEmail === null)
 			return { ok: true, grantId, status: "pending", mailed: null };
 		const mailed = await this.sendShareLink(
@@ -2004,8 +2005,9 @@ export class NoteService {
 
 	/**
 	 * Issues a single-use view link for a person share and emails it. Null when a link was already issued (and `replace`
-	 * is off): nothing is sent twice. False when the mail could not be sent: the share stands, and its proposer can ask
-	 * for the link again.
+	 * is off) or, with `replace`, the share is gone: nothing is sent twice. False when the mail could not be sent: the
+	 * share stands, and its proposer can ask for the link again. With `replace` the new hash is stored only after the
+	 * mail went out, so a failed send leaves the link the recipient already holds working.
 	 */
 	private async sendShareLink(
 		noteId: string,
@@ -2015,13 +2017,16 @@ export class NoteService {
 		replace: boolean,
 	): Promise<boolean | null> {
 		const token = this.deps.ids.token(SHARE_TOKEN_BYTES);
-		const written = await this.deps.store.issueShareLink(
-			noteId,
-			grantId,
-			await sha256Hex(token),
-			replace,
-		);
-		if (!written) return null;
+		const hash = await sha256Hex(token);
+		if (!replace) {
+			const written = await this.deps.store.issueShareLink(
+				noteId,
+				grantId,
+				hash,
+				false,
+			);
+			if (!written) return null;
+		}
 		const link = `${this.deps.baseUrl}/s/${noteId}/${grantId}/enter?t=${token}`;
 		try {
 			await this.deps.mailer.send({
@@ -2030,6 +2035,15 @@ export class NoteService {
 			});
 		} catch {
 			return false;
+		}
+		if (replace) {
+			const replaced = await this.deps.store.issueShareLink(
+				noteId,
+				grantId,
+				hash,
+				true,
+			);
+			if (!replaced) return null;
 		}
 		return true;
 	}
@@ -2266,9 +2280,13 @@ export class NoteService {
 			grant.expires_at,
 			true,
 		);
-		return mailed === true
-			? { ok: true }
-			: failure("mail_failed", "The link could not be sent. Try again later.");
+		if (mailed === true) return { ok: true };
+		if (mailed === null)
+			return failure("not_found", "No such share to send again.");
+		return failure(
+			"mail_failed",
+			"The link could not be sent. The old link still works. Try again later.",
+		);
 	}
 
 	private stateOf(events: NoteEvent[]): Statement["state"] {
