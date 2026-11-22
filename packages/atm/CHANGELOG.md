@@ -12,7 +12,7 @@ Newest first. The version history before 0.3.0 and what a caller has to change f
 
 ## 0.12.0
 
-**Release 0.12.0**: B4 Uni as its own merchant on tfd (`plans/b4uni-merchant/PLAN.md`): menu audiences, holder prefixes, pay-what-you-can add-ons and member codes limited to intervals; and promissory notes, with the tfd-notes engine, `tfd note` and Pay later. Tag `tfd-v0.12.0`. What a caller changes is in `UPGRADING.md`, "Moving to 0.12.0 from 0.11.1".
+**Release 0.12.0**: B4 Uni as its own merchant on tfd (`plans/b4uni-merchant/PLAN.md`): menu audiences, holder prefixes, pay-what-you-can add-ons and member codes limited to intervals; and promissory notes, with the tfd-notes engine, `tfd note` and Pay later. Tag `tfd-v0.12.0` at `03a77078aa6a246dc67c75fd1098cbc5c93ed817` (2026-11-22; the merge of #110 on `dev`). Release `https://github.com/justbry/atm/releases/tag/tfd-v0.12.0` (published to `justbry/atm`, as 0.11.1 was; only the tag was pushed there). Tarball `https://github.com/justbry/atm/releases/download/tfd-v0.12.0/tfd-0.12.0.tgz` (982207 bytes), sha256 `2534b10671e6f7cc08ce3266a305ece1c6fff6d2bd15cbaa2ffc49a150af42fc`, sha512 `sha512-PjW2WZWpQIQCdnGXRZk54zKHe0g4Wr94mmdqjEzfeKBi+W9W/Vz9he2pVjKEljBME1x8lbJ+ocfqg8QmO3pZSA==` (what a `bun.lock` pinning it records), built with bun 1.4.4 by `release.ts --ci` at that commit (workflow run 45034819471), and checked by downloading the published asset (same sha256 and sha512; its `package.json` is `tfd` 0.12.0). The README inside the tarball names the commit it was built from, so a dry run before the merge (at `2fd89618a0`) gave other bytes (sha256 `4d840be9…`). What a caller changes is in `UPGRADING.md`, "Moving to 0.12.0 from 0.11.1".
 
 | PR | Merge commit | What |
 |---|---|---|
