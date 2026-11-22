@@ -6,6 +6,7 @@ This repository holds code under more than one license.
 |---|---|
 | Everything not listed below, including the Autumn code this repo forks (see `UPSTREAM.md`) | Apache-2.0, in `LICENSE` |
 | `apps/trifold-site/` (the Trifold website) | Proprietary, all rights reserved. See `apps/trifold-site/LICENSE`. Its receipt verifier comes from `packages/verify`. |
+| `apps/trifold-cloud/` (the hosted Trifold product: notes and billing Worker) | Proprietary, all rights reserved. See `apps/trifold-cloud/LICENSE`. It imports `packages/tfd-notes`, `packages/verify-notes` and `packages/atm`, which keep their own licenses. |
 | `catalog/trifold/` (Trifold's own plan catalog, a tfd menu) | Proprietary, all rights reserved. See `catalog/trifold/LICENSE`. |
 | `apps/trifold-brief/` (the confidential, password-protected pitch brief) | Proprietary, all rights reserved. See `apps/trifold-brief/LICENSE`. Its embedded typefaces are under the SIL Open Font License 1.1 (`apps/trifold-brief/fonts/`). |
 | `docs/brand/logo/` (Trifold logo concepts) | Proprietary, all rights reserved. See `docs/brand/logo/LICENSE`. |

@@ -163,8 +163,9 @@ env -u CLOUDFLARE_API_TOKEN bunx wrangler@4.90.0 secret put NOTES_SESSION_SECRET
 env -u CLOUDFLARE_API_TOKEN bunx wrangler@4.90.0 secret put NOTES_API_KEY --env staging < ~/.config/trifold/notes-api.key
 ```
 
-No email provider is wired: until one is chosen the Worker's mailer refuses, a create answers 502 `mail_failed` (the
-note exists; each party can ask for a link on the page once mail works), and no email is sent from tests or from here.
+Mail goes through Cloudflare Email Service (see "Mail" below). While the sender domain is not onboarded, or `EMAIL` or
+`NOTES_MAIL_FROM` is unset, a send fails: a create answers 502 `mail_failed` (the note exists; each party can ask for a
+link on the page once mail works). Tests use a fake and send nothing.
 
 ### Build step 3: signed documents, release and notices (staging)
 
@@ -288,6 +289,35 @@ pages. The recipient's address is kept in the note's Durable Object only, and ev
 The same `share/...` steps exist under `/o/:orgId/n/:id` for a treasurer or board member (a viewer reads the panel and
 presses nothing). `NOTES_PUBLIC_KEYS_JSON` is in the configuration table above. A share cookie has its own name, so a `/n` or
 `/o` route never reads it (and a note cookie opens nothing at `/s`). All of it answers 404 outside staging.
+
+## Mail
+
+Note mail (invitation links, step-up codes, notices, share and disclosure emails) is sent with Cloudflare Email Service
+through the Workers `send_email` binding `EMAIL`. It is on **staging only**: `wrangler.jsonc` adds the binding, limited
+to the sender `notes@trifold.app`, and the var `NOTES_MAIL_FROM` to `env.staging`; the top level (production) has neither,
+and `tests/config.test.ts` checks both.
+
+`src/notes/cloudflare-mailer.ts` wraps the binding as the `MailSender` port. It checks a message first (one plain
+recipient address, no line break or NUL in the address or subject, subject at most 998 characters), always sends from
+`NOTES_MAIL_FROM`, sends the text and an HTML twin made from it (everything escaped, no link created), and turns a
+failure into a `MailError` with the service's `code` and a `retryable` flag. It logs no address, body or link and has no
+retry loop: a failed send is the app's existing "mail failed" outcome. With `EMAIL` or `NOTES_MAIL_FROM` unset the Worker
+uses a mailer that always refuses.
+
+**Owner steps** (nothing here is done by the code):
+
+1. Onboard the domain `trifold.app` in the dashboard under Compute > Email Service > Email Sending. The domain needs
+   Cloudflare DNS. Onboarding adds MX, SPF and DKIM TXT records on the `cf-bounce` subdomain, and a DMARC record if the
+   domain has none.
+2. Sending to arbitrary recipients needs the Workers Paid plan. A new account starts with a conservative daily quota.
+3. Deploy staging (`bun run deploy:staging`) after the domain is onboarded.
+
+Until the domain is onboarded a send fails with `E_SENDER_DOMAIN_NOT_CONFIGURED` and the app shows its "mail failed"
+outcome.
+
+Local `wrangler dev` simulates the binding and sends nothing; setting `"remote": true` on it sends real mail, which is
+not recommended. Email Sending is in Beta. The sends show as dropped in Email Routing metrics: read Email Sending metrics
+instead.
 
 ## Backups
 

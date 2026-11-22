@@ -133,6 +133,18 @@ describe("production stays unbound until the launch gate", () => {
 	});
 });
 
+describe("note mail goes out through Email Service, on staging only", () => {
+	test("production has no send_email binding and no mail var; staging has exactly the restricted EMAIL binding and the sender var", async () => {
+		const config = await readConfig("..");
+		expect(config.send_email).toBeUndefined();
+		expect(config.vars).toBeUndefined();
+		expect(config.env.staging.send_email).toEqual([
+			{ name: "EMAIL", allowed_sender_addresses: ["notes@trifold.app"] },
+		]);
+		expect(config.env.staging.vars.NOTES_MAIL_FROM).toBe("notes@trifold.app");
+	});
+});
+
 describe("CI covers what the hosted notes build on", () => {
 	test("the workflow runs on a change to the note libraries and the lockfile, and tests them", async () => {
 		const workflow = await Bun.file(

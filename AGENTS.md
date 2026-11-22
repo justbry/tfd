@@ -35,7 +35,8 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 | The verifier SDK `tfd-verify` (`packages/verify`): tfd's receipt and seal checks for browsers and other WebCrypto runtimes; the website's verifier comes from it | **Apache-2.0** | SPDX headers; `packages/verify/LICENSE`, `packages/verify/REUSE.toml` |
 | The promissory-note engine `tfd-notes` (`packages/tfd-notes`): schedule, interest and two-party balance statements; its golden vectors (`tests/golden/`) are CC0-1.0. Apache-2.0 so anyone can recompute a statement; decided 2026-11-12 | **Apache-2.0**; vectors **CC0-1.0** | SPDX headers; `packages/tfd-notes/LICENSE`, `packages/tfd-notes/REUSE.toml` |
 | The note verifier `tfd-verify-notes` (`packages/verify-notes`): offline checks of a note's signed documents and hash chain, built on `tfd-verify` and `tfd-notes` | **Apache-2.0** | SPDX headers; `packages/verify-notes/LICENSE`, `packages/verify-notes/REUSE.toml` |
-| Hosted service, Rifo, the witness | Proprietary, not in this repo | — |
+| The hosted service code for notes and billing (`apps/trifold-cloud`): the Worker, routes, pages and stores. Imports the Apache-2.0 packages and `packages/atm`, which keep their own licenses; decided 2026-11-22 | **Proprietary**, all rights reserved | `apps/trifold-cloud/LICENSE` |
+| Rifo, the witness | Proprietary, not in this repo | — |
 
 `packages/atm/LICENSING.md` explains the package's licenses in prose. `REUSE.toml` is the machine-readable map: keep both in step when files move.
 
@@ -47,6 +48,7 @@ Decisions and rules for anyone, human or agent, working in this repo. Git and co
 - `packages/verify` is Apache-2.0 throughout and must not import from `packages/atm`. Verification code the website needs goes there, not into `apps/trifold-site`, which keeps no Apache-2.0 files.
 - The website's build ships third-party code, so it writes `/licenses.txt` (`apps/trifold-site/third-party-notices.ts`) with every bundled package's license text; the legal page links to it.
 - `packages/tfd-notes` is Apache-2.0 throughout and must not import from `packages/atm` or any FSL code. `packages/atm` may import it (FSL code may use Apache-2.0 code), and so may `packages/verify-notes`. `packages/verify` itself never imports it (the website copies `packages/verify`, so it stays free of workspace dependencies). `packages/verify-notes` is Apache-2.0, may import `tfd-verify` and `tfd-notes`, and must not import `packages/atm`.
+- `apps/trifold-cloud` is proprietary: it may import the Apache-2.0 packages and `packages/atm`, and nothing in an Apache-2.0 package may import it.
 - Don't copy FSL code into Apache-2.0 files, or into other packages.
 - Mark an Autumn file you modify at its top and list it in `UPSTREAM.md` (Apache-2.0 section 4).
 

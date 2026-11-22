@@ -5,8 +5,8 @@
 > every fact; a number anyone can recompute with an Apache-2.0 library.
 >
 > Status 2026-11-22: build steps 1 to 5 are built, as the library halves (`packages/tfd-notes`, `packages/verify-notes`)
-> and the hosted halves (`apps/trifold-cloud/src/notes`). The hosted code is staging-only: nothing is deployed, no mail
-> provider is chosen, the secrets are not created. Step 6 is later.
+> and the hosted halves (`apps/trifold-cloud/src/notes`). The hosted code is staging-only: nothing is deployed, mail goes
+> through Cloudflare Email Service once its sender domain is onboarded, the secrets are not created. Step 6 is later.
 
 ## Problem
 
@@ -232,7 +232,7 @@ recorded as an event on the note.
   once (R-10) and the parent can still dispute it (R-11). A failed, refunded or charged-back checkout is a whole
   `reversal` of that payment (R-9a).
 - **Parent view.** The magic-link guest view (build step 2) shows the schedule, the payments and the balance. It is built
-  in the hosted staging code only: not deployed, and no mail provider is chosen, so no link has been sent. Until it ships,
+  in the hosted staging code only: not deployed, and the sender domain is not yet onboarded to Cloudflare Email Service, so no link has been sent. Until it ships,
   the engine produces statements and the CLI prints them.
 - **Evidence.** Matching a checkout to Stripe's records is build step 6. Until then `reference` is only a string the
   lender entered; the statement does not claim Stripe moved the money.
@@ -261,7 +261,7 @@ recorded as an event on the note.
    validator, statement with two views; golden vectors; `tfd note schedule|statement` in the CLI.
 2. **Counterparty magic link (built; hosted staging only):** the guest flow, step-up codes, sessions, `terms.accepted` and
    `terms.declined` (R-20 to R-22, R-25). Hosted in `apps/trifold-cloud/src/notes` on one Durable Object per note. Known
-   limits: no mail provider, so no link has been sent; `NOTES_SESSION_SECRET` and `NOTES_API_KEY` are not created.
+   limits: the Cloudflare Email Service sender domain is not yet onboarded, so no link has been sent; `NOTES_SESSION_SECRET` and `NOTES_API_KEY` are not created.
 3. **Chain, documents, verifier (built; hosted staging only):** the hash chain, receipt, payoff statement, release and
    seal (R-33, R-34), the offline verifier `packages/verify-notes` (R-35), release and notices (R-23, R-24). Known
    limits: confirmations are email confirmations, not signatures (no per-party keys); Trifold holds the keys; document
@@ -278,12 +278,13 @@ recorded as an event on the note.
 1. **Payer-decides alternative.** The reviews say audience should be per note and widening should need both parties
    (R-36, as built); the owner leans Venmo-style, where the payer decides. Not built; the reviews are against it. The
    owner decides whether to build it instead.
-2. **Hosted app licence.** `apps/trifold-cloud` has no `LICENSE` or SPDX headers. `AGENTS.md` (open licensing item 5)
-   puts new code outside `packages/atm` under the root Apache-2.0 `LICENSE` by default, while it also calls the hosted
-   service proprietary, and the app bundles FSL code. The owner decides which applies and adds the file and headers.
-3. **Mail provider and secrets.** No provider is chosen, so the Worker's mailer refuses. To create, for staging:
-   `NOTES_SESSION_SECRET` (at least 32 characters), `NOTES_API_KEY`, the vars `NOTES_RECEIPT_KEY_ID` and
-   `NOTES_SEAL_KEY_ID`, and `NOTES_PUBLIC_KEYS_JSON` (the published public keys). Nothing is created or deployed.
+2. **Hosted app licence.** Decided 2026-11-22: `apps/trifold-cloud` is proprietary, all rights reserved
+   (`apps/trifold-cloud/LICENSE`); it imports the Apache-2.0 packages and `packages/atm`, which keep their own licenses.
+3. **Mail provider and secrets.** The mail provider is decided: Cloudflare Email Service, through the `send_email`
+   binding `EMAIL`, sending as `notes@trifold.app` (staging only; `apps/trifold-cloud/README.md`, "Mail"). Still to do
+   by the owner: onboard the domain `trifold.app` in Email Service. To create, for staging: `NOTES_SESSION_SECRET` (at
+   least 32 characters), `NOTES_API_KEY`, the vars `NOTES_RECEIPT_KEY_ID` and `NOTES_SEAL_KEY_ID`, and
+   `NOTES_PUBLIC_KEYS_JSON` (the published public keys). Nothing is created or deployed.
 4. **Carve-outs.** The owner may drop them or keep the narrow exception (R-37). Counsel should review the disclosure
    wording the other party is emailed and the log they can read.
 5. **Counsel on Pay later:** Regulation Z coverage above four installments (and at four or fewer), lender licensing and

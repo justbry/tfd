@@ -1,4 +1,5 @@
 import type { CloudEnv } from "../env";
+import { mailerFor } from "./cloudflare-mailer";
 import { RemoteNoteStore } from "./do-store";
 import {
 	type DocumentSigners,
@@ -49,7 +50,6 @@ import {
 	type MailSender,
 	type PublicKeySource,
 	systemClock,
-	unconfiguredMailer,
 } from "./ports";
 import {
 	type Failure,
@@ -169,19 +169,16 @@ interface Services {
 }
 
 /** The services for this request, or null when `NOTES_SESSION_SECRET` is not set (the feature answers 503). */
-const serviceFor = (
-	env: CloudEnv,
-	url: URL,
-	deps: NotesDeps,
-): Services | null => {
+const serviceFor = (env: CloudEnv, deps: NotesDeps): Services | null => {
 	const secret = env.NOTES_SESSION_SECRET;
 	if (secret === undefined || secret.length < MIN_SECRET_LENGTH) return null;
 	const store = deps.store ?? new RemoteNoteStore(env.NOTE);
-	const mailer = deps.mailer ?? unconfiguredMailer;
+	const mailer = deps.mailer ?? mailerFor(env);
 	const clock = deps.clock ?? systemClock;
 	const ids = deps.ids ?? cryptoIdSource;
 	const { defer } = deps;
-	const baseUrl = `https://${url.host}`;
+	// Emailed links open pages, and pages live on the ledger host even when the request came in on the API host.
+	const baseUrl = `https://${env.LEDGER_HOST}`;
 	const org = new OrgService({
 		orgs: deps.orgs ?? new D1OrgStore(env.DB),
 		store,
@@ -1195,8 +1192,8 @@ const orgNoteRoute = async (
 
 /**
  * Answers a request this module owns, or null so the router carries on. Nothing here is served outside staging.
- * `deps` lets tests swap the store, mailer, clock and ids; the Worker passes none (Durable Object store, no mailer
- * until an email provider is chosen, the system clock, WebCrypto ids).
+ * `deps` lets tests swap the store, mailer, clock and ids; the Worker passes none (Durable Object store, the
+ * Cloudflare mailer when `EMAIL` and `NOTES_MAIL_FROM` are set, the system clock, WebCrypto ids).
  */
 export const notesRoute = async (
 	request: Request,
@@ -1218,7 +1215,7 @@ export const notesRoute = async (
 			},
 		});
 	}
-	const services = serviceFor(env, url, deps);
+	const services = serviceFor(env, deps);
 	if (services === null) return notConfigured(surface);
 	try {
 		return surface === "api"

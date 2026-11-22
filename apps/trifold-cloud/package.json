@@ -2,6 +2,7 @@
 	"name": "trifold-cloud",
 	"version": "0.1.0",
 	"private": true,
+	"license": "SEE LICENSE IN LICENSE",
 	"type": "module",
 	"description": "The hosted Trifold product: ledger.trifold.app and api.trifold.app. See plans/trifold-cloud/PLAN.md.",
 	"scripts": {
