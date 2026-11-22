@@ -48,6 +48,21 @@ export type DurableObjectNamespace = {
 /** A Secrets Store binding. */
 export type SecretBinding = { get(): Promise<string> };
 
+/**
+ * The Workers `send_email` binding (Cloudflare Email Service). `@cloudflare/workers-types` is not a dependency of this
+ * package, so the minimal shape is declared here. A failed send throws an `Error` with a string `code` such as
+ * `E_RECIPIENT_SUPPRESSED`; a malformed message throws a `TypeError` with none.
+ */
+export type SendEmailService = {
+	send(message: {
+		to: string | string[];
+		from: string | { email: string; name: string };
+		subject: string;
+		text?: string;
+		html?: string;
+	}): Promise<{ messageId: string }>;
+};
+
 export type CloudEnv = {
 	DB: D1Database;
 	/** The books: `schools/<orgId>/…` (PLAN.md section 6). */
@@ -80,6 +95,10 @@ export type CloudEnv = {
 	NOTES_SEAL_KEY_ID?: string;
 	/** The published public keys as JSON (key id to PEM, or to `{ pem, purpose, not_before, not_after }`), for the verify link's document check. Unset: the page says the check is not configured. */
 	NOTES_PUBLIC_KEYS_JSON?: string;
+	/** The Email Service sending binding (`send_email` in `wrangler.jsonc`, staging only). Unset: note mail is refused and the app shows its "mail failed" outcome. */
+	EMAIL?: SendEmailService;
+	/** The fixed sender address of note mail (a plain var, `notes@trifold.app` on staging). Its domain must be onboarded in Email Service. Unset: note mail is refused. */
+	NOTES_MAIL_FROM?: string;
 	/** The bearer key of `POST /v1/notes` and `GET /v1/notes/:id/statement`, a Worker secret. Unset: those routes answer 401. */
 	NOTES_API_KEY?: string;
 };

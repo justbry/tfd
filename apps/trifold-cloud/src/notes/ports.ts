@@ -5,7 +5,11 @@
 
 import type { KeysInput } from "tfd-verify-notes";
 
-/** Sends one plain-text email. No provider is wired yet: the Worker's default throws (see `routes.ts`). */
+/**
+ * Sends one plain-text email. The Worker's mailer is `mailerFor(env)` (`cloudflare-mailer.ts`): Cloudflare Email Service
+ * when `EMAIL` and `NOTES_MAIL_FROM` are set, else the one below that always throws. A failed send throws; callers treat
+ * any throw as "mail failed" and add no retry.
+ */
 export interface MailSender {
 	send(message: { to: string; subject: string; text: string }): Promise<void>;
 }
@@ -65,10 +69,10 @@ export const cryptoIdSource: IdSource = {
 	token: (bytes) => toBase64Url(crypto.getRandomValues(new Uint8Array(bytes))),
 };
 
-/** Thrown by the default mailer: the email provider is an owner decision and is not configured. */
+/** Thrown by the default mailer: no sending service or no sender address is configured. */
 export class MailNotConfiguredError extends Error {
 	constructor() {
-		super("no email provider is configured");
+		super("no mail sender is configured");
 		this.name = "MailNotConfiguredError";
 	}
 }
@@ -76,3 +80,20 @@ export class MailNotConfiguredError extends Error {
 export const unconfiguredMailer: MailSender = {
 	send: () => Promise.reject(new MailNotConfiguredError()),
 };
+
+/**
+ * A send that failed. `code` is the sending service's error code when it gave one (null for a refusal made here or a
+ * malformed call); `retryable` says whether trying the same message later could succeed. The message never carries an
+ * address, a subject or a link.
+ */
+export class MailError extends Error {
+	readonly code: string | null;
+	readonly retryable: boolean;
+
+	constructor(message: string, code: string | null, retryable: boolean) {
+		super(message);
+		this.name = "MailError";
+		this.code = code;
+		this.retryable = retryable;
+	}
+}

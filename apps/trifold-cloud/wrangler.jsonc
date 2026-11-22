@@ -52,11 +52,15 @@
 				{ "binding": "SIGNING_SEAL", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_SEAL" },
 				{ "binding": "SIGNING_DIRECTORY", "store_id": "71b2addb9ebb4fb2bbabab470dc4e1c7", "secret_name": "TRIFOLD_STAGING_SIGNING_DIRECTORY" }
 			],
+			"send_email": [
+				{ "name": "EMAIL", "allowed_sender_addresses": ["notes@trifold.app"] }
+			],
 			"vars": {
 				"ENVIRONMENT": "staging",
 				"LEDGER_HOST": "staging-ledger.trifold.app",
 				"API_HOST": "staging-api.trifold.app",
 				"BACKUP_SUBREQUEST_BUDGET": "900",
+				"NOTES_MAIL_FROM": "notes@trifold.app",
 				"NOTES_RECEIPT_KEY_ID": "trifold-staging-2026-11-receipt",
 				"NOTES_SEAL_KEY_ID": "trifold-staging-2026-11-seal",
 				"NOTES_PUBLIC_KEYS_JSON": "{\"trifold-staging-2026-11-receipt\":{\"pem\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAwxmZV0ZthKj9GO9wNSOnwwY4r7QBPsQu4Hjxs/9mYIk=\\n-----END PUBLIC KEY-----\\n\",\"purpose\":\"receipt\",\"not_before\":\"2026-11-01T00:00:00Z\",\"not_after\":\"2027-01-31T23:59:59Z\"},\"trifold-staging-2026-11-seal\":{\"pem\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAATJBok2Hs2s7ODYJol2VeKYGkM+t9OlsDTYMpvRi1oY=\\n-----END PUBLIC KEY-----\\n\",\"purpose\":\"seal\",\"not_before\":\"2026-11-01T00:00:00Z\",\"not_after\":\"2027-01-31T23:59:59Z\"}}"

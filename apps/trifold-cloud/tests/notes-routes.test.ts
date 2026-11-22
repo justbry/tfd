@@ -270,6 +270,14 @@ describe("the API host", () => {
 		expect((await noSecret.ledger("/n/nt_whatever0000")).status).toBe(503);
 	});
 
+	test("a note created through the API emails a link on the ledger host, not the API host", async () => {
+		const { createViaApi, h } = setup();
+		await createViaApi();
+		const invitation = h.mailer.to(BORROWER_EMAIL).at(0);
+		expect(invitation?.text).toContain(`https://${LEDGER}/n/`);
+		expect(invitation?.text).not.toContain(API);
+	});
+
 	test("with no email provider configured a create still writes the note and says the invitation was not sent", async () => {
 		const env = notesEnv();
 		const h = harness();

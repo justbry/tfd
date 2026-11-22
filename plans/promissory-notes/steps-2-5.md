@@ -95,9 +95,11 @@ reversal (value date after the release's UTC date) reopens it (R-9a stays).
 ## What is left
 
 - **Owner decisions** (spec, Open questions): payer-decides versus consent of both; keep or drop the carve-out; whether to
-  block a payment before accepted terms; the hosted app licence (`apps/trifold-cloud` has no `LICENSE` or SPDX headers,
-  root default is Apache-2.0, `AGENTS.md` calls the hosted service proprietary, and the app bundles FSL code).
-- **Mail provider.** None chosen; the Worker's mailer refuses, so no link, code or notice email has been sent.
+  block a payment before accepted terms. The hosted app licence is decided (2026-11-22): `apps/trifold-cloud` is
+  proprietary, with its own `LICENSE`.
+- **Mail provider.** Decided: Cloudflare Email Service (`send_email` binding `EMAIL`, sender `notes@trifold.app`, staging
+  only). Left for the owner: onboard the domain `trifold.app` (Compute > Email Service > Email Sending; needs Cloudflare
+  DNS, and Workers Paid for arbitrary recipients). Until then every send fails and the app shows "mail failed".
 - **Secrets and vars to create** (staging): `NOTES_SESSION_SECRET` (at least 32 characters), `NOTES_API_KEY`,
   `NOTES_RECEIPT_KEY_ID`, `NOTES_SEAL_KEY_ID`, `NOTES_PUBLIC_KEYS_JSON`; the Secrets Store `receipt` and `seal` keys
   already exist.

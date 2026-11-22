@@ -1,0 +1,23 @@
+Copyright 2026 Trifold. All rights reserved.
+
+The hosted Trifold product code in this directory (the Worker, its routes,
+pages, billing, promissory-note service, stores, migrations, scripts and
+tests, and the copy and design they contain) is proprietary. You may not
+copy, modify, host or redistribute it, in whole or in part, without written
+permission from Trifold. "Trifold", "tfd" and "Rifo" are Trifold's brands.
+
+The packages this code imports are not part of this directory and keep their
+own licenses:
+
+- packages/tfd-notes (the promissory-note engine), packages/verify (the
+  receipt and seal verifier) and packages/verify-notes (the note verifier)
+  are under the Apache License, Version 2.0 (each has its text in its own
+  LICENSE file), and so is the receipt and seal format. Anyone can check a
+  Trifold receipt or recompute a statement with them, forever.
+- packages/atm (tfd, the engine and CLI) is under the Functional Source
+  License, Version 1.1, Apache 2.0 Future License (FSL-1.1-ALv2), except its
+  receipt and seal format, verifier and test vectors, which are Apache-2.0 and
+  CC0-1.0. See packages/atm/LICENSING.md.
+
+Nothing in this directory is under those licenses, and no Apache-2.0 package
+may import this directory.
