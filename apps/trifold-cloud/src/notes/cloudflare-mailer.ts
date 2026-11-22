@@ -7,8 +7,8 @@
 import type { CloudEnv, SendEmailService } from "../env";
 import { MailError, type MailSender, unconfiguredMailer } from "./ports";
 
-/** The most characters a subject may have (RFC 5322 line limit; the service refuses more). */
-export const MAX_SUBJECT_LENGTH = 998;
+/** The most characters a subject may have: under the RFC 5322 998-octet line limit, with room for the header name and encoding. */
+export const MAX_SUBJECT_LENGTH = 900;
 
 const CONTROL_LINE_BREAK = /[\r\n]/;
 const CONTROL_NUL = /\0/;
@@ -68,6 +68,9 @@ const checkRecipient = (to: string): void => {
 	const [local, domain] = parts;
 	if (parts.length !== 2 || !local || !domain)
 		throw refuse("the recipient is not one address");
+	const labels = domain.split(".");
+	if (labels.length < 2 || labels.some((label) => label === ""))
+		throw refuse("the recipient's domain is not a full domain name");
 };
 
 const checkSubject = (subject: string): void => {

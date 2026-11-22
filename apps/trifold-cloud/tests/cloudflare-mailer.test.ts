@@ -122,6 +122,9 @@ describe("cloudflareMailer", () => {
 			"a@",
 			"a@example.com, b@example.com",
 			"Ana <a@example.com>",
+			"a@localhost",
+			"a@.",
+			"a@example..com",
 			"",
 		]) {
 			const error = await mailError(
@@ -133,7 +136,7 @@ describe("cloudflareMailer", () => {
 		expect(binding.sent).toHaveLength(0);
 	});
 
-	test("CR or LF in the subject, or a subject over 998 characters, is refused before the binding is called", async () => {
+	test("CR or LF in the subject, or a subject over the limit, is refused before the binding is called", async () => {
 		const binding = new FakeBinding();
 		const mailer = cloudflareMailer(binding, FROM);
 		for (const subject of [
