@@ -9,10 +9,9 @@ import type { Command } from "commander";
 import {
 	generateSchedule,
 	isValidCivilDate,
-	NOTE_EVENT_SCHEMA,
 	type NoteTerms,
 	parseMinor,
-	parseNoteEvent,
+	parseNoteTerms,
 	type ScheduleRow,
 	type Statement,
 	statement,
@@ -26,18 +25,9 @@ const STATEMENT_FOOTER =
 const SCHEDULE_FOOTER =
 	"Computed by tfd-notes from the terms. A record, not legal or tax advice.";
 
-/** The placeholder fields that make a terms object a `note.created` event, so the library's own checks run on it. */
-const TERMS_WRAPPER = {
-	schema: NOTE_EVENT_SCHEMA,
-	id: "terms-check",
-	note_id: "terms-check",
-	seq: 1,
-	entered_at: "2000-01-01T00:00:00Z",
-	entered_by: "lender",
-	type: "note.created",
-} as const;
-
 const NEWLINE = /\r?\n/;
+/** A UTF-8 byte order mark, which some editors put at the start of a file and `JSON.parse` refuses. */
+const BYTE_ORDER_MARK = /^\uFEFF/;
 const MINUS = "-";
 const COLUMN_GAP = "  ";
 
@@ -78,7 +68,8 @@ const alignedTable = (rows: string[][]): string => {
 
 const readText = async (kit: CliKit, path: string): Promise<string> => {
 	try {
-		return await readFile(path, "utf8");
+		const text = await readFile(path, "utf8");
+		return text.replace(BYTE_ORDER_MARK, "");
 	} catch (error) {
 		throw new kit.InputError(`${path} cannot be read: ${messageOf(error)}`);
 	}
@@ -96,9 +87,7 @@ const parseTermsFile = async (
 		throw new kit.InputError(`${path} is not JSON: ${messageOf(error)}`);
 	}
 	try {
-		const event = parseNoteEvent({ ...TERMS_WRAPPER, terms });
-		if (event.type !== "note.created") throw new Error("not a note.created");
-		return event.terms;
+		return parseNoteTerms(terms);
 	} catch (error) {
 		throw new kit.InputError(
 			`${path} is not valid note terms: ${messageOf(error)}`,
@@ -116,9 +105,9 @@ const readEventLines = async (
 		if (line.trim() === "") continue;
 		try {
 			events.push(JSON.parse(line));
-		} catch {
+		} catch (error) {
 			throw new kit.InputError(
-				`${path} line ${index + 1} is not JSON: one event per line`,
+				`${path} line ${index + 1} is not JSON (one event per line): ${messageOf(error)}`,
 			);
 		}
 	}
@@ -262,9 +251,7 @@ const scheduleOf = (kit: CliKit, terms: NoteTerms): ScheduleRow[] => {
 	try {
 		return generateSchedule(terms);
 	} catch (error) {
-		throw new kit.InputError(
-			error instanceof Error ? error.message : String(error),
-		);
+		throw new kit.InputError(messageOf(error));
 	}
 };
 
@@ -287,11 +274,11 @@ export const addNoteCommands = (program: Command, kit: CliKit): void => {
 				"--json",
 				"print one JSON line ({ok, schedule}) with the library's strings unchanged, instead of the table",
 			)
-			.action((path: string, opts: { json?: boolean }) =>
-				kit.unattended("note schedule", opts.json === true, async () => {
+			.action((path: string, options: { json?: boolean }) =>
+				kit.unattended("note schedule", options.json === true, async () => {
 					const terms = await parseTermsFile(kit, path);
 					const rows = scheduleOf(kit, terms);
-					if (opts.json) kit.writeJson({ ok: true, schedule: rows });
+					if (options.json) kit.writeJson({ ok: true, schedule: rows });
 					else process.stdout.write(scheduleText(terms, rows));
 				}),
 			),
@@ -315,21 +302,21 @@ export const addNoteCommands = (program: Command, kit: CliKit): void => {
 				"--json",
 				"print one JSON line ({ok, statement}) instead of the text",
 			)
-			.action((path: string, opts: { asOf: string; json?: boolean }) =>
-				kit.unattended("note statement", opts.json === true, async () => {
-					if (!isValidCivilDate(opts.asOf)) {
+			.action((path: string, options: { asOf: string; json?: boolean }) =>
+				kit.unattended("note statement", options.json === true, async () => {
+					if (!isValidCivilDate(options.asOf)) {
 						throw new kit.InputError(
-							`--as-of ${opts.asOf} is not a date: use YYYY-MM-DD`,
+							`--as-of ${options.asOf} is not a date: use YYYY-MM-DD`,
 						);
 					}
 					const events = await readEventLines(kit, path);
 					let report: Statement;
 					try {
-						report = statement(events, opts.asOf);
+						report = statement(events, options.asOf);
 					} catch (error) {
 						throw new kit.InputError(`${path}: ${messageOf(error)}`);
 					}
-					if (opts.json) kit.writeJson({ ok: true, statement: report });
+					if (options.json) kit.writeJson({ ok: true, statement: report });
 					else process.stdout.write(statementText(report));
 				}),
 			),

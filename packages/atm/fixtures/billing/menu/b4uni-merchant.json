@@ -1,0 +1,310 @@
+{
+	"currency": "usd",
+	"timeZone": "America/Denver",
+	"holderPrefixes": {
+		"families": "fam_",
+		"guides": "guide-",
+		"schools": "school-",
+		"organizers": "org-"
+	},
+	"features": [
+		{
+			"id": "credits",
+			"name": "AI answer credits",
+			"unit": {
+				"one": "credit",
+				"other": "credits"
+			}
+		}
+	],
+	"tiers": [
+		{
+			"id": "go_build",
+			"name": "Go Build",
+			"blurb": "Learn by building real projects.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 1900
+				},
+				{
+					"interval": "year",
+					"amount": 18200
+				}
+			],
+			"grants": [],
+			"audience": "families"
+		},
+		{
+			"id": "go_hive",
+			"name": "Go Unlimited",
+			"blurb": "Unlimited help for serious learners.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 19000
+				},
+				{
+					"interval": "year",
+					"amount": 182400
+				}
+			],
+			"grants": [],
+			"audience": "families"
+		},
+		{
+			"id": "passport",
+			"name": "Passport",
+			"blurb": "Get on the best trips first.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 4900
+				},
+				{
+					"interval": "year",
+					"amount": 47000
+				}
+			],
+			"grants": [],
+			"audience": "families"
+		},
+		{
+			"id": "odyssey",
+			"name": "Odyssey",
+			"blurb": "A Field Study Year: a mentor for your year of trips.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 12000
+				},
+				{
+					"interval": "year",
+					"amount": 120000
+				}
+			],
+			"grants": [],
+			"audience": "families"
+		},
+		{
+			"id": "guide_pro",
+			"name": "Guide Pro",
+			"blurb": "Grow a tutoring practice.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 1900
+				},
+				{
+					"interval": "year",
+					"amount": 18200
+				}
+			],
+			"grants": [],
+			"audience": "guides"
+		},
+		{
+			"id": "guide_studio",
+			"name": "Guide Studio",
+			"blurb": "Teach big classes and stream.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 7900
+				},
+				{
+					"interval": "year",
+					"amount": 75800
+				}
+			],
+			"grants": [],
+			"audience": "guides"
+		},
+		{
+			"id": "academy",
+			"name": "Academy",
+			"blurb": "A website and the tools to run a school.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 5900
+				},
+				{
+					"interval": "year",
+					"amount": 56600
+				}
+			],
+			"grants": [],
+			"audience": "schools"
+		},
+		{
+			"id": "basecamp",
+			"name": "Basecamp",
+			"blurb": "Overnight trips, all year.",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 7900
+				},
+				{
+					"interval": "year",
+					"amount": 75800
+				}
+			],
+			"grants": [],
+			"audience": "organizers"
+		},
+		{
+			"id": "listed_treasurer",
+			"name": "Listed with Treasurer",
+			"blurb": "Listed, plus Treasurer for the school's books",
+			"public": true,
+			"prices": [
+				{
+					"interval": "month",
+					"amount": 800
+				}
+			],
+			"grants": [],
+			"audience": "schools"
+		}
+	],
+	"addons": [
+		{
+			"id": "credits_50",
+			"name": "50 credits",
+			"price": {
+				"amount": 500,
+				"every": "once"
+			},
+			"grants": [
+				{
+					"featureId": "credits",
+					"amount": 50,
+					"every": "month"
+				}
+			],
+			"audience": "families"
+		},
+		{
+			"id": "credits_100",
+			"name": "100 credits",
+			"price": {
+				"amount": 1000,
+				"every": "once"
+			},
+			"grants": [
+				{
+					"featureId": "credits",
+					"amount": 100,
+					"every": "month"
+				}
+			],
+			"audience": "families"
+		},
+		{
+			"id": "credits_250",
+			"name": "250 credits",
+			"price": {
+				"amount": 2500,
+				"every": "once"
+			},
+			"grants": [
+				{
+					"featureId": "credits",
+					"amount": 250,
+					"every": "month"
+				}
+			],
+			"audience": "families"
+		},
+		{
+			"id": "credits_500",
+			"name": "500 credits",
+			"price": {
+				"amount": 5000,
+				"every": "once"
+			},
+			"grants": [
+				{
+					"featureId": "credits",
+					"amount": 500,
+					"every": "month"
+				}
+			],
+			"audience": "families"
+		},
+		{
+			"id": "go_learn",
+			"name": "Go Learn (pay what you can)",
+			"price": {
+				"amount": 50,
+				"every": "once",
+				"payWhatYouCan": {
+					"maximum": 50000,
+					"preset": 4800
+				}
+			},
+			"grants": [],
+			"audience": "families"
+		},
+		{
+			"id": "vetting",
+			"name": "Vetting to teach minors",
+			"price": {
+				"amount": 4000,
+				"every": "once"
+			},
+			"grants": [],
+			"audience": "guides"
+		},
+		{
+			"id": "vetting_pro",
+			"name": "Vetting to teach minors (Guide Pro)",
+			"price": {
+				"amount": 3000,
+				"every": "once"
+			},
+			"grants": [],
+			"audience": "guides"
+		},
+		{
+			"id": "extra_school",
+			"name": "Each extra school",
+			"price": {
+				"amount": 2500,
+				"every": "month"
+			},
+			"grants": [],
+			"audience": "schools"
+		},
+		{
+			"id": "trip_leader_check",
+			"name": "Trip leader check",
+			"price": {
+				"amount": 7500,
+				"every": "once"
+			},
+			"grants": [],
+			"audience": "organizers"
+		}
+	],
+	"codes": [
+		{
+			"id": "early-prepay",
+			"kind": "member",
+			"code": "EARLY2027",
+			"percentOff": 30,
+			"tierIds": ["go_build", "go_hive"],
+			"expiresAt": 1797404400000
+		}
+	]
+}

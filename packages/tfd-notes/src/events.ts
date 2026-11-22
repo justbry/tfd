@@ -9,7 +9,8 @@
  * type and the field.
  */
 
-import { addDays, addMonthsAnchored } from "./date.js";
+import { addDays, isValidCivilDate } from "./date.js";
+import { dueDateFor, MAX_INSTALLMENTS } from "./schedule.js";
 import {
 	type AnnotationAddedEvent,
 	type ApprovalAction,
@@ -50,27 +51,21 @@ type BaseFields = Pick<
 	"schema" | "id" | "note_id" | "seq" | "entered_at" | "entered_by"
 > & { via?: EventVia; agent_ref?: string };
 
-const MONEY_PATTERN = /^(0|[1-9][0-9]*)$/;
+/**
+ * At most 20 digits (below 10^20 minor units): far above any real note, and small enough that the level-payment search,
+ * which re-simulates the schedule for each probe, stays quick on terms from an untrusted event.
+ */
+const MONEY_PATTERN = /^(0|[1-9][0-9]{0,19})$/;
 const RATE_PATTERN = /^(0|0\.[0-9]{1,6})$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
-const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const INSTANT_PATTERN =
 	/^(\d{4}-\d{2}-\d{2})T([01]\d|2[0-3]):[0-5]\d:[0-5]\d(\.\d{1,9})?Z$/;
 
 const MAX_EXPONENT = 4;
 const MAX_AGENT_REF_LENGTH = 128;
 const MAX_CURE_DAYS = 365;
-/** The most installments an amortized schedule may have (R-8); the schedule generator refuses more. */
-const MAX_INSTALLMENTS = 5200;
-const WEEK_DAYS = 7;
-const BIWEEK_DAYS = 14;
 const FIRST_SEQ = 1;
-const FEBRUARY = 2;
-const LEAP_YEAR_CYCLE = 4;
-const CENTURY = 100;
-const LEAP_CENTURY_CYCLE = 400;
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
 
 const BASE_KEYS = [
 	"schema",
@@ -145,24 +140,6 @@ function fail(label: string, message: string): never {
 	throw new Error(`${label}: ${message}`);
 }
 
-const isLeapYear = (year: number): boolean =>
-	year % LEAP_YEAR_CYCLE === 0 &&
-	(year % CENTURY !== 0 || year % LEAP_CENTURY_CYCLE === 0);
-
-const isCalendarDate = (text: string): boolean => {
-	const match = DATE_PATTERN.exec(text);
-	if (match === null) return false;
-	const year = Number.parseInt(match[1], 10);
-	const month = Number.parseInt(match[2], 10);
-	const day = Number.parseInt(match[3], 10);
-	if (year < 1 || month < 1 || month > DAYS_IN_MONTH.length) return false;
-	const daysInMonth =
-		month === FEBRUARY && isLeapYear(year)
-			? DAYS_IN_MONTH[month - 1] + 1
-			: DAYS_IN_MONTH[month - 1];
-	return day >= 1 && day <= daysInMonth;
-};
-
 const isOneOf = <Choice extends string>(
 	choices: readonly Choice[],
 	value: unknown,
@@ -220,14 +197,14 @@ const readMoney = (label: string, path: string, value: unknown): string => {
 	if (typeof value !== "string" || !MONEY_PATTERN.test(value)) {
 		return fail(
 			label,
-			`${path} must be a non-negative integer digit string of minor units, got ${show(value)}`,
+			`${path} must be a non-negative integer digit string of minor units, at most 20 digits, got ${show(value)}`,
 		);
 	}
 	return value;
 };
 
 const readDate = (label: string, path: string, value: unknown): string => {
-	if (typeof value !== "string" || !isCalendarDate(value)) {
+	if (typeof value !== "string" || !isValidCivilDate(value)) {
 		return fail(
 			label,
 			`${path} must be a calendar date YYYY-MM-DD, got ${show(value)}`,
@@ -251,7 +228,7 @@ const readInstant = (label: string, path: string, value: unknown): string => {
 	if (
 		typeof value !== "string" ||
 		match === null ||
-		!isCalendarDate(match[1])
+		!isValidCivilDate(match[1] ?? "")
 	) {
 		return fail(
 			label,
@@ -383,17 +360,6 @@ const compareInstants = (left: string, right: string): number => {
 	return paddedLeft < paddedRight ? -1 : 1;
 };
 
-/** The due date of installment `index` (from 0) counted from `firstDue`, the same way the schedule generator does. */
-const dueDateAt = (
-	firstDue: string,
-	frequency: (typeof FREQUENCIES)[number],
-	index: number,
-): string => {
-	if (frequency === "weekly") return addDays(firstDue, WEEK_DAYS * index);
-	if (frequency === "biweekly") return addDays(firstDue, BIWEEK_DAYS * index);
-	return addMonthsAnchored(firstDue, index);
-};
-
 const readAmortized = (
 	label: string,
 	issueDate: string,
@@ -414,7 +380,7 @@ const readAmortized = (
 		);
 	}
 	try {
-		dueDateAt(firstDue, frequency, count - 1);
+		dueDateFor(firstDue, frequency, count - 1);
 	} catch {
 		fail(
 			label,
@@ -588,6 +554,10 @@ const readTerms = (label: string, value: unknown): NoteTerms => {
 	}
 	return terms;
 };
+
+/** Validates a bare terms object (the `terms` of a `note.created`) and returns it typed. Errors read as for that event. */
+export const parseNoteTerms = (value: unknown): NoteTerms =>
+	readTerms("note.created", value);
 
 const parseNoteCreated = (record: JsonRecord): NoteCreatedEvent => {
 	const label = "note.created";

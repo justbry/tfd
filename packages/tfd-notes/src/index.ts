@@ -73,7 +73,7 @@ export {
 	releaseBody,
 	signDocument,
 } from "./documents.js";
-export { parseNoteEvent, validateStream } from "./events.js";
+export { parseNoteEvent, parseNoteTerms, validateStream } from "./events.js";
 export type { DisclosureEntry, Grant, GrantStatus } from "./grants.js";
 export {
 	activeGrants,
